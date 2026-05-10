@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ping Pong</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #111;
+      font-family: Arial, sans-serif;
+      color: #eee;
+    }
+    .wrap { text-align: center; }
+    canvas {
+      background: #000;
+      border: 2px solid #666;
+      box-shadow: 0 0 18px rgba(255,255,255,.15);
+      max-width: 92vw;
+      height: auto;
+    }
+    p { margin: 10px 0 0; opacity: .85; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="800" height="450"></canvas>
+    <p>Move mouse or use ↑/↓ (W/S). First to 7 wins.</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    const state = {
+      player: { x: 20, y: canvas.height / 2 - 45, w: 12, h: 90, speed: 8, score: 0 },
+      ai: { x: canvas.width - 32, y: canvas.height / 2 - 45, w: 12, h: 90, speed: 5.3, score: 0 },
+      ball: { x: canvas.width / 2, y: canvas.height / 2, r: 8, vx: 5, vy: 3.5 },
+      keys: {},
+      running: true,
+      winner: null,
+      maxScore: 7
+    };
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+    function resetBall(direction = 1) {
+      state.ball.x = canvas.width / 2;
+      state.ball.y = canvas.height / 2;
+      state.ball.vx = 5 * direction;
+      state.ball.vy = (Math.random() * 4 - 2) || 1.5;
+    }
+
+    function drawNet() {
+      ctx.fillStyle = '#444';
+      for (let y = 8; y < canvas.height; y += 20) {
+        ctx.fillRect(canvas.width / 2 - 2, y, 4, 12);
+      }
+    }
+
+    function drawRect(r, color = '#fff') {
+      ctx.fillStyle = color;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+
+    function drawBall() {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(state.ball.x, state.ball.y, state.ball.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawScore() {
+      ctx.fillStyle = '#ddd';
+      ctx.font = 'bold 42px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(state.player.score, canvas.width * 0.25, 55);
+      ctx.fillText(state.ai.score, canvas.width * 0.75, 55);
+
+      if (!state.running && state.winner) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px Arial';
+        ctx.fillText(`${state.winner} wins!`, canvas.width / 2, canvas.height / 2 - 8);
+        ctx.font = '20px Arial';
+        ctx.fillText('Press Space to restart', canvas.width / 2, canvas.height / 2 + 26);
+      }
+    }
+
+    function updatePlayer() {
+      if (state.keys['ArrowUp'] || state.keys['w']) state.player.y -= state.player.speed;
+      if (state.keys['ArrowDown'] || state.keys['s']) state.player.y += state.player.speed;
+      state.player.y = clamp(state.player.y, 0, canvas.height - state.player.h);
+    }
+
+    function updateAI() {
+      const center = state.ai.y + state.ai.h / 2;
+      const target = state.ball.y;
+      if (center < target - 10) state.ai.y += state.ai.speed;
+      if (center > target + 10) state.ai.y -= state.ai.speed;
+      state.ai.y = clamp(state.ai.y, 0, canvas.height - state.ai.h);
+    }
+
+    function paddleBounce(paddle, isPlayer) {
+      const b = state.ball;
+      if (
+        b.x - b.r < paddle.x + paddle.w &&
+        b.x + b.r > paddle.x &&
+        b.y + b.r > paddle.y &&
+        b.y - b.r < paddle.y + paddle.h
+      ) {
+        b.x = isPlayer ? paddle.x + paddle.w + b.r : paddle.x - b.r;
+        b.vx *= -1.05;
+        const offset = (b.y - (paddle.y + paddle.h / 2)) / (paddle.h / 2);
+        b.vy += offset * 2.1;
+      }
+    }
+
+    function updateBall() {
+      const b = state.ball;
+      b.x += b.vx;
+      b.y += b.vy;
+
+      if (b.y - b.r <= 0 || b.y + b.r >= canvas.height) {
+        b.vy *= -1;
+        b.y = clamp(b.y, b.r, canvas.height - b.r);
+      }
+
+      paddleBounce(state.player, true);
+      paddleBounce(state.ai, false);
+
+      if (b.x < 0) {
+        state.ai.score++;
+        checkWin();
+        resetBall(1);
+      } else if (b.x > canvas.width) {
+        state.player.score++;
+        checkWin();
+        resetBall(-1);
+      }
+    }
+
+    function checkWin() {
+      if (state.player.score >= state.maxScore) {
+        state.running = false;
+        state.winner = 'You';
+      } else if (state.ai.score >= state.maxScore) {
+        state.running = false;
+        state.winner = 'Computer';
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawNet();
+      drawRect(state.player, '#7CFF9E');
+      drawRect(state.ai, '#FF7C9E');
+      drawBall();
+      drawScore();
+    }
+
+    function tick() {
+      if (state.running) {
+        updatePlayer();
+        updateAI();
+        updateBall();
+      }
+      draw();
+      requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === ' ') {
+        if (!state.running) {
+          state.player.score = 0;
+          state.ai.score = 0;
+          state.running = true;
+          state.winner = null;
+          resetBall(Math.random() > 0.5 ? 1 : -1);
+        }
+      } else {
+        state.keys[e.key] = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      state.keys[e.key] = false;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      state.player.y = clamp(y - state.player.h / 2, 0, canvas.height - state.player.h);
+    });
+
+    tick();
+  </script>
+</body>
+</html>
