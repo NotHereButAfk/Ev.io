@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { WEAPONS } from './weaponDefs.js';
 import { buildWeaponModel } from './WeaponModels.js';
-import { applyWeaponSkin } from './WeaponSkins.js';
+import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
+import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 
 const TRACER_LIFE = 0.07;
 const FLASH_LIFE = 0.05;
@@ -50,6 +51,8 @@ export class WeaponSystem {
     this.rockets = [];
     this.explosions = [];
     this.weaponSkin = null;
+    this.swordSkin = null;
+    this.animTime = 0;
     this.flashLight = new THREE.PointLight(0xffd27a, 0, 6, 2);
     this.camera.add(this.flashLight);
 
@@ -113,12 +116,23 @@ export class WeaponSystem {
     this.gloveMat.color.setHex(skin.secondary);
   }
 
-  /** Apply a cosmetic weapon finish to every gun model. */
+  /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
   setWeaponSkin(skin) {
     this.weaponSkin = skin;
     if (!skin) return;
-    for (const { group } of this.models.values()) {
-      applyWeaponSkin(group, skin);
+    for (const w of this.loadout) {
+      if (w.kind === 'melee') continue;
+      applyWeaponSkin(this.models.get(w.id).group, skin);
+    }
+  }
+
+  /** Apply a cosmetic finish to the sword model only. */
+  setSwordSkin(skin) {
+    this.swordSkin = skin;
+    if (!skin) return;
+    for (const w of this.loadout) {
+      if (w.kind !== 'melee') continue;
+      applySwordSkin(this.models.get(w.id).group, skin);
     }
   }
 
@@ -550,6 +564,15 @@ export class WeaponSystem {
     // rockets + explosions
     this._updateRockets(dt, world, botManager);
     this._updateExplosions(dt);
+
+    // skin animations (only on the currently visible weapon)
+    this.animTime += dt;
+    const activeGroup = this.models.get(def.id).group;
+    if (def.kind === 'melee') {
+      if (this.swordSkin?.animated) animateSwordSkin(activeGroup, this.swordSkin, this.animTime);
+    } else {
+      if (this.weaponSkin?.animated) animateWeaponSkin(activeGroup, this.weaponSkin, this.animTime);
+    }
   }
 
   getHudInfo() {

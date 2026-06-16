@@ -9,6 +9,7 @@ import { HUD } from '../ui/HUD.js';
 import { MenuUI } from '../ui/MainMenu.js';
 import { getSkin } from '../player/skins.js';
 import { getWeaponSkin } from '../weapons/WeaponSkins.js';
+import { getSwordSkin } from '../weapons/SwordSkins.js';
 import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
@@ -36,6 +37,7 @@ export class Game {
 
     this.selectedSkin = getSkin('crimson');
     this.selectedWeaponSkin = getWeaponSkin('midnight');
+    this.selectedSwordSkin = getSwordSkin('iron');
     this.previewCharacter = buildPreviewCharacter(this.selectedSkin);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.world.scene.add(this.previewCharacter);
@@ -82,20 +84,22 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, weaponSkinId) => this._startGame(name, skinId, weaponSkinId);
+    this.menu.onPlay = (name, skinId, weaponSkinId, swordSkinId) => this._startGame(name, skinId, weaponSkinId, swordSkinId);
     this.menu.onResume = () => this._resume();
     this.menu.onQuit = () => this._quitToMenu();
     this.menu.onRestart = () => this._restart();
     this.menu.onBackToMenu = () => this._quitToMenu();
   }
 
-  _startGame(name, skinId, weaponSkinId) {
+  _startGame(name, skinId, weaponSkinId, swordSkinId) {
     this.audio.resume();
     this.selectedSkin = getSkin(skinId);
     if (weaponSkinId) this.selectedWeaponSkin = getWeaponSkin(weaponSkinId);
+    if (swordSkinId) this.selectedSwordSkin = getSwordSkin(swordSkinId);
     applySkinToCharacter(this.previewCharacter, this.selectedSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
     this.weaponSystem.setWeaponSkin(this.selectedWeaponSkin);
+    this.weaponSystem.setSwordSkin(this.selectedSwordSkin);
     this.player.name = name;
     this.player.skin = this.selectedSkin;
     this.player.respawn(SPAWN_POINT);

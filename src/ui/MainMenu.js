@@ -1,6 +1,7 @@
 import { SKINS } from '../player/skins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 
 export class MenuUI {
   constructor() {
@@ -20,9 +21,12 @@ export class MenuUI {
 
     this.selectedSkinId = SKINS[0].id;
     this.selectedWeaponSkinId = WEAPON_SKINS[0].id;
+    this.selectedSwordSkinId = SWORD_SKINS[0].id;
+    this.swordSkinGrid = document.getElementById('sword-skin-grid');
 
     this._buildSkinGrid();
     this._buildWeaponSkinGrid();
+    this._buildSwordSkinGrid();
     this._buildLoadoutList();
 
     this.onPlay = null;
@@ -33,7 +37,7 @@ export class MenuUI {
 
     this.playBtn.addEventListener('click', () => {
       const name = this.nameInput.value.trim() || 'Recruit';
-      if (this.onPlay) this.onPlay(name, this.selectedSkinId, this.selectedWeaponSkinId);
+      if (this.onPlay) this.onPlay(name, this.selectedSkinId, this.selectedWeaponSkinId, this.selectedSwordSkinId);
     });
     this.resumeBtn.addEventListener('click', () => this.onResume && this.onResume());
     this.quitBtn.addEventListener('click', () => this.onQuit && this.onQuit());
@@ -61,7 +65,10 @@ export class MenuUI {
     this.weaponSkinGrid.innerHTML = '';
     WEAPON_SKINS.forEach((skin) => {
       const el = document.createElement('div');
-      el.className = 'skin-swatch' + (skin.id === this.selectedWeaponSkinId ? ' selected' : '');
+      let cls = 'skin-swatch';
+      if (skin.id === this.selectedWeaponSkinId) cls += ' selected';
+      if (skin.animated) cls += ' animated';
+      el.className = cls;
       el.style.background = `linear-gradient(145deg, #${skin.body.toString(16).padStart(6, '0')}, #${skin.accent.toString(16).padStart(6, '0')})`;
       el.title = skin.name;
       el.addEventListener('click', () => {
@@ -70,6 +77,25 @@ export class MenuUI {
         el.classList.add('selected');
       });
       this.weaponSkinGrid.appendChild(el);
+    });
+  }
+
+  _buildSwordSkinGrid() {
+    this.swordSkinGrid.innerHTML = '';
+    SWORD_SKINS.forEach((skin) => {
+      const el = document.createElement('div');
+      let cls = 'skin-swatch';
+      if (skin.id === this.selectedSwordSkinId) cls += ' selected';
+      if (skin.animated) cls += ' animated';
+      el.className = cls;
+      el.style.background = `linear-gradient(145deg, #${skin.blade.toString(16).padStart(6, '0')}, #${skin.guard.toString(16).padStart(6, '0')})`;
+      el.title = skin.name;
+      el.addEventListener('click', () => {
+        this.selectedSwordSkinId = skin.id;
+        this.swordSkinGrid.querySelectorAll('.skin-swatch').forEach((s) => s.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+      this.swordSkinGrid.appendChild(el);
     });
   }
 

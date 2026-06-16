@@ -111,6 +111,33 @@ html, body {
   gap: 8px;
 }
 
+.skin-grid-wide {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+@keyframes skinGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(160, 80, 255, 0.55); }
+  50%       { box-shadow: 0 0 16px rgba(200, 120, 255, 0.95); }
+}
+
+.skin-swatch.animated {
+  animation: skinGlow 1.8s ease-in-out infinite;
+  border-color: rgba(170, 90, 255, 0.5);
+}
+
+.skin-swatch.animated::after {
+  content: '✦';
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1;
+  pointer-events: none;
+}
+
 .skin-swatch {
   position: relative;
   aspect-ratio: 1;
