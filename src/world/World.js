@@ -113,6 +113,95 @@ function makeFacadeTexture(seed) {
   return tex;
 }
 
+// Brick facade: a real masonry course pattern with framed windows that have
+// stone lintels + sills. Returns separate colour and emissive maps so only lit
+// windows glow (the brick itself stays matte).
+function makeBrickFacadeTexture(seed) {
+  const w = 256;
+  const h = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const em = document.createElement('canvas');
+  em.width = w;
+  em.height = h;
+  const ectx = em.getContext('2d');
+  ectx.fillStyle = '#000';
+  ectx.fillRect(0, 0, w, h);
+
+  // mortar base
+  ctx.fillStyle = '#2c2622';
+  ctx.fillRect(0, 0, w, h);
+
+  // brick courses (running bond)
+  const brickH = 9;
+  const brickW = 26;
+  const gap = 2;
+  const palettes = [
+    ['#7a3f30', '#86452f', '#6e3a2c', '#92503a', '#693528'], // red brick
+    ['#6b5240', '#765a45', '#5f4a3a', '#82654e', '#5a463a'], // tan brick
+    ['#585860', '#666670', '#4f4f56', '#727278', '#4a4a50'] // grey brick
+  ];
+  const pal = palettes[seed % palettes.length];
+  let row = 0;
+  for (let y = 0; y < h; y += brickH) {
+    const off = (row % 2) * (brickW / 2);
+    for (let x = -brickW; x < w + brickW; x += brickW) {
+      ctx.fillStyle = pal[Math.floor(Math.random() * pal.length)];
+      ctx.fillRect(x + off + gap / 2, y + gap / 2, brickW - gap, brickH - gap);
+    }
+    row++;
+  }
+
+  // windows with stone surrounds
+  const cols = 5;
+  const rows = 11;
+  const padX = 16;
+  const padY = 18;
+  const cellW = (w - padX * 2) / cols;
+  const cellH = (h - padY * 2) / rows;
+  const winW = cellW * 0.58;
+  const winH = cellH * 0.6;
+  const litWarm = ['#ffd9a0', '#ffe7bd', '#ffcf86', '#fff0cf'];
+  const litCool = ['#bcd4ff', '#d4e4ff'];
+  const stone = '#c7bda8';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = padX + c * cellW + (cellW - winW) / 2;
+      const y = padY + r * cellH + (cellH - winH) / 2;
+      // lintel + sill
+      ctx.fillStyle = stone;
+      ctx.fillRect(x - 4, y - 4, winW + 8, 4);
+      ctx.fillRect(x - 5, y + winH, winW + 10, 5);
+      // frame
+      ctx.fillStyle = '#191310';
+      ctx.fillRect(x - 2, y - 2, winW + 4, winH + 4);
+      // glazing
+      const lit = Math.random() < 0.4;
+      if (lit) {
+        const pic = (Math.random() < 0.25 ? litCool : litWarm);
+        const col = pic[Math.floor(Math.random() * pic.length)];
+        ctx.fillStyle = col;
+        ctx.fillRect(x, y, winW, winH);
+        ectx.fillStyle = col;
+        ectx.globalAlpha = 0.6 + Math.random() * 0.4;
+        ectx.fillRect(x, y, winW, winH);
+        ectx.globalAlpha = 1;
+      } else {
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(x, y, winW, winH);
+      }
+    }
+  }
+
+  const map = new THREE.CanvasTexture(canvas);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  const emissiveMap = new THREE.CanvasTexture(em);
+  emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
+  return { map, emissiveMap };
+}
+
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
@@ -125,6 +214,45 @@ export class World {
 
     // a few shared facade textures to keep memory sane
     this._facadeTex = [0, 1, 2, 3, 4, 5].map((i) => makeFacadeTexture(i));
+    this._brickTex = [0, 1, 2].map((i) => makeBrickFacadeTexture(i));
+    this._sidewalkTex = makeSidewalkTexture();
+    this._flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xb481ff, 0xffffff, 0xff4d4d, 0xff9ec4];
+
+    // Shared geometry + materials. The city spawns hundreds of small props
+    // (flowers, hedges, lamps); reusing one geometry/material per kind keeps
+    // GPU memory and draw-state low enough to run smoothly.
+    this._geo = {
+      flower: new THREE.SphereGeometry(0.07, 6, 6),
+      bush: new THREE.SphereGeometry(0.32, 8, 7)
+    };
+    this._mats = {
+      hedge: new THREE.MeshStandardMaterial({ color: 0x1f3d1b, roughness: 0.95 }),
+      bush: new THREE.MeshStandardMaterial({ color: 0x24471f, roughness: 0.95 }),
+      planter: new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 }),
+      planterBox: new THREE.MeshStandardMaterial({ color: 0x4a4036, roughness: 0.9 }),
+      soil: new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 }),
+      grass: new THREE.MeshStandardMaterial({ color: 0x1f3b1a, roughness: 1 }),
+      stem: new THREE.MeshStandardMaterial({ color: 0x2c5a22 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0xc9bfa8, roughness: 0.8 }),
+      door: new THREE.MeshStandardMaterial({ color: 0x10161c, roughness: 0.3, metalness: 0.5, emissive: 0x24343f, emissiveIntensity: 0.35 }),
+      awning: new THREE.MeshStandardMaterial({ color: 0x6a2230, roughness: 0.7 }),
+      lamp: new THREE.MeshStandardMaterial({ color: 0xfff0c0, emissive: 0xffd27a, emissiveIntensity: 2.2 }),
+      poleMetal: new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.6, metalness: 0.6 }),
+      streetLamp: new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb060, emissiveIntensity: 2.2 }),
+      treeTrunk: new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 }),
+      treeLeaf: new THREE.MeshStandardMaterial({ color: 0x213a1c, roughness: 0.95 }),
+      carGlass: new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.2, metalness: 0.4 }),
+      carHead: new THREE.MeshBasicMaterial({ color: 0xfff2cf }),
+      carTail: new THREE.MeshBasicMaterial({ color: 0xff2a22 }),
+      carWheel: new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9 }),
+      beacon: new THREE.MeshBasicMaterial({ color: 0xff3322 }),
+      brickPlinth: new THREE.MeshStandardMaterial({ color: 0x3a342c, roughness: 0.9 }),
+      glassPlinth: new THREE.MeshStandardMaterial({ color: 0x14181e, roughness: 0.9 }),
+      brickCornice: new THREE.MeshStandardMaterial({ color: 0x4a4236, roughness: 0.85 }),
+      glassCornice: new THREE.MeshStandardMaterial({ color: 0x0c0f14, roughness: 0.85 })
+    };
+    this._flowerMats = new Map();
+    this._carMats = new Map();
 
     this._buildLighting();
     this._buildGround();
@@ -218,6 +346,33 @@ export class World {
     this.colliders.push({ box, mesh });
   }
 
+  _flowerMat(c) {
+    let m = this._flowerMats.get(c);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.6 });
+      this._flowerMats.set(c, m);
+    }
+    return m;
+  }
+
+  _carMat(c) {
+    let m = this._carMats.get(c);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.4, metalness: 0.6 });
+      this._carMats.set(c, m);
+    }
+    return m;
+  }
+
+  _flower(x, y, z, scale = 1) {
+    const c = this._flowerColors[Math.floor(Math.random() * this._flowerColors.length)];
+    const f = new THREE.Mesh(this._geo.flower, this._flowerMat(c));
+    f.position.set(x, y, z);
+    if (scale !== 1) f.scale.setScalar(scale);
+    this.scene.add(f);
+    return f;
+  }
+
   _buildCity() {
     // City blocks sit in a grid; the central row (z=0) and column (x=0) are
     // left clear so two wide avenues cross at the plaza, giving long sightlines
@@ -234,68 +389,269 @@ export class World {
         // footprint, leaving room for sidewalks + streets
         const fw = 9 + Math.random() * 4;
         const fd = 9 + Math.random() * 4;
-        const height = 10 + Math.random() * 30;
 
-        this._buildBuilding(cx, cz, fw, fd, height);
+        // mix of tall glass towers and shorter brick low-rises
+        const brick = Math.random() < 0.5;
+        const height = brick ? 8 + Math.random() * 10 : 20 + Math.random() * 22;
+
+        this._buildBuilding(cx, cz, fw, fd, height, brick ? 'brick' : 'glass');
       }
     }
   }
 
-  _buildBuilding(cx, cz, fw, fd, height) {
-    // sidewalk slab under/around the building
-    const swMat = new THREE.MeshStandardMaterial({
-      map: makeSidewalkTexture(),
-      roughness: 0.9,
-      metalness: 0.05,
-      color: 0xb8bcc4
-    });
-    swMat.map.repeat.set(Math.round(fw / 2), Math.round(fd / 2));
-    const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(fw + 3, 0.25, fd + 3), swMat);
-    sidewalk.position.set(cx, 0.125, cz);
+  _buildBuilding(cx, cz, fw, fd, height, style) {
+    const base = 0.25; // sits on the sidewalk slab
+
+    // sidewalk slab under/around the building (shared texture, cloned for repeat)
+    const swTex = this._sidewalkTex.clone();
+    swTex.needsUpdate = true;
+    swTex.repeat.set(Math.round(fw / 2), Math.round(fd / 2));
+    const swMat = new THREE.MeshStandardMaterial({ map: swTex, roughness: 0.9, metalness: 0.05, color: 0xb8bcc4 });
+    const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(fw + 3, base, fd + 3), swMat);
+    sidewalk.position.set(cx, base / 2, cz);
     sidewalk.receiveShadow = true;
     this.scene.add(sidewalk);
 
-    // the tower itself — facade glows with windows
-    const tex = this._facadeTex[Math.floor(Math.random() * this._facadeTex.length)].clone();
-    tex.needsUpdate = true;
-    tex.repeat.set(Math.max(1, Math.round(fw / 4)), Math.max(2, Math.round(height / 8)));
+    // facade material differs by style
+    let facadeMat;
+    if (style === 'brick') {
+      const v = this._brickTex[Math.floor(Math.random() * this._brickTex.length)];
+      const map = v.map.clone();
+      const emi = v.emissiveMap.clone();
+      map.needsUpdate = emi.needsUpdate = true;
+      const rx = Math.max(1, Math.round(fw / 7));
+      const ry = Math.max(1, Math.round(height / 10));
+      map.repeat.set(rx, ry);
+      emi.repeat.set(rx, ry);
+      facadeMat = new THREE.MeshStandardMaterial({
+        map,
+        emissiveMap: emi,
+        emissive: 0xffffff,
+        emissiveIntensity: 1.0,
+        color: 0xffffff,
+        roughness: 0.95,
+        metalness: 0.0
+      });
+    } else {
+      const tex = this._facadeTex[Math.floor(Math.random() * this._facadeTex.length)].clone();
+      tex.needsUpdate = true;
+      tex.repeat.set(Math.max(1, Math.round(fw / 4)), Math.max(2, Math.round(height / 8)));
+      facadeMat = new THREE.MeshStandardMaterial({
+        map: tex,
+        emissiveMap: tex,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.9,
+        color: 0x20242b,
+        roughness: 0.7,
+        metalness: 0.25
+      });
+    }
 
-    const facadeMat = new THREE.MeshStandardMaterial({
-      map: tex,
-      emissiveMap: tex,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.9,
-      color: 0x20242b,
-      roughness: 0.7,
-      metalness: 0.25
-    });
     const building = new THREE.Mesh(new THREE.BoxGeometry(fw, height, fd), facadeMat);
-    building.position.set(cx, height / 2 + 0.25, cz);
+    building.position.set(cx, height / 2 + base, cz);
     building.castShadow = true;
     building.receiveShadow = true;
     this._addCollider(building);
 
-    // simple rooftop cap / parapet
-    const capMat = new THREE.MeshStandardMaterial({ color: 0x0c0f14, roughness: 0.9 });
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.4, 0.6, fd + 0.4), capMat);
-    cap.position.set(cx, height + 0.25 + 0.3, cz);
-    cap.castShadow = true;
+    // stone plinth / base course
+    const plinthMat = style === 'brick' ? this._mats.brickPlinth : this._mats.glassPlinth;
+    const corniceMat = style === 'brick' ? this._mats.brickCornice : this._mats.glassCornice;
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.3, 1.2, fd + 0.3), plinthMat);
+    plinth.position.set(cx, base + 0.6, cz);
+    plinth.receiveShadow = true;
+    this.scene.add(plinth);
+
+    // cornice band near the top
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.5, 0.5, fd + 0.5), corniceMat);
+    cornice.position.set(cx, base + height - 0.4, cz);
+    this.scene.add(cornice);
+
+    // rooftop parapet cap
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.4, 0.6, fd + 0.4), corniceMat);
+    cap.position.set(cx, height + base + 0.3, cz);
     this.scene.add(cap);
 
-    // occasional rooftop aircraft-warning light
+    // rooftop aircraft-warning light on tall towers
     if (height > 22 && Math.random() < 0.7) {
-      const beacon = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xff3322 })
-      );
-      beacon.position.set(cx, height + 1.1, cz);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), this._mats.beacon);
+      beacon.position.set(cx, height + base + 0.9, cz);
       this.scene.add(beacon);
+    }
+
+    // street-level entrance facing the nearest avenue
+    const front = this._frontFace(cx, cz);
+    this._buildEntrance(cx, cz, fw, fd, front);
+
+    if (style === 'brick') {
+      // window flower boxes on the lower floors + a planted front garden
+      this._buildWindowBoxes(cx, cz, fw, fd, front, height);
+      this._buildFrontGarden(cx, cz, fw, fd, front);
+    } else if (Math.random() < 0.6) {
+      this._buildRoofGarden(cx, cz, fw, fd, height + base);
+    }
+  }
+
+  // Which face looks onto the nearest avenue. Returns the outward normal.
+  _frontFace(cx, cz) {
+    if (Math.abs(cx) <= Math.abs(cz)) return { axis: 'x', sign: cx >= 0 ? -1 : 1 };
+    return { axis: 'z', sign: cz >= 0 ? -1 : 1 };
+  }
+
+  _faceVecs(front, fw, fd) {
+    const { axis, sign } = front;
+    return {
+      ox: axis === 'x' ? sign : 0,
+      oz: axis === 'z' ? sign : 0, // outward normal
+      ax: axis === 'x' ? 0 : 1,
+      az: axis === 'x' ? 1 : 0, // along-wall unit
+      half: (axis === 'x' ? fw : fd) / 2,
+      len: axis === 'x' ? fd : fw
+    };
+  }
+
+  _buildEntrance(cx, cz, fw, fd, front) {
+    const { ox, oz, half } = this._faceVecs(front, fw, fd);
+    const wx = cx + ox * half;
+    const wz = cz + oz * half;
+    const isX = front.axis === 'x';
+    const doorW = 1.7;
+    const doorH = 2.6;
+
+    // recessed frame surround
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(isX ? 0.16 : doorW + 0.4, doorH + 0.4, isX ? doorW + 0.4 : 0.16),
+      this._mats.stone
+    );
+    frame.position.set(wx + ox * 0.04, 0.25 + (doorH + 0.4) / 2, wz + oz * 0.04);
+    this.scene.add(frame);
+
+    // glass door
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(isX ? 0.18 : doorW, doorH, isX ? doorW : 0.18),
+      this._mats.door
+    );
+    door.position.set(wx + ox * 0.1, 0.25 + doorH / 2, wz + oz * 0.1);
+    this.scene.add(door);
+
+    // awning above the door, sloped outward
+    const awning = new THREE.Mesh(
+      new THREE.BoxGeometry(isX ? 1.0 : doorW + 0.8, 0.12, isX ? doorW + 0.8 : 1.0),
+      this._mats.awning
+    );
+    awning.position.set(wx + ox * 0.55, 0.25 + doorH + 0.2, wz + oz * 0.55);
+    if (isX) awning.rotation.z = front.sign * 0.16;
+    else awning.rotation.x = -front.sign * 0.16;
+    this.scene.add(awning);
+
+    // stoop slab
+    const stoop = new THREE.Mesh(
+      new THREE.BoxGeometry(isX ? 1.0 : doorW + 1.0, 0.2, isX ? doorW + 1.0 : 1.0),
+      this._mats.stone
+    );
+    stoop.position.set(wx + ox * 0.5, 0.25 + 0.1, wz + oz * 0.5);
+    stoop.receiveShadow = true;
+    this.scene.add(stoop);
+
+    // a pair of warm entrance lamps
+    const { ax, az } = this._faceVecs(front, fw, fd);
+    for (const s of [-1, 1]) {
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), this._mats.lamp);
+      lamp.position.set(
+        wx + ox * 0.12 + ax * s * (doorW / 2 + 0.25),
+        0.25 + doorH - 0.1,
+        wz + oz * 0.12 + az * s * (doorW / 2 + 0.25)
+      );
+      this.scene.add(lamp);
+    }
+  }
+
+  _buildWindowBoxes(cx, cz, fw, fd, front, height) {
+    const { ox, oz, ax, az, half, len } = this._faceVecs(front, fw, fd);
+    const cols = Math.min(3, Math.max(2, Math.floor(len / 4)));
+    const y = 2.2;
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() < 0.4) continue;
+      const t = -len / 2 + (len / cols) * (c + 0.5);
+      if (Math.abs(t) < 1.1) continue; // skip the doorway column
+      const bx = cx + ox * (half + 0.18) + ax * t;
+      const bz = cz + oz * (half + 0.18) + az * t;
+      this._flowerBox(bx, bz, ax, az, y);
+    }
+  }
+
+  _flowerBox(x, z, ax, az, y) {
+    const w = 1.0;
+    const planter = new THREE.Mesh(
+      new THREE.BoxGeometry(ax ? w : 0.26, 0.22, az ? w : 0.26),
+      this._mats.planter
+    );
+    planter.position.set(x, y, z);
+    this.scene.add(planter);
+    for (let i = 0; i < 3; i++) {
+      const t = -w / 2 + Math.random() * w;
+      this._flower(x + ax * t, y + 0.16, z + az * t, 0.85);
+    }
+  }
+
+  _buildFrontGarden(cx, cz, fw, fd, front) {
+    const { ox, oz, ax, az, half, len } = this._faceVecs(front, fw, fd);
+    const dist = half + 0.9;
+    const bx = cx + ox * dist;
+    const bz = cz + oz * dist;
+
+    const segLen = len / 2 - 1.3;
+    if (segLen > 0.6) {
+      for (const s of [-1, 1]) {
+        const segC = 1.3 + segLen / 2;
+        const hedge = new THREE.Mesh(
+          new THREE.BoxGeometry(ax ? segLen : 0.55, 0.6, az ? segLen : 0.55),
+          this._mats.hedge
+        );
+        hedge.position.set(bx + ax * s * segC, 0.25 + 0.3, bz + az * s * segC);
+        hedge.receiveShadow = true;
+        this.scene.add(hedge);
+      }
+    }
+
+    // flowers in front of the hedges
+    for (let i = 0; i < 5; i++) {
+      const t = -len / 2 + Math.random() * len;
+      if (Math.abs(t) < 1.3) continue;
+      this._flower(bx + ax * t + ox * 0.45, 0.5, bz + az * t + oz * 0.45);
+    }
+  }
+
+  _buildRoofGarden(cx, cz, fw, fd, roofY) {
+    const hw = fw - 1.2;
+    const hd = fd - 1.2;
+    // hedge ring around the roof edge
+    const rim = [
+      [0, -hd / 2, hw, 0.4],
+      [0, hd / 2, hw, 0.4],
+      [-hw / 2, 0, 0.4, hd],
+      [hw / 2, 0, 0.4, hd]
+    ];
+    for (const [dx, dz, w, d] of rim) {
+      const hedge = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), this._mats.hedge);
+      hedge.position.set(cx + dx, roofY + 0.35, cz + dz);
+      this.scene.add(hedge);
+    }
+    // a few potted shrubs
+    for (let i = 0; i < 3; i++) {
+      const px = cx + (Math.random() - 0.5) * (hw - 1);
+      const pz = cz + (Math.random() - 0.5) * (hd - 1);
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.24, 0.5, 8), this._mats.planterBox);
+      pot.position.set(px, roofY + 0.35, pz);
+      this.scene.add(pot);
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 7), this._mats.bush);
+      bush.position.set(px, roofY + 0.9, pz);
+      this.scene.add(bush);
     }
   }
 
   _streetLight(x, z) {
     const group = new THREE.Group();
-    const metal = new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.6, metalness: 0.6 });
+    const metal = this._mats.poleMetal;
 
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 6, 8), metal);
     pole.position.y = 3;
@@ -306,12 +662,7 @@ export class World {
     arm.position.set(0.6, 5.9, 0);
     group.add(arm);
 
-    const lampMat = new THREE.MeshStandardMaterial({
-      color: 0xffd9a0,
-      emissive: 0xffb060,
-      emissiveIntensity: 2.2
-    });
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.35), lampMat);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.35), this._mats.streetLamp);
     lamp.position.set(1.25, 5.82, 0);
     group.add(lamp);
 
@@ -325,32 +676,27 @@ export class World {
 
   _buildCar(x, z, rotY, color) {
     const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.6 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.2, metalness: 0.4 });
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.7, 4.2), bodyMat);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.7, 4.2), this._carMat(color));
     body.position.y = 0.6;
     body.castShadow = true;
     group.add(body);
 
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.1), glassMat);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.1), this._mats.carGlass);
     cabin.position.set(0, 1.15, -0.1);
     group.add(cabin);
 
-    const headMat = new THREE.MeshBasicMaterial({ color: 0xfff2cf });
-    const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2a22 });
     for (const sx of [-0.6, 0.6]) {
-      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.08), headMat);
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.08), this._mats.carHead);
       hl.position.set(sx, 0.6, -2.12);
       group.add(hl);
-      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.08), tailMat);
+      const tl = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.18, 0.08), this._mats.carTail);
       tl.position.set(sx, 0.6, 2.12);
       group.add(tl);
     }
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9 });
     for (const wx of [-0.85, 0.85]) {
       for (const wz of [-1.4, 1.4]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.25, 12), wheelMat);
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.25, 12), this._mats.carWheel);
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(wx, 0.36, wz);
         group.add(wheel);
@@ -395,12 +741,15 @@ export class World {
   // Ladder-style zebra crossing. `axis` 'x' paints bars spanning the X road
   // width (a crossing over the north-south avenue); 'z' spans the Z width.
   _crosswalk(cx, cz, axis) {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xe4e7ec,
-      emissive: 0x3a3d42,
-      emissiveIntensity: 0.4,
-      roughness: 0.8
-    });
+    if (!this._crosswalkMat) {
+      this._crosswalkMat = new THREE.MeshStandardMaterial({
+        color: 0xe4e7ec,
+        emissive: 0x3a3d42,
+        emissiveIntensity: 0.4,
+        roughness: 0.8
+      });
+    }
+    const mat = this._crosswalkMat;
     const roadW = 15;
     const bars = 6;
     const barLen = roadW;
@@ -433,10 +782,8 @@ export class World {
 
   _buildTree(x, z) {
     const group = new THREE.Group();
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 });
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x213a1c, roughness: 0.95 });
 
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8), trunkMat);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8), this._mats.treeTrunk);
     trunk.position.y = 1.1;
     trunk.castShadow = true;
     group.add(trunk);
@@ -449,7 +796,7 @@ export class World {
       [0.2, 3.1, -0.3, 0.7]
     ];
     for (const [bx, by, bz, r] of blobs) {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), leafMat);
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), this._mats.treeLeaf);
       leaf.position.set(bx, by, bz);
       leaf.castShadow = true;
       group.add(leaf);
@@ -469,44 +816,33 @@ export class World {
 
   _buildPlanter(x, z) {
     const group = new THREE.Group();
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0x4a4036, roughness: 0.9 });
-    const soilMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 });
-    const bushMat = new THREE.MeshStandardMaterial({ color: 0x24471f, roughness: 0.95 });
 
-    const planter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.9), boxMat);
+    const planter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.9), this._mats.planterBox);
     planter.position.y = 0.25;
     planter.castShadow = true;
     planter.receiveShadow = true;
     group.add(planter);
 
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 0.7), soilMat);
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 0.7), this._mats.soil);
     soil.position.y = 0.5;
     group.add(soil);
 
     // leafy clumps
     for (let i = 0; i < 3; i++) {
-      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 7), bushMat);
+      const bush = new THREE.Mesh(this._geo.bush, this._mats.bush);
       bush.position.set(-0.7 + i * 0.7, 0.62, 0);
-      bush.scale.y = 0.8;
-      bush.castShadow = true;
+      bush.scale.set(1, 0.8, 1);
       group.add(bush);
-    }
-
-    // bright flowers dotted through the greenery
-    const flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xe85d75, 0xb481ff, 0xffffff];
-    for (let i = 0; i < 10; i++) {
-      const c = flowerColors[Math.floor(Math.random() * flowerColors.length)];
-      const flower = new THREE.Mesh(
-        new THREE.SphereGeometry(0.07, 6, 6),
-        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, roughness: 0.6 })
-      );
-      flower.position.set(-0.9 + Math.random() * 1.8, 0.66 + Math.random() * 0.12, -0.25 + Math.random() * 0.5);
-      group.add(flower);
     }
 
     group.position.set(x, 0.25, z);
     group.updateMatrixWorld(true);
     this.scene.add(group);
+
+    // bright flowers dotted through the greenery (absolute coords)
+    for (let i = 0; i < 8; i++) {
+      this._flower(x - 0.9 + Math.random() * 1.8, 0.25 + 0.7 + Math.random() * 0.1, z - 0.25 + Math.random() * 0.5);
+    }
 
     const box = new THREE.Box3().setFromObject(group);
     this.colliders.push({ box, mesh: group });
@@ -514,34 +850,19 @@ export class World {
 
   _buildFlowerBed(x, z) {
     // a low ground bed of grass dotted with flowers — no collider, walkable edge
-    const group = new THREE.Group();
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x1f3b1a, roughness: 1 });
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 1.4), grassMat);
-    bed.position.y = 0.31;
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 1.4), this._mats.grass);
+    bed.position.set(x, 0.31, z);
     bed.receiveShadow = true;
-    group.add(bed);
+    this.scene.add(bed);
 
-    const flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xb481ff, 0xffffff, 0xff4d4d];
-    for (let i = 0; i < 22; i++) {
-      const c = flowerColors[Math.floor(Math.random() * flowerColors.length)];
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.012, 0.012, 0.16, 4),
-        new THREE.MeshStandardMaterial({ color: 0x2c5a22 })
-      );
-      const fx = -1.3 + Math.random() * 2.6;
-      const fz = -0.55 + Math.random() * 1.1;
+    for (let i = 0; i < 12; i++) {
+      const fx = x - 1.3 + Math.random() * 2.6;
+      const fz = z - 0.55 + Math.random() * 1.1;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 4), this._mats.stem);
       stem.position.set(fx, 0.45, fz);
-      group.add(stem);
-      const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.06, 6, 6),
-        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.6 })
-      );
-      head.position.set(fx, 0.55, fz);
-      group.add(head);
+      this.scene.add(stem);
+      this._flower(fx, 0.55, fz, 0.85);
     }
-
-    group.position.set(x, 0, z);
-    this.scene.add(group);
   }
 
   _buildGreenery() {
