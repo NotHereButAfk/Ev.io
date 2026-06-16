@@ -43,6 +43,7 @@ export class AudioManager {
       smg: { dur: 0.08, freq: 260, noiseMix: 0.6 },
       shotgun: { dur: 0.22, freq: 150, noiseMix: 0.85 },
       rifle: { dur: 0.1, freq: 240, noiseMix: 0.6 },
+      lmg: { dur: 0.13, freq: 180, noiseMix: 0.7 },
       sniper: { dur: 0.32, freq: 110, noiseMix: 0.7 }
     }[kind] || { dur: 0.12, freq: 240, noiseMix: 0.6 };
 

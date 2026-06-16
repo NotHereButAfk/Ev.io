@@ -59,7 +59,7 @@ export class MenuUI {
       const row = document.createElement('div');
       row.className = 'loadout-row';
       const stat = w.kind === 'melee' ? `${w.damage} dmg / swing` : `${w.damage} dmg / ${w.magSize} mag`;
-      row.innerHTML = `<span><b>${i + 1}</b> ${w.name}</span><span>${stat}</span>`;
+      row.innerHTML = `<span><b>${w.key || i + 1}</b> ${w.name}</span><span>${stat}</span>`;
       this.loadoutList.appendChild(row);
     });
   }

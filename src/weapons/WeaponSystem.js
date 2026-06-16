@@ -20,6 +20,13 @@ export class WeaponSystem {
     this.audio = audio;
 
     this.loadout = WEAPONS;
+    // map keyboard codes to loadout indices from each weapon's `key` field
+    this.keyMap = new Map();
+    this.loadout.forEach((w, i) => {
+      if (!w.key) return;
+      const code = /^[0-9]$/.test(w.key) ? `Digit${w.key}` : `Key${w.key.toUpperCase()}`;
+      this.keyMap.set(code, i);
+    });
     this.currentIndex = 0;
     this.state = new Map();
     for (const w of this.loadout) {
@@ -283,7 +290,7 @@ export class WeaponSystem {
 
     st.magAmmo -= 1;
     this.fireTimer = def.fireRate;
-    this.audio.playShot(def.id === 'sniper' ? 'sniper' : def.id === 'shotgun' ? 'shotgun' : def.id === 'smg' ? 'smg' : def.id === 'sidearm' ? 'sidearm' : 'rifle');
+    this.audio.playShot(def.sound || 'rifle');
     this._doHitscanShot(world, botMeshes);
     this._flash();
 
@@ -301,8 +308,8 @@ export class WeaponSystem {
   update(dt, input, world, botManager, player) {
     if (this.fireTimer > 0) this.fireTimer -= dt;
 
-    for (let i = 0; i < 6; i++) {
-      if (input.consumeJustPressed(`Digit${i + 1}`)) this.switchTo(i);
+    for (const [code, index] of this.keyMap) {
+      if (input.consumeJustPressed(code)) this.switchTo(index);
     }
     if (input.wheelDelta !== 0) {
       const dir = input.wheelDelta > 0 ? 1 : -1;
@@ -392,7 +399,7 @@ export class WeaponSystem {
       reserveAmmo: st.reserveAmmo,
       isReloading: st.isReloading,
       currentIndex: this.currentIndex,
-      slots: this.loadout.map((_, i) => String(i + 1))
+      slots: this.loadout.map((w, i) => w.key || String(i + 1))
     };
   }
 }
