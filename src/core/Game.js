@@ -7,6 +7,9 @@ import { InputManager } from './InputManager.js';
 import { AudioManager } from './AudioManager.js';
 import { HUD } from '../ui/HUD.js';
 import { MenuUI } from '../ui/MainMenu.js';
+import { AuthUI } from '../ui/AuthUI.js';
+import { UserAccount } from './UserAccount.js';
+import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getSkin } from '../player/skins.js';
 import { getWeaponSkin } from '../weapons/WeaponSkins.js';
 import { getSwordSkin } from '../weapons/SwordSkins.js';
@@ -27,10 +30,12 @@ export class Game {
     this.player = new Player(window.innerWidth / window.innerHeight);
     this.audio = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
+    this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager = new BotManager(this.world, this.world.scene);
     this.input = new InputManager(canvas);
     this.hud = new HUD();
     this.menu = new MenuUI();
+    this.authUI = new AuthUI();
 
     this.menuCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
     this.menuTime = 0;
@@ -46,12 +51,15 @@ export class Game {
     this.kills = 0;
     this.score = 0;
     this.playTime = 0;
+    this._statsSaved = true; // avoid double-save
+    this.currentUsername = null;
 
     this.timer = new THREE.Timer();
     this.timer.connect(document);
 
     this._wireCallbacks();
     this._wireMenu();
+    this._initAuth();
 
     this.canvas.addEventListener('click', () => {
       this.audio.resume();
@@ -59,13 +67,35 @@ export class Game {
     });
     window.addEventListener('resize', () => this._onResize());
 
-    // react to actual lock-loss events instead of polling pointerLocked every
-    // frame, which would race the async grant right after requestPointerLock().
     this.input.onLockChange = (locked) => {
       if (!locked && this.state === 'playing') this._pause();
     };
 
     requestAnimationFrame(() => this._loop());
+  }
+
+  _initAuth() {
+    if (UserAccount.isLoggedIn()) {
+      // Auto-login from previous session
+      this._onAuth(UserAccount.current());
+    }
+    // Otherwise auth screen is already visible in HTML
+
+    this.authUI.onAuth = (username) => {
+      this.authUI.hide();
+      this._onAuth(username);
+    };
+  }
+
+  _onAuth(username) {
+    this.currentUsername = username;
+    this.menu.setUsername(username);
+    // Pre-fill callsign from account display name (not for guests)
+    if (!UserAccount.isGuest()) {
+      const display = UserAccount.getDisplayName(username);
+      document.getElementById('player-name').value = display;
+    }
+    this.menu.showMain();
   }
 
   _wireCallbacks() {
@@ -75,6 +105,16 @@ export class Game {
       this.audio.playHit();
       this.hud.flashHitmarker();
       if (killed) {
+        // Death effect — type depends on active skin
+        const def     = this.weaponSystem.currentDef;
+        const isMelee = def.kind === 'melee';
+        this.deathEffects.spawn(
+          bot.mesh.position,
+          this.selectedWeaponSkin?.id,
+          this.selectedSwordSkin?.id,
+          isMelee
+        );
+
         this.kills += 1;
         this.score += 100;
         this.audio.playKill();
@@ -84,18 +124,25 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, weaponSkinId, swordSkinId) => this._startGame(name, skinId, weaponSkinId, swordSkinId);
-    this.menu.onResume = () => this._resume();
-    this.menu.onQuit = () => this._quitToMenu();
-    this.menu.onRestart = () => this._restart();
+    this.menu.onPlay = (name, skinId, weaponSkinId, swordSkinId) =>
+      this._startGame(name, skinId, weaponSkinId, swordSkinId);
+    this.menu.onResume     = () => this._resume();
+    this.menu.onQuit       = () => this._quitToMenu();
+    this.menu.onRestart    = () => this._restart();
     this.menu.onBackToMenu = () => this._quitToMenu();
+    this.menu.onLogout     = () => {
+      UserAccount.logout();
+      this.currentUsername = null;
+      this.menu.hideMain();
+      this.authUI.show();
+    };
   }
 
   _startGame(name, skinId, weaponSkinId, swordSkinId) {
     this.audio.resume();
     this.selectedSkin = getSkin(skinId);
     if (weaponSkinId) this.selectedWeaponSkin = getWeaponSkin(weaponSkinId);
-    if (swordSkinId) this.selectedSwordSkin = getSwordSkin(swordSkinId);
+    if (swordSkinId)  this.selectedSwordSkin  = getSwordSkin(swordSkinId);
     applySkinToCharacter(this.previewCharacter, this.selectedSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
     this.weaponSystem.setWeaponSkin(this.selectedWeaponSkin);
@@ -108,6 +155,7 @@ export class Game {
     this.kills = 0;
     this.score = 0;
     this.playTime = 0;
+    this._statsSaved = false;
     this.previewCharacter.visible = false;
 
     this.menu.hideMain();
@@ -117,6 +165,12 @@ export class Game {
 
     this.state = 'playing';
     this.input.requestPointerLock();
+  }
+
+  _saveStats() {
+    if (this._statsSaved) return;
+    this._statsSaved = true;
+    UserAccount.addGameStats(this.currentUsername, this.kills, this.score);
   }
 
   _resume() {
@@ -131,6 +185,7 @@ export class Game {
   }
 
   _quitToMenu() {
+    if (this.state === 'playing') this._saveStats();
     this.state = 'menu';
     this.menu.hidePause();
     this.menu.hideGameOver();
@@ -138,11 +193,18 @@ export class Game {
     this.input.exitPointerLock();
     this.botManager.clear();
     this.previewCharacter.visible = true;
+    this.menu.showMain();
   }
 
   _restart() {
+    this._saveStats();
     this.menu.hideGameOver();
-    this._startGame(this.player.name, this.selectedSkin.id);
+    this._startGame(
+      this.player.name,
+      this.selectedSkin.id,
+      this.selectedWeaponSkin?.id,
+      this.selectedSwordSkin?.id
+    );
   }
 
   _onPlayerDamaged(dmg) {
@@ -154,6 +216,7 @@ export class Game {
   }
 
   _onPlayerDeath() {
+    this._saveStats();
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
@@ -173,10 +236,9 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
     this.player.update(dt, this.input, this.world);
-    // the camera lives outside the scene graph, so its matrixWorld is only
-    // refreshed by the renderer; weapon raycasts need it up to date *now*.
     this.player.camera.updateMatrixWorld(true);
     this.weaponSystem.update(dt, this.input, this.world, this.botManager, this.player);
+    this.deathEffects.update(dt);
     this.botManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);

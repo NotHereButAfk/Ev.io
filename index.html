@@ -10,37 +10,129 @@
   <div id="app">
     <canvas id="game-canvas"></canvas>
 
-    <!-- ===================== MAIN MENU ===================== -->
-    <div id="main-menu" class="overlay">
-      <div class="menu-panel">
+    <!-- ===================== AUTH SCREEN ===================== -->
+    <div id="auth-screen" class="overlay">
+      <div class="menu-panel auth-panel">
         <h1 class="logo">STRIKER<span>.IO</span></h1>
-        <p class="tagline">low-poly arena shooter &mdash; guns, blades, glory</p>
+        <p class="tagline">zombie arena &mdash; guns &bull; blades &bull; glory</p>
 
-        <label class="field-label" for="player-name">callsign</label>
-        <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">LOGIN</button>
+          <button class="auth-tab" data-tab="register">REGISTER</button>
+        </div>
 
-        <label class="field-label">player skin</label>
-        <div id="skin-grid" class="skin-grid"></div>
+        <!-- LOGIN -->
+        <div id="auth-login" class="auth-form">
+          <label class="field-label" for="auth-login-name">username</label>
+          <input id="auth-login-name" class="text-input" placeholder="Your username" autocomplete="username" />
+          <label class="field-label" for="auth-login-pass">password</label>
+          <input id="auth-login-pass" class="text-input" type="password" placeholder="Your password" autocomplete="current-password" />
+          <div id="auth-login-err" class="auth-error hidden"></div>
+          <button id="auth-login-btn" class="play-btn" style="margin-top:14px">LOGIN</button>
+        </div>
 
-        <label class="field-label">weapon finish</label>
-        <div id="weapon-skin-grid" class="skin-grid-wide"></div>
+        <!-- REGISTER -->
+        <div id="auth-register" class="auth-form hidden">
+          <label class="field-label" for="auth-reg-name">choose username</label>
+          <input id="auth-reg-name" class="text-input" placeholder="Letters, numbers, _" autocomplete="username" />
+          <label class="field-label" for="auth-reg-pass">password</label>
+          <input id="auth-reg-pass" class="text-input" type="password" placeholder="Min 3 characters" autocomplete="new-password" />
+          <label class="field-label" for="auth-reg-pass2">confirm password</label>
+          <input id="auth-reg-pass2" class="text-input" type="password" placeholder="Repeat password" autocomplete="new-password" />
+          <div id="auth-reg-err" class="auth-error hidden"></div>
+          <button id="auth-reg-btn" class="play-btn" style="margin-top:14px">CREATE ACCOUNT</button>
+        </div>
 
-        <label class="field-label">sword finish</label>
-        <div id="sword-skin-grid" class="skin-grid-wide"></div>
+        <div class="auth-divider"><span>or</span></div>
+        <button id="auth-guest-btn" class="ghost-btn">PLAY AS GUEST</button>
+      </div>
+    </div>
 
-        <label class="field-label">loadout</label>
-        <div id="loadout-list" class="loadout-list"></div>
+    <!-- ===================== MAIN MENU ===================== -->
+    <div id="main-menu" class="overlay hidden">
+      <div class="menu-panel">
+        <div class="menu-header">
+          <h1 class="logo">STRIKER<span>.IO</span></h1>
+          <div class="menu-tabs">
+            <button class="menu-tab active" data-tab="play">&#9654; PLAY</button>
+            <button class="menu-tab" data-tab="profile">&#9632; PROFILE</button>
+          </div>
+        </div>
 
-        <button id="play-btn" class="play-btn">CLICK TO PLAY</button>
+        <!-- ── PLAY TAB ── -->
+        <div id="tab-play" class="tab-content">
+          <label class="field-label" for="player-name">callsign</label>
+          <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
 
-        <div class="controls-hint">
-          <div><b>WASD</b> Move</div>
-          <div><b>Mouse</b> Look</div>
-          <div><b>LMB</b> Fire &nbsp; <b>RMB</b> Scope</div>
-          <div><b>R</b> Reload &nbsp; <b>Scroll</b> Cycle Guns</div>
-          <div><b>1-0</b> Guns &nbsp; <b>G</b> RPG &nbsp; <b>H</b> LMG</div>
-          <div><b>N/B</b> Snipers &nbsp; <b>V</b> Blade</div>
-          <div><b>Shift</b> Sprint &nbsp; <b>Space</b> Jump</div>
+          <label class="field-label">player skin</label>
+          <div id="skin-grid" class="skin-grid"></div>
+
+          <label class="field-label">weapon finish</label>
+          <div id="weapon-skin-grid" class="skin-grid-wide"></div>
+
+          <label class="field-label">sword finish</label>
+          <div id="sword-skin-grid" class="skin-grid-wide"></div>
+
+          <label class="field-label">loadout</label>
+          <div id="loadout-list" class="loadout-list"></div>
+
+          <button id="play-btn" class="play-btn">CLICK TO PLAY</button>
+
+          <div class="controls-hint">
+            <div><b>WASD</b> Move</div>
+            <div><b>Mouse</b> Look</div>
+            <div><b>LMB</b> Fire &nbsp; <b>RMB</b> Scope</div>
+            <div><b>R</b> Reload &nbsp; <b>Scroll</b> Cycle</div>
+            <div><b>1-0</b> Guns &nbsp; <b>G</b> RPG &nbsp; <b>H</b> LMG</div>
+            <div><b>N/B</b> Snipers &nbsp; <b>V</b> Blade</div>
+            <div><b>Shift</b> Sprint &nbsp; <b>Space</b> Jump</div>
+          </div>
+        </div>
+
+        <!-- ── PROFILE TAB ── -->
+        <div id="tab-profile" class="tab-content hidden">
+          <div class="profile-header">
+            <div id="profile-avatar" class="profile-avatar"></div>
+            <div class="profile-info">
+              <div id="profile-username" class="profile-name">RECRUIT</div>
+              <div id="profile-badge" class="profile-badge">RECRUIT</div>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="stat-kills">0</div>
+              <div class="stat-label">KILLS</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-score">0</div>
+              <div class="stat-label">SCORE</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="stat-games">0</div>
+              <div class="stat-label">GAMES</div>
+            </div>
+          </div>
+
+          <label class="field-label">equipped finishes</label>
+          <div class="equipped-skins">
+            <div class="equipped-slot">
+              <div id="profile-weapon-skin" class="equipped-preview"></div>
+              <div class="equipped-text">
+                <div id="profile-weapon-skin-name" class="equipped-name">Midnight Black</div>
+                <div class="equipped-type">GUN SKIN</div>
+              </div>
+            </div>
+            <div class="equipped-slot">
+              <div id="profile-sword-skin" class="equipped-preview"></div>
+              <div class="equipped-text">
+                <div id="profile-sword-skin-name" class="equipped-name">Iron</div>
+                <div class="equipped-type">SWORD SKIN</div>
+              </div>
+            </div>
+          </div>
+
+          <button id="profile-logout-btn" class="ghost-btn" style="margin-top:20px;display:none">LOGOUT</button>
         </div>
       </div>
     </div>
@@ -90,7 +182,6 @@
       </div>
 
       <div id="weapon-slots"></div>
-
       <div id="killfeed"></div>
     </div>
   </div>
