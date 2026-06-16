@@ -91,7 +91,10 @@ function makeFacadeTexture(seed) {
     for (let c = 0; c < cols; c++) {
       const x = padX + c * cellW + (cellW - winW) / 2;
       const y = padY + r * cellH + (cellH - winH) / 2;
-      const lit = Math.random() < 0.42;
+      // most of the city has gone dark — these tiles repeat several times
+      // across a tall building, so keep the base rate very low or the
+      // repeats stack into something that reads as "lit up"
+      const lit = Math.random() < 0.018;
       if (lit) {
         const cool = Math.random() < 0.25;
         const pal = cool ? litCool : litWarm;
@@ -166,7 +169,7 @@ function makeBrickFacadeTexture(seed) {
   const winH = cellH * 0.6;
   const litWarm = ['#ffd9a0', '#ffe7bd', '#ffcf86', '#fff0cf'];
   const litCool = ['#bcd4ff', '#d4e4ff'];
-  const stone = '#c7bda8';
+  const stone = '#5c5648'; // grimy, weathered trim — no longer bright enough to read as "lit" from a distance
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = padX + c * cellW + (cellW - winW) / 2;
@@ -178,8 +181,9 @@ function makeBrickFacadeTexture(seed) {
       // frame
       ctx.fillStyle = '#191310';
       ctx.fillRect(x - 2, y - 2, winW + 4, winH + 4);
-      // glazing
-      const lit = Math.random() < 0.4;
+      // glazing — most windows are dark and abandoned now (kept low since
+      // the tile repeats several times up a tall building)
+      const lit = Math.random() < 0.018;
       if (lit) {
         const pic = (Math.random() < 0.25 ? litCool : litWarm);
         const col = pic[Math.floor(Math.random() * pic.length)];
@@ -203,9 +207,10 @@ function makeBrickFacadeTexture(seed) {
   return { map, emissiveMap };
 }
 
-// Giant Times Square-style jumbotron ad: bold saturated colour blocks, a
-// scrolling "marquee" text bar, and a faint LED pixel grid. Self-lit, so the
-// same canvas serves as both colour and emissive map.
+// Dead/dying jumbotron ad panel: mostly powered-down, sickly desaturated
+// colour blocks instead of the old vivid neon, plus a faint LED pixel grid.
+// Self-lit (barely), so the same canvas serves as both colour and emissive
+// map — these read as long-dark screens rather than working billboards.
 function makeBillboardTexture(seed) {
   const w = 256;
   const h = 384;
@@ -214,10 +219,10 @@ function makeBillboardTexture(seed) {
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   const palettes = [
-    ['#ff1d4e', '#ffe600', '#0091ff'],
-    ['#00e0ff', '#ff5400', '#ffffff'],
-    ['#ffd400', '#ff0066', '#00ff9d'],
-    ['#7a2bff', '#00d2ff', '#ffe600']
+    ['#33392c', '#1c1f17', '#4a4a3a'],
+    ['#2c3a36', '#181f1c', '#3f463a'],
+    ['#3a3230', '#1c1816', '#46392f'],
+    ['#2e332b', '#16190f', '#3c3c2c']
   ];
   const pal = palettes[seed % palettes.length];
   ctx.fillStyle = pal[0];
@@ -228,7 +233,7 @@ function makeBillboardTexture(seed) {
     const bh = 30 + Math.random() * 90;
     ctx.fillRect(Math.random() * (w - bw), Math.random() * (h - bh), bw, bh);
   }
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = 'rgba(220,220,200,0.25)';
   for (let i = 0; i < 3; i++) {
     const y = h * 0.72 + i * 26;
     ctx.fillRect(16, y, w - 32, 14);
@@ -250,7 +255,8 @@ function makeBillboardTexture(seed) {
   return new THREE.CanvasTexture(canvas);
 }
 
-// The big neon "TIMES SQUARE" marquee mounted on one tall tower at the core.
+// The old "TIMES SQUARE" marquee, still standing but barely powered — dim,
+// flickering-looking glow instead of a bright neon sign.
 function makeTimesSquareSignTexture() {
   const w = 512;
   const h = 128;
@@ -263,19 +269,56 @@ function makeTimesSquareSignTexture() {
   ctx.font = 'bold 60px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = '#ff2a4d';
-  ctx.shadowBlur = 26;
-  ctx.fillStyle = '#ff2a4d';
+  ctx.shadowColor = '#7a1622';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#7a1622';
   ctx.fillText('TIMES SQUARE', w / 2, h / 2);
   ctx.shadowBlur = 0;
   return new THREE.CanvasTexture(canvas);
+}
+
+// Barbed-wire strand: a tileable, mostly-transparent strip with a zigzag
+// wire line and X-shaped barb ticks, alpha-mapped onto a thin strand mesh
+// strung between posts.
+function makeBarbedWireTexture() {
+  const w = 128;
+  const h = 32;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  const midY = h / 2;
+  ctx.strokeStyle = '#9a958a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, midY);
+  for (let x = 6; x <= w; x += 6) {
+    ctx.lineTo(x, midY + (x % 12 === 0 ? -3 : 3));
+  }
+  ctx.stroke();
+  ctx.lineWidth = 1.2;
+  for (let x = 4; x < w; x += 10) {
+    ctx.beginPath();
+    ctx.moveTo(x - 3, midY - 5);
+    ctx.lineTo(x + 3, midY + 5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 3, midY + 5);
+    ctx.lineTo(x + 3, midY - 5);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
 }
 
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x05070d);
-    this.scene.fog = new THREE.Fog(0x06080f, 28, 175);
+    this.scene.fog = new THREE.Fog(0x0a0d09, 18, 130);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -287,6 +330,7 @@ export class World {
     this._sidewalkTex = makeSidewalkTexture();
     this._billboardTex = [0, 1, 2, 3].map((i) => makeBillboardTexture(i));
     this._timesSquareSignTex = makeTimesSquareSignTexture();
+    this._barbedWireTex = makeBarbedWireTexture();
     this._signPlaced = false;
     this._flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xb481ff, 0xffffff, 0xff4d4d, 0xff9ec4];
 
@@ -314,8 +358,8 @@ export class World {
       treeTrunk: new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 }),
       treeLeaf: new THREE.MeshStandardMaterial({ color: 0x213a1c, roughness: 0.95 }),
       carGlass: new THREE.MeshStandardMaterial({ color: 0x0a0d12, roughness: 0.2, metalness: 0.4 }),
-      carHead: new THREE.MeshBasicMaterial({ color: 0xfff2cf }),
-      carTail: new THREE.MeshBasicMaterial({ color: 0xff2a22 }),
+      carHead: new THREE.MeshBasicMaterial({ color: 0x8a8470 }),
+      carTail: new THREE.MeshBasicMaterial({ color: 0x5a1a18 }),
       carWheel: new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9 }),
       beacon: new THREE.MeshBasicMaterial({ color: 0xff3322 }),
       brickPlinth: new THREE.MeshStandardMaterial({ color: 0x3a342c, roughness: 0.9 }),
@@ -338,7 +382,14 @@ export class World {
       subwayDark: new THREE.MeshStandardMaterial({ color: 0x14151a, roughness: 0.95 }),
       subwayRail: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.5, metalness: 0.6 }),
       subwayGlobe: new THREE.MeshStandardMaterial({ color: 0x1fae4a, emissive: 0x2dff7a, emissiveIntensity: 2.4 }),
-      taxiSign: new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xfff7c2, emissiveIntensity: 1.2 })
+      taxiSign: new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xfff7c2, emissiveIntensity: 0.3 }),
+      // zombie-apocalypse debris: abandoned trucks, crates, barbed wire
+      truckBody: new THREE.MeshStandardMaterial({ color: 0x4a5240, roughness: 0.92, metalness: 0.12 }),
+      truckBody2: new THREE.MeshStandardMaterial({ color: 0x5c4630, roughness: 0.95, metalness: 0.08 }),
+      truckCab: new THREE.MeshStandardMaterial({ color: 0x33362f, roughness: 0.85, metalness: 0.2 }),
+      crateWood: new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.95 }),
+      crateBand: new THREE.MeshStandardMaterial({ color: 0x232323, roughness: 0.6, metalness: 0.4 }),
+      barbedPost: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8, metalness: 0.4 })
     };
     this._flowerMats = new Map();
     this._carMats = new Map();
@@ -358,12 +409,12 @@ export class World {
   }
 
   _buildLighting() {
-    // faint sky bounce
-    const hemi = new THREE.HemisphereLight(0x2a3550, 0x080808, 0.35);
+    // faint, sickly sky bounce — the city's ambient glow has mostly died
+    const hemi = new THREE.HemisphereLight(0x222a1c, 0x060606, 0.22);
     this.scene.add(hemi);
 
     // moonlight — cool, low, casts the scene's shadows
-    const moon = new THREE.DirectionalLight(0xaec3e8, 0.5);
+    const moon = new THREE.DirectionalLight(0x9fb09a, 0.42);
     moon.position.set(-50, 70, 40);
     moon.castShadow = true;
     moon.shadow.mapSize.set(1024, 1024);
@@ -376,8 +427,9 @@ export class World {
     moon.shadow.bias = -0.0015;
     this.scene.add(moon);
 
-    // warm city skyglow fill from below the horizon
-    const fill = new THREE.DirectionalLight(0xff7a3a, 0.12);
+    // faint warm skyglow fill from below the horizon — most of the city's
+    // power grid is dark now, so this is barely a glow rather than a fill
+    const fill = new THREE.DirectionalLight(0xff7a3a, 0.04);
     fill.position.set(20, 6, -30);
     this.scene.add(fill);
   }
@@ -613,7 +665,7 @@ export class World {
       map: tex,
       emissiveMap: tex,
       emissive: 0xffffff,
-      emissiveIntensity: special ? 1.6 : 1.25,
+      emissiveIntensity: special ? 0.45 : 0.3,
       color: 0x1a1a1a,
       roughness: 0.45,
       metalness: 0.1
@@ -624,7 +676,7 @@ export class World {
     this.scene.add(panel);
 
     if (special) {
-      const light = new THREE.PointLight(0xffe9c2, 5, 20, 2);
+      const light = new THREE.PointLight(0xc97a6a, 1.6, 14, 2);
       light.position.set(cx + ox * (half + 2), y, cz + oz * (half + 2));
       this.scene.add(light);
     }
@@ -867,12 +919,13 @@ export class World {
       this._streetLight(x, 8);
     }
 
-    // parked + stopped cars along the avenues and side streets (also cover) —
-    // a big share of NYC yellow cabs for the Times Square feel
+    // parked + abandoned cars along the avenues and side streets (also
+    // cover) — weathered, rusted, grimy tones; only a couple of faded
+    // yellow cabs remain as a relic of busier days
     const carColors = [
-      TAXI_YELLOW, 0x882222, TAXI_YELLOW, 0x223a66, TAXI_YELLOW, 0x2c2c30,
-      TAXI_YELLOW, 0x335533, TAXI_YELLOW, 0x6a6a70, TAXI_YELLOW, 0x554433,
-      TAXI_YELLOW, 0xb0b4ba, TAXI_YELLOW, 0x1d1d22
+      0x6b5a3a, 0x3a3f33, 0x5a2a22, 0x4a4d4f, 0x2f3a2a,
+      0x705840, 0x33363a, TAXI_YELLOW, 0x5c4a36, 0x26301f,
+      0x614b3f, 0x3c372e, 0x4a4438, TAXI_YELLOW, 0x575048, 0x2a2e26
     ];
     const cars = [
       // main north-south avenue, both kerbs
@@ -1257,11 +1310,116 @@ export class World {
     this.colliders.push({ box, mesh: group });
   }
 
+  // Abandoned cargo truck left blocking the road — big, solid cover.
+  _buildTruck(x, z, rotY, rusty = false) {
+    const group = new THREE.Group();
+    const bodyMat = rusty ? this._mats.truckBody2 : this._mats.truckBody;
+
+    const cargo = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.3, 5.4), bodyMat);
+    cargo.position.set(0, 1.3, -0.5);
+    cargo.castShadow = true;
+    group.add(cargo);
+
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.6, 1.8), this._mats.truckCab);
+    cab.position.set(0, 1.0, 3.0);
+    cab.castShadow = true;
+    group.add(cab);
+
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.55, 0.08), this._mats.carGlass);
+    windshield.position.set(0, 1.55, 3.9);
+    group.add(windshield);
+
+    for (const wx of [-1.15, 1.15]) {
+      for (const wz of [-2.3, -0.1, 2.6]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 12), this._mats.carWheel);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wx, 0.42, wz);
+        group.add(wheel);
+      }
+    }
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // One splintering wood crate with metal corner/edge bands.
+  _crateMesh(size) {
+    const group = new THREE.Group();
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), this._mats.crateWood);
+    crate.position.y = size / 2;
+    crate.castShadow = true;
+    group.add(crate);
+    for (const dy of [size * 0.15, size * 0.85]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(size + 0.04, 0.08, size + 0.04), this._mats.crateBand);
+      band.position.y = dy;
+      group.add(band);
+    }
+    return group;
+  }
+
+  // A loose stack of two crates, just tall enough to crouch or stand behind.
+  _buildCrateStack(x, z, rotY) {
+    const group = new THREE.Group();
+    group.add(this._crateMesh(1.1));
+    const small = this._crateMesh(0.7);
+    small.position.set(0.5, 0, 0.15);
+    small.rotation.y = 0.4;
+    group.add(small);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // A short barbed-wire barricade strung between two posts — see-through
+  // but still blocks movement, like a hastily thrown-up checkpoint fence.
+  _buildBarbedWire(x, z, rotY, length) {
+    const group = new THREE.Group();
+    const postH = 1.2;
+    for (const lx of [-length / 2, length / 2]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, postH, 6), this._mats.barbedPost);
+      post.position.set(lx, postH / 2, 0);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const tex = this._barbedWireTex.clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(Math.max(1, Math.round(length / 1.2)), 1);
+    const wireMat = new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.35,
+      color: 0xb8b4a4,
+      roughness: 0.7,
+      metalness: 0.4
+    });
+    for (const dy of [0.5, 0.85, 1.15]) {
+      const strand = new THREE.Mesh(new THREE.BoxGeometry(length, 0.12, 0.06), wireMat);
+      strand.position.y = dy;
+      group.add(strand);
+    }
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
   // Scattered street furniture players can duck behind — carts, newsstands,
   // scaffolding, dumpsters, mailboxes and barrier rows down the two main
   // avenues, on top of the existing parked cars/planters/trees. Kept within
   // the open avenue corridors (small cross-axis offset) so nothing clips
-  // into a building footprint.
+  // into a building footprint. Abandoned trucks and barbed-wire checkpoints
+  // guard each avenue's far end, with loose crate stacks for closer cover.
   _buildObstacles() {
     this._buildHotDogCart(3, 16, 0);
     this._buildHotDogCart(-3, -16, Math.PI);
@@ -1287,6 +1445,26 @@ export class World {
 
     this._buildTktsSteps(0, -66);
     this._buildSubwayEntrance(0, 66, 0);
+
+    // abandoned trucks blocking each avenue's far end, paired with a
+    // barbed-wire barricade — like a checkpoint nobody came back to staff
+    this._buildTruck(3, 76, 0, false);
+    this._buildTruck(-3, -76, Math.PI, true);
+    this._buildTruck(76, -3, Math.PI / 2, true);
+    this._buildTruck(-76, 3, -Math.PI / 2, false);
+
+    this._buildBarbedWire(-5, 76, 0, 4);
+    this._buildBarbedWire(5, -76, Math.PI, 4);
+    this._buildBarbedWire(76, 5, Math.PI / 2, 4);
+    this._buildBarbedWire(-76, -5, Math.PI / 2, 4);
+
+    // loose crates dropped for closer-range cover
+    this._buildCrateStack(4, 4, 0.2);
+    this._buildCrateStack(-4, -4, 0.2 + Math.PI);
+    this._buildCrateStack(-4, 54, -0.3);
+    this._buildCrateStack(4, -52, -0.3 + Math.PI);
+    this._buildCrateStack(54, -4, Math.PI / 2);
+    this._buildCrateStack(-54, 4, -Math.PI / 2);
   }
 
   _buildBoundary() {
