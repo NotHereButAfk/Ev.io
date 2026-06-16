@@ -19,6 +19,11 @@ export class AudioManager {
     if (this.ctx.state === 'suspended') this.ctx.resume();
   }
 
+  setVolume(v) {
+    this.ensureContext();
+    this.master.gain.value = Math.max(0, Math.min(1, v));
+  }
+
   _noiseBuffer(duration) {
     const ctx = this.ctx;
     const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);

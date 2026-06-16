@@ -9,10 +9,11 @@ import { HUD } from '../ui/HUD.js';
 import { MenuUI } from '../ui/MainMenu.js';
 import { AuthUI } from '../ui/AuthUI.js';
 import { UserAccount } from './UserAccount.js';
+import { Armory } from './Armory.js';
+import { GameSettings } from './GameSettings.js';
 import { DeathEffectManager } from '../effects/DeathEffects.js';
+import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
-import { getWeaponSkin } from '../weapons/WeaponSkins.js';
-import { getSwordSkin } from '../weapons/SwordSkins.js';
 import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
@@ -26,37 +27,44 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-    this.world = new World();
-    this.player = new Player(window.innerWidth / window.innerHeight);
-    this.audio = new AudioManager();
+    GameSettings.load();
+
+    this.world        = new World();
+    this.player       = new Player(window.innerWidth / window.innerHeight);
+    this.audio        = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     this.deathEffects = new DeathEffectManager(this.world.scene);
-    this.botManager = new BotManager(this.world, this.world.scene);
-    this.input = new InputManager(canvas);
-    this.hud = new HUD();
-    this.menu = new MenuUI();
-    this.authUI = new AuthUI();
+    this.botManager   = new BotManager(this.world, this.world.scene);
+    this.input        = new InputManager(canvas);
+    this.hud          = new HUD();
+    this.menu         = new MenuUI();
+    this.authUI       = new AuthUI();
 
     this.menuCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-    this.menuTime = 0;
+    this.menuTime   = 0;
 
     this.selectedSkin = getSkin('crimson');
-    this.selectedWeaponSkin = getWeaponSkin('midnight');
-    this.selectedSwordSkin = getSwordSkin('iron');
     this.previewCharacter = buildPreviewCharacter(this.selectedSkin);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.world.scene.add(this.previewCharacter);
 
-    this.state = 'menu';
-    this.kills = 0;
-    this.score = 0;
+    this.state   = 'menu';
+    this.kills   = 0;
+    this.score   = 0;
     this.playTime = 0;
-    this._statsSaved = true; // avoid double-save
+    this._statsSaved  = true;
     this.currentUsername = null;
+
+    // Game-mode runtime state
+    this._mode      = null; // current mode definition object
+    this._lives     = Infinity;
+    this._wave      = 1;
+    this._modeTimer = 0;    // countdown (time-attack)
 
     this.timer = new THREE.Timer();
     this.timer.connect(document);
 
+    this._applySettings();
     this._wireCallbacks();
     this._wireMenu();
     this._initAuth();
@@ -66,7 +74,6 @@ export class Game {
       if (this.state === 'paused') this._resume();
     });
     window.addEventListener('resize', () => this._onResize());
-
     this.input.onLockChange = (locked) => {
       if (!locked && this.state === 'playing') this._pause();
     };
@@ -74,13 +81,12 @@ export class Game {
     requestAnimationFrame(() => this._loop());
   }
 
+  // ── Auth ────────────────────────────────────────────────────────────────────
+
   _initAuth() {
     if (UserAccount.isLoggedIn()) {
-      // Auto-login from previous session
       this._onAuth(UserAccount.current());
     }
-    // Otherwise auth screen is already visible in HTML
-
     this.authUI.onAuth = (username) => {
       this.authUI.hide();
       this._onAuth(username);
@@ -90,13 +96,28 @@ export class Game {
   _onAuth(username) {
     this.currentUsername = username;
     this.menu.setUsername(username);
-    // Pre-fill callsign from account display name (not for guests)
     if (!UserAccount.isGuest()) {
-      const display = UserAccount.getDisplayName(username);
-      document.getElementById('player-name').value = display;
+      document.getElementById('player-name').value = UserAccount.getDisplayName(username);
     }
     this.menu.showMain();
   }
+
+  // ── Settings application ────────────────────────────────────────────────────
+
+  _applySettings() {
+    this.player.sensitivityMult = GameSettings.get('sensitivity');
+    this.player.baseFov         = GameSettings.get('fov');
+    this.player.camera.fov      = this.player.baseFov;
+    this.player.camera.updateProjectionMatrix();
+    const vol = GameSettings.get('volume');
+    this.audio.setVolume(vol);
+    const q = GameSettings.get('quality');
+    const pr = q === 'high' ? Math.min(window.devicePixelRatio, 2)
+             : q === 'low'  ? 0.6 : 1;
+    this.renderer.setPixelRatio(pr);
+  }
+
+  // ── Wire callbacks ──────────────────────────────────────────────────────────
 
   _wireCallbacks() {
     this.weaponSystem.applyRecoilToPlayer = (amt) => this.player.applyRecoil(amt);
@@ -105,16 +126,15 @@ export class Game {
       this.audio.playHit();
       this.hud.flashHitmarker();
       if (killed) {
-        // Death effect — type depends on active skin
         const def     = this.weaponSystem.currentDef;
         const isMelee = def.kind === 'melee';
+        const entry   = this.weaponSystem._armoryMap?.get(def.id);
         this.deathEffects.spawn(
           bot.mesh.position,
-          this.selectedWeaponSkin?.id,
-          this.selectedSwordSkin?.id,
+          entry?.isSword ? null : entry?.skin?.id,
+          entry?.isSword ? entry?.skin?.id : null,
           isMelee
         );
-
         this.kills += 1;
         this.score += 100;
         this.audio.playKill();
@@ -124,13 +144,29 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, weaponSkinId, swordSkinId) =>
-      this._startGame(name, skinId, weaponSkinId, swordSkinId);
-    this.menu.onResume     = () => this._resume();
-    this.menu.onQuit       = () => this._quitToMenu();
-    this.menu.onRestart    = () => this._restart();
-    this.menu.onBackToMenu = () => this._quitToMenu();
-    this.menu.onLogout     = () => {
+    this.menu.onPlay = (name, skinId, modeId) => this._startGame(name, skinId, modeId);
+    this.menu.onResume        = () => this._resume();
+    this.menu.onQuit          = () => this._quitToMenu();
+    this.menu.onRestart       = () => this._restart();
+    this.menu.onBackToMenu    = () => this._quitToMenu();
+    this.menu.onArmoryChanged = () => {
+      // Re-apply armory skins to live weapon models
+      const map = Armory.buildSkinMap(this.weaponSystem.loadout);
+      this.weaponSystem.applyArmoryMap(map);
+    };
+    this.menu.onSettingsSaved = (s) => {
+      this.player.sensitivityMult = s.sensitivity;
+      this.player.baseFov         = s.fov;
+      if (this.state !== 'playing') {
+        this.player.camera.fov = s.fov;
+        this.player.camera.updateProjectionMatrix();
+      }
+      this.audio.setVolume(s.volume);
+      const pr = s.quality === 'high' ? Math.min(window.devicePixelRatio, 2)
+               : s.quality === 'low'  ? 0.6 : 1;
+      this.renderer.setPixelRatio(pr);
+    };
+    this.menu.onLogout = () => {
       UserAccount.logout();
       this.currentUsername = null;
       this.menu.hideMain();
@@ -138,22 +174,37 @@ export class Game {
     };
   }
 
-  _startGame(name, skinId, weaponSkinId, swordSkinId) {
+  // ── Game start / restart ────────────────────────────────────────────────────
+
+  _startGame(name, skinId, modeId = 'deathmatch') {
     this.audio.resume();
     this.selectedSkin = getSkin(skinId);
-    if (weaponSkinId) this.selectedWeaponSkin = getWeaponSkin(weaponSkinId);
-    if (swordSkinId)  this.selectedSwordSkin  = getSwordSkin(swordSkinId);
     applySkinToCharacter(this.previewCharacter, this.selectedSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
-    this.weaponSystem.setWeaponSkin(this.selectedWeaponSkin);
-    this.weaponSystem.setSwordSkin(this.selectedSwordSkin);
+
+    // Apply per-weapon skins from the armory
+    const armoryMap = Armory.buildSkinMap(this.weaponSystem.loadout);
+    this.weaponSystem.applyArmoryMap(armoryMap);
+
     this.player.name = name;
     this.player.skin = this.selectedSkin;
     this.player.respawn(SPAWN_POINT);
     this.weaponSystem.resetState(this.player.baseFov);
-    this.botManager.spawnAll();
-    this.kills = 0;
-    this.score = 0;
+
+    // Apply selected game mode
+    this._mode    = getMode(modeId);
+    this._wave    = 1;
+    this._lives   = this._mode.lives === Infinity ? Infinity : this._mode.lives;
+    this._modeTimer = this._mode.timeLimit || 0;
+
+    this.botManager.spawnAll(
+      this._mode.waves ? 3 : this._mode.botCount,
+      this._mode.noRespawn,
+      1
+    );
+
+    this.kills    = 0;
+    this.score    = 0;
     this.playTime = 0;
     this._statsSaved = false;
     this.previewCharacter.visible = false;
@@ -163,8 +214,27 @@ export class Game {
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
 
+    // Mode-specific HUD setup
+    this._refreshModeHUD();
+
     this.state = 'playing';
     this.input.requestPointerLock();
+  }
+
+  _refreshModeHUD() {
+    if (!this._mode) return;
+    if (this._mode.timeLimit) {
+      const mins = Math.floor(this._modeTimer / 60);
+      const secs = Math.floor(this._modeTimer % 60);
+      this.hud.setModeHUD(`${mins}:${String(secs).padStart(2, '0')}`, 'TIME REMAINING');
+    } else if (this._mode.waves) {
+      const livesStr = this._lives === Infinity ? '∞' : '♥'.repeat(Math.max(0, this._lives));
+      this.hud.setModeHUD(`WAVE ${this._wave}`, livesStr);
+    } else if (this._mode.noRespawn && this._mode.lives <= 1) {
+      this.hud.setModeHUD('ELIMINATION', `${this.botManager.bots.filter(b => b.alive).length} REMAINING`);
+    } else {
+      this.hud.hideModeHUD();
+    }
   }
 
   _saveStats() {
@@ -179,7 +249,7 @@ export class Game {
     this.input.requestPointerLock();
   }
 
-  _pause() {
+  _pause()  {
     this.state = 'paused';
     this.menu.showPause();
   }
@@ -190,6 +260,7 @@ export class Game {
     this.menu.hidePause();
     this.menu.hideGameOver();
     this.hud.hide();
+    this.hud.hideModeHUD();
     this.input.exitPointerLock();
     this.botManager.clear();
     this.previewCharacter.visible = true;
@@ -202,10 +273,11 @@ export class Game {
     this._startGame(
       this.player.name,
       this.selectedSkin.id,
-      this.selectedWeaponSkin?.id,
-      this.selectedSwordSkin?.id
+      this._mode?.id || 'deathmatch'
     );
   }
+
+  // ── Player damage / death ───────────────────────────────────────────────────
 
   _onPlayerDamaged(dmg) {
     if (this.player.isDead) return;
@@ -216,22 +288,39 @@ export class Game {
   }
 
   _onPlayerDeath() {
+    if (this._mode?.lives !== Infinity) {
+      this._lives = Math.max(0, this._lives - 1);
+      if (this._lives > 0 && this._mode?.waves) {
+        // Extra life — respawn in place
+        setTimeout(() => {
+          this.player.respawn(SPAWN_POINT);
+          this._refreshModeHUD();
+        }, 1500);
+        return;
+      }
+    }
     this._saveStats();
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
-    this.menu.showGameOver({ kills: this.kills, score: this.score, time: Math.floor(this.playTime) });
+    this.menu.showGameOver(
+      { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
+      'YOU DIED'
+    );
   }
 
+  // ── Resize ─────────────────────────────────────────────────────────────────
+
   _onResize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h);
     this.player.camera.aspect = w / h;
     this.player.camera.updateProjectionMatrix();
     this.menuCamera.aspect = w / h;
     this.menuCamera.updateProjectionMatrix();
   }
+
+  // ── Update loop ─────────────────────────────────────────────────────────────
 
   _updatePlaying(dt) {
     this.playTime += dt;
@@ -242,6 +331,61 @@ export class Game {
     this.botManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
+
+    this._updateModeLogic(dt);
+  }
+
+  _updateModeLogic(dt) {
+    if (!this._mode || this.state !== 'playing') return;
+
+    // --- TIME ATTACK ---
+    if (this._mode.timeLimit > 0) {
+      this._modeTimer = Math.max(0, this._modeTimer - dt);
+      const mins = Math.floor(this._modeTimer / 60);
+      const secs = Math.floor(this._modeTimer % 60);
+      this.hud.setModeHUD(`${mins}:${String(secs).padStart(2, '0')}`, 'TIME REMAINING');
+      if (this._modeTimer <= 0) {
+        this._saveStats();
+        this.state = 'gameover';
+        this.input.exitPointerLock();
+        this.hud.hide();
+        this.menu.showGameOver(
+          { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
+          'TIME\'S UP'
+        );
+      }
+      return;
+    }
+
+    // --- WAVE SURVIVAL ---
+    if (this._mode.waves && this.botManager.allDead()) {
+      this._wave += 1;
+      const count = 3 + (this._wave - 1) * 2;
+      const healthMult = 1 + (this._wave - 1) * 0.18;
+      this.botManager.spawnAll(count, true, healthMult);
+      this.hud.addKillFeed(`— WAVE ${this._wave} — (+${Math.round((healthMult - 1) * 100)}% HP)`);
+      this._refreshModeHUD();
+      return;
+    }
+
+    // --- ELIMINATION ---
+    if (this._mode.noRespawn && !this._mode.waves && this.botManager.allDead()) {
+      this._saveStats();
+      this.state = 'gameover';
+      this.input.exitPointerLock();
+      this.hud.hide();
+      this.menu.showGameOver(
+        { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
+        'VICTORY'
+      );
+      return;
+    }
+
+    // Update elimination counter
+    if (this._mode.id === 'elimination') {
+      const alive = this.botManager.bots.filter((b) => b.alive).length;
+      this.hud.setModeHUD('ELIMINATION', `${alive} REMAINING`);
+    }
   }
 
   _updateMenuScene(dt) {
@@ -249,7 +393,11 @@ export class Game {
     this.previewCharacter.rotation.y += dt * 0.6;
     const r = 4;
     const p = this.world.previewPedestalPos;
-    this.menuCamera.position.set(p.x + Math.sin(this.menuTime * 0.3) * r, p.y + 1.6, p.z + Math.cos(this.menuTime * 0.3) * r);
+    this.menuCamera.position.set(
+      p.x + Math.sin(this.menuTime * 0.3) * r,
+      p.y + 1.6,
+      p.z + Math.cos(this.menuTime * 0.3) * r
+    );
     this.menuCamera.lookAt(p.x, p.y + 1.05, p.z);
   }
 
@@ -266,7 +414,6 @@ export class Game {
 
     const camera = this.state === 'menu' ? this.menuCamera : this.player.camera;
     this.renderer.render(this.world.scene, camera);
-
     this.input.endFrame();
   }
 }

@@ -28,6 +28,7 @@ export class Player {
 
     this.name = 'Recruit';
     this.skin = null;
+    this.sensitivityMult = 1.0;
   }
 
   get isDead() {
@@ -51,8 +52,8 @@ export class Player {
 
   update(dt, input, world) {
     // --- look ---
-    this.yaw -= input.mouseDX * MOUSE_SENSITIVITY;
-    this.pitch -= input.mouseDY * MOUSE_SENSITIVITY;
+    this.yaw -= input.mouseDX * MOUSE_SENSITIVITY * this.sensitivityMult;
+    this.pitch -= input.mouseDY * MOUSE_SENSITIVITY * this.sensitivityMult;
     this.pitch = THREE.MathUtils.clamp(this.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
 
     // recoil recovery (spring back to 0)

@@ -136,6 +136,26 @@ export class WeaponSystem {
     }
   }
 
+  /**
+   * Apply per-weapon skins from the Armory skin map.
+   * Map<weaponId, { skin, isSword }> — each weapon gets its own individual finish.
+   */
+  applyArmoryMap(map) {
+    this._armoryMap = map;
+    for (const w of this.loadout) {
+      const entry = map.get(w.id);
+      if (!entry) continue;
+      const { group } = this.models.get(w.id);
+      if (entry.isSword) {
+        this.swordSkin = entry.skin;
+        applySwordSkin(group, entry.skin);
+      } else {
+        if (!this.weaponSkin) this.weaponSkin = entry.skin;
+        applyWeaponSkin(group, entry.skin);
+      }
+    }
+  }
+
   _setActiveModel(index) {
     this.loadout.forEach((w, i) => {
       this.models.get(w.id).group.visible = i === index;
@@ -568,10 +588,12 @@ export class WeaponSystem {
     // skin animations (only on the currently visible weapon)
     this.animTime += dt;
     const activeGroup = this.models.get(def.id).group;
-    if (def.kind === 'melee') {
-      if (this.swordSkin?.animated) animateSwordSkin(activeGroup, this.swordSkin, this.animTime);
-    } else {
-      if (this.weaponSkin?.animated) animateWeaponSkin(activeGroup, this.weaponSkin, this.animTime);
+    // Per-weapon skin takes priority over the global skin
+    const perSkin = this._armoryMap?.get(def.id)?.skin;
+    const activeSkin = perSkin || (def.kind === 'melee' ? this.swordSkin : this.weaponSkin);
+    if (activeSkin?.animated) {
+      if (def.kind === 'melee') animateSwordSkin(activeGroup, activeSkin, this.animTime);
+      else                      animateWeaponSkin(activeGroup, activeSkin, this.animTime);
     }
   }
 

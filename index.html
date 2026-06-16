@@ -21,7 +21,6 @@
           <button class="auth-tab" data-tab="register">REGISTER</button>
         </div>
 
-        <!-- LOGIN -->
         <div id="auth-login" class="auth-form">
           <label class="field-label" for="auth-login-name">username</label>
           <input id="auth-login-name" class="text-input" placeholder="Your username" autocomplete="username" />
@@ -31,7 +30,6 @@
           <button id="auth-login-btn" class="play-btn" style="margin-top:14px">LOGIN</button>
         </div>
 
-        <!-- REGISTER -->
         <div id="auth-register" class="auth-form hidden">
           <label class="field-label" for="auth-reg-name">choose username</label>
           <input id="auth-reg-name" class="text-input" placeholder="Letters, numbers, _" autocomplete="username" />
@@ -50,16 +48,20 @@
 
     <!-- ===================== MAIN MENU ===================== -->
     <div id="main-menu" class="overlay hidden">
-      <div class="menu-panel">
+      <div class="menu-panel wide-panel">
+
         <div class="menu-header">
           <h1 class="logo">STRIKER<span>.IO</span></h1>
-          <div class="menu-tabs">
+          <nav class="menu-tabs">
             <button class="menu-tab active" data-tab="play">&#9654; PLAY</button>
-            <button class="menu-tab" data-tab="profile">&#9632; PROFILE</button>
-          </div>
+            <button class="menu-tab" data-tab="armory">&#9670; ARMORY</button>
+            <button class="menu-tab" data-tab="modes">&#9632; MODES</button>
+            <button class="menu-tab" data-tab="settings">&#9881; SETTINGS</button>
+            <button class="menu-tab" data-tab="profile">&#9650; PROFILE</button>
+          </nav>
         </div>
 
-        <!-- ── PLAY TAB ── -->
+        <!-- ── PLAY TAB ─────────────────────────────────────────────── -->
         <div id="tab-play" class="tab-content">
           <label class="field-label" for="player-name">callsign</label>
           <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
@@ -67,17 +69,7 @@
           <label class="field-label">player skin</label>
           <div id="skin-grid" class="skin-grid"></div>
 
-          <label class="field-label">weapon finish</label>
-          <div id="weapon-skin-grid" class="skin-grid-wide"></div>
-
-          <label class="field-label">sword finish</label>
-          <div id="sword-skin-grid" class="skin-grid-wide"></div>
-
-          <label class="field-label">loadout</label>
-          <div id="loadout-list" class="loadout-list"></div>
-
-          <button id="play-btn" class="play-btn">CLICK TO PLAY</button>
-
+          <label class="field-label">controls hint</label>
           <div class="controls-hint">
             <div><b>WASD</b> Move</div>
             <div><b>Mouse</b> Look</div>
@@ -87,9 +79,87 @@
             <div><b>N/B</b> Snipers &nbsp; <b>V</b> Blade</div>
             <div><b>Shift</b> Sprint &nbsp; <b>Space</b> Jump</div>
           </div>
+
+          <button id="play-btn" class="play-btn">CLICK TO PLAY</button>
         </div>
 
-        <!-- ── PROFILE TAB ── -->
+        <!-- ── ARMORY TAB ────────────────────────────────────────────── -->
+        <div id="tab-armory" class="tab-content hidden">
+          <div class="armory-layout">
+
+            <!-- Left: weapon list -->
+            <div class="armory-weapon-list">
+              <div class="armory-section-label">WEAPONS</div>
+              <div id="armory-weapon-list"></div>
+            </div>
+
+            <!-- Right: skin browser -->
+            <div class="armory-skin-panel">
+              <!-- 3D Preview -->
+              <div class="armory-preview-wrap">
+                <canvas id="skin-preview-canvas" width="290" height="162"></canvas>
+                <div class="armory-preview-info">
+                  <div id="preview-skin-name" class="preview-skin-name">Select a skin</div>
+                  <div id="preview-skin-tags" class="preview-skin-tags"></div>
+                </div>
+              </div>
+
+              <!-- Skin grid -->
+              <div class="armory-skin-header">
+                <span class="armory-section-label">FINISHES</span>
+                <span id="armory-equipped-chip" class="equipped-chip">— none equipped —</span>
+              </div>
+              <div id="armory-skin-grid" class="armory-skin-grid"></div>
+              <button id="armory-equip-btn" class="play-btn armory-equip-btn" disabled>EQUIP FINISH</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── MODES TAB ─────────────────────────────────────────────── -->
+        <div id="tab-modes" class="tab-content hidden">
+          <p class="modes-intro">Choose a game mode for your next session.</p>
+          <div id="mode-cards" class="mode-cards"></div>
+        </div>
+
+        <!-- ── SETTINGS TAB ──────────────────────────────────────────── -->
+        <div id="tab-settings" class="tab-content hidden">
+
+          <div class="settings-section">CONTROLS</div>
+
+          <label class="field-label">Mouse Sensitivity</label>
+          <div class="setting-row">
+            <input type="range" id="set-sens" min="30" max="300" step="5" value="100" class="setting-slider" />
+            <span id="set-sens-val" class="setting-val">1.0×</span>
+          </div>
+
+          <label class="field-label">Field of View</label>
+          <div class="setting-row">
+            <input type="range" id="set-fov" min="60" max="110" step="5" value="78" class="setting-slider" />
+            <span id="set-fov-val" class="setting-val">78°</span>
+          </div>
+
+          <div class="settings-section">AUDIO</div>
+
+          <label class="field-label">Master Volume</label>
+          <div class="setting-row">
+            <input type="range" id="set-vol" min="0" max="100" step="5" value="50" class="setting-slider" />
+            <span id="set-vol-val" class="setting-val">50%</span>
+          </div>
+
+          <div class="settings-section">GRAPHICS</div>
+
+          <label class="field-label">Render Quality</label>
+          <div class="quality-btns" id="quality-btns">
+            <button class="quality-btn" data-q="low">LOW</button>
+            <button class="quality-btn active" data-q="medium">MEDIUM</button>
+            <button class="quality-btn" data-q="high">HIGH</button>
+          </div>
+
+          <button id="settings-save-btn" class="play-btn" style="margin-top:22px">SAVE SETTINGS</button>
+        </div>
+
+        <!-- ── PROFILE TAB ───────────────────────────────────────────── -->
         <div id="tab-profile" class="tab-content hidden">
           <div class="profile-header">
             <div id="profile-avatar" class="profile-avatar"></div>
@@ -134,6 +204,7 @@
 
           <button id="profile-logout-btn" class="ghost-btn" style="margin-top:20px;display:none">LOGOUT</button>
         </div>
+
       </div>
     </div>
 
@@ -149,7 +220,7 @@
     <!-- ===================== GAME OVER ===================== -->
     <div id="gameover-menu" class="overlay hidden">
       <div class="menu-panel small">
-        <h2>YOU DIED</h2>
+        <h2 id="gameover-title">YOU DIED</h2>
         <div class="stats" id="gameover-stats"></div>
         <button id="restart-btn" class="play-btn">RESPAWN</button>
         <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
@@ -163,6 +234,9 @@
       </div>
       <div id="hitmarker"></div>
       <div id="damage-flash"></div>
+
+      <!-- Mode info (timer / wave / lives) -->
+      <div id="mode-info" class="hidden"></div>
 
       <div id="health-wrap" class="hud-panel">
         <div class="hud-icon health-icon">&hearts;</div>

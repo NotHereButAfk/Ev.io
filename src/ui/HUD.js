@@ -1,28 +1,34 @@
 export class HUD {
   constructor() {
-    this.root = document.getElementById('hud');
-    this.healthBar = document.getElementById('health-bar');
-    this.healthText = document.getElementById('health-text');
-    this.weaponName = document.getElementById('weapon-name');
-    this.ammoText = document.getElementById('ammo-text');
-    this.reloadText = document.getElementById('reload-text');
-    this.killCount = document.getElementById('kill-count');
-    this.scoreCount = document.getElementById('score-count');
+    this.root        = document.getElementById('hud');
+    this.healthBar   = document.getElementById('health-bar');
+    this.healthText  = document.getElementById('health-text');
+    this.weaponName  = document.getElementById('weapon-name');
+    this.ammoText    = document.getElementById('ammo-text');
+    this.reloadText  = document.getElementById('reload-text');
+    this.killCount   = document.getElementById('kill-count');
+    this.scoreCount  = document.getElementById('score-count');
     this.weaponSlots = document.getElementById('weapon-slots');
-    this.hitmarker = document.getElementById('hitmarker');
+    this.hitmarker   = document.getElementById('hitmarker');
     this.damageFlash = document.getElementById('damage-flash');
-    this.killfeed = document.getElementById('killfeed');
+    this.killfeed    = document.getElementById('killfeed');
+    this.modeInfo    = document.getElementById('mode-info');
     this._hitmarkerTimeout = null;
-    this._damageTimeout = null;
+    this._damageTimeout    = null;
   }
 
-  show() {
-    this.root.classList.remove('hidden');
+  show() { this.root.classList.remove('hidden'); }
+  hide() { this.root.classList.add('hidden'); }
+
+  // Mode-specific top-center overlay (timer, wave, lives).
+  setModeHUD(primary, secondary = '') {
+    this.modeInfo.classList.remove('hidden');
+    this.modeInfo.innerHTML =
+      `<span class="mode-primary">${primary}</span>` +
+      (secondary ? `<span class="mode-secondary">${secondary}</span>` : '');
   }
 
-  hide() {
-    this.root.classList.add('hidden');
-  }
+  hideModeHUD() { this.modeInfo.classList.add('hidden'); }
 
   buildWeaponSlots(labels, activeIndex) {
     this.weaponSlots.innerHTML = '';
@@ -47,14 +53,12 @@ export class HUD {
     this.healthText.textContent = Math.ceil(player.health);
 
     this.weaponName.textContent = weaponInfo.name.toUpperCase();
-    if (weaponInfo.isMelee) {
-      this.ammoText.textContent = '∞';
-    } else {
-      this.ammoText.textContent = `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
-    }
+    this.ammoText.textContent = weaponInfo.isMelee
+      ? '∞'
+      : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
     this.reloadText.classList.toggle('hidden', !weaponInfo.isReloading);
 
-    this.killCount.textContent = kills;
+    this.killCount.textContent  = kills;
     this.scoreCount.textContent = score;
   }
 

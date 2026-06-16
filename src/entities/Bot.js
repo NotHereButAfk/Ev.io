@@ -140,9 +140,9 @@ export class Bot {
 
   update(dt, player, camera, onAttack) {
     if (!this.alive) {
-      this.respawnTimer -= dt;
-      if (this.respawnTimer <= 0) {
-        this.respawnAt(this.world.randomSpawnPoint());
+      if (!this.noRespawn) {
+        this.respawnTimer -= dt;
+        if (this.respawnTimer <= 0) this.respawnAt(this.world.randomSpawnPoint());
       }
       return;
     }
