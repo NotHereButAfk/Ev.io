@@ -1,0 +1,461 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0c10;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  color: #e8edf2;
+  user-select: none;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  outline: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ===================== Overlays / Menus ===================== */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(10, 14, 22, 0.55) 0%, rgba(6, 8, 12, 0.92) 100%);
+  z-index: 10;
+}
+
+.menu-panel {
+  width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 28px 32px 34px;
+  background: linear-gradient(160deg, rgba(22, 27, 38, 0.96), rgba(14, 17, 24, 0.96));
+  border: 1px solid rgba(120, 200, 255, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+.menu-panel.small {
+  width: 360px;
+  text-align: center;
+}
+
+.logo {
+  font-size: 40px;
+  letter-spacing: 3px;
+  font-weight: 800;
+  color: #f1f5f9;
+  text-shadow: 0 0 18px rgba(80, 200, 255, 0.5);
+}
+
+.logo span {
+  color: #ff4d4d;
+}
+
+.tagline {
+  margin-top: 4px;
+  margin-bottom: 22px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #7c8aa0;
+  text-transform: uppercase;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #6f7d92;
+  margin-bottom: 6px;
+  margin-top: 18px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: #4fc3f7;
+}
+
+.skin-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.skin-swatch {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.skin-swatch:hover {
+  transform: translateY(-2px);
+}
+
+.skin-swatch.selected {
+  border-color: #fff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.4);
+}
+
+.loadout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #9fb0c4;
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.loadout-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.loadout-row b {
+  color: #e8edf2;
+}
+
+.play-btn {
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #ff5c5c, #ff8a3d);
+  color: #1a0a05;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(255, 92, 92, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.play-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(255, 92, 92, 0.5);
+}
+
+.ghost-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  background: transparent;
+  color: #9fb0c4;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.controls-hint {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  font-size: 11px;
+  color: #6f7d92;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+}
+
+.controls-hint b {
+  color: #c9d4e0;
+}
+
+.menu-panel h2 {
+  font-size: 26px;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  color: #ff5c5c;
+}
+
+.stats {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  color: #c9d4e0;
+  display: flex;
+  justify-content: space-around;
+}
+
+.stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats span {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ===================== HUD ===================== */
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  font-variant-numeric: tabular-nums;
+}
+
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+}
+
+#crosshair span {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+#crosshair span:nth-child(1), #crosshair span:nth-child(2) {
+  width: 2px;
+  height: 7px;
+  left: 50%;
+  margin-left: -1px;
+}
+#crosshair span:nth-child(1) { top: 0; }
+#crosshair span:nth-child(2) { bottom: 0; }
+
+#crosshair span:nth-child(3), #crosshair span:nth-child(4) {
+  width: 7px;
+  height: 2px;
+  top: 50%;
+  margin-top: -1px;
+}
+#crosshair span:nth-child(3) { left: 0; }
+#crosshair span:nth-child(4) { right: 0; }
+
+#hitmarker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%) rotate(45deg) scale(0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#hitmarker.show {
+  opacity: 1;
+  transition: none;
+}
+
+#hitmarker::before, #hitmarker::after {
+  content: '';
+  position: absolute;
+  background: #ff3b3b;
+}
+#hitmarker::before { width: 100%; height: 2px; top: 50%; margin-top: -1px; }
+#hitmarker::after { width: 2px; height: 100%; left: 50%; margin-left: -1px; }
+
+#damage-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(200, 0, 0, 0.45) 100%);
+  opacity: 0;
+}
+
+#damage-flash.show {
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+}
+
+.hud-panel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 13, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  backdrop-filter: blur(2px);
+}
+
+#health-wrap {
+  left: 22px;
+  bottom: 22px;
+}
+
+.health-icon {
+  color: #ff4d4d;
+  font-size: 18px;
+}
+
+.bar-bg {
+  width: 140px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #ff4d4d, #ff8a3d);
+  transition: width 0.15s ease;
+}
+
+#health-text {
+  font-weight: 700;
+  width: 30px;
+  text-align: right;
+}
+
+#weapon-wrap {
+  right: 22px;
+  bottom: 22px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+#weapon-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #fff;
+}
+
+#ammo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffd27a;
+}
+
+#reload-text {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #ff8a3d;
+  animation: blink 0.6s infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.3; }
+}
+
+#score-wrap {
+  top: 22px;
+  right: 22px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 12px;
+  color: #9fb0c4;
+}
+
+#score-wrap span {
+  color: #fff;
+  font-weight: 700;
+}
+
+#weapon-slots {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.weapon-slot {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgba(10, 13, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6f7d92;
+}
+
+.weapon-slot.active {
+  border-color: #ff8a3d;
+  color: #fff;
+  background: rgba(255, 138, 61, 0.18);
+}
+
+#killfeed {
+  position: absolute;
+  top: 70px;
+  right: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.kill-entry {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(10, 13, 20, 0.6);
+  color: #c9d4e0;
+  animation: fadeOut 4s forwards;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+#crosshair, #weapon-name, #ammo-text {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}

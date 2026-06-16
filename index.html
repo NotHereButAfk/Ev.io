@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>STRIKER.IO</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- ===================== MAIN MENU ===================== -->
+    <div id="main-menu" class="overlay">
+      <div class="menu-panel">
+        <h1 class="logo">STRIKER<span>.IO</span></h1>
+        <p class="tagline">low-poly arena shooter &mdash; guns, blades, glory</p>
+
+        <label class="field-label" for="player-name">callsign</label>
+        <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
+
+        <label class="field-label">skin</label>
+        <div id="skin-grid" class="skin-grid"></div>
+
+        <label class="field-label">loadout</label>
+        <div id="loadout-list" class="loadout-list"></div>
+
+        <button id="play-btn" class="play-btn">CLICK TO PLAY</button>
+
+        <div class="controls-hint">
+          <div><b>WASD</b> Move</div>
+          <div><b>Mouse</b> Look</div>
+          <div><b>LMB</b> Fire / Swing</div>
+          <div><b>R</b> Reload</div>
+          <div><b>1-6 / Scroll</b> Switch Weapon</div>
+          <div><b>Shift</b> Sprint &nbsp; <b>Space</b> Jump</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PAUSE MENU ===================== -->
+    <div id="pause-menu" class="overlay hidden">
+      <div class="menu-panel small">
+        <h2>PAUSED</h2>
+        <button id="resume-btn" class="play-btn">RESUME</button>
+        <button id="quit-btn" class="ghost-btn">QUIT TO MENU</button>
+      </div>
+    </div>
+
+    <!-- ===================== GAME OVER ===================== -->
+    <div id="gameover-menu" class="overlay hidden">
+      <div class="menu-panel small">
+        <h2>YOU DIED</h2>
+        <div class="stats" id="gameover-stats"></div>
+        <button id="restart-btn" class="play-btn">RESPAWN</button>
+        <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
+      </div>
+    </div>
+
+    <!-- ===================== HUD ===================== -->
+    <div id="hud" class="hidden">
+      <div id="crosshair">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div id="hitmarker"></div>
+      <div id="damage-flash"></div>
+
+      <div id="health-wrap" class="hud-panel">
+        <div class="hud-icon health-icon">&hearts;</div>
+        <div class="bar-bg"><div id="health-bar" class="bar-fill"></div></div>
+        <span id="health-text">100</span>
+      </div>
+
+      <div id="weapon-wrap" class="hud-panel">
+        <div id="weapon-name">SIDEARM</div>
+        <div id="ammo-text">12 / 60</div>
+        <div id="reload-text" class="hidden">RELOADING...</div>
+      </div>
+
+      <div id="score-wrap" class="hud-panel">
+        <div>KILLS <span id="kill-count">0</span></div>
+        <div>SCORE <span id="score-count">0</span></div>
+      </div>
+
+      <div id="weapon-slots"></div>
+
+      <div id="killfeed"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
