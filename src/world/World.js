@@ -130,7 +130,9 @@ export class World {
     this._buildGround();
     this._buildSky();
     this._buildCity();
+    this._buildCrosswalks();
     this._buildStreetProps();
+    this._buildGreenery();
     this._buildBoundary();
     this._buildSpawnPoints();
 
@@ -375,13 +377,213 @@ export class World {
       this._streetLight(x, 8);
     }
 
-    // a scattering of parked cars along the kerbs (also act as cover)
-    const carColors = [0x882222, 0x223a66, 0x2c2c30, 0x335533, 0x6a6a70, 0x554433];
+    // parked + stopped cars along the avenues and side streets (also cover)
+    const carColors = [0x882222, 0x223a66, 0x2c2c30, 0x335533, 0x6a6a70, 0x554433, 0xb0b4ba, 0x1d1d22];
     const cars = [
-      [-7.2, -40, 0], [7.2, -22, Math.PI], [-7.2, 10, 0], [7.2, 30, Math.PI], [-7.2, 46, 0],
-      [-40, 7.2, Math.PI / 2], [-18, -7.2, -Math.PI / 2], [16, 7.2, Math.PI / 2], [44, -7.2, -Math.PI / 2]
+      // main north-south avenue, both kerbs
+      [-7.2, -46, 0], [-7.2, -28, 0], [-7.2, 12, 0], [-7.2, 30, 0], [-7.2, 48, 0],
+      [7.2, -40, Math.PI], [7.2, -16, Math.PI], [7.2, 22, Math.PI], [7.2, 44, Math.PI],
+      // main east-west avenue, both kerbs
+      [-46, 7.2, Math.PI / 2], [-24, 7.2, Math.PI / 2], [18, 7.2, Math.PI / 2], [40, 7.2, Math.PI / 2],
+      [-38, -7.2, -Math.PI / 2], [-14, -7.2, -Math.PI / 2], [26, -7.2, -Math.PI / 2],
+      // side streets between blocks
+      [27, 27, 0], [-27, -27, Math.PI], [27, -45, 0], [-45, 27, Math.PI / 2]
     ];
     cars.forEach((c, i) => this._buildCar(c[0], c[1], c[2], carColors[i % carColors.length]));
+  }
+
+  // Ladder-style zebra crossing. `axis` 'x' paints bars spanning the X road
+  // width (a crossing over the north-south avenue); 'z' spans the Z width.
+  _crosswalk(cx, cz, axis) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xe4e7ec,
+      emissive: 0x3a3d42,
+      emissiveIntensity: 0.4,
+      roughness: 0.8
+    });
+    const roadW = 15;
+    const bars = 6;
+    const barLen = roadW;
+    const barThk = 0.55;
+    const spacing = 0.95;
+    const start = -((bars - 1) * spacing) / 2;
+    for (let i = 0; i < bars; i++) {
+      const off = start + i * spacing;
+      const geo = axis === 'x'
+        ? new THREE.BoxGeometry(barLen, 0.04, barThk)
+        : new THREE.BoxGeometry(barThk, 0.04, barLen);
+      const bar = new THREE.Mesh(geo, mat);
+      bar.position.set(axis === 'x' ? cx : cx + off, 0.03, axis === 'x' ? cz + off : cz);
+      bar.receiveShadow = true;
+      this.scene.add(bar);
+    }
+  }
+
+  _buildCrosswalks() {
+    // four crossings around the central intersection, plus a couple further out
+    this._crosswalk(0, 11, 'x');
+    this._crosswalk(0, -11, 'x');
+    this._crosswalk(11, 0, 'z');
+    this._crosswalk(-11, 0, 'z');
+    this._crosswalk(0, 47, 'x');
+    this._crosswalk(0, -47, 'x');
+    this._crosswalk(47, 0, 'z');
+    this._crosswalk(-47, 0, 'z');
+  }
+
+  _buildTree(x, z) {
+    const group = new THREE.Group();
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x213a1c, roughness: 0.95 });
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8), trunkMat);
+    trunk.position.y = 1.1;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    // layered canopy from a few overlapping spheres
+    const blobs = [
+      [0, 2.6, 0, 1.05],
+      [0.5, 2.3, 0.3, 0.75],
+      [-0.5, 2.4, -0.2, 0.7],
+      [0.2, 3.1, -0.3, 0.7]
+    ];
+    for (const [bx, by, bz, r] of blobs) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), leafMat);
+      leaf.position.set(bx, by, bz);
+      leaf.castShadow = true;
+      group.add(leaf);
+    }
+
+    group.position.set(x, 0.25, z);
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+
+    // slim trunk collider
+    const box = new THREE.Box3(
+      new THREE.Vector3(x - 0.35, 0, z - 0.35),
+      new THREE.Vector3(x + 0.35, 2.5, z + 0.35)
+    );
+    this.colliders.push({ box, mesh: trunk });
+  }
+
+  _buildPlanter(x, z) {
+    const group = new THREE.Group();
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x4a4036, roughness: 0.9 });
+    const soilMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 1 });
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x24471f, roughness: 0.95 });
+
+    const planter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.9), boxMat);
+    planter.position.y = 0.25;
+    planter.castShadow = true;
+    planter.receiveShadow = true;
+    group.add(planter);
+
+    const soil = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 0.7), soilMat);
+    soil.position.y = 0.5;
+    group.add(soil);
+
+    // leafy clumps
+    for (let i = 0; i < 3; i++) {
+      const bush = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 7), bushMat);
+      bush.position.set(-0.7 + i * 0.7, 0.62, 0);
+      bush.scale.y = 0.8;
+      bush.castShadow = true;
+      group.add(bush);
+    }
+
+    // bright flowers dotted through the greenery
+    const flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xe85d75, 0xb481ff, 0xffffff];
+    for (let i = 0; i < 10; i++) {
+      const c = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+      const flower = new THREE.Mesh(
+        new THREE.SphereGeometry(0.07, 6, 6),
+        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.25, roughness: 0.6 })
+      );
+      flower.position.set(-0.9 + Math.random() * 1.8, 0.66 + Math.random() * 0.12, -0.25 + Math.random() * 0.5);
+      group.add(flower);
+    }
+
+    group.position.set(x, 0.25, z);
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  _buildFlowerBed(x, z) {
+    // a low ground bed of grass dotted with flowers — no collider, walkable edge
+    const group = new THREE.Group();
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x1f3b1a, roughness: 1 });
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 1.4), grassMat);
+    bed.position.y = 0.31;
+    bed.receiveShadow = true;
+    group.add(bed);
+
+    const flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xb481ff, 0xffffff, 0xff4d4d];
+    for (let i = 0; i < 22; i++) {
+      const c = flowerColors[Math.floor(Math.random() * flowerColors.length)];
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, 0.16, 4),
+        new THREE.MeshStandardMaterial({ color: 0x2c5a22 })
+      );
+      const fx = -1.3 + Math.random() * 2.6;
+      const fz = -0.55 + Math.random() * 1.1;
+      stem.position.set(fx, 0.45, fz);
+      group.add(stem);
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.06, 6, 6),
+        new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, roughness: 0.6 })
+      );
+      head.position.set(fx, 0.55, fz);
+      group.add(head);
+    }
+
+    group.position.set(x, 0, z);
+    this.scene.add(group);
+  }
+
+  _buildGreenery() {
+    // trees lining the central avenues at regular intervals
+    const treeRows = [-50, -34, -18, 18, 34, 50];
+    for (const z of treeRows) {
+      this._buildTree(-9.5, z);
+      this._buildTree(9.5, z);
+    }
+    for (const x of treeRows) {
+      this._buildTree(x, -9.5);
+      this._buildTree(x, 9.5);
+    }
+
+    // flower planters near the central plaza corners
+    const planters = [
+      [-9.2, 4, 0], [9.2, 4, 0], [-9.2, -4, 0], [9.2, -4, 0],
+      [4, -9.2, 1], [-4, -9.2, 1], [4, 9.2, 1], [-4, 9.2, 1]
+    ];
+    for (const [px, pz, rot] of planters) {
+      this._buildPlanterRot(px, pz, rot ? Math.PI / 2 : 0);
+    }
+
+    // ground flower beds dotted around the plaza
+    this._buildFlowerBed(0, 0);
+    this._buildFlowerBed(13, 13);
+    this._buildFlowerBed(-13, 13);
+    this._buildFlowerBed(13, -13);
+    this._buildFlowerBed(-13, -13);
+  }
+
+  _buildPlanterRot(x, z, rotY) {
+    // wrapper so planters along the EW avenue can face the other way
+    const before = this.colliders.length;
+    this._buildPlanter(x, z);
+    if (rotY) {
+      const entry = this.colliders[this.colliders.length - 1];
+      entry.mesh.rotation.y = rotY;
+      entry.mesh.updateMatrixWorld(true);
+      entry.box.setFromObject(entry.mesh);
+    }
+    void before;
   }
 
   _buildBoundary() {
