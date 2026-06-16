@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-const ARENA_HALF = 60;
+const ARENA_HALF = 85;
+const TAXI_YELLOW = 0xffcf3d;
 
 // ---------------------------------------------------------------------------
 // Procedural textures
@@ -202,11 +203,79 @@ function makeBrickFacadeTexture(seed) {
   return { map, emissiveMap };
 }
 
+// Giant Times Square-style jumbotron ad: bold saturated colour blocks, a
+// scrolling "marquee" text bar, and a faint LED pixel grid. Self-lit, so the
+// same canvas serves as both colour and emissive map.
+function makeBillboardTexture(seed) {
+  const w = 256;
+  const h = 384;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const palettes = [
+    ['#ff1d4e', '#ffe600', '#0091ff'],
+    ['#00e0ff', '#ff5400', '#ffffff'],
+    ['#ffd400', '#ff0066', '#00ff9d'],
+    ['#7a2bff', '#00d2ff', '#ffe600']
+  ];
+  const pal = palettes[seed % palettes.length];
+  ctx.fillStyle = pal[0];
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = pal[(i + 1) % pal.length];
+    const bw = 40 + Math.random() * 120;
+    const bh = 30 + Math.random() * 90;
+    ctx.fillRect(Math.random() * (w - bw), Math.random() * (h - bh), bw, bh);
+  }
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 3; i++) {
+    const y = h * 0.72 + i * 26;
+    ctx.fillRect(16, y, w - 32, 14);
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 4) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+  }
+  for (let y = 0; y < h; y += 4) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+// The big neon "TIMES SQUARE" marquee mounted on one tall tower at the core.
+function makeTimesSquareSignTexture() {
+  const w = 512;
+  const h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#05070a';
+  ctx.fillRect(0, 0, w, h);
+  ctx.font = 'bold 60px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#ff2a4d';
+  ctx.shadowBlur = 26;
+  ctx.fillStyle = '#ff2a4d';
+  ctx.fillText('TIMES SQUARE', w / 2, h / 2);
+  ctx.shadowBlur = 0;
+  return new THREE.CanvasTexture(canvas);
+}
+
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x05070d);
-    this.scene.fog = new THREE.Fog(0x06080f, 28, 130);
+    this.scene.fog = new THREE.Fog(0x06080f, 28, 175);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -216,6 +285,9 @@ export class World {
     this._facadeTex = [0, 1, 2, 3, 4, 5].map((i) => makeFacadeTexture(i));
     this._brickTex = [0, 1, 2].map((i) => makeBrickFacadeTexture(i));
     this._sidewalkTex = makeSidewalkTexture();
+    this._billboardTex = [0, 1, 2, 3].map((i) => makeBillboardTexture(i));
+    this._timesSquareSignTex = makeTimesSquareSignTexture();
+    this._signPlaced = false;
     this._flowerColors = [0xff5d8f, 0xffd23f, 0xff7a3d, 0xb481ff, 0xffffff, 0xff4d4d, 0xff9ec4];
 
     // Shared geometry + materials. The city spawns hundreds of small props
@@ -249,7 +321,24 @@ export class World {
       brickPlinth: new THREE.MeshStandardMaterial({ color: 0x3a342c, roughness: 0.9 }),
       glassPlinth: new THREE.MeshStandardMaterial({ color: 0x14181e, roughness: 0.9 }),
       brickCornice: new THREE.MeshStandardMaterial({ color: 0x4a4236, roughness: 0.85 }),
-      glassCornice: new THREE.MeshStandardMaterial({ color: 0x0c0f14, roughness: 0.85 })
+      glassCornice: new THREE.MeshStandardMaterial({ color: 0x0c0f14, roughness: 0.85 }),
+      // street-cover obstacles
+      cartBody: new THREE.MeshStandardMaterial({ color: 0xb8333a, roughness: 0.6, metalness: 0.3 }),
+      cartMetal: new THREE.MeshStandardMaterial({ color: 0xd8dadd, roughness: 0.35, metalness: 0.7 }),
+      umbrella: new THREE.MeshStandardMaterial({ color: 0xffd400, roughness: 0.7 }),
+      newsstandBody: new THREE.MeshStandardMaterial({ color: 0x1f5c3a, roughness: 0.7 }),
+      newsstandRoof: new THREE.MeshStandardMaterial({ color: 0x123322, roughness: 0.6 }),
+      scaffoldPole: new THREE.MeshStandardMaterial({ color: 0x6a6f78, roughness: 0.5, metalness: 0.7 }),
+      scaffoldBoard: new THREE.MeshStandardMaterial({ color: 0x9a7a3a, roughness: 0.85 }),
+      dumpsterBody: new THREE.MeshStandardMaterial({ color: 0x2c5c34, roughness: 0.8, metalness: 0.2 }),
+      mailboxBody: new THREE.MeshStandardMaterial({ color: 0x1f3f8c, roughness: 0.5, metalness: 0.4 }),
+      barrierBody: new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.8 }),
+      barrierStripe: new THREE.MeshStandardMaterial({ color: 0xff7a1a, emissive: 0x6a2c00, emissiveIntensity: 0.3, roughness: 0.6 }),
+      tktsRed: new THREE.MeshStandardMaterial({ color: 0xcc132c, emissive: 0x3a0008, emissiveIntensity: 0.5, roughness: 0.6 }),
+      subwayDark: new THREE.MeshStandardMaterial({ color: 0x14151a, roughness: 0.95 }),
+      subwayRail: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.5, metalness: 0.6 }),
+      subwayGlobe: new THREE.MeshStandardMaterial({ color: 0x1fae4a, emissive: 0x2dff7a, emissiveIntensity: 2.4 }),
+      taxiSign: new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xfff7c2, emissiveIntensity: 1.2 })
     };
     this._flowerMats = new Map();
     this._carMats = new Map();
@@ -261,6 +350,7 @@ export class World {
     this._buildCrosswalks();
     this._buildStreetProps();
     this._buildGreenery();
+    this._buildObstacles();
     this._buildBoundary();
     this._buildSpawnPoints();
 
@@ -277,12 +367,12 @@ export class World {
     moon.position.set(-50, 70, 40);
     moon.castShadow = true;
     moon.shadow.mapSize.set(1024, 1024);
-    moon.shadow.camera.left = -70;
-    moon.shadow.camera.right = 70;
-    moon.shadow.camera.top = 70;
-    moon.shadow.camera.bottom = -70;
+    moon.shadow.camera.left = -95;
+    moon.shadow.camera.right = 95;
+    moon.shadow.camera.top = 95;
+    moon.shadow.camera.bottom = -95;
     moon.shadow.camera.near = 1;
-    moon.shadow.camera.far = 220;
+    moon.shadow.camera.far = 260;
     moon.shadow.bias = -0.0015;
     this.scene.add(moon);
 
@@ -310,7 +400,7 @@ export class World {
     // moon disc
     const moonMat = new THREE.MeshBasicMaterial({ color: 0xeef2ff, fog: false });
     const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 24, 24), moonMat);
-    moon.position.set(-90, 80, -120);
+    moon.position.set(-130, 95, -170);
     this.scene.add(moon);
     const halo = new THREE.Mesh(
       new THREE.SphereGeometry(11, 24, 24),
@@ -324,7 +414,7 @@ export class World {
     const count = 600;
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      const r = 200;
+      const r = 260;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.random() * Math.PI * 0.45 + 0.05;
       pos[i * 3] = Math.cos(theta) * Math.sin(phi) * r;
@@ -376,9 +466,12 @@ export class World {
   _buildCity() {
     // City blocks sit in a grid; the central row (z=0) and column (x=0) are
     // left clear so two wide avenues cross at the plaza, giving long sightlines
-    // and somewhere to spawn. Buildings only fill the four quadrants.
+    // and somewhere to spawn. Buildings only fill the four quadrants. The
+    // outer ring (ring 4) gets simplified detail and the inner two rings
+    // (the "Times Square" core) get jumbotron billboards, keeping the bigger
+    // map's prop count under control.
     const cell = 18; // centre-to-centre spacing
-    const range = 3; // cells out from centre (=> avenues + 6x6 of blocks)
+    const range = 4; // cells out from centre
 
     for (let ix = -range; ix <= range; ix++) {
       for (let iz = -range; iz <= range; iz++) {
@@ -393,13 +486,14 @@ export class World {
         // mix of tall glass towers and shorter brick low-rises
         const brick = Math.random() < 0.5;
         const height = brick ? 8 + Math.random() * 10 : 20 + Math.random() * 22;
+        const ring = Math.max(Math.abs(ix), Math.abs(iz));
 
-        this._buildBuilding(cx, cz, fw, fd, height, brick ? 'brick' : 'glass');
+        this._buildBuilding(cx, cz, fw, fd, height, brick ? 'brick' : 'glass', ring);
       }
     }
   }
 
-  _buildBuilding(cx, cz, fw, fd, height, style) {
+  _buildBuilding(cx, cz, fw, fd, height, style, ring = 1) {
     const base = 0.25; // sits on the sidewalk slab
 
     // sidewalk slab under/around the building (shared texture, cloned for repeat)
@@ -482,12 +576,57 @@ export class World {
     const front = this._frontFace(cx, cz);
     this._buildEntrance(cx, cz, fw, fd, front);
 
-    if (style === 'brick') {
-      // window flower boxes on the lower floors + a planted front garden
-      this._buildWindowBoxes(cx, cz, fw, fd, front, height);
-      this._buildFrontGarden(cx, cz, fw, fd, front);
-    } else if (Math.random() < 0.6) {
-      this._buildRoofGarden(cx, cz, fw, fd, height + base);
+    const simplified = ring >= 4; // outer ring: keep it quieter for performance
+    const core = ring <= 2; // inner two rings: the Times Square showpiece
+
+    if (!simplified) {
+      if (style === 'brick') {
+        // window flower boxes on the lower floors + a planted front garden
+        this._buildWindowBoxes(cx, cz, fw, fd, front, height);
+        this._buildFrontGarden(cx, cz, fw, fd, front);
+      } else if (Math.random() < 0.6) {
+        this._buildRoofGarden(cx, cz, fw, fd, height + base);
+      }
+    }
+
+    if (core && Math.random() < 0.65) {
+      const wantSign = !this._signPlaced && style === 'glass' && height > 28;
+      this._buildBillboard(cx, cz, fw, fd, front, height, base, wantSign);
+      if (wantSign) this._signPlaced = true;
+    }
+  }
+
+  // Oversized jumbotron/ad panel mounted flush against a building's front
+  // face, Times-Square style. One special panel (the first qualifying tall
+  // glass tower near the core) gets the "TIMES SQUARE" marquee instead.
+  _buildBillboard(cx, cz, fw, fd, front, height, base, special) {
+    const { ox, oz, ax, az, half, len } = this._faceVecs(front, fw, fd);
+    const panelW = Math.max(2, Math.min(len - 0.6, len * (special ? 0.95 : 0.8)));
+    const panelH = special ? panelW * 0.22 : Math.min(height * 0.4, panelW * 1.2);
+    const y = special
+      ? base + height - panelH * 0.7
+      : base + 3.4 + Math.random() * Math.max(1, height * 0.3);
+    const tex = special
+      ? this._timesSquareSignTex
+      : this._billboardTex[Math.floor(Math.random() * this._billboardTex.length)];
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      emissiveMap: tex,
+      emissive: 0xffffff,
+      emissiveIntensity: special ? 1.6 : 1.25,
+      color: 0x1a1a1a,
+      roughness: 0.45,
+      metalness: 0.1
+    });
+    const geo = new THREE.BoxGeometry(ax ? panelW : 0.1, panelH, az ? panelW : 0.1);
+    const panel = new THREE.Mesh(geo, mat);
+    panel.position.set(cx + ox * (half + 0.1), y, cz + oz * (half + 0.1));
+    this.scene.add(panel);
+
+    if (special) {
+      const light = new THREE.PointLight(0xffe9c2, 5, 20, 2);
+      light.position.set(cx + ox * (half + 2), y, cz + oz * (half + 2));
+      this.scene.add(light);
     }
   }
 
@@ -694,6 +833,11 @@ export class World {
       tl.position.set(sx, 0.6, 2.12);
       group.add(tl);
     }
+    if (color === TAXI_YELLOW) {
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.22), this._mats.taxiSign);
+      sign.position.set(0, 1.5, -0.1);
+      group.add(sign);
+    }
     for (const wx of [-0.85, 0.85]) {
       for (const wz of [-1.4, 1.4]) {
         const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.25, 12), this._mats.carWheel);
@@ -713,7 +857,7 @@ export class World {
 
   _buildStreetProps() {
     // streetlights down the two central avenues
-    const lampPos = [-50, -34, -18, 18, 34, 50];
+    const lampPos = [-72, -50, -34, -18, 18, 34, 50, 72];
     for (const z of lampPos) {
       this._streetLight(-8, z);
       this._streetLight(8, z);
@@ -723,17 +867,23 @@ export class World {
       this._streetLight(x, 8);
     }
 
-    // parked + stopped cars along the avenues and side streets (also cover)
-    const carColors = [0x882222, 0x223a66, 0x2c2c30, 0x335533, 0x6a6a70, 0x554433, 0xb0b4ba, 0x1d1d22];
+    // parked + stopped cars along the avenues and side streets (also cover) —
+    // a big share of NYC yellow cabs for the Times Square feel
+    const carColors = [
+      TAXI_YELLOW, 0x882222, TAXI_YELLOW, 0x223a66, TAXI_YELLOW, 0x2c2c30,
+      TAXI_YELLOW, 0x335533, TAXI_YELLOW, 0x6a6a70, TAXI_YELLOW, 0x554433,
+      TAXI_YELLOW, 0xb0b4ba, TAXI_YELLOW, 0x1d1d22
+    ];
     const cars = [
       // main north-south avenue, both kerbs
-      [-7.2, -46, 0], [-7.2, -28, 0], [-7.2, 12, 0], [-7.2, 30, 0], [-7.2, 48, 0],
-      [7.2, -40, Math.PI], [7.2, -16, Math.PI], [7.2, 22, Math.PI], [7.2, 44, Math.PI],
+      [-7.2, -46, 0], [-7.2, -28, 0], [-7.2, 12, 0], [-7.2, 30, 0], [-7.2, 48, 0], [-7.2, 64, 0],
+      [7.2, -40, Math.PI], [7.2, -16, Math.PI], [7.2, 22, Math.PI], [7.2, 44, Math.PI], [7.2, -64, Math.PI],
       // main east-west avenue, both kerbs
-      [-46, 7.2, Math.PI / 2], [-24, 7.2, Math.PI / 2], [18, 7.2, Math.PI / 2], [40, 7.2, Math.PI / 2],
-      [-38, -7.2, -Math.PI / 2], [-14, -7.2, -Math.PI / 2], [26, -7.2, -Math.PI / 2],
+      [-46, 7.2, Math.PI / 2], [-24, 7.2, Math.PI / 2], [18, 7.2, Math.PI / 2], [40, 7.2, Math.PI / 2], [62, 7.2, Math.PI / 2],
+      [-38, -7.2, -Math.PI / 2], [-14, -7.2, -Math.PI / 2], [26, -7.2, -Math.PI / 2], [-62, -7.2, -Math.PI / 2],
       // side streets between blocks
-      [27, 27, 0], [-27, -27, Math.PI], [27, -45, 0], [-45, 27, Math.PI / 2]
+      [27, 27, 0], [-27, -27, Math.PI], [27, -45, 0], [-45, 27, Math.PI / 2],
+      [63, 63, 0], [-63, -63, Math.PI], [63, -63, Math.PI / 2]
     ];
     cars.forEach((c, i) => this._buildCar(c[0], c[1], c[2], carColors[i % carColors.length]));
   }
@@ -778,6 +928,10 @@ export class World {
     this._crosswalk(0, -47, 'x');
     this._crosswalk(47, 0, 'z');
     this._crosswalk(-47, 0, 'z');
+    this._crosswalk(0, 70, 'x');
+    this._crosswalk(0, -70, 'x');
+    this._crosswalk(70, 0, 'z');
+    this._crosswalk(-70, 0, 'z');
   }
 
   _buildTree(x, z) {
@@ -867,7 +1021,7 @@ export class World {
 
   _buildGreenery() {
     // trees lining the central avenues at regular intervals
-    const treeRows = [-50, -34, -18, 18, 34, 50];
+    const treeRows = [-72, -50, -34, -18, 18, 34, 50, 72];
     for (const z of treeRows) {
       this._buildTree(-9.5, z);
       this._buildTree(9.5, z);
@@ -907,6 +1061,234 @@ export class World {
     void before;
   }
 
+  // TKTS-style red bleacher steps near the plaza.
+  _buildTktsSteps(x, z) {
+    const group = new THREE.Group();
+    const steps = 5;
+    for (let i = 0; i < steps; i++) {
+      const d = 3.6 - i * 0.5;
+      const h = 0.34;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(6, h, d), this._mats.tktsRed);
+      step.position.set(0, h / 2 + i * h, -d / 2 + 1.8);
+      step.receiveShadow = true;
+      group.add(step);
+    }
+    group.position.set(x, 0, z);
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Subway stair entrance with railings and green globe lamps.
+  _buildSubwayEntrance(x, z, rotY) {
+    const group = new THREE.Group();
+    const pit = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 2.4), this._mats.subwayDark);
+    pit.position.y = 0.05;
+    group.add(pit);
+
+    const railSpecs = [
+      [0, -1.2, 3.2, 0.1],
+      [0, 1.2, 3.2, 0.1],
+      [-1.6, 0, 0.1, 2.4],
+      [1.6, 0, 0.1, 2.4]
+    ];
+    for (const [dx, dz, w, d] of railSpecs) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), this._mats.subwayRail);
+      rail.position.set(dx, 0.45, dz);
+      group.add(rail);
+    }
+    for (const sx of [-1.3, 1.3]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 8), this._mats.poleMetal);
+      pole.position.set(sx, 0.8, -1.3);
+      group.add(pole);
+      const globe = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), this._mats.subwayGlobe);
+      globe.position.set(sx, 1.65, -1.3);
+      group.add(globe);
+    }
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // NYC street-cart cover: bright umbrella over a boxy cart body.
+  _buildHotDogCart(x, z, rotY) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.0, 0.8), this._mats.cartBody);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    group.add(body);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.9), this._mats.cartMetal);
+    counter.position.y = 1.1;
+    group.add(counter);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), this._mats.cartMetal);
+    pole.position.y = 1.8;
+    group.add(pole);
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.5, 10), this._mats.umbrella);
+    canopy.position.y = 2.55;
+    group.add(canopy);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Green NYC newsstand kiosk — solid chest-height cover.
+  _buildNewsstand(x, z, rotY) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.5, 1.2), this._mats.newsstandBody);
+    body.position.y = 0.85;
+    body.castShadow = true;
+    group.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.12, 1.5), this._mats.newsstandRoof);
+    roof.position.y = 1.66;
+    group.add(roof);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Sidewalk-shed scaffolding tunnel: a row of poles holding up a plank roof,
+  // tall and wide enough to run through or duck behind the support poles.
+  _buildScaffold(x, z, rotY, length) {
+    const group = new THREE.Group();
+    const bays = Math.max(2, Math.round(length / 2.5));
+    const bayLen = length / bays;
+    const rowA = new THREE.Group();
+    const rowB = new THREE.Group();
+    for (let i = 0; i <= bays; i++) {
+      const lx = -length / 2 + i * bayLen;
+      const poleA = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), this._mats.scaffoldPole);
+      poleA.position.set(lx, 1.3, -1.1);
+      rowA.add(poleA);
+      const poleB = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), this._mats.scaffoldPole);
+      poleB.position.set(lx, 1.3, 1.1);
+      rowB.add(poleB);
+    }
+    group.add(rowA, rowB);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(length, 0.12, 2.4), this._mats.scaffoldBoard);
+    roof.position.y = 2.65;
+    roof.receiveShadow = true;
+    group.add(roof);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+
+    // collide only with the two rows of support poles, leaving the tunnel
+    // underneath open so players can actually run through it for cover
+    for (const row of [rowA, rowB]) {
+      const box = new THREE.Box3().setFromObject(row);
+      this.colliders.push({ box, mesh: row });
+    }
+  }
+
+  // Dumpster: tall, solid, great full-body cover.
+  _buildDumpster(x, z, rotY) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.3), this._mats.dumpsterBody);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    group.add(body);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 1.4), this._mats.dumpsterBody);
+    lid.position.y = 1.26;
+    group.add(lid);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // USPS mailbox — small low cover, good for crouching.
+  _buildMailbox(x, z, rotY) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.1, 10), this._mats.mailboxBody);
+    body.position.y = 0.65;
+    body.castShadow = true;
+    group.add(body);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), this._mats.mailboxBody);
+    top.position.y = 1.2;
+    group.add(top);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // A short row of concrete construction barriers with a reflective stripe,
+  // placed end to end — low crouch cover.
+  _buildBarrierRow(x, z, rotY, count = 3) {
+    const group = new THREE.Group();
+    const spacing = 1.7;
+    const start = -((count - 1) * spacing) / 2;
+    for (let i = 0; i < count; i++) {
+      const lx = start + i * spacing;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 0.4), this._mats.barrierBody);
+      body.position.set(lx, 0.4, 0);
+      body.castShadow = true;
+      group.add(body);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.16, 0.42), this._mats.barrierStripe);
+      stripe.position.set(lx, 0.55, 0);
+      group.add(stripe);
+    }
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Scattered street furniture players can duck behind — carts, newsstands,
+  // scaffolding, dumpsters, mailboxes and barrier rows down the two main
+  // avenues, on top of the existing parked cars/planters/trees. Kept within
+  // the open avenue corridors (small cross-axis offset) so nothing clips
+  // into a building footprint.
+  _buildObstacles() {
+    this._buildHotDogCart(3, 16, 0);
+    this._buildHotDogCart(-3, -16, Math.PI);
+    this._buildHotDogCart(-3, 44, 0.4);
+    this._buildHotDogCart(3, -44, -0.4);
+
+    this._buildNewsstand(-3, 22, Math.PI / 2);
+    this._buildNewsstand(3, -28, -Math.PI / 2);
+
+    this._buildScaffold(-3.2, -38, Math.PI / 2, 6);
+    this._buildScaffold(3.2, 58, -Math.PI / 2, 6);
+
+    this._buildDumpster(3, -58, 0);
+    this._buildDumpster(-3, 28, 0.5);
+
+    this._buildMailbox(58, 3, Math.PI / 2);
+    this._buildMailbox(-58, -3, -Math.PI / 2);
+
+    this._buildBarrierRow(3, -22, 0, 3);
+    this._buildBarrierRow(-3, 38, 0, 3);
+    this._buildBarrierRow(22, -3, Math.PI / 2, 3);
+    this._buildBarrierRow(-22, 3, Math.PI / 2, 3);
+
+    this._buildTktsSteps(0, -66);
+    this._buildSubwayEntrance(0, 66, 0);
+  }
+
   _buildBoundary() {
     // low jersey-barrier walls ring the playable area so you can't leave the city
     const mat = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9 });
@@ -932,7 +1314,8 @@ export class World {
     // spawn out on the streets, never inside a block
     const coords = [
       [0, 0], [0, 20], [0, -20], [20, 0], [-20, 0],
-      [7.5, 42], [-7.5, -42], [42, 7.5], [-42, -7.5], [7.5, -50], [-7.5, 50]
+      [7.5, 42], [-7.5, -42], [42, 7.5], [-42, -7.5], [7.5, -50], [-7.5, 50],
+      [0, 60], [0, -60], [60, 0], [-60, 0]
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));
