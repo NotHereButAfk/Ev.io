@@ -44,7 +44,8 @@ export class AudioManager {
       shotgun: { dur: 0.22, freq: 150, noiseMix: 0.85 },
       rifle: { dur: 0.1, freq: 240, noiseMix: 0.6 },
       lmg: { dur: 0.13, freq: 180, noiseMix: 0.7 },
-      sniper: { dur: 0.32, freq: 110, noiseMix: 0.7 }
+      sniper: { dur: 0.32, freq: 110, noiseMix: 0.7 },
+      rpg: { dur: 0.35, freq: 90, noiseMix: 0.85 }
     }[kind] || { dur: 0.12, freq: 240, noiseMix: 0.6 };
 
     const noise = this.ctx.createBufferSource();
@@ -66,6 +67,32 @@ export class AudioManager {
     osc.start(t);
     noise.stop(t + params.dur + 0.02);
     osc.stop(t + params.dur + 0.02);
+  }
+
+  playExplosion() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.6);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, t);
+    filter.frequency.exponentialRampToValueAtTime(70, t + 0.5);
+    const noiseGain = this._envGain(0.95, 0.005, 0.55, t);
+    noise.connect(filter).connect(noiseGain).connect(this.master);
+
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(130, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.4);
+    const oscGain = this._envGain(0.8, 0.005, 0.42, t);
+    osc.connect(oscGain).connect(this.master);
+
+    noise.start(t);
+    osc.start(t);
+    noise.stop(t + 0.62);
+    osc.stop(t + 0.45);
   }
 
   playSwing() {

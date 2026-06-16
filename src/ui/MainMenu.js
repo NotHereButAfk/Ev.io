@@ -1,5 +1,6 @@
 import { SKINS } from '../player/skins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
+import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 
 export class MenuUI {
   constructor() {
@@ -8,6 +9,7 @@ export class MenuUI {
     this.gameoverMenu = document.getElementById('gameover-menu');
     this.nameInput = document.getElementById('player-name');
     this.skinGrid = document.getElementById('skin-grid');
+    this.weaponSkinGrid = document.getElementById('weapon-skin-grid');
     this.loadoutList = document.getElementById('loadout-list');
     this.playBtn = document.getElementById('play-btn');
     this.resumeBtn = document.getElementById('resume-btn');
@@ -17,8 +19,10 @@ export class MenuUI {
     this.gameoverStats = document.getElementById('gameover-stats');
 
     this.selectedSkinId = SKINS[0].id;
+    this.selectedWeaponSkinId = WEAPON_SKINS[0].id;
 
     this._buildSkinGrid();
+    this._buildWeaponSkinGrid();
     this._buildLoadoutList();
 
     this.onPlay = null;
@@ -29,7 +33,7 @@ export class MenuUI {
 
     this.playBtn.addEventListener('click', () => {
       const name = this.nameInput.value.trim() || 'Recruit';
-      if (this.onPlay) this.onPlay(name, this.selectedSkinId);
+      if (this.onPlay) this.onPlay(name, this.selectedSkinId, this.selectedWeaponSkinId);
     });
     this.resumeBtn.addEventListener('click', () => this.onResume && this.onResume());
     this.quitBtn.addEventListener('click', () => this.onQuit && this.onQuit());
@@ -50,6 +54,22 @@ export class MenuUI {
         el.classList.add('selected');
       });
       this.skinGrid.appendChild(el);
+    });
+  }
+
+  _buildWeaponSkinGrid() {
+    this.weaponSkinGrid.innerHTML = '';
+    WEAPON_SKINS.forEach((skin) => {
+      const el = document.createElement('div');
+      el.className = 'skin-swatch' + (skin.id === this.selectedWeaponSkinId ? ' selected' : '');
+      el.style.background = `linear-gradient(145deg, #${skin.body.toString(16).padStart(6, '0')}, #${skin.accent.toString(16).padStart(6, '0')})`;
+      el.title = skin.name;
+      el.addEventListener('click', () => {
+        this.selectedWeaponSkinId = skin.id;
+        this.weaponSkinGrid.querySelectorAll('.skin-swatch').forEach((s) => s.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+      this.weaponSkinGrid.appendChild(el);
     });
   }
 

@@ -1,11 +1,30 @@
 // Weapon stats for the arsenal. Times are in seconds.
-// `key` is the keyboard binding shown in the HUD ("1".."9","0" for guns, "V" for melee).
-// `sound` maps to a profile in AudioManager.playShot().
+// `key` is the keyboard binding shown in the HUD (digits for the first ten guns,
+// letters for the rest, "V" for the blade). `sound` maps to a profile in
+// AudioManager.playShot(). The scroll wheel cycles through everything.
 export const WEAPONS = [
+  {
+    id: 'glock',
+    name: 'Glock 17',
+    key: '1',
+    kind: 'hitscan',
+    sound: 'sidearm',
+    damage: 22,
+    pellets: 1,
+    spread: 0.007,
+    fireRate: 0.16,
+    automatic: false,
+    magSize: 17,
+    reserveMax: 102,
+    reloadTime: 1.0,
+    range: 110,
+    recoil: 0.016,
+    color: 0x1b1d20
+  },
   {
     id: 'sidearm',
     name: 'Sidearm',
-    key: '1',
+    key: '2',
     kind: 'hitscan',
     sound: 'sidearm',
     damage: 18,
@@ -18,12 +37,12 @@ export const WEAPONS = [
     reloadTime: 1.1,
     range: 120,
     recoil: 0.018,
-    color: 0x9aa5b1
+    color: 0x2b2f36
   },
   {
     id: 'uzi',
     name: 'Uzi',
-    key: '2',
+    key: '3',
     kind: 'hitscan',
     sound: 'smg',
     damage: 12,
@@ -41,7 +60,7 @@ export const WEAPONS = [
   {
     id: 'smg',
     name: 'Viper SMG',
-    key: '3',
+    key: '4',
     kind: 'hitscan',
     sound: 'smg',
     damage: 11,
@@ -54,12 +73,12 @@ export const WEAPONS = [
     reloadTime: 1.6,
     range: 90,
     recoil: 0.012,
-    color: 0x4a5560
+    color: 0x3a4048
   },
   {
     id: 'levershotgun',
     name: 'Lever Shotgun',
-    key: '4',
+    key: '5',
     kind: 'hitscan',
     sound: 'shotgun',
     damage: 10,
@@ -77,7 +96,7 @@ export const WEAPONS = [
   {
     id: 'shotgun',
     name: 'Buckshot',
-    key: '5',
+    key: '6',
     kind: 'hitscan',
     sound: 'shotgun',
     damage: 9,
@@ -95,7 +114,7 @@ export const WEAPONS = [
   {
     id: 'm4',
     name: 'M4 Carbine',
-    key: '6',
+    key: '7',
     kind: 'hitscan',
     sound: 'rifle',
     damage: 22,
@@ -111,9 +130,45 @@ export const WEAPONS = [
     color: 0x2a2d33
   },
   {
+    id: 'ar10',
+    name: 'AR-10 .308',
+    key: '8',
+    kind: 'hitscan',
+    sound: 'rifle',
+    damage: 42,
+    pellets: 1,
+    spread: 0.005,
+    fireRate: 0.14,
+    automatic: false,
+    magSize: 20,
+    reserveMax: 100,
+    reloadTime: 2.0,
+    range: 200,
+    recoil: 0.028,
+    color: 0x202327
+  },
+  {
+    id: 'm16',
+    name: 'M16A2',
+    key: '9',
+    kind: 'hitscan',
+    sound: 'rifle',
+    damage: 24,
+    pellets: 1,
+    spread: 0.009,
+    fireRate: 0.1,
+    automatic: true,
+    magSize: 20,
+    reserveMax: 120,
+    reloadTime: 2.0,
+    range: 160,
+    recoil: 0.02,
+    color: 0x1a1c20
+  },
+  {
     id: 'rifle',
     name: 'Falcon Rifle',
-    key: '7',
+    key: '0',
     kind: 'hitscan',
     sound: 'rifle',
     damage: 24,
@@ -131,7 +186,7 @@ export const WEAPONS = [
   {
     id: 'lmg',
     name: 'M240 Bravo',
-    key: '8',
+    key: 'H',
     kind: 'hitscan',
     sound: 'lmg',
     damage: 20,
@@ -147,9 +202,30 @@ export const WEAPONS = [
     color: 0x23262b
   },
   {
+    id: 'rpg',
+    name: 'RPG-7',
+    key: 'G',
+    kind: 'rocket',
+    sound: 'rpg',
+    damage: 130,
+    splashRadius: 5.5,
+    splashMin: 0.25,
+    rocketSpeed: 40,
+    pellets: 1,
+    spread: 0,
+    fireRate: 1.2,
+    automatic: false,
+    magSize: 1,
+    reserveMax: 6,
+    reloadTime: 3.2,
+    range: 220,
+    recoil: 0.09,
+    color: 0x33363b
+  },
+  {
     id: 'sniper',
     name: 'Longshot',
-    key: '9',
+    key: 'N',
     kind: 'hitscan',
     sound: 'sniper',
     damage: 95,
@@ -168,7 +244,7 @@ export const WEAPONS = [
   {
     id: 'boltsniper',
     name: 'Precision Bolt',
-    key: '0',
+    key: 'B',
     kind: 'hitscan',
     sound: 'sniper',
     damage: 110,
