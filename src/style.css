@@ -423,6 +423,82 @@ html, body {
   text-align: right;
 }
 
+#stamina-wrap {
+  left: 22px;
+  bottom: 68px;
+}
+
+.stamina-icon {
+  color: #38d9f5;
+  font-size: 18px;
+}
+
+.stamina-fill {
+  background: linear-gradient(90deg, #1ab8d4, #38d9f5);
+  transition: width 0.1s ease;
+}
+
+.stamina-low {
+  background: linear-gradient(90deg, #d4821a, #f5b438) !important;
+  animation: blink 0.4s infinite;
+}
+
+#stamina-text {
+  font-weight: 700;
+  width: 30px;
+  text-align: right;
+  color: #38d9f5;
+}
+
+#grenade-wrap {
+  left: 22px;
+  bottom: 114px;
+  gap: 14px;
+  padding: 8px 14px;
+}
+
+.grenade-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.grenade-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.frag-icon  { color: #e8d47a; }
+.smoke-icon { color: #b0d4e8; }
+
+#frag-count,
+#smoke-count {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.grenade-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #8a9aaa;
+  font-weight: 600;
+}
+
+.grenade-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255,255,255,0.12);
+  align-self: center;
+}
+
+.grenade-empty {
+  color: #555 !important;
+  opacity: 0.5;
+}
+
 #weapon-wrap {
   right: 22px;
   bottom: 22px;

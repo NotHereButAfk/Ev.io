@@ -17,6 +17,7 @@ import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
+import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -45,8 +46,9 @@ export class Game {
     this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager   = new BotManager(this.world, this.world.scene);
     this.input        = new InputManager(canvas);
-    this.hud          = new HUD();
-    this.menu         = new MenuUI();
+    this.hud            = new HUD();
+    this.grenadeSystem  = new GrenadeSystem(this.world.scene);
+    this.menu           = new MenuUI();
     this.authUI       = new AuthUI();
 
     this.menuCamera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
@@ -181,6 +183,26 @@ export class Game {
 
   _wireCallbacks() {
     this.weaponSystem.applyRecoilToPlayer = (amt) => this.player.applyRecoil(amt);
+
+    this.grenadeSystem.onExplode = (point, radius, damage) => {
+      for (const bot of this.botManager.bots) {
+        if (!bot.alive) continue;
+        const d = bot.position.distanceTo(point);
+        if (d <= radius) {
+          const f = THREE.MathUtils.lerp(1, 0.1, THREE.MathUtils.clamp(d / radius, 0, 1));
+          const killed = bot.takeDamage(damage * f);
+          this.hud.flashHitmarker();
+          if (killed) {
+            this.deathEffects.spawn(bot.mesh.position, null, null, false);
+            this.kills  += 1;
+            this.score  += 100;
+            this.audio.playKill();
+            this.hud.addKillFeed(`${this.player.name} fragged a target  +100`);
+          }
+        }
+      }
+    };
+
     this.weaponSystem.onHitBot = (bot, dmg) => {
       const killed = bot.takeDamage(dmg);
       this.audio.playHit();
@@ -262,6 +284,7 @@ export class Game {
     this.player.skin = this.selectedSkin;
     this.player.respawn(SPAWN_POINT);
     this.weaponSystem.resetState(this.player.baseFov);
+    this.grenadeSystem.reset();
 
     // Apply selected game mode
     this._mode    = getMode(modeId);
@@ -402,7 +425,20 @@ export class Game {
     this.weaponSystem.update(dt, this.input, this.world, this.botManager, this.player);
     this.deathEffects.update(dt);
     this.botManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
+
+    // grenade input  Q = frag  E = smoke
+    if (this.input.consumeJustPressed('KeyQ')) {
+      this.grenadeSystem.throwFrag(this.player.camera);
+      this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
+    }
+    if (this.input.consumeJustPressed('KeyE')) {
+      this.grenadeSystem.throwSmoke(this.player.camera);
+      this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
+    }
+    this.grenadeSystem.update(dt, this.player);
+
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
 
     this._updateModeLogic(dt);

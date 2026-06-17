@@ -3,6 +3,10 @@ export class HUD {
     this.root        = document.getElementById('hud');
     this.healthBar   = document.getElementById('health-bar');
     this.healthText  = document.getElementById('health-text');
+    this.staminaBar  = document.getElementById('stamina-bar');
+    this.staminaText = document.getElementById('stamina-text');
+    this.fragCount   = document.getElementById('frag-count');
+    this.smokeCount  = document.getElementById('smoke-count');
     this.weaponName  = document.getElementById('weapon-name');
     this.ammoText    = document.getElementById('ammo-text');
     this.reloadText  = document.getElementById('reload-text');
@@ -48,9 +52,15 @@ export class HUD {
   }
 
   update(player, weaponInfo, kills, score) {
-    const pct = Math.max(0, (player.health / player.maxHealth) * 100);
-    this.healthBar.style.width = `${pct}%`;
+    const hpct = Math.max(0, (player.health / player.maxHealth) * 100);
+    this.healthBar.style.width  = `${hpct}%`;
     this.healthText.textContent = Math.ceil(player.health);
+
+    const spct = Math.max(0, (player.stamina / player.maxStamina) * 100);
+    this.staminaBar.style.width  = `${spct}%`;
+    this.staminaText.textContent = Math.ceil(player.stamina);
+    // pulse low-stamina warning
+    this.staminaBar.classList.toggle('stamina-low', player.stamina < 25);
 
     this.weaponName.textContent = weaponInfo.name.toUpperCase();
     this.ammoText.textContent = weaponInfo.isMelee
@@ -60,6 +70,13 @@ export class HUD {
 
     this.killCount.textContent  = kills;
     this.scoreCount.textContent = score;
+  }
+
+  updateGrenades(frags, smokes) {
+    this.fragCount.textContent  = `${frags}`;
+    this.smokeCount.textContent = `${smokes}`;
+    this.fragCount.classList.toggle('grenade-empty',  frags  === 0);
+    this.smokeCount.classList.toggle('grenade-empty', smokes === 0);
   }
 
   flashHitmarker() {

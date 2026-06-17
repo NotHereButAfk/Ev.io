@@ -8,6 +8,11 @@ const JUMP_SPEED = 7.5;
 const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
 
+const MAX_STAMINA = 100;
+const STAMINA_DRAIN = 28;     // per second while sprinting
+const STAMINA_REGEN = 14;     // per second when idle/walking
+const STAMINA_REGEN_DELAY = 1.2; // seconds before regen kicks in after sprint ends
+
 export class Player {
   constructor(aspect) {
     this.camera = new THREE.PerspectiveCamera(78, aspect, 0.05, 300);
@@ -21,6 +26,9 @@ export class Player {
 
     this.maxHealth = 100;
     this.health = this.maxHealth;
+    this.maxStamina = MAX_STAMINA;
+    this.stamina = MAX_STAMINA;
+    this._staminaRegenDelay = 0;
     this.isSprinting = false;
     this.bobTime = 0;
     this.recoilPitch = 0;
@@ -36,7 +44,9 @@ export class Player {
   }
 
   respawn(position) {
-    this.health = this.maxHealth;
+    this.health   = this.maxHealth;
+    this.stamina  = this.maxStamina;
+    this._staminaRegenDelay = 0;
     this.position.copy(position);
     this.velocity.set(0, 0, 0);
   }
@@ -70,7 +80,20 @@ export class Player {
     if (input.isDown('KeyD')) moveX += 1;
 
     const moving = moveX !== 0 || moveZ !== 0;
-    this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ < 0;
+    this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ < 0 && this.stamina > 2;
+
+    // stamina drain / regen
+    if (this.isSprinting) {
+      this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt);
+      this._staminaRegenDelay = STAMINA_REGEN_DELAY;
+      if (this.stamina <= 0) this.isSprinting = false;
+    } else {
+      if (this._staminaRegenDelay > 0) {
+        this._staminaRegenDelay = Math.max(0, this._staminaRegenDelay - dt);
+      } else {
+        this.stamina = Math.min(this.maxStamina, this.stamina + STAMINA_REGEN * dt);
+      }
+    }
 
     const len = Math.hypot(moveX, moveZ);
     if (len > 0) {
