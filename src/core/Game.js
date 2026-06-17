@@ -296,7 +296,7 @@ export class Game {
 
   _resume() {
     this.menu.hidePause();
-    this.state = 'playing';
+    this._rafId = requestAnimationFrame(() => this._loop());
     this.input.requestPointerLock();
   }
 
