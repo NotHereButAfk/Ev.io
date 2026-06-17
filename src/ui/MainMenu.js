@@ -7,6 +7,7 @@ import { Armory } from '../core/Armory.js';
 import { GameSettings, DEFAULTS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { WeaponPreviewRenderer } from './WeaponPreviewRenderer.js';
+import { warmThumbnails, getThumbnail } from './SkinThumbnails.js';
 
 function _hex(n) { return n.toString(16).padStart(6, '0'); }
 function _rank(k) {
@@ -63,6 +64,7 @@ export class MenuUI {
     this.onArmoryChanged = null;
     this.onSettingsSaved = null;
 
+    warmThumbnails(); // kick off async thumbnail generation immediately
     this._buildSkinGrid();
     this._buildModeCards();
     this._buildSettings();
@@ -189,9 +191,25 @@ export class MenuUI {
       el.className = 'armory-swatch';
       if (skin.animated)          el.classList.add('animated');
       if (skin.id === equippedId) el.classList.add('equipped');
-      const c1 = this._armoryIsSword ? skin.blade : skin.body;
-      const c2 = this._armoryIsSword ? skin.guard : skin.accent;
-      el.style.background = `linear-gradient(145deg, #${_hex(c1)}, #${_hex(c2)})`;
+
+      // Thumbnail image (PBR render) — falls back to gradient if not ready yet
+      const thumb = getThumbnail(skin.id, this._armoryIsSword);
+      const imgEl = document.createElement('div');
+      imgEl.className = 'swatch-thumb';
+      if (thumb) {
+        imgEl.style.backgroundImage = `url(${thumb})`;
+      } else {
+        const c1 = this._armoryIsSword ? skin.blade : skin.body;
+        const c2 = this._armoryIsSword ? skin.guard : skin.accent;
+        imgEl.style.background = `linear-gradient(145deg, #${_hex(c1)}, #${_hex(c2)})`;
+      }
+      el.appendChild(imgEl);
+
+      // Skin name label
+      const nameEl = document.createElement('div');
+      nameEl.className = 'swatch-name';
+      nameEl.textContent = skin.name.replace(/[🔥⚡👻💀🌊]/u, '').trim();
+      el.appendChild(nameEl);
 
       el.addEventListener('mouseenter', () => { this._armoryHoverSkin = skin; this._previewSkin(skin); });
       el.addEventListener('mouseleave', () => {
