@@ -17,8 +17,8 @@ export class HUD {
     this._damageTimeout    = null;
   }
 
-  show() { this.root.classList.remove('hidden'); }
-  hide() { this.root.classList.add('hidden'); }
+  show() { this.root?.classList.remove('hidden'); }
+  hide() { this.root?.classList.add('hidden'); }
 
   // Mode-specific top-center overlay (timer, wave, lives).
   setModeHUD(primary, secondary = '') {

@@ -80,8 +80,8 @@ export class MenuUI {
       this._closeAllPanels();
       this.onPlay?.(name, this.selectedSkinId, this.selectedModeId);
     };
-    document.getElementById('nav-public-btn').addEventListener('click', startGame);
-    this.playBtn.addEventListener('click', startGame);
+    document.getElementById('nav-public-btn')?.addEventListener('click', startGame);
+    this.playBtn?.addEventListener('click', startGame);
 
     // Nav dropdown items
     document.querySelectorAll('[data-panel]').forEach((btn) => {
