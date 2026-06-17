@@ -16,6 +16,7 @@ import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
+import { loadArmorType } from '../player/ArmorTypes.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -63,10 +64,11 @@ export class Game {
     this._camSegTime = 0;
     this._CAM_SEG_DUR = 7.0; // seconds per transition
 
-    this.selectedSkin = getSkin('crimson');
-    this.previewCharacter = buildPreviewCharacter(this.selectedSkin);
+    this.selectedSkin      = getSkin('crimson');
+    this.selectedArmorType = loadArmorType();
+    this.previewCharacter  = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
-    this.previewCharacter.visible = false; // hidden until PLAY tab opens
+    this.previewCharacter.visible = false;
     this.world.scene.add(this.previewCharacter);
 
     this.state   = 'menu';
@@ -202,11 +204,14 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, modeId) => this._startGame(name, skinId, modeId);
+    this.menu.onPlay = (name, skinId, modeId, armorTypeId) => this._startGame(name, skinId, modeId, armorTypeId);
     this.menu.onResume        = () => this._resume();
     this.menu.onQuit          = () => this._quitToMenu();
     this.menu.onRestart       = () => this._restart();
     this.menu.onBackToMenu    = () => this._quitToMenu();
+    this.menu.onArmorChanged  = (armorTypeId) => this._rebuildPreviewCharacter(armorTypeId);
+    this.menu.onLoadoutOpen   = () => { this.previewCharacter.visible = true; };
+    this.menu.onLoadoutClose  = () => { this.previewCharacter.visible = false; };
     this.menu.onArmoryChanged = () => {
       // Re-apply armory skins to live weapon models
       const map = Armory.buildSkinMap(this.weaponSystem.loadout);
@@ -234,7 +239,16 @@ export class Game {
 
   // ── Game start / restart ────────────────────────────────────────────────────
 
-  _startGame(name, skinId, modeId = 'deathmatch') {
+  _rebuildPreviewCharacter(armorTypeId) {
+    this.selectedArmorType = armorTypeId;
+    this.world.scene.remove(this.previewCharacter);
+    this.previewCharacter = buildPreviewCharacter(this.selectedSkin, armorTypeId);
+    this.previewCharacter.position.copy(this.world.previewPedestalPos);
+    this.previewCharacter.visible = true;
+    this.world.scene.add(this.previewCharacter);
+  }
+
+  _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
     this.audio.resume();
     this.selectedSkin = getSkin(skinId);
     applySkinToCharacter(this.previewCharacter, this.selectedSkin);

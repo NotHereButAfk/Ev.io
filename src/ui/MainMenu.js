@@ -1,4 +1,5 @@
 import { SKINS } from '../player/skins.js';
+import { ARMOR_TYPES, loadArmorType, saveArmorType } from '../player/ArmorTypes.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
@@ -43,10 +44,14 @@ export class MenuUI {
     this.menuBtn       = document.getElementById('menu-btn');
     this.gameoverStats = document.getElementById('gameover-stats');
 
-    this.selectedSkinId = SKINS[0].id;
-    this.selectedModeId = GAME_MODES[0].id;
-    this._currentUser   = null;
-    this._preview       = null;
+    this.selectedSkinId   = SKINS[0].id;
+    this.selectedArmorId  = loadArmorType();
+    this.selectedModeId   = GAME_MODES[0].id;
+    this._currentUser     = null;
+    this._preview         = null;
+
+    // Callback: called when armor type changes so Game.js can rebuild preview
+    this.onArmorChanged = null; // (armorTypeId) => void
 
     // Armory state
     this._armoryWeaponId   = null;
@@ -66,6 +71,7 @@ export class MenuUI {
 
     warmThumbnails(); // kick off async thumbnail generation immediately
     this._buildSkinGrid();
+    this._buildArmorGrid();
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -78,7 +84,7 @@ export class MenuUI {
     const startGame = () => {
       const name = this.nameInput.value.trim() || 'Recruit';
       this._closeAllPanels();
-      this.onPlay?.(name, this.selectedSkinId, this.selectedModeId);
+      this.onPlay?.(name, this.selectedSkinId, this.selectedModeId, this.selectedArmorId);
     };
     document.getElementById('nav-public-btn')?.addEventListener('click', startGame);
     this.playBtn?.addEventListener('click', startGame);
@@ -116,13 +122,19 @@ export class MenuUI {
     document.getElementById('panel-' + id)?.classList.remove('hidden');
     document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
 
-    if (id === 'loadout')  this._initArmory();
+    if (id === 'loadout') {
+      this._initArmory();
+      this.onLoadoutOpen?.();
+    }
     if (id === 'profile')  this._renderProfile();
     if (id === 'settings') this._loadSettings();
   }
 
   _closeAllPanels() {
-    if (this._activePanel === 'loadout') this._stopPreview();
+    if (this._activePanel === 'loadout') {
+      this._stopPreview();
+      this.onLoadoutClose?.();
+    }
     this._activePanel = null;
     document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
     document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('active'));
@@ -170,6 +182,36 @@ export class MenuUI {
         el.classList.add('selected');
       });
       this.skinGrid.appendChild(el);
+    });
+  }
+
+  // ── Armor type grid ────────────────────────────────────────────────────────
+
+  _buildArmorGrid() {
+    const grid = document.getElementById('armor-type-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    ARMOR_TYPES.forEach((armor) => {
+      const card = document.createElement('div');
+      card.className = 'armor-card' + (armor.id === this.selectedArmorId ? ' selected' : '');
+      card.dataset.armorId = armor.id;
+      card.innerHTML = `
+        <div class="armor-card-icon">
+          <svg viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">${_armorSVG(armor.id)}</svg>
+        </div>
+        <div class="armor-card-info">
+          <div class="armor-card-name">${armor.name}</div>
+          <div class="armor-card-desc">${armor.desc}</div>
+        </div>
+      `;
+      card.addEventListener('click', () => {
+        this.selectedArmorId = armor.id;
+        saveArmorType(armor.id);
+        grid.querySelectorAll('.armor-card').forEach((c) => c.classList.remove('selected'));
+        card.classList.add('selected');
+        this.onArmorChanged?.(armor.id);
+      });
+      grid.appendChild(card);
     });
   }
 
@@ -453,3 +495,53 @@ export class MenuUI {
   }
   hideGameOver() { this.gameoverMenu.classList.add('hidden'); }
 }
+
+// SVG silhouette paths per armor type — used inside armor card icons
+function _armorSVG(id) {
+  const fill = 'rgba(0,207,255,0.7)';
+  const dark = 'rgba(0,0,0,0.5)';
+  switch (id) {
+    case 'assault': return `
+      <ellipse cx="16" cy="6.5" rx="5" ry="5.5" fill="${dark}"/>
+      <rect x="8" y="10" width="16" height="3" rx="1" fill="${fill}"/>
+      <rect x="9" y="13" width="14" height="14" rx="2" fill="${dark}"/>
+      <rect x="5" y="11" width="3.5" height="12" rx="1" fill="${dark}"/>
+      <rect x="23.5" y="11" width="3.5" height="12" rx="1" fill="${dark}"/>
+      <rect x="9.5" y="28" width="5.5" height="14" rx="2" fill="${dark}"/>
+      <rect x="17" y="28" width="5.5" height="14" rx="2" fill="${dark}"/>
+      <rect x="10" y="11" width="12" height="3" rx="1" fill="${fill}"/>
+      <rect x="13" y="8" width="6" height="3" rx="1" fill="${fill}"/>`;
+    case 'recon': return `
+      <ellipse cx="16" cy="7" rx="4.5" ry="5" fill="${dark}"/>
+      <rect x="12" y="11" width="8" height="2.5" rx="1" fill="${fill}"/>
+      <rect x="10.5" y="13.5" width="11" height="12" rx="2" fill="${dark}"/>
+      <rect x="6" y="12" width="4" height="10" rx="1.5" fill="${dark}"/>
+      <rect x="22" y="12" width="4" height="10" rx="1.5" fill="${dark}"/>
+      <rect x="11" y="26.5" width="4.5" height="13.5" rx="2" fill="${dark}"/>
+      <rect x="16.5" y="26.5" width="4.5" height="13.5" rx="2" fill="${dark}"/>
+      <rect x="12.5" y="12" width="7" height="2" rx="1" fill="${fill}"/>`;
+    case 'heavy': return `
+      <ellipse cx="16" cy="6" rx="6" ry="6" fill="${dark}"/>
+      <rect x="7" y="9.5" width="18" height="3.5" rx="1" fill="${fill}"/>
+      <rect x="7.5" y="13" width="17" height="15" rx="2" fill="${dark}"/>
+      <rect x="3" y="10" width="4.5" height="14" rx="1.5" fill="${dark}"/>
+      <rect x="24.5" y="10" width="4.5" height="14" rx="1.5" fill="${dark}"/>
+      <rect x="8.5" y="29" width="6" height="13" rx="2" fill="${dark}"/>
+      <rect x="17.5" y="29" width="6" height="13" rx="2" fill="${dark}"/>
+      <rect x="8" y="10" width="16" height="3" rx="1" fill="${fill}"/>
+      <rect x="12" y="7" width="8" height="3" rx="1" fill="${fill}"/>
+      <rect x="7.5" y="29" width="7" height="2" rx="1" fill="${fill}"/>
+      <rect x="17.5" y="29" width="7" height="2" rx="1" fill="${fill}"/>`;
+    case 'stealth': return `
+      <ellipse cx="16" cy="7" rx="4" ry="5" fill="${dark}"/>
+      <rect x="13" y="11" width="6" height="2" rx="1" fill="${fill}"/>
+      <rect x="11.5" y="13" width="9" height="13" rx="2" fill="${dark}"/>
+      <rect x="7.5" y="13" width="3.5" height="9" rx="1.5" fill="${dark}"/>
+      <rect x="21" y="13" width="3.5" height="9" rx="1.5" fill="${dark}"/>
+      <rect x="12" y="27" width="4" height="15" rx="2" fill="${dark}"/>
+      <rect x="16" y="27" width="4" height="15" rx="2" fill="${dark}"/>
+      <rect x="13" y="11.5" width="6" height="1.5" rx="0.75" fill="${fill}"/>`;
+    default: return '';
+  }
+}
+
