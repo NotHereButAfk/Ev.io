@@ -146,11 +146,15 @@ html, body {
 
 .skin-swatch {
   position: relative;
-  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   border-radius: 10px;
   cursor: pointer;
   border: 2px solid transparent;
+  overflow: hidden;
   transition: transform 0.12s ease, border-color 0.12s ease;
+  background: rgba(10,12,18,0.7);
 }
 
 .skin-swatch:hover {
@@ -160,6 +164,37 @@ html, body {
 .skin-swatch.selected {
   border-color: #fff;
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.4);
+}
+
+.skin-swatch-color {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px 8px 0 0;
+}
+
+.skin-swatch-silhouette {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 58%;
+  height: auto;
+  pointer-events: none;
+}
+
+.skin-swatch-name {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(200,220,255,0.82);
+  background: rgba(0,0,0,0.55);
+  padding: 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .loadout-list {

@@ -135,8 +135,35 @@ export class MenuUI {
     SKINS.forEach((skin) => {
       const el = document.createElement('div');
       el.className = 'skin-swatch' + (skin.id === this.selectedSkinId ? ' selected' : '');
-      el.style.background = `linear-gradient(145deg, #${_hex(skin.primary)}, #${_hex(skin.secondary)})`;
       el.title = skin.name;
+
+      // Armor preview: two-tone gradient using skin colors
+      const swatch = document.createElement('div');
+      swatch.className = 'skin-swatch-color';
+      swatch.style.background = `linear-gradient(155deg, #${_hex(skin.primary)} 55%, #${_hex(skin.secondary)} 100%)`;
+      el.appendChild(swatch);
+
+      // Soldier silhouette SVG (minimal humanoid shape)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 32 48');
+      svg.setAttribute('class', 'skin-swatch-silhouette');
+      svg.innerHTML = `
+        <ellipse cx="16" cy="7" rx="5" ry="6" fill="rgba(0,0,0,0.45)"/>
+        <rect x="9" y="14" width="14" height="14" rx="2" fill="rgba(0,0,0,0.4)"/>
+        <rect x="3" y="14" width="5" height="11" rx="2" fill="rgba(0,0,0,0.35)"/>
+        <rect x="24" y="14" width="5" height="11" rx="2" fill="rgba(0,0,0,0.35)"/>
+        <rect x="9" y="29" width="5" height="13" rx="2" fill="rgba(0,0,0,0.4)"/>
+        <rect x="18" y="29" width="5" height="13" rx="2" fill="rgba(0,0,0,0.4)"/>
+        <rect x="10" y="11" width="12" height="4" rx="1" fill="rgba(0,207,255,0.55)"/>
+      `;
+      el.appendChild(svg);
+
+      // Name label
+      const name = document.createElement('span');
+      name.className = 'skin-swatch-name';
+      name.textContent = skin.name.toUpperCase();
+      el.appendChild(name);
+
       el.addEventListener('click', () => {
         this.selectedSkinId = skin.id;
         this.skinGrid.querySelectorAll('.skin-swatch').forEach((s) => s.classList.remove('selected'));
