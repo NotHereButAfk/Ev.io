@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { World } from '../world/World.js';
 import { Player } from '../player/Player.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
@@ -26,10 +27,17 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
 
     GameSettings.load();
 
     this.world        = new World();
+
+    // IBL — makes every MeshStandardMaterial look physically accurate
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.6)).texture;
+    pmrem.dispose();
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
