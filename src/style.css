@@ -39,8 +39,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(10, 14, 22, 0.55) 0%, rgba(6, 8, 12, 0.92) 100%);
   z-index: 10;
+  /* No solid background — canvas shows through into glass panels */
 }
 
 .menu-panel {
@@ -48,10 +48,12 @@ html, body {
   max-height: 92vh;
   overflow-y: auto;
   padding: 28px 32px 34px;
-  background: linear-gradient(160deg, rgba(22, 27, 38, 0.96), rgba(14, 17, 24, 0.96));
-  border: 1px solid rgba(120, 200, 255, 0.18);
+  background: rgba(6, 9, 18, 0.80);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(120, 200, 255, 0.14);
   border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .wide-panel {
@@ -1088,4 +1090,94 @@ html, body {
   color: #9fb0c4;
   text-transform: uppercase;
   margin-top: 2px;
+}
+
+/* ===================== Connect / Loading Screen ===================== */
+
+#connect-screen {
+  z-index: 200;
+  background: rgba(3, 5, 10, 0.96);
+  transition: opacity 0.7s ease;
+  flex-direction: column;
+  gap: 0;
+}
+#connect-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+.connect-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.connect-status-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 36px;
+}
+.connect-dots {
+  display: flex;
+  gap: 6px;
+}
+.connect-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d4d;
+  animation: dot-bounce 1.3s infinite ease-in-out;
+}
+.connect-dots span:nth-child(2) { animation-delay: 0.22s; }
+.connect-dots span:nth-child(3) { animation-delay: 0.44s; }
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+  40%            { transform: translateY(-7px); opacity: 1; }
+}
+#connect-status-text {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #7c8aa0;
+  text-transform: uppercase;
+  min-width: 210px;
+  transition: color 0.3s;
+}
+.connect-bar-wrap {
+  width: 270px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+  margin-top: 22px;
+  overflow: hidden;
+}
+.connect-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ff4d4d, #ff8c4d);
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+}
+.connect-server-info {
+  margin-top: 14px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: rgba(100, 120, 145, 0.55);
+  text-transform: uppercase;
+}
+.connect-server-info span {
+  color: rgba(120, 200, 120, 0.7);
+}
+
+/* Spectating label shown on top of canvas while in menu */
+#spectate-label {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.28);
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 5;
 }

@@ -40,12 +40,25 @@ export class Game {
     this.menu         = new MenuUI();
     this.authUI       = new AuthUI();
 
-    this.menuCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-    this.menuTime   = 0;
+    this.menuCamera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
+
+    // Cinematic spectator waypoints (pos + lookAt) for the fly-through
+    this._camWpts = [
+      { p: new THREE.Vector3(-30,  9, -22), t: new THREE.Vector3(  5, 3,   0) },
+      { p: new THREE.Vector3( 18,  5, -58), t: new THREE.Vector3( -6, 4,  16) },
+      { p: new THREE.Vector3( 62, 15,  24), t: new THREE.Vector3(  0, 4, -10) },
+      { p: new THREE.Vector3(-14,  7,  62), t: new THREE.Vector3( 20, 3,   0) },
+      { p: new THREE.Vector3(  4, 22,  -3), t: new THREE.Vector3( 42, 1,  40) },
+      { p: new THREE.Vector3(-58,  6,  10), t: new THREE.Vector3( 10, 5,   0) },
+    ];
+    this._camSeg     = 0;
+    this._camSegTime = 0;
+    this._CAM_SEG_DUR = 7.0; // seconds per transition
 
     this.selectedSkin = getSkin('crimson');
     this.previewCharacter = buildPreviewCharacter(this.selectedSkin);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
+    this.previewCharacter.visible = false; // hidden until PLAY tab opens
     this.world.scene.add(this.previewCharacter);
 
     this.state   = 'menu';
@@ -67,7 +80,7 @@ export class Game {
     this._applySettings();
     this._wireCallbacks();
     this._wireMenu();
-    this._initAuth();
+    // Auth is deferred until after the connect sequence
 
     this.canvas.addEventListener('click', () => {
       this.audio.resume();
@@ -79,6 +92,41 @@ export class Game {
     };
 
     requestAnimationFrame(() => this._loop());
+    this._runConnectSequence();
+  }
+
+  // ── Connect sequence ─────────────────────────────────────────────────────────
+
+  _runConnectSequence() {
+    const screen   = document.getElementById('connect-screen');
+    const statusEl = document.getElementById('connect-status-text');
+    const barEl    = document.getElementById('connect-bar');
+    const pingEl   = document.getElementById('connect-ping');
+
+    // Fake latency ping display
+    setTimeout(() => { pingEl.textContent = Math.floor(28 + Math.random() * 40); }, 400);
+
+    const steps = [
+      { text: 'CONNECTING TO SERVER', pct: 20,  ms: 0    },
+      { text: 'AUTHENTICATING',       pct: 52,  ms: 900  },
+      { text: 'LOADING WORLD',        pct: 80,  ms: 1700 },
+      { text: 'READY',                pct: 100, ms: 2400 },
+    ];
+    steps.forEach(({ text, pct, ms }) => {
+      setTimeout(() => {
+        statusEl.textContent = text;
+        barEl.style.width    = pct + '%';
+      }, ms);
+    });
+
+    // Fade out connect screen, then show auth (or main menu if already logged in)
+    setTimeout(() => {
+      screen.classList.add('fade-out');
+      setTimeout(() => {
+        screen.classList.add('hidden');
+        this._initAuth();
+      }, 700);
+    }, 3000);
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -86,6 +134,8 @@ export class Game {
   _initAuth() {
     if (UserAccount.isLoggedIn()) {
       this._onAuth(UserAccount.current());
+    } else {
+      this.authUI.show(); // was previously visible by default; now we show it explicitly
     }
     this.authUI.onAuth = (username) => {
       this.authUI.hide();
@@ -213,6 +263,7 @@ export class Game {
     this.menu.hideGameOver();
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
+    document.getElementById('spectate-label').classList.add('hidden');
 
     // Mode-specific HUD setup
     this._refreshModeHUD();
@@ -263,7 +314,7 @@ export class Game {
     this.hud.hideModeHUD();
     this.input.exitPointerLock();
     this.botManager.clear();
-    this.previewCharacter.visible = true;
+    document.getElementById('spectate-label').classList.remove('hidden');
     this.menu.showMain();
   }
 
@@ -389,16 +440,25 @@ export class Game {
   }
 
   _updateMenuScene(dt) {
-    this.menuTime += dt;
-    this.previewCharacter.rotation.y += dt * 0.6;
-    const r = 4;
-    const p = this.world.previewPedestalPos;
-    this.menuCamera.position.set(
-      p.x + Math.sin(this.menuTime * 0.3) * r,
-      p.y + 1.6,
-      p.z + Math.cos(this.menuTime * 0.3) * r
-    );
-    this.menuCamera.lookAt(p.x, p.y + 1.05, p.z);
+    // Slowly rotate the preview character (only shown on PLAY tab)
+    if (this.previewCharacter.visible) {
+      this.previewCharacter.rotation.y += dt * 0.6;
+    }
+
+    // Cinematic spectator fly-through
+    this._camSegTime += dt;
+    if (this._camSegTime >= this._CAM_SEG_DUR) {
+      this._camSegTime -= this._CAM_SEG_DUR;
+      this._camSeg = (this._camSeg + 1) % this._camWpts.length;
+    }
+    const from = this._camWpts[this._camSeg];
+    const to   = this._camWpts[(this._camSeg + 1) % this._camWpts.length];
+    const t    = this._camSegTime / this._CAM_SEG_DUR;
+    const e    = t * t * (3 - 2 * t); // smoothstep
+
+    this.menuCamera.position.lerpVectors(from.p, to.p, e);
+    const lookTarget = new THREE.Vector3().lerpVectors(from.t, to.t, e);
+    this.menuCamera.lookAt(lookTarget);
   }
 
   _loop() {
@@ -408,11 +468,12 @@ export class Game {
 
     if (this.state === 'playing') {
       this._updatePlaying(dt);
-    } else if (this.state === 'menu') {
+    } else {
+      // Cinematic camera runs for every non-playing state (connecting, auth, menu, paused, gameover)
       this._updateMenuScene(dt);
     }
 
-    const camera = this.state === 'menu' ? this.menuCamera : this.player.camera;
+    const camera = this.state === 'playing' ? this.player.camera : this.menuCamera;
     this.renderer.render(this.world.scene, camera);
     this.input.endFrame();
   }
