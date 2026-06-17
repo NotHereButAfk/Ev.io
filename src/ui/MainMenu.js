@@ -17,17 +17,25 @@ function _rank(k) {
   if (k >= 1)   return 'GRUNT';
   return 'RECRUIT';
 }
-function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}`; }
+function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}s`; }
 
 export class MenuUI {
   constructor() {
-    this.mainMenu      = document.getElementById('main-menu');
-    this.pauseMenu     = document.getElementById('pause-menu');
-    this.gameoverMenu  = document.getElementById('gameover-menu');
+    // Top-nav elements
+    this.topNav      = document.getElementById('top-nav');
+    this.centerPlay  = document.getElementById('center-play');
+
+    // Panels
+    this._activePanel = null;
+
+    // Inputs / buttons in panels
     this.nameInput     = document.getElementById('player-name');
     this.skinGrid      = document.getElementById('skin-grid');
-    this.loadoutList   = document.getElementById('loadout-list');
     this.playBtn       = document.getElementById('play-btn');
+
+    // Pause / game-over
+    this.pauseMenu     = document.getElementById('pause-menu');
+    this.gameoverMenu  = document.getElementById('gameover-menu');
     this.resumeBtn     = document.getElementById('resume-btn');
     this.quitBtn       = document.getElementById('quit-btn');
     this.restartBtn    = document.getElementById('restart-btn');
@@ -37,7 +45,7 @@ export class MenuUI {
     this.selectedSkinId = SKINS[0].id;
     this.selectedModeId = GAME_MODES[0].id;
     this._currentUser   = null;
-    this._preview       = null; // WeaponPreviewRenderer, created lazily
+    this._preview       = null;
 
     // Armory state
     this._armoryWeaponId   = null;
@@ -45,53 +53,77 @@ export class MenuUI {
     this._armoryHoverSkin  = null;
     this._armorySelectedId = null;
 
-    this._buildSkinGrid();
-    this._buildMenuTabs();
-    this._buildModeCards();
-    this._buildSettings();
-
+    // Callbacks
     this.onPlay          = null; // (name, skinId, modeId) => void
     this.onResume        = null;
     this.onQuit          = null;
     this.onRestart       = null;
     this.onBackToMenu    = null;
     this.onLogout        = null;
-    this.onSettingsSaved = null; // (settings) => void
+    this.onArmoryChanged = null;
+    this.onSettingsSaved = null;
 
-    this.playBtn.addEventListener('click', () => {
+    this._buildSkinGrid();
+    this._buildModeCards();
+    this._buildSettings();
+    this._wireNav();
+  }
+
+  // ── Nav wiring ──────────────────────────────────────────────────────────────
+
+  _wireNav() {
+    // PUBLIC GAME button and center CLICK TO PLAY both start the game
+    const startGame = () => {
       const name = this.nameInput.value.trim() || 'Recruit';
+      this._closeAllPanels();
       this.onPlay?.(name, this.selectedSkinId, this.selectedModeId);
+    };
+    document.getElementById('nav-public-btn').addEventListener('click', startGame);
+    this.playBtn.addEventListener('click', startGame);
+
+    // Nav dropdown items
+    document.querySelectorAll('[data-panel]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._togglePanel(btn.dataset.panel);
+      });
     });
-    this.resumeBtn.addEventListener('click', () => this.onResume?.());
-    this.quitBtn.addEventListener('click',   () => this.onQuit?.());
-    this.restartBtn.addEventListener('click',() => this.onRestart?.());
-    this.menuBtn.addEventListener('click',   () => this.onBackToMenu?.());
+
+    // Click anywhere outside a panel closes it
+    document.addEventListener('click', (e) => {
+      if (this._activePanel && !e.target.closest('.nav-panel') && !e.target.closest('[data-panel]')) {
+        this._closeAllPanels();
+      }
+    });
+
+    // Pause / gameover buttons
+    this.resumeBtn.addEventListener('click',  () => this.onResume?.());
+    this.quitBtn.addEventListener('click',    () => this.onQuit?.());
+    this.restartBtn.addEventListener('click', () => this.onRestart?.());
+    this.menuBtn.addEventListener('click',    () => this.onBackToMenu?.());
     document.getElementById('profile-logout-btn').addEventListener('click', () => this.onLogout?.());
   }
 
-  // ── Tab system ─────────────────────────────────────────────────────────────
+  _togglePanel(id) {
+    if (this._activePanel === id) {
+      this._closeAllPanels();
+      return;
+    }
+    this._closeAllPanels();
+    this._activePanel = id;
+    document.getElementById('panel-' + id)?.classList.remove('hidden');
+    document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
 
-  _buildMenuTabs() {
-    document.querySelectorAll('.menu-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.menu-tab').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach((t) => t.classList.add('hidden'));
-        btn.classList.add('active');
-        const id = btn.dataset.tab;
-        document.getElementById('tab-' + id)?.classList.remove('hidden');
-        this._onTabOpen(id);
-      });
-    });
+    if (id === 'loadout')  this._initArmory();
+    if (id === 'profile')  this._renderProfile();
+    if (id === 'settings') this._loadSettings();
   }
 
-  _onTabOpen(id) {
-    if (id === 'armory') {
-      this._initArmory();
-    } else {
-      this._stopPreview();
-    }
-    if (id === 'profile') this._renderProfile();
-    if (id === 'settings') this._loadSettings();
+  _closeAllPanels() {
+    if (this._activePanel === 'loadout') this._stopPreview();
+    this._activePanel = null;
+    document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
+    document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('active'));
   }
 
   // ── Player skin grid ───────────────────────────────────────────────────────
@@ -112,19 +144,18 @@ export class MenuUI {
     });
   }
 
-  // ── ARMORY TAB ─────────────────────────────────────────────────────────────
+  // ── Armory ─────────────────────────────────────────────────────────────────
 
   _initArmory() {
-    // First time: build weapon list and set first weapon active
     const list = document.getElementById('armory-weapon-list');
     if (!list.children.length) {
       WEAPONS.forEach((w) => {
         const row = document.createElement('div');
         row.className = 'armory-weapon-row';
         row.dataset.id = w.id;
-        const isSword = w.kind === 'melee';
+        const isSword    = w.kind === 'melee';
         const equippedId = Armory.getSkinId(w.id, isSword);
-        const skinName = isSword
+        const skinName   = isSword
           ? (SWORD_SKINS.find((s) => s.id === equippedId)?.name || 'Iron')
           : (WEAPON_SKINS.find((s) => s.id === equippedId)?.name || 'Midnight Black');
         row.innerHTML = `<div class="aw-name">${w.name}</div><div class="aw-skin">${skinName}</div>`;
@@ -132,42 +163,38 @@ export class MenuUI {
         list.appendChild(row);
       });
     }
-    // Default to first weapon
     if (!this._armoryWeaponId) this._selectArmoryWeapon(WEAPONS[0].id);
     else this._selectArmoryWeapon(this._armoryWeaponId);
   }
 
   _selectArmoryWeapon(weaponId) {
-    this._armoryWeaponId = weaponId;
+    this._armoryWeaponId   = weaponId;
     const w = WEAPONS.find((w) => w.id === weaponId);
     if (!w) return;
     this._armoryIsSword    = w.kind === 'melee';
     this._armoryHoverSkin  = null;
     this._armorySelectedId = null;
 
-    // Highlight active row
     document.querySelectorAll('.armory-weapon-row').forEach((r) => {
       r.classList.toggle('active', r.dataset.id === weaponId);
     });
 
-    // Build skin grid
-    const skins = this._armoryIsSword ? SWORD_SKINS : WEAPON_SKINS;
+    const skins      = this._armoryIsSword ? SWORD_SKINS : WEAPON_SKINS;
     const equippedId = Armory.getSkinId(weaponId, this._armoryIsSword);
-    const grid = document.getElementById('armory-skin-grid');
-    grid.innerHTML = '';
+    const grid       = document.getElementById('armory-skin-grid');
+    grid.innerHTML   = '';
+
     skins.forEach((skin) => {
       const el = document.createElement('div');
       el.className = 'armory-swatch';
-      if (skin.animated)           el.classList.add('animated');
-      if (skin.id === equippedId)  el.classList.add('equipped');
-
+      if (skin.animated)          el.classList.add('animated');
+      if (skin.id === equippedId) el.classList.add('equipped');
       const c1 = this._armoryIsSword ? skin.blade : skin.body;
       const c2 = this._armoryIsSword ? skin.guard : skin.accent;
       el.style.background = `linear-gradient(145deg, #${_hex(c1)}, #${_hex(c2)})`;
 
       el.addEventListener('mouseenter', () => { this._armoryHoverSkin = skin; this._previewSkin(skin); });
       el.addEventListener('mouseleave', () => {
-        // Revert to selected or equipped
         const back = this._armorySelectedId
           ? skins.find((s) => s.id === this._armorySelectedId)
           : skins.find((s) => s.id === equippedId);
@@ -183,17 +210,14 @@ export class MenuUI {
       grid.appendChild(el);
     });
 
-    // Update equipped chip
     const equippedSkin = skins.find((s) => s.id === equippedId);
     document.getElementById('armory-equipped-chip').textContent =
       equippedSkin ? `EQUIPPED: ${equippedSkin.name.toUpperCase()}` : '— none —';
 
-    // Reset equip button
-    const btn = document.getElementById('armory-equip-btn');
+    const btn  = document.getElementById('armory-equip-btn');
     btn.disabled = true;
-    btn.onclick = () => this._equipSelected(weaponId, skins, equippedId);
+    btn.onclick  = () => this._equipSelected(weaponId, skins);
 
-    // Start 3D preview
     this._startPreview(w);
     const defaultSkin = equippedSkin || skins[0];
     if (defaultSkin) this._previewSkin(defaultSkin);
@@ -207,50 +231,37 @@ export class MenuUI {
     if (skin.animated) tags.push('✦ ANIMATED');
     if (skin.metalness >= 0.85) tags.push('HIGH GLOSS');
     else if (skin.roughness >= 0.7) tags.push('MATTE');
-    const mi = (skin.metalness ?? 0) * 100;
-    tags.push(`METAL ${Math.round(mi)}%`);
+    tags.push(`METAL ${Math.round((skin.metalness ?? 0) * 100)}%`);
     document.getElementById('preview-skin-tags').textContent = tags.join('  ·  ');
   }
 
-  _equipSelected(weaponId, skins, oldEquippedId) {
+  _equipSelected(weaponId, skins) {
     if (!this._armorySelectedId) return;
     Armory.equipSkin(weaponId, this._armorySelectedId);
-
-    // Update row subtitle in weapon list
     const skin = skins.find((s) => s.id === this._armorySelectedId);
-    const row = document.querySelector(`.armory-weapon-row[data-id="${weaponId}"]`);
+    const row  = document.querySelector(`.armory-weapon-row[data-id="${weaponId}"]`);
     if (row && skin) row.querySelector('.aw-skin').textContent = skin.name;
-
-    // Update the grid (mark old equipped, new equipped)
     document.querySelectorAll('.armory-swatch').forEach((el, i) => {
       el.classList.remove('equipped');
       if (skins[i]?.id === this._armorySelectedId) el.classList.add('equipped');
     });
-
     document.getElementById('armory-equipped-chip').textContent =
       skin ? `EQUIPPED: ${skin.name.toUpperCase()}` : '';
-
     document.getElementById('armory-equip-btn').disabled = true;
     this._armorySelectedId = null;
-
-    // Fire a callback so Game can re-apply armory map live
     this.onArmoryChanged?.();
   }
 
   _startPreview(weaponDef) {
     const canvas = document.getElementById('skin-preview-canvas');
-    if (!this._preview) {
-      this._preview = new WeaponPreviewRenderer(canvas);
-    }
+    if (!this._preview) this._preview = new WeaponPreviewRenderer(canvas);
     this._preview.loadWeapon(weaponDef);
     this._preview.start();
   }
 
-  _stopPreview() {
-    this._preview?.stop();
-  }
+  _stopPreview() { this._preview?.stop(); }
 
-  // ── MODES TAB ──────────────────────────────────────────────────────────────
+  // ── Mode cards ─────────────────────────────────────────────────────────────
 
   _buildModeCards() {
     const container = document.getElementById('mode-cards');
@@ -274,7 +285,7 @@ export class MenuUI {
     });
   }
 
-  // ── SETTINGS TAB ───────────────────────────────────────────────────────────
+  // ── Settings ───────────────────────────────────────────────────────────────
 
   _buildSettings() {
     const sens = document.getElementById('set-sens');
@@ -282,12 +293,11 @@ export class MenuUI {
     const vol  = document.getElementById('set-vol');
 
     const update = (el, valId, fmt) => {
-      const v = document.getElementById(valId);
+      const v       = document.getElementById(valId);
       const refresh = () => { v.textContent = fmt(parseFloat(el.value)); };
       el.addEventListener('input', refresh);
       refresh();
     };
-
     update(sens, 'set-sens-val', (v) => `${(v / 100).toFixed(1)}×`);
     update(fov,  'set-fov-val',  (v) => `${v}°`);
     update(vol,  'set-vol-val',  (v) => `${Math.round(v)}%`);
@@ -307,14 +317,13 @@ export class MenuUI {
         quality:     document.querySelector('.quality-btn.active')?.dataset.q || 'medium',
       };
       GameSettings.set('sensitivity', s.sensitivity);
-      GameSettings.set('fov', s.fov);
-      GameSettings.set('volume', s.volume);
-      GameSettings.set('quality', s.quality);
+      GameSettings.set('fov',         s.fov);
+      GameSettings.set('volume',      s.volume);
+      GameSettings.set('quality',     s.quality);
       this.onSettingsSaved?.(s);
-      // Flash the button
       const btn = document.getElementById('settings-save-btn');
-      btn.textContent = 'SAVED!';
-      setTimeout(() => { btn.textContent = 'SAVE SETTINGS'; }, 1200);
+      btn.textContent = 'SAVED ✓';
+      setTimeout(() => { btn.textContent = 'SAVE SETTINGS'; }, 1400);
     });
   }
 
@@ -330,38 +339,39 @@ export class MenuUI {
     fov.dispatchEvent(new Event('input'));
     vol.dispatchEvent(new Event('input'));
     const q = GameSettings.get('quality');
-    document.querySelectorAll('.quality-btn').forEach((b) => {
-      b.classList.toggle('active', b.dataset.q === q);
-    });
+    document.querySelectorAll('.quality-btn').forEach((b) => b.classList.toggle('active', b.dataset.q === q));
   }
 
-  // ── PROFILE TAB ────────────────────────────────────────────────────────────
+  // ── Profile ────────────────────────────────────────────────────────────────
 
-  setUsername(username) { this._currentUser = username; }
+  setUsername(username) {
+    this._currentUser = username;
+    const display = username === '__guest__' ? 'GUEST' : UserAccount.getDisplayName(username).toUpperCase();
+    const el = document.getElementById('nav-username');
+    if (el) el.textContent = display;
+  }
 
   _renderProfile() {
     const u       = this._currentUser;
     const isGuest = !u || u === '__guest__';
     document.getElementById('profile-username').textContent = isGuest ? 'GUEST' : UserAccount.getDisplayName(u).toUpperCase();
     const stats = isGuest ? { kills: 0, score: 0, games: 0 } : UserAccount.getStats(u);
-    document.getElementById('profile-badge').textContent    = isGuest ? 'GUEST MODE' : _rank(stats.kills);
-    document.getElementById('stat-kills').textContent       = isGuest ? '—' : stats.kills;
-    document.getElementById('stat-score').textContent       = isGuest ? '—' : stats.score;
-    document.getElementById('stat-games').textContent       = isGuest ? '—' : stats.games;
+    document.getElementById('profile-badge').textContent  = isGuest ? 'GUEST MODE' : _rank(stats.kills);
+    document.getElementById('stat-kills').textContent     = isGuest ? '—' : stats.kills;
+    document.getElementById('stat-score').textContent     = isGuest ? '—' : stats.score;
+    document.getElementById('stat-games').textContent     = isGuest ? '—' : stats.games;
 
-    // Avatar from first rifle skin
     const firstGunSkinId = Armory.getSkinId(WEAPONS.find((w) => w.kind !== 'melee')?.id || WEAPONS[0].id, false);
     const ws = WEAPON_SKINS.find((s) => s.id === firstGunSkinId) || WEAPON_SKINS[0];
     document.getElementById('profile-avatar').style.background =
       `linear-gradient(135deg, #${_hex(ws.body)}, #${_hex(ws.metal)})`;
 
-    // Equipped skin previews (first gun + sword)
     const gunWep   = WEAPONS.find((w) => w.kind !== 'melee');
     const swordWep = WEAPONS.find((w) => w.kind === 'melee');
     const gsId     = gunWep   ? Armory.getSkinId(gunWep.id,   false) : null;
     const ssId     = swordWep ? Armory.getSkinId(swordWep.id, true)  : null;
-    const gs = gsId ? WEAPON_SKINS.find((s) => s.id === gsId) || WEAPON_SKINS[0] : WEAPON_SKINS[0];
-    const ss = ssId ? SWORD_SKINS.find((s) => s.id === ssId)  || SWORD_SKINS[0]  : SWORD_SKINS[0];
+    const gs = WEAPON_SKINS.find((s) => s.id === gsId)  || WEAPON_SKINS[0];
+    const ss = SWORD_SKINS.find((s) => s.id === ssId)   || SWORD_SKINS[0];
 
     document.getElementById('profile-weapon-skin').style.background =
       `linear-gradient(145deg, #${_hex(gs.body)}, #${_hex(gs.accent)})`;
@@ -369,32 +379,31 @@ export class MenuUI {
     document.getElementById('profile-sword-skin').style.background =
       `linear-gradient(145deg, #${_hex(ss.blade)}, #${_hex(ss.guard)})`;
     document.getElementById('profile-sword-skin-name').textContent = ss.name;
-
     document.getElementById('profile-logout-btn').style.display = isGuest ? 'none' : 'block';
   }
 
   // ── Visibility helpers ─────────────────────────────────────────────────────
 
-  showMain()  {
-    this.mainMenu.classList.remove('hidden');
-    // Ensure PLAY tab is active when main menu opens
-    document.querySelectorAll('.menu-tab').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach((t) => t.classList.add('hidden'));
-    document.querySelector('.menu-tab[data-tab="play"]')?.classList.add('active');
-    document.getElementById('tab-play')?.classList.remove('hidden');
-    this._stopPreview();
+  showMain() {
+    this.topNav.classList.remove('hidden');
+    this.centerPlay.classList.remove('hidden');
   }
-  hideMain()  { this.mainMenu.classList.add('hidden'); }
-  showPause() { this.pauseMenu.classList.remove('hidden'); }
-  hidePause() { this.pauseMenu.classList.add('hidden'); }
+
+  hideMain() {
+    this.topNav.classList.add('hidden');
+    this.centerPlay.classList.add('hidden');
+    this._closeAllPanels();
+  }
+
+  showPause()    { this.pauseMenu.classList.remove('hidden'); }
+  hidePause()    { this.pauseMenu.classList.add('hidden'); }
 
   showGameOver(stats, title = 'YOU DIED') {
     document.getElementById('gameover-title').textContent = title;
     this.gameoverStats.innerHTML = `
       <div>KILLS<span>${stats.kills}</span></div>
       <div>SCORE<span>${stats.score}</span></div>
-      <div>TIME<span>${_fmt(stats.time)}s</span></div>
-    `;
+      <div>TIME<span>${_fmt(stats.time)}</span></div>`;
     this.gameoverMenu.classList.remove('hidden');
   }
   hideGameOver() { this.gameoverMenu.classList.add('hidden'); }

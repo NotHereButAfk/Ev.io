@@ -1181,3 +1181,172 @@ html, body {
   pointer-events: none;
   z-index: 5;
 }
+
+/* ===================== Top Nav Bar ===================== */
+
+#top-nav {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: rgba(5, 7, 14, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 30;
+  gap: 4px;
+}
+
+.nav-brand {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #f1f5f9;
+  text-shadow: 0 0 14px rgba(80, 200, 255, 0.4);
+  margin-right: 20px;
+  white-space: nowrap;
+}
+.nav-brand span { color: #ff4d4d; }
+
+.nav-items {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.nav-item {
+  padding: 6px 13px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(190, 205, 225, 0.75);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+}
+.nav-item.active {
+  color: #ff6b4a;
+  background: rgba(255, 100, 60, 0.1);
+}
+
+.nav-play-btn {
+  color: #ff8060;
+  border: 1px solid rgba(255, 100, 60, 0.3);
+}
+.nav-play-btn:hover {
+  background: rgba(255, 100, 60, 0.15);
+  border-color: rgba(255, 100, 60, 0.5);
+  color: #ff9070;
+}
+
+.nav-right {
+  margin-left: auto;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(160, 180, 210, 0.5);
+  text-transform: uppercase;
+}
+.nav-username { color: rgba(190, 210, 240, 0.7); }
+
+/* ===================== Center Play Area ===================== */
+
+#center-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.click-to-play {
+  font-size: 26px;
+  letter-spacing: 8px;
+  font-weight: 700;
+  color: #fff;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.8), 0 0 40px rgba(255,255,255,0.12);
+  pointer-events: all;
+  transition: letter-spacing 0.2s, text-shadow 0.2s, color 0.2s;
+  text-transform: uppercase;
+  padding: 10px 20px;
+}
+.click-to-play:hover {
+  color: #ff8c60;
+  letter-spacing: 11px;
+  text-shadow: 0 2px 24px rgba(0,0,0,0.9), 0 0 50px rgba(255,140,80,0.35);
+}
+
+.spectate-hint {
+  margin-top: 10px;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.22);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ===================== Nav Dropdown Panels ===================== */
+
+.nav-panel {
+  position: absolute;
+  top: 50px; /* sits just below nav */
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(96vw, 520px);
+  max-height: calc(88vh - 50px);
+  overflow-y: auto;
+  background: rgba(6, 9, 18, 0.88);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(120, 200, 255, 0.12);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 20px 24px 26px;
+  z-index: 29;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+}
+
+.nav-panel-wide {
+  width: min(96vw, 660px);
+}
+
+.panel-label {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: #5a6a80;
+  margin-bottom: 8px;
+  margin-top: 14px;
+}
+.panel-label:first-child { margin-top: 0; }
+
+.panel-top-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.panel-section { flex-shrink: 0; min-width: 140px; }
+.panel-section-grow { flex: 1; }
+
+.panel-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 16px 0 4px;
+}
