@@ -18,6 +18,9 @@ import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
+import { Shop } from './Shop.js';
+import { BattlePass } from './BattlePass.js';
+import { getArmorSkin } from '../player/ArmorSkins.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -68,7 +71,8 @@ export class Game {
 
     this.selectedSkin      = getSkin('crimson');
     this.selectedArmorType = loadArmorType();
-    this.previewCharacter  = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType);
+    this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
+    this.previewCharacter  = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.previewCharacter.visible = false;
     this.world.scene.add(this.previewCharacter);
@@ -220,7 +224,9 @@ export class Game {
         this.kills += 1;
         this.score += 100;
         this.audio.playKill();
-        this.hud.addKillFeed(`${this.player.name} eliminated a target  +100`);
+        Shop.addCoins(10);
+        BattlePass.addXP(25);
+        this.hud.addKillFeed(`${this.player.name} eliminated a target  +100  💰+10`);
       }
     };
   }
@@ -231,7 +237,8 @@ export class Game {
     this.menu.onQuit          = () => this._quitToMenu();
     this.menu.onRestart       = () => this._restart();
     this.menu.onBackToMenu    = () => this._quitToMenu();
-    this.menu.onArmorChanged  = (armorTypeId) => this._rebuildPreviewCharacter(armorTypeId);
+    this.menu.onArmorChanged  = (armorTypeId) => this._rebuildPreviewCharacter(armorTypeId, undefined);
+    this.menu.onArmorSkinEquipped = (skinId)  => this._rebuildPreviewCharacter(undefined, skinId);
     this.menu.onLoadoutOpen   = () => { this.previewCharacter.visible = true; };
     this.menu.onLoadoutClose  = () => { this.previewCharacter.visible = false; };
     this.menu.onArmoryChanged = () => {
@@ -261,10 +268,11 @@ export class Game {
 
   // ── Game start / restart ────────────────────────────────────────────────────
 
-  _rebuildPreviewCharacter(armorTypeId) {
-    this.selectedArmorType = armorTypeId;
+  _rebuildPreviewCharacter(armorTypeId, armorSkinId) {
+    if (armorTypeId !== undefined) this.selectedArmorType = armorTypeId;
+    if (armorSkinId !== undefined) this.selectedArmorSkin = getArmorSkin(armorSkinId);
     this.world.scene.remove(this.previewCharacter);
-    this.previewCharacter = buildPreviewCharacter(this.selectedSkin, armorTypeId);
+    this.previewCharacter = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin);
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.previewCharacter.visible = true;
     this.world.scene.add(this.previewCharacter);
@@ -272,8 +280,9 @@ export class Game {
 
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
     this.audio.resume();
-    this.selectedSkin = getSkin(skinId);
-    applySkinToCharacter(this.previewCharacter, this.selectedSkin);
+    this.selectedSkin      = getSkin(skinId);
+    this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
+    applySkinToCharacter(this.previewCharacter, this.selectedSkin, this.selectedArmorSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
 
     // Apply per-weapon skins from the armory
@@ -337,6 +346,8 @@ export class Game {
     if (this._statsSaved) return;
     this._statsSaved = true;
     UserAccount.addGameStats(this.currentUsername, this.kills, this.score);
+    Shop.addCoins(100);
+    BattlePass.addXP(100);
   }
 
   _resume() {

@@ -69,10 +69,13 @@
         <button class="nav-item nav-play-btn" id="nav-public-btn">PUBLIC GAME</button>
         <button class="nav-item" data-panel="loadout">LOADOUT &#9660;</button>
         <button class="nav-item" data-panel="modes">MODES &#9660;</button>
+        <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
+        <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
         <button class="nav-item" data-panel="settings">SETTINGS</button>
         <button class="nav-item" data-panel="profile">PROFILE &#9660;</button>
       </nav>
       <div class="nav-right">
+        <span id="nav-coins" class="nav-coins">&#128176; 500</span>
         <span id="nav-username" class="nav-username"></span>
       </div>
     </div>
@@ -213,6 +216,43 @@
       </div>
 
       <button id="profile-logout-btn" class="ghost-btn" style="margin-top:20px;display:none">LOGOUT</button>
+    </div>
+
+    <!-- ===================== PANEL: SHOP ===================== -->
+    <div id="panel-shop" class="nav-panel nav-panel-wide hidden">
+      <div class="shop-header">
+        <div>
+          <div class="panel-label">ARMOR SHOP</div>
+          <div class="shop-subtitle">Buy armor finishes to customize your look</div>
+        </div>
+        <div class="shop-balance">
+          <span class="shop-coin-icon">&#128176;</span>
+          <span id="shop-coin-balance">500</span>
+          <span class="shop-coin-label">COINS</span>
+        </div>
+      </div>
+      <div id="shop-grid-root"></div>
+      <div class="shop-earn-tip">&#9660; Earn coins by playing — 10 per kill, 100 per game</div>
+    </div>
+
+    <!-- ===================== PANEL: BATTLE PASS ===================== -->
+    <div id="panel-battlepass" class="nav-panel nav-panel-wide hidden">
+      <div class="bp-header-row">
+        <div>
+          <div class="panel-label">BATTLE PASS <span class="bp-season-tag">SEASON 1</span></div>
+          <div id="bp-tier-label" class="bp-tier-label">Tier 1 / 30</div>
+          <div class="bp-xp-bar-wrap">
+            <div class="bp-xp-bar-bg"><div id="bp-xp-bar" class="bp-xp-bar-fill"></div></div>
+            <span id="bp-xp-text" class="bp-xp-text">0 / 500 XP</span>
+          </div>
+        </div>
+        <div class="bp-premium-box" id="bp-premium-box">
+          <div class="bp-prem-label">PREMIUM PASS</div>
+          <div class="bp-prem-desc">Unlock 14 extra skins + bonus coins</div>
+          <button id="bp-unlock-btn" class="bp-unlock-btn">UNLOCK — &#128176; 1000</button>
+        </div>
+      </div>
+      <div id="bp-track" class="bp-track"></div>
     </div>
 
     <!-- ===================== PAUSE MENU ===================== -->

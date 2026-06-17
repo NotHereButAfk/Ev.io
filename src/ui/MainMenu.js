@@ -1,10 +1,13 @@
 import { SKINS } from '../player/skins.js';
 import { ARMOR_TYPES, loadArmorType, saveArmorType } from '../player/ArmorTypes.js';
+import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Armory } from '../core/Armory.js';
+import { Shop } from '../core/Shop.js';
+import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings, DEFAULTS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { WeaponPreviewRenderer } from './WeaponPreviewRenderer.js';
@@ -60,14 +63,15 @@ export class MenuUI {
     this._armorySelectedId = null;
 
     // Callbacks
-    this.onPlay          = null; // (name, skinId, modeId) => void
-    this.onResume        = null;
-    this.onQuit          = null;
-    this.onRestart       = null;
-    this.onBackToMenu    = null;
-    this.onLogout        = null;
-    this.onArmoryChanged = null;
-    this.onSettingsSaved = null;
+    this.onPlay               = null; // (name, skinId, modeId) => void
+    this.onResume             = null;
+    this.onQuit               = null;
+    this.onRestart            = null;
+    this.onBackToMenu         = null;
+    this.onLogout             = null;
+    this.onArmoryChanged      = null;
+    this.onSettingsSaved      = null;
+    this.onArmorSkinEquipped  = null; // (skinId) => void
 
     warmThumbnails(); // kick off async thumbnail generation immediately
     this._buildSkinGrid();
@@ -126,8 +130,10 @@ export class MenuUI {
       this._initArmory();
       this.onLoadoutOpen?.();
     }
-    if (id === 'profile')  this._renderProfile();
-    if (id === 'settings') this._loadSettings();
+    if (id === 'profile')     this._renderProfile();
+    if (id === 'settings')    this._loadSettings();
+    if (id === 'shop')        this._renderShop();
+    if (id === 'battlepass')  this._renderBattlePass();
   }
 
   _closeAllPanels() {
@@ -436,6 +442,12 @@ export class MenuUI {
     const display = username === '__guest__' ? 'GUEST' : UserAccount.getDisplayName(username).toUpperCase();
     const el = document.getElementById('nav-username');
     if (el) el.textContent = display;
+    this._refreshCoins();
+  }
+
+  _refreshCoins() {
+    const el = document.getElementById('nav-coins');
+    if (el) el.textContent = `\u{1F4B0} ${Shop.getCoins().toLocaleString()}`;
   }
 
   _renderProfile() {
@@ -492,8 +504,213 @@ export class MenuUI {
       <div>SCORE<span>${stats.score}</span></div>
       <div>TIME<span>${_fmt(stats.time)}</span></div>`;
     this.gameoverMenu.classList.remove('hidden');
+    this._refreshCoins();
   }
   hideGameOver() { this.gameoverMenu.classList.add('hidden'); }
+
+  // ── Shop ───────────────────────────────────────────────────────────────────
+
+  _renderShop() {
+    this._refreshCoins();
+    const root = document.getElementById('shop-grid-root');
+    const bal  = document.getElementById('shop-coin-balance');
+    if (!root) return;
+    if (bal) bal.textContent = Shop.getCoins().toLocaleString();
+
+    root.innerHTML = '';
+    const equipped = Shop.getEquipped();
+
+    RARITY_ORDER.forEach(rarity => {
+      const skins = ARMOR_SKINS.filter(s => s.rarity === rarity);
+      const color = RARITY_COLORS[rarity];
+
+      const section = document.createElement('div');
+      section.className = 'shop-section';
+
+      const hdr = document.createElement('div');
+      hdr.className = 'shop-rarity-header';
+      hdr.innerHTML = `<span class="shop-rarity-dot" style="background:${color}"></span>${rarity.toUpperCase()}`;
+      section.appendChild(hdr);
+
+      const grid = document.createElement('div');
+      grid.className = 'shop-skin-grid';
+
+      skins.forEach(skin => {
+        const owned    = Shop.isOwned(skin.id);
+        const isEquip  = equipped === skin.id;
+        const card     = document.createElement('div');
+        card.className = 'shop-skin-card' + (isEquip ? ' equipped' : '');
+
+        const swatch = document.createElement('div');
+        swatch.className = 'shop-swatch';
+        swatch.style.background = `linear-gradient(145deg,#${skin.primary.toString(16).padStart(6,'0')},#${skin.secondary.toString(16).padStart(6,'0')})`;
+        if (skin.emissive) {
+          const glowColor = '#' + skin.emissive.toString(16).padStart(6,'0');
+          swatch.style.boxShadow = `0 0 14px ${glowColor}88`;
+        }
+        card.appendChild(swatch);
+
+        const info = document.createElement('div');
+        info.className = 'shop-skin-info';
+        info.innerHTML = `<div class="shop-skin-name">${skin.name}</div>
+          <div class="shop-rarity-tag" style="color:${color}">${rarity.toUpperCase()}</div>`;
+        card.appendChild(info);
+
+        const btn = document.createElement('button');
+        if (isEquip) {
+          btn.className = 'shop-btn shop-btn-equip';
+          btn.textContent = 'EQUIPPED';
+        } else if (owned) {
+          btn.className = 'shop-btn shop-btn-owned';
+          btn.textContent = 'EQUIP';
+          btn.addEventListener('click', () => {
+            Shop.equip(skin.id);
+            this.onArmorSkinEquipped?.(skin.id);
+            this._renderShop();
+          });
+        } else {
+          btn.className = 'shop-btn shop-btn-buy';
+          btn.textContent = `\u{1F4B0} ${skin.price.toLocaleString()}`;
+          const enough = Shop.getCoins() >= skin.price;
+          if (!enough) btn.classList.add('shop-btn-disabled');
+          btn.addEventListener('click', () => {
+            const res = Shop.buy(skin.id, skin.price);
+            if (res.ok) {
+              this.onArmorSkinEquipped?.(skin.id);
+              Shop.equip(skin.id);
+              this._renderShop();
+              this._refreshCoins();
+            } else {
+              btn.textContent = res.err.toUpperCase();
+              setTimeout(() => { btn.textContent = `\u{1F4B0} ${skin.price.toLocaleString()}`; }, 1500);
+            }
+          });
+        }
+        card.appendChild(btn);
+        grid.appendChild(card);
+      });
+
+      section.appendChild(grid);
+      root.appendChild(section);
+    });
+  }
+
+  // ── Battle Pass ────────────────────────────────────────────────────────────
+
+  _renderBattlePass() {
+    this._refreshCoins();
+    const tier    = BattlePass.getTier();
+    const xpIn    = BattlePass.getXPInTier();
+    const premium = BattlePass.hasPremium();
+
+    // Header
+    document.getElementById('bp-tier-label').textContent = `Tier ${tier} / ${BattlePass.TOTAL_TIERS}`;
+    const xpPct = (xpIn / BattlePass.XP_PER_TIER) * 100;
+    document.getElementById('bp-xp-bar').style.width = `${xpPct}%`;
+    document.getElementById('bp-xp-text').textContent = `${xpIn} / ${BattlePass.XP_PER_TIER} XP`;
+
+    const premBox = document.getElementById('bp-premium-box');
+    if (premium) {
+      premBox.classList.add('bp-premium-owned');
+      document.getElementById('bp-unlock-btn').textContent = 'PREMIUM ACTIVE ✓';
+      document.getElementById('bp-unlock-btn').disabled = true;
+    } else {
+      const unlockBtn = document.getElementById('bp-unlock-btn');
+      unlockBtn.disabled = false;
+      unlockBtn.textContent = `UNLOCK — \u{1F4B0} ${BattlePass.PREMIUM_COST}`;
+      unlockBtn.onclick = () => {
+        const res = Shop.buy('__bp_premium__', BattlePass.PREMIUM_COST);
+        if (res.ok) {
+          BattlePass.unlockPremium();
+          this._renderBattlePass();
+          this._refreshCoins();
+        } else {
+          unlockBtn.textContent = res.err.toUpperCase();
+          setTimeout(() => this._renderBattlePass(), 1500);
+        }
+      };
+    }
+
+    // Tier track
+    const track = document.getElementById('bp-track');
+    track.innerHTML = '';
+
+    BP_TIERS.forEach(({ tier: t, free, premium: prem }) => {
+      const reached   = tier >= t;
+      const col       = document.createElement('div');
+      col.className   = 'bp-tier-col' + (reached ? ' reached' : '') + (t === tier ? ' current' : '');
+
+      const numEl     = document.createElement('div');
+      numEl.className = 'bp-tier-num';
+      numEl.textContent = t;
+      col.appendChild(numEl);
+
+      col.appendChild(this._bpRewardCard(t, 'free',    free,  reached));
+      col.appendChild(this._bpRewardCard(t, 'premium', prem,  reached && premium));
+      track.appendChild(col);
+    });
+
+    // scroll to current tier
+    const curCol = track.querySelector('.current');
+    if (curCol) curCol.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }
+
+  _bpRewardCard(tier, track, reward, unlocked) {
+    const card = document.createElement('div');
+    card.className = 'bp-reward-card' + (unlocked ? ' unlocked' : ' locked') + (track === 'premium' ? ' prem-track' : '');
+
+    const claimed = BattlePass.isClaimed(tier, track);
+    if (claimed) card.classList.add('claimed');
+
+    if (reward.type === 'skin') {
+      const skin = getArmorSkin(reward.id);
+      if (skin) {
+        card.style.background = `linear-gradient(145deg,#${skin.primary.toString(16).padStart(6,'0')},#${skin.secondary.toString(16).padStart(6,'0')})`;
+        if (skin.emissive) card.style.boxShadow = `0 0 10px #${skin.emissive.toString(16).padStart(6,'0')}88`;
+        const lbl = document.createElement('div');
+        lbl.className = 'bp-reward-label';
+        lbl.textContent = skin.name;
+        card.appendChild(lbl);
+        const rar = document.createElement('div');
+        rar.className = 'bp-reward-rarity';
+        rar.style.color = RARITY_COLORS[skin.rarity];
+        rar.textContent = skin.rarity.toUpperCase();
+        card.appendChild(rar);
+      }
+    } else {
+      const coinEl = document.createElement('div');
+      coinEl.className = 'bp-reward-coin';
+      coinEl.innerHTML = `\u{1F4B0}<br>${reward.amount}`;
+      card.appendChild(coinEl);
+    }
+
+    if (claimed) {
+      const chk = document.createElement('div');
+      chk.className = 'bp-claimed-badge';
+      chk.textContent = '✓';
+      card.appendChild(chk);
+    } else if (unlocked) {
+      const btn = document.createElement('button');
+      btn.className = 'bp-claim-btn';
+      btn.textContent = 'CLAIM';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const res = BattlePass.claimReward(tier, track);
+        if (res.ok && res.reward.type === 'skin') {
+          Shop.unlock(res.reward.id);
+          Shop.equip(res.reward.id);
+          this.onArmorSkinEquipped?.(res.reward.id);
+        } else if (res.ok && res.reward.type === 'coins') {
+          Shop.addCoins(res.reward.amount);
+          this._refreshCoins();
+        }
+        this._renderBattlePass();
+      });
+      card.appendChild(btn);
+    }
+
+    return card;
+  }
 }
 
 // SVG silhouette paths per armor type — used inside armor card icons

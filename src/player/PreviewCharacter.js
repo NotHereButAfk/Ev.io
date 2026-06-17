@@ -410,14 +410,24 @@ const BUILDERS = {
   stealth: buildStealth,
 };
 
-export function buildPreviewCharacter(skin, armorTypeId = 'assault') {
+export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null) {
   const g = new THREE.Group();
 
+  const src = armorSkin || {};
+  const primaryColor   = armorSkin ? armorSkin.primary   : skin.primary;
+  const secondaryColor = armorSkin ? armorSkin.secondary : skin.secondary;
+
   const P = new THREE.MeshStandardMaterial({
-    color: skin.primary, roughness: 0.42, metalness: 0.52
+    color:             primaryColor,
+    roughness:         src.roughness         ?? 0.42,
+    metalness:         src.metalness         ?? 0.52,
+    emissive:          new THREE.Color(src.emissive ?? 0x000000),
+    emissiveIntensity: src.emissiveIntensity ?? 0,
   });
   const S = new THREE.MeshStandardMaterial({
-    color: skin.secondary, roughness: 0.72, metalness: 0.18
+    color:     secondaryColor,
+    roughness: (src.roughness ?? 0.72) * 1.3,
+    metalness: (src.metalness ?? 0.18) * 0.35,
   });
 
   const builder = BUILDERS[armorTypeId] || buildAssault;
@@ -434,8 +444,14 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault') {
   return g;
 }
 
-export function applySkinToCharacter(group, skin) {
+export function applySkinToCharacter(group, skin, armorSkin = null) {
   const { primaryMat, secondaryMat } = group.userData;
-  primaryMat.color.setHex(skin.primary);
-  secondaryMat.color.setHex(skin.secondary);
+  primaryMat.color.setHex(armorSkin ? armorSkin.primary   : skin.primary);
+  secondaryMat.color.setHex(armorSkin ? armorSkin.secondary : skin.secondary);
+  if (armorSkin) {
+    primaryMat.roughness         = armorSkin.roughness         ?? 0.42;
+    primaryMat.metalness         = armorSkin.metalness         ?? 0.52;
+    primaryMat.emissive.setHex(armorSkin.emissive ?? 0x000000);
+    primaryMat.emissiveIntensity = armorSkin.emissiveIntensity ?? 0;
+  }
 }
