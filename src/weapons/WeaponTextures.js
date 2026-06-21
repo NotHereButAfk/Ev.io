@@ -254,29 +254,30 @@ function dragonDecal() {
 
 // CYBER — neon circuit traces + nodes on near-black, glows via emissive map.
 function cyberDecal() {
-  const size = 256;
+  const size = 512;
   const c = makeCanvas(size);
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#04080c';
   ctx.fillRect(0, 0, size, size);
   ctx.strokeStyle = '#00e5ff';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2.4;
   ctx.shadowColor = '#00e5ff';
-  ctx.shadowBlur = 4;
-  for (let i = 0; i < 22; i++) {
+  ctx.shadowBlur = 8;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 44; i++) {
     let x = Math.random() * size, y = Math.random() * size;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    const segs = 2 + (Math.random() * 4 | 0);
+    const segs = 2 + (Math.random() * 5 | 0);
     for (let s = 0; s < segs; s++) {
-      if (Math.random() < 0.5) x += (Math.random() - 0.5) * 60;
-      else y += (Math.random() - 0.5) * 60;
+      if (Math.random() < 0.5) x += (Math.random() - 0.5) * 120;
+      else y += (Math.random() - 0.5) * 120;
       ctx.lineTo(x, y);
     }
     ctx.stroke();
-    ctx.fillStyle = '#7dffff';
+    ctx.fillStyle = '#bdffff';
     ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.arc(x, y, 3.6, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.shadowBlur = 0;
@@ -386,22 +387,22 @@ function frostDecal() {
 
 // GALAXY — nebula clouds + starfield.
 function galaxyDecal() {
-  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
   ctx.fillStyle = '#06030f';
   ctx.fillRect(0, 0, size, size);
-  const clouds = ['#5a1e9c', '#1e3a9c', '#9c1e6e', '#2a8ccc'];
-  for (let i = 0; i < 14; i++) {
-    const x = Math.random() * size, y = Math.random() * size, r = 30 + Math.random() * 70;
+  const clouds = ['#7a2ad0', '#2a5aff', '#d02a9a', '#2ab8ff'];
+  for (let i = 0; i < 26; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 50 + Math.random() * 130;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, clouds[(Math.random() * clouds.length) | 0] + 'cc');
+    g.addColorStop(0, clouds[(Math.random() * clouds.length) | 0] + 'dd');
     g.addColorStop(1, 'rgba(6,3,15,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
   }
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < 520; i++) {
     const b = Math.random();
-    ctx.fillStyle = b > 0.9 ? '#bfe0ff' : `rgba(255,255,255,${0.4 + b * 0.6})`;
-    const s = b > 0.95 ? 2 : 1;
+    ctx.fillStyle = b > 0.9 ? '#dff0ff' : `rgba(255,255,255,${0.4 + b * 0.6})`;
+    const s = b > 0.96 ? 3 : (b > 0.85 ? 2 : 1);
     ctx.fillRect(Math.random() * size, Math.random() * size, s, s);
   }
   return c;
@@ -483,21 +484,22 @@ function toxicDecal() {
 
 // LIGHTNING — branching electric arcs, glows.
 function lightningDecal() {
-  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
   ctx.fillStyle = '#070a16';
   ctx.fillRect(0, 0, size, size);
-  ctx.shadowColor = '#aef0ff';
-  ctx.shadowBlur = 6;
+  ctx.shadowColor = '#cdf5ff';
+  ctx.shadowBlur = 10;
+  ctx.lineCap = 'round';
   const bolt = (x, y, ang, len, w) => {
-    if (len < 8 || w < 0.4) return;
-    ctx.strokeStyle = w > 1.5 ? '#ffffff' : '#7fd8ff';
+    if (len < 10 || w < 0.5) return;
+    ctx.strokeStyle = w > 2.2 ? '#ffffff' : '#9fe4ff';
     ctx.lineWidth = w;
     const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
-    bolt(nx, ny, ang + (Math.random() - 0.5) * 1.1, len * 0.7, w * 0.7);
+    bolt(nx, ny, ang + (Math.random() - 0.5) * 1.1, len * 0.72, w * 0.72);
     if (Math.random() < 0.5) bolt(nx, ny, ang + (Math.random() - 0.5) * 1.6, len * 0.5, w * 0.5);
   };
-  for (let i = 0; i < 5; i++) bolt(Math.random() * size, 0, Math.PI / 2 + (Math.random() - 0.5), 50, 2.4);
+  for (let i = 0; i < 9; i++) bolt(Math.random() * size, 0, Math.PI / 2 + (Math.random() - 0.5), 90, 3.6);
   ctx.shadowBlur = 0;
   return c;
 }
@@ -527,21 +529,276 @@ function tigerDecal() {
   return c;
 }
 
+// HOLOGRAPHIC — iridescent rainbow foil with a brushed sheen. Glows.
+function holographicDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  // diagonal rainbow sweep
+  const g = ctx.createLinearGradient(0, 0, size, size);
+  const stops = ['#ff2bd0', '#ff8a2b', '#fff52b', '#2bff7a', '#2bd8ff', '#6a4bff', '#ff2bd0'];
+  stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  // shimmering diagonal bands (foil refraction)
+  for (let i = 0; i < 60; i++) {
+    const off = (i / 60) * size * 1.6 - size * 0.3;
+    const bg = ctx.createLinearGradient(off, 0, off + 40, size);
+    bg.addColorStop(0, 'rgba(255,255,255,0)');
+    bg.addColorStop(0.5, `rgba(255,255,255,${0.10 + Math.random() * 0.20})`);
+    bg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = bg;
+    ctx.save();
+    ctx.translate(off, 0);
+    ctx.rotate(0.6);
+    ctx.fillRect(-size, -size, 30, size * 3);
+    ctx.restore();
+  }
+  // fine sparkle
+  for (let i = 0; i < 260; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`;
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+  }
+  return c;
+}
+
+// CIRCUITNEON — dense glowing PCB: traces, pads, vias. Glows.
+function circuitneonDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#02100a';
+  ctx.fillRect(0, 0, size, size);
+  const grid = 32;
+  ctx.lineCap = 'square';
+  ctx.shadowColor = '#1bff8a';
+  ctx.shadowBlur = 6;
+  // manhattan traces snapped to a grid for a dense PCB look
+  for (let i = 0; i < 130; i++) {
+    let gx = (Math.random() * (size / grid) | 0) * grid;
+    let gy = (Math.random() * (size / grid) | 0) * grid;
+    const horiz = Math.random() < 0.5;
+    ctx.strokeStyle = Math.random() < 0.18 ? '#7bffd0' : '#15e07a';
+    ctx.lineWidth = 1.6 + Math.random() * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    let steps = 1 + (Math.random() * 4 | 0);
+    let h = horiz;
+    for (let s = 0; s < steps; s++) {
+      if (h) gx += (Math.random() < 0.5 ? -1 : 1) * grid * (1 + (Math.random() * 3 | 0));
+      else gy += (Math.random() < 0.5 ? -1 : 1) * grid * (1 + (Math.random() * 3 | 0));
+      ctx.lineTo(gx, gy);
+      h = !h;
+    }
+    ctx.stroke();
+  }
+  // solder pads / vias
+  for (let i = 0; i < 90; i++) {
+    const x = (Math.random() * (size / grid) | 0) * grid;
+    const y = (Math.random() * (size / grid) | 0) * grid;
+    ctx.fillStyle = '#9fffdd';
+    ctx.beginPath(); ctx.arc(x, y, 2.6 + Math.random() * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#02100a';
+    ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// LAVA — cracked black basalt with glowing magma veins. Glows.
+function lavaDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  // dark cracked rock base
+  ctx.fillStyle = '#0c0503';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 80; i++) {
+    const v = 10 + Math.random() * 24;
+    ctx.fillStyle = `rgb(${v|0},${(v*0.6)|0},${(v*0.4)|0})`;
+    ctx.globalAlpha = 0.4;
+    const x = Math.random() * size, y = Math.random() * size, r = 8 + Math.random() * 30;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // glowing magma veins — branching cracks
+  ctx.shadowColor = '#ff7b1a';
+  ctx.shadowBlur = 12;
+  const vein = (x, y, ang, len, w) => {
+    if (len < 12 || w < 0.6) return;
+    const g = ctx.createLinearGradient(x, y, x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+    g.addColorStop(0, '#fff0a0');
+    g.addColorStop(0.5, '#ff7b1a');
+    g.addColorStop(1, '#c41800');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+    vein(nx, ny, ang + (Math.random() - 0.5) * 1.0, len * 0.72, w * 0.72);
+    if (Math.random() < 0.55) vein(nx, ny, ang + (Math.random() - 0.5) * 1.6, len * 0.6, w * 0.62);
+  };
+  for (let i = 0; i < 10; i++) vein(Math.random() * size, Math.random() * size, Math.random() * Math.PI * 2, 70, 4.5);
+  // glowing embers
+  ctx.shadowBlur = 6;
+  for (let i = 0; i < 70; i++) {
+    ctx.fillStyle = Math.random() < 0.5 ? '#ffcc55' : '#ff5511';
+    ctx.beginPath(); ctx.arc(Math.random() * size, Math.random() * size, 1 + Math.random() * 2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// ICE — refractive crystal facets with cool glints. Subtle glow.
+function iceDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#9fd8ec');
+  bg.addColorStop(0.5, '#cfeefb');
+  bg.addColorStop(1, '#6fb6d8');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  // crystalline facets — random triangles with refraction shading
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 24 + Math.random() * 70;
+    const a0 = Math.random() * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a0) * r, y + Math.sin(a0) * r);
+    ctx.lineTo(x + Math.cos(a0 + 1 + Math.random()) * r, y + Math.sin(a0 + 1 + Math.random()) * r);
+    ctx.closePath();
+    const shade = 200 + Math.random() * 55;
+    ctx.fillStyle = `rgba(${shade|0},${(shade+5)|0},255,${0.10 + Math.random() * 0.18})`;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  // bright glints
+  ctx.shadowColor = '#e6faff';
+  ctx.shadowBlur = 6;
+  for (let i = 0; i < 50; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// BLOODMOON — dark red marble veined with gold. Subtle glow on veins.
+function bloodmoonDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  const bg = ctx.createRadialGradient(size * 0.5, size * 0.5, 10, size * 0.5, size * 0.5, size * 0.7);
+  bg.addColorStop(0, '#5a0c10');
+  bg.addColorStop(0.6, '#2c0608');
+  bg.addColorStop(1, '#120203');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  // dark marble swirls
+  for (let i = 0; i < 50; i++) {
+    ctx.strokeStyle = `rgba(${100 + Math.random()*60|0},10,14,${0.2 + Math.random()*0.3})`;
+    ctx.lineWidth = 4 + Math.random() * 12;
+    ctx.beginPath();
+    let x = Math.random() * size, y = Math.random() * size;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 4; s++) {
+      x += (Math.random() - 0.5) * 120; y += (Math.random() - 0.5) * 120;
+      ctx.quadraticCurveTo(x + 30, y - 30, x, y);
+    }
+    ctx.stroke();
+  }
+  // gold veins (faint glow)
+  ctx.shadowColor = '#ffd86a';
+  ctx.shadowBlur = 5;
+  for (let i = 0; i < 26; i++) {
+    ctx.strokeStyle = '#f0c24a';
+    ctx.lineWidth = 0.8 + Math.random() * 1.8;
+    ctx.lineCap = 'round';
+    let x = Math.random() * size, y = Math.random() * size;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) {
+      x += (Math.random() - 0.5) * 90; y += (Math.random() - 0.5) * 90;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// MATRIX — falling green code glyphs on black. Glows.
+function matrixDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#010803';
+  ctx.fillRect(0, 0, size, size);
+  const glyphs = 'ｱｲｳｴｵｶｷｸ0123456789ﾊﾋﾌﾍﾎ@#$%';
+  const colW = 16;
+  ctx.font = '14px monospace';
+  ctx.textBaseline = 'top';
+  ctx.shadowColor = '#28ff7a';
+  for (let cx = 0; cx < size; cx += colW) {
+    const head = Math.random() * size;
+    const trail = 6 + (Math.random() * 14 | 0);
+    for (let r = 0; r < trail; r++) {
+      const y = (head - r * colW) ;
+      const yy = ((y % size) + size) % size;
+      const ch = glyphs[(Math.random() * glyphs.length) | 0];
+      if (r === 0) { ctx.fillStyle = '#d8ffe6'; ctx.shadowBlur = 8; }
+      else { const a = 1 - r / trail; ctx.fillStyle = `rgba(30,${200 + (a*55)|0},90,${a})`; ctx.shadowBlur = 4; }
+      ctx.fillText(ch, cx + 1, yy);
+    }
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// CAMO_URBAN — sharp angular urban camouflage.
+function camoUrbanDecal() {
+  const size = 512, c = makeCanvas(size), ctx = c.getContext('2d');
+  const cols = ['#c8ccd2', '#8a9099', '#4a4f57', '#23262b'];
+  ctx.fillStyle = cols[0];
+  ctx.fillRect(0, 0, size, size);
+  // angular blotches, drawn wrapped for tiling
+  const blob = (x, y, col, scale) => {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    const pts = 5 + (Math.random() * 4 | 0);
+    for (let i = 0; i < pts; i++) {
+      const a = (i / pts) * Math.PI * 2;
+      const r = scale * (0.5 + Math.random() * 0.8);
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const col = cols[1 + (Math.random() * (cols.length - 1) | 0)];
+    const sc = 18 + Math.random() * 46;
+    [[0,0],[size,0],[-size,0],[0,size],[0,-size]].forEach(([dx,dy]) => blob(x+dx, y+dy, col, sc));
+  }
+  return c;
+}
+
 const DECALS = {
-  fire:      fireDecal,
-  anime:     animeDecal,
-  dragon:    dragonDecal,
-  cyber:     cyberDecal,
-  carbon:    carbonDecal,
-  digicamo:  digicamoDecal,
-  hextech:   hextechDecal,
-  frost:     frostDecal,
-  galaxy:    galaxyDecal,
-  gold:      goldDecal,
-  skull:     skullDecal,
-  toxic:     toxicDecal,
-  lightning: lightningDecal,
-  tiger:     tigerDecal,
+  fire:        fireDecal,
+  anime:       animeDecal,
+  dragon:      dragonDecal,
+  cyber:       cyberDecal,
+  carbon:      carbonDecal,
+  digicamo:    digicamoDecal,
+  hextech:     hextechDecal,
+  frost:       frostDecal,
+  galaxy:      galaxyDecal,
+  gold:        goldDecal,
+  skull:       skullDecal,
+  toxic:       toxicDecal,
+  lightning:   lightningDecal,
+  tiger:       tigerDecal,
+  // ── new high-quality decals ──
+  holographic: holographicDecal,
+  circuitneon: circuitneonDecal,
+  lava:        lavaDecal,
+  ice:         iceDecal,
+  bloodmoon:   bloodmoonDecal,
+  matrix:      matrixDecal,
+  camo_urban:  camoUrbanDecal,
 };
 
 // Returns a seamless color CanvasTexture for the given decal type (cached).

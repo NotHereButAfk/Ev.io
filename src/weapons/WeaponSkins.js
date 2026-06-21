@@ -34,8 +34,8 @@ export const WEAPON_SKINS = [
   {
     id: 'arctic', name: 'Arctic Frost', rarity: 'rare',
     body: 0xd6dde5, accent: 0x5a7a8a, metal: 0xc2cad3, metalness: 0.6, roughness: 0.3,
-    emissive: 0x2a6a9a, emissiveIntensity: 0.25, decal: 'frost', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 1.8, animMin: 0.15, animMax: 0.55
+    emissive: 0x2a6a9a, emissiveIntensity: 0.6, decal: 'frost', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 1.8, animMin: 0.4, animMax: 1.2
   },
 
   // ── EPIC ───────────────────────────────────────────────────────────────────
@@ -49,20 +49,20 @@ export const WEAPON_SKINS = [
   {
     id: 'plasma', name: 'Plasma ⚡', rarity: 'epic',
     body: 0x0a0f1a, accent: 0x001066, metal: 0x0055cc, metalness: 0.8, roughness: 0.15,
-    emissive: 0x00aaff, emissiveIntensity: 0.4,
-    animated: true, animType: 'pulse', animSpeed: 3.2, animMin: 0.2, animMax: 1.1
+    emissive: 0x00aaff, emissiveIntensity: 1.2,
+    animated: true, animType: 'pulse', animSpeed: 3.2, animMin: 0.6, animMax: 2.2
   },
   {
     id: 'toxic', name: 'Toxic Waste ☣', rarity: 'epic',
     body: 0x0a1206, accent: 0x05100a, metal: 0x3a9c1a, metalness: 0.6, roughness: 0.35,
-    emissive: 0x66ff22, emissiveIntensity: 0.45, decal: 'toxic', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 3.5, animMin: 0.25, animMax: 1.0
+    emissive: 0x66ff22, emissiveIntensity: 1.2, decal: 'toxic', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 3.5, animMin: 0.6, animMax: 1.8
   },
   {
     id: 'inferno', name: 'Inferno', rarity: 'epic',
     body: 0x1a0800, accent: 0x5c1400, metal: 0xcc3300, metalness: 0.6, roughness: 0.3,
-    emissive: 0xff4400, emissiveIntensity: 0.5,
-    animated: true, animType: 'flicker', animSpeed: 6.0, animMin: 0.3, animMax: 1.2
+    emissive: 0xff4400, emissiveIntensity: 1.3,
+    animated: true, animType: 'flicker', animSpeed: 6.0, animMin: 0.6, animMax: 2.3
   },
 
   // ── LEGENDARY ──────────────────────────────────────────────────────────────
@@ -75,42 +75,42 @@ export const WEAPON_SKINS = [
   {
     id: 'wildfire', name: 'Wildfire 🔥', rarity: 'legendary',
     body: 0xff5a00, accent: 0x2a0a00, metal: 0xff7a1a, metalness: 0.5, roughness: 0.4,
-    emissive: 0xff3300, emissiveIntensity: 0.6, decal: 'fire', decalEmissive: true,
-    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 0.4, animMax: 1.4,
+    emissive: 0xff3300, emissiveIntensity: 1.4, decal: 'fire', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 0.7, animMax: 2.4,
     shootSound: 'fire'
   },
   {
     id: 'cybernet', name: 'Cybernet 🤖', rarity: 'legendary',
     body: 0x0a1014, accent: 0x04080c, metal: 0x0aa0c0, metalness: 0.85, roughness: 0.18,
-    emissive: 0x00e5ff, emissiveIntensity: 0.5, decal: 'cyber', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 4.0, animMin: 0.25, animMax: 0.9,
+    emissive: 0x00e5ff, emissiveIntensity: 1.3, decal: 'cyber', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 4.0, animMin: 0.7, animMax: 2.0,
     shootSound: 'laser'
   },
   {
     id: 'thunderbolt', name: 'Thunderbolt ⚡', rarity: 'legendary',
     body: 0x070a16, accent: 0x040610, metal: 0x7fd8ff, metalness: 0.8, roughness: 0.2,
-    emissive: 0xaef0ff, emissiveIntensity: 0.5, decal: 'lightning', decalEmissive: true,
-    animated: true, animType: 'flicker', animSpeed: 9.0, animMin: 0.2, animMax: 1.3,
+    emissive: 0xaef0ff, emissiveIntensity: 1.4, decal: 'lightning', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 9.0, animMin: 0.5, animMax: 2.4,
     shootSound: 'laser'
   },
   {
     id: 'galaxy', name: 'Galaxy ✦', rarity: 'legendary',
     body: 0x06030f, accent: 0x030208, metal: 0x5a3a9c, metalness: 0.8, roughness: 0.2,
-    emissive: 0x9c4aff, emissiveIntensity: 0.4, decal: 'galaxy', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.3, animMax: 1.0
+    emissive: 0x9c4aff, emissiveIntensity: 1.2, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.6, animMax: 2.0
   },
 
   // ── MYTHIC ───────────────────────────────────────────────────────────────────
   {
     id: 'prism', name: 'Prism 🌈', rarity: 'mythic',
     body: 0x1a1a1a, accent: 0x0f0f0f, metal: 0x808080, metalness: 0.85, roughness: 0.12,
-    emissive: 0xffffff, emissiveIntensity: 0.5, animated: true, animType: 'cycle'
+    emissive: 0xffffff, emissiveIntensity: 1.6, animated: true, animType: 'cycle'
   },
   {
     id: 'void', name: 'Void ◈', rarity: 'mythic',
     body: 0x080608, accent: 0x12001a, metal: 0x3a0055, metalness: 0.88, roughness: 0.1,
-    emissive: 0x6600cc, emissiveIntensity: 0.4,
-    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.1, animMax: 0.9
+    emissive: 0x6600cc, emissiveIntensity: 1.3,
+    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.5, animMax: 2.1
   },
   {
     id: 'sakura', name: 'Sakura Anime 🌸', rarity: 'mythic',
@@ -120,9 +120,101 @@ export const WEAPON_SKINS = [
   {
     id: 'supernova', name: 'Supernova 💥', rarity: 'mythic',
     body: 0x100318, accent: 0x05010a, metal: 0xff6acc, metalness: 0.8, roughness: 0.16,
-    emissive: 0xffffff, emissiveIntensity: 0.6, decal: 'galaxy', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 5.0, animMin: 0.35, animMax: 1.3,
+    emissive: 0xffffff, emissiveIntensity: 1.5, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 5.0, animMin: 0.7, animMax: 2.5,
     shootSound: 'laser'
+  },
+
+  // ── NEW SKINS (epic+) ────────────────────────────────────────────────────────
+
+  // EPIC
+  {
+    id: 'urbanedge', name: 'Urban Edge', rarity: 'epic',
+    body: 0x8a9099, accent: 0x23262b, metal: 0xc8ccd2, metalness: 0.7, roughness: 0.3,
+    decal: 'camo_urban'
+  },
+  {
+    id: 'frostbite', name: 'Frostbite ❄', rarity: 'epic',
+    body: 0x9fd8ec, accent: 0x18394a, metal: 0xcfeefb, metalness: 0.7, roughness: 0.18,
+    emissive: 0x6fd0ff, emissiveIntensity: 0.9, decal: 'ice', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 1.6, animMin: 0.4, animMax: 1.3
+  },
+  {
+    id: 'overclock', name: 'Overclock', rarity: 'epic',
+    body: 0x02100a, accent: 0x021008, metal: 0x15e07a, metalness: 0.8, roughness: 0.22,
+    emissive: 0x1bff8a, emissiveIntensity: 1.1, decal: 'circuitneon', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 3.0, animMin: 0.6, animMax: 1.9,
+    shootSound: 'laser'
+  },
+
+  // LEGENDARY
+  {
+    id: 'magmacore', name: 'Magma Core', rarity: 'legendary',
+    body: 0x0c0503, accent: 0x2a0c00, metal: 0xff7b1a, metalness: 0.55, roughness: 0.4,
+    emissive: 0xff5a00, emissiveIntensity: 1.4, decal: 'lava', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 5.5, animMin: 0.7, animMax: 2.3,
+    shootSound: 'fire'
+  },
+  {
+    id: 'crimsonmoon', name: 'Crimson Moon 🌑', rarity: 'legendary',
+    body: 0x2c0608, accent: 0x120203, metal: 0xf0c24a, metalness: 0.85, roughness: 0.2,
+    emissive: 0xff2a3a, emissiveIntensity: 1.0, decal: 'bloodmoon', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 1.4, animMin: 0.5, animMax: 1.6
+  },
+  {
+    id: 'datastream', name: 'Datastream', rarity: 'legendary',
+    body: 0x010803, accent: 0x010402, metal: 0x28ff7a, metalness: 0.78, roughness: 0.2,
+    emissive: 0x28ff7a, emissiveIntensity: 1.3, decal: 'matrix', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 4.5, animMin: 0.6, animMax: 2.1,
+    shootSound: 'laser'
+  },
+  {
+    id: 'iridium', name: 'Iridium 🪙', rarity: 'legendary',
+    body: 0x1a1a1a, accent: 0x0f0f0f, metal: 0xc0c0c0, metalness: 0.92, roughness: 0.12,
+    emissive: 0xffffff, emissiveIntensity: 1.4, decal: 'holographic', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.22, animMin: 1.0, animMax: 2.0
+  },
+
+  // MYTHIC
+  {
+    id: 'holographic', name: 'Holographic 🌈', rarity: 'mythic',
+    body: 0x1a1a1a, accent: 0x101010, metal: 0xb0b0b0, metalness: 0.9, roughness: 0.1,
+    emissive: 0xffffff, emissiveIntensity: 1.8, decal: 'holographic', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.35, animMin: 1.3, animMax: 2.5,
+    shootSound: 'laser'
+  },
+  {
+    id: 'lavacore', name: 'Lava Core 🌋', rarity: 'mythic',
+    body: 0x0c0503, accent: 0x1a0600, metal: 0xff8a2a, metalness: 0.5, roughness: 0.45,
+    emissive: 0xff5a00, emissiveIntensity: 1.8, decal: 'lava', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 1.0, animMax: 2.5,
+    shootSound: 'fire'
+  },
+  {
+    id: 'matrix', name: 'Matrix 💻', rarity: 'mythic',
+    body: 0x010803, accent: 0x010402, metal: 0x28ff7a, metalness: 0.85, roughness: 0.15,
+    emissive: 0x28ff7a, emissiveIntensity: 1.9, decal: 'matrix', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 8.0, animMin: 1.0, animMax: 2.4,
+    shootSound: 'laser'
+  },
+  {
+    id: 'bloodmoon', name: 'Blood Moon 🩸', rarity: 'mythic',
+    body: 0x2c0608, accent: 0x120203, metal: 0xf0c24a, metalness: 0.9, roughness: 0.16,
+    emissive: 0xff1a2a, emissiveIntensity: 1.7, decal: 'bloodmoon', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 1.6, animMin: 0.9, animMax: 2.3
+  },
+  {
+    id: 'celestial', name: 'Celestial ✦', rarity: 'mythic',
+    body: 0x05030f, accent: 0x020108, metal: 0x6a8aff, metalness: 0.85, roughness: 0.14,
+    emissive: 0x9cb8ff, emissiveIntensity: 1.8, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.18, animMin: 1.2, animMax: 2.4,
+    shootSound: 'laser'
+  },
+  {
+    id: 'cryostorm', name: 'Cryostorm ❄', rarity: 'mythic',
+    body: 0x9fd8ec, accent: 0x123040, metal: 0xeafaff, metalness: 0.8, roughness: 0.12,
+    emissive: 0x7fe0ff, emissiveIntensity: 1.7, decal: 'ice', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 2.0, animMin: 0.9, animMax: 2.4
   }
 ];
 
@@ -214,7 +306,19 @@ export function animateWeaponSkin(group, skin, t) {
         const hue = (t * 0.14) % 1;
         _hsl.setHSL(hue, 0.95, 0.55);
         m.emissive.copy(_hsl);
-        m.emissiveIntensity = 0.55;
+        m.emissiveIntensity = 1.6;
+        break;
+      }
+      case 'rainbow': {
+        // Fast continuous hue cycling with a gentle brightness pulse so the
+        // bloom shimmers through the whole spectrum.
+        const speed = skin.animSpeed ?? 0.35;
+        const hue = (t * speed) % 1;
+        _hsl.setHSL(hue, 1.0, 0.55);
+        if (!keepWhite) m.emissive.copy(_hsl);
+        const lo = skin.animMin ?? 1.2, hi = skin.animMax ?? 2.2;
+        const pulse = (Math.sin(t * 4.0) + 1) * 0.5;
+        m.emissiveIntensity = lo + pulse * (hi - lo);
         break;
       }
     }

@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { World } from '../world/World.js';
 import { Player } from '../player/Player.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
@@ -53,6 +57,11 @@ export class Game {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.6)).texture;
     pmrem.dispose();
+
+    // ── HDR bloom post-processing ──────────────────────────────────────────
+    // Makes every emissive surface — neon signs, lit windows, glowing weapon
+    // skins, muzzle flashes, lamps — bleed light for a cinematic glow.
+    this._buildPostFX();
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
@@ -572,11 +581,41 @@ export class Game {
     );
   }
 
+  // ── Post-processing (bloom) ──────────────────────────────────────────────
+
+  _buildPostFX() {
+    const w = window.innerWidth, h = window.innerHeight;
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.composer.setSize(w, h);
+
+    // RenderPass camera is swapped each frame between player/menu cameras.
+    this.renderPass = new RenderPass(this.world.scene, this.menuCamera);
+    this.composer.addPass(this.renderPass);
+
+    // Selective-ish glow: threshold keeps only bright/emissive pixels blooming.
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(w, h),
+      0.85,   // strength
+      0.55,   // radius
+      0.72    // threshold — only pixels brighter than this bloom
+    );
+    this.composer.addPass(this.bloomPass);
+
+    // OutputPass applies the renderer's tone mapping + sRGB after bloom.
+    this.composer.addPass(new OutputPass());
+
+    // Bloom on by default; disabled on the 'low' quality preset for performance.
+    this._bloomEnabled = GameSettings.get('quality') !== 'low';
+  }
+
   // ── Resize ─────────────────────────────────────────────────────────────────
 
   _onResize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h);
+    this.composer?.setSize(w, h);
+    this.bloomPass?.setSize(w, h);
     this.player.camera.aspect = w / h;
     this.player.camera.updateProjectionMatrix();
     this.menuCamera.aspect = w / h;
@@ -722,7 +761,12 @@ export class Game {
     }
 
     const camera = this.state === 'playing' ? this.player.camera : this.menuCamera;
-    this.renderer.render(this.world.scene, camera);
+    if (this._bloomEnabled && this.composer) {
+      this.renderPass.camera = camera;
+      this.composer.render();
+    } else {
+      this.renderer.render(this.world.scene, camera);
+    }
     this.input.endFrame();
   }
 }
