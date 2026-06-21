@@ -55,8 +55,20 @@ export class WeaponSystem {
     this.weaponSkin = null;
     this.swordSkin = null;
     this.animTime = 0;
-    this.flashLight = new THREE.PointLight(0xffd27a, 0, 6, 2);
+    this.flashLight = new THREE.PointLight(0xffcc66, 0, 8, 1.8);
     this.camera.add(this.flashLight);
+
+    // Visible muzzle flash sprite — two crossed quads for a star shape
+    const flashMat = new THREE.MeshBasicMaterial({
+      color: 0xfff0a0, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide
+    });
+    this._flashMeshes = [];
+    for (let i = 0; i < 3; i++) {
+      const geo = new THREE.PlaneGeometry(0.18, 0.18);
+      const mesh = new THREE.Mesh(geo, flashMat.clone());
+      mesh.rotation.z = (i / 3) * Math.PI;
+      this._flashMeshes.push(mesh);
+    }
 
     this._buildViewmodels();
     this._lastSpawnedTracerHolder = scene;
@@ -92,23 +104,82 @@ export class WeaponSystem {
   }
 
   _buildArm() {
-    this.sleeveMat = new THREE.MeshStandardMaterial({ color: 0x9aa5b1, roughness: 0.6 });
-    this.gloveMat = new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.7 });
-
-    const arm = new THREE.Group();
-    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.34, 8), this.sleeveMat);
-    forearm.rotation.x = 1.15;
-    forearm.position.set(0, -0.07, 0.16);
-    arm.add(forearm);
-
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), this.gloveMat);
-    hand.position.set(0, -0.02, -0.02);
-    arm.add(hand);
-
-    arm.traverse((obj) => {
-      if (obj.isMesh) obj.castShadow = true;
+    this.sleeveMat = new THREE.MeshStandardMaterial({
+      color: 0x2d3540, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.6
+    });
+    this.gloveMat = new THREE.MeshStandardMaterial({
+      color: 0x191c22, roughness: 0.52, metalness: 0.12, envMapIntensity: 1.0
+    });
+    const gloveSeam = new THREE.MeshStandardMaterial({
+      color: 0x0c0e12, roughness: 0.6, metalness: 0.08
     });
 
+    const bx = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const cy = (r1, r2, h, mat, segs = 12) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, segs), mat);
+      m.rotation.x = Math.PI / 2;
+      return m;
+    };
+
+    const arm = new THREE.Group();
+
+    // Forearm — tapered sleeve
+    const forearm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.046, 0.062, 0.38, 12), this.sleeveMat);
+    forearm.rotation.x = 1.18;
+    forearm.position.set(0, -0.055, 0.19);
+    arm.add(forearm);
+
+    // Sleeve cuff detail ring
+    const cuff = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.018, 12), gloveSeam);
+    cuff.rotation.x = 1.18;
+    cuff.position.set(0, -0.032, 0.01);
+    arm.add(cuff);
+
+    // Wrist
+    const wrist = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.046, 0.07, 12), this.gloveMat);
+    wrist.rotation.x = 1.18;
+    wrist.position.set(0, -0.022, -0.02);
+    arm.add(wrist);
+
+    // Palm
+    const palm = bx(0.088, 0.048, 0.095, this.gloveMat);
+    palm.position.set(0, 0.0, -0.098);
+    arm.add(palm);
+
+    // Knuckle ridge
+    const knuckleBar = bx(0.09, 0.014, 0.018, gloveSeam);
+    knuckleBar.position.set(0, 0.025, -0.148);
+    arm.add(knuckleBar);
+
+    // 4 fingers
+    const fingerX = [-0.031, -0.010, 0.011, 0.032];
+    fingerX.forEach((xOff, i) => {
+      const len = i === 0 || i === 3 ? 0.055 : 0.065;
+      const fing = cy(0.009, 0.011, len, this.gloveMat, 8);
+      fing.rotation.x = 1.38;
+      fing.position.set(xOff, 0.018, -0.178 - (i === 0 || i === 3 ? 0.005 : 0));
+      arm.add(fing);
+      // fingertip cap
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 5), gloveSeam);
+      tip.position.set(xOff, 0.038, -0.207 - (i === 0 || i === 3 ? 0.004 : 0));
+      arm.add(tip);
+    });
+
+    // Thumb
+    const thumb = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.013, 0.016, 0.055, 8), this.gloveMat);
+    thumb.rotation.x = 1.22;
+    thumb.rotation.z = -0.45;
+    thumb.position.set(-0.052, 0.01, -0.115);
+    arm.add(thumb);
+    const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), gloveSeam);
+    thumbTip.position.set(-0.068, 0.022, -0.148);
+    arm.add(thumbTip);
+
+    arm.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
     this.swayGroup.add(arm);
     this.armGroup = arm;
   }
@@ -252,12 +323,20 @@ export class WeaponSystem {
   }
 
   _flash() {
-    this.flashLight.intensity = 4.5;
+    this.flashLight.intensity = 8;
     const muzzleWorld = new THREE.Vector3();
     this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
     this.camera.worldToLocal(muzzleWorld);
     this.flashLight.position.copy(muzzleWorld);
     this._flashTimer = FLASH_LIFE;
+
+    // Show sprite meshes at muzzle
+    const muzzleObj = this.models.get(this.currentDef.id).muzzle;
+    this._flashMeshes.forEach((m) => {
+      muzzleObj.add(m);
+      m.material.opacity = 0.92;
+      m.rotation.z += Math.random() * Math.PI;
+    });
   }
 
   _spawnShell() {
@@ -639,7 +718,12 @@ export class WeaponSystem {
     // muzzle flash decay
     if (this._flashTimer !== undefined && this._flashTimer > 0) {
       this._flashTimer -= dt;
-      this.flashLight.intensity = Math.max(0, (this._flashTimer / FLASH_LIFE)) * 4.5;
+      const t = Math.max(0, this._flashTimer / FLASH_LIFE);
+      this.flashLight.intensity = t * 8;
+      this._flashMeshes.forEach((m) => { m.material.opacity = t * 0.92; });
+      if (t === 0) {
+        this._flashMeshes.forEach((m) => m.parent?.remove(m));
+      }
     }
 
     // tracers

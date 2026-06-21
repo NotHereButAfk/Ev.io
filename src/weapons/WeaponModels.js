@@ -10,7 +10,9 @@ import * as THREE from 'three';
 //   special= optics, unique parts (untouched)
 // ---------------------------------------------------------------------------
 function M(role, color, opts = {}) {
-  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.5, ...opts });
+  // Higher envMapIntensity makes metals catch the IBL and look physically real.
+  const defaults = { roughness: 0.5, metalness: 0.5, envMapIntensity: 1.8 };
+  const m = new THREE.MeshStandardMaterial({ color, ...defaults, ...opts });
   m.userData.role = role;
   return m;
 }
