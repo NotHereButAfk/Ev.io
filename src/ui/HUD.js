@@ -38,9 +38,17 @@ export class HUD {
   // Mode-specific top-center overlay (timer, wave, lives).
   setModeHUD(primary, secondary = '') {
     this.modeInfo.classList.remove('hidden');
-    this.modeInfo.innerHTML =
-      `<span class="mode-primary">${primary}</span>` +
-      (secondary ? `<span class="mode-secondary">${secondary}</span>` : '');
+    this.modeInfo.textContent = '';
+    const p = document.createElement('span');
+    p.className = 'mode-primary';
+    p.textContent = primary;
+    this.modeInfo.appendChild(p);
+    if (secondary) {
+      const s = document.createElement('span');
+      s.className = 'mode-secondary';
+      s.textContent = secondary;
+      this.modeInfo.appendChild(s);
+    }
   }
 
   hideModeHUD() { this.modeInfo.classList.add('hidden'); }

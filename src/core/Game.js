@@ -122,6 +122,14 @@ export class Game {
     this._runConnectSequence();
   }
 
+  // Release all global event listeners (call if the Game instance is discarded).
+  dispose() {
+    this.input.dispose();
+    this.renderer.dispose();
+    this.botManager.clear();
+    this.zombieManager.clear();
+  }
+
   // ── Connect sequence ─────────────────────────────────────────────────────────
 
   _runConnectSequence() {
