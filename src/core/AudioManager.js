@@ -43,60 +43,103 @@ export class AudioManager {
   playShot(kind = 'rifle') {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    const params = {
-      sidearm: { dur: 0.12, freq: 320, noiseMix: 0.5 },
-      smg: { dur: 0.08, freq: 260, noiseMix: 0.6 },
-      shotgun: { dur: 0.22, freq: 150, noiseMix: 0.85 },
-      rifle: { dur: 0.1, freq: 240, noiseMix: 0.6 },
-      lmg: { dur: 0.13, freq: 180, noiseMix: 0.7 },
-      sniper: { dur: 0.32, freq: 110, noiseMix: 0.7 },
-      rpg: { dur: 0.35, freq: 90, noiseMix: 0.85 }
-    }[kind] || { dur: 0.12, freq: 240, noiseMix: 0.6 };
+    // Per-weapon character: punch (low body), crack (filtered noise), tail.
+    const P = {
+      sidearm: { dur: 0.14, body: 300, crackHz: 3200, tail: 0.10, gain: 0.9 },
+      smg:     { dur: 0.10, body: 250, crackHz: 3600, tail: 0.07, gain: 0.85 },
+      shotgun: { dur: 0.26, body: 130, crackHz: 1900, tail: 0.22, gain: 1.0 },
+      rifle:   { dur: 0.13, body: 220, crackHz: 4200, tail: 0.12, gain: 0.95 },
+      lmg:     { dur: 0.16, body: 170, crackHz: 3000, tail: 0.14, gain: 1.0 },
+      sniper:  { dur: 0.36, body: 100, crackHz: 5200, tail: 0.30, gain: 1.0 },
+      rpg:     { dur: 0.4,  body: 80,  crackHz: 1400, tail: 0.34, gain: 1.0 },
+    }[kind] || { dur: 0.13, body: 220, crackHz: 4000, tail: 0.12, gain: 0.95 };
 
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = this._noiseBuffer(params.dur);
-    const noiseGain = this._envGain(params.noiseMix, 0.002, params.dur, t);
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = params.freq * 6;
-    noise.connect(filter).connect(noiseGain).connect(this.master);
+    // 1) Transient crack — short bright noise burst (the "snap").
+    const crack = this.ctx.createBufferSource();
+    crack.buffer = this._noiseBuffer(0.05);
+    const crackHP = this.ctx.createBiquadFilter();
+    crackHP.type = 'highpass';
+    crackHP.frequency.value = 1200;
+    const crackBP = this.ctx.createBiquadFilter();
+    crackBP.type = 'bandpass';
+    crackBP.frequency.setValueAtTime(P.crackHz, t);
+    crackBP.frequency.exponentialRampToValueAtTime(P.crackHz * 0.4, t + 0.05);
+    crackBP.Q.value = 0.8;
+    const crackGain = this._envGain(0.55 * P.gain, 0.001, 0.05, t);
+    crack.connect(crackHP).connect(crackBP).connect(crackGain).connect(this.master);
 
-    const osc = this.ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(params.freq, t);
-    osc.frequency.exponentialRampToValueAtTime(params.freq * 0.4, t + params.dur);
-    const oscGain = this._envGain(1 - params.noiseMix * 0.5, 0.001, params.dur, t);
-    osc.connect(oscGain).connect(this.master);
+    // 2) Body punch — pitch-dropping tone for weight.
+    const body = this.ctx.createOscillator();
+    body.type = 'square';
+    body.frequency.setValueAtTime(P.body, t);
+    body.frequency.exponentialRampToValueAtTime(P.body * 0.35, t + P.dur);
+    const bodyGain = this._envGain(0.6 * P.gain, 0.001, P.dur, t);
+    const bodyShape = this.ctx.createBiquadFilter();
+    bodyShape.type = 'lowpass';
+    bodyShape.frequency.value = P.body * 8;
+    body.connect(bodyShape).connect(bodyGain).connect(this.master);
 
-    noise.start(t);
-    osc.start(t);
-    noise.stop(t + params.dur + 0.02);
-    osc.stop(t + params.dur + 0.02);
+    // 3) Tail — lower-passed noise that decays, the report bouncing off the map.
+    const tail = this.ctx.createBufferSource();
+    tail.buffer = this._noiseBuffer(P.tail);
+    const tailLP = this.ctx.createBiquadFilter();
+    tailLP.type = 'lowpass';
+    tailLP.frequency.setValueAtTime(P.crackHz * 0.5, t);
+    tailLP.frequency.exponentialRampToValueAtTime(220, t + P.tail);
+    const tailGain = this._envGain(0.5 * P.gain, 0.004, P.tail, t + 0.01);
+    tail.connect(tailLP).connect(tailGain).connect(this.master);
+
+    crack.start(t); body.start(t); tail.start(t + 0.005);
+    crack.stop(t + 0.06);
+    body.stop(t + P.dur + 0.02);
+    tail.stop(t + P.tail + 0.04);
   }
 
-  // Kawaii anime "pew!" — a cute pitch-bent chirp with a sparkle harmonic.
+  // Kawaii anime "pew~!" — a cute vocal-ish chirp with vibrato + sparkle.
   playAnimeShot() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    // main chirp: quick rise then fall
+
+    // Vibrato LFO for a cute "voice" wobble.
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 28;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 55;
+    lfo.connect(lfoGain);
+
+    // Main "pew" — bright rise then a quick down-glide (the kawaii drop).
     const osc = this.ctx.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.exponentialRampToValueAtTime(1760, t + 0.05);
-    osc.frequency.exponentialRampToValueAtTime(620, t + 0.18);
-    const gain = this._envGain(0.32, 0.004, 0.18, t);
-    osc.connect(gain).connect(this.master);
-    osc.start(t);
-    osc.stop(t + 0.22);
-    // sparkle harmonic
+    osc.frequency.setValueAtTime(1040, t);
+    osc.frequency.exponentialRampToValueAtTime(1960, t + 0.045);
+    osc.frequency.exponentialRampToValueAtTime(680, t + 0.2);
+    lfoGain.connect(osc.frequency);
+    // soft formant so it sounds vocal, not buzzy
+    const formant = this.ctx.createBiquadFilter();
+    formant.type = 'bandpass';
+    formant.frequency.value = 1500;
+    formant.Q.value = 1.4;
+    const gain = this._envGain(0.34, 0.005, 0.2, t);
+    osc.connect(formant).connect(gain).connect(this.master);
+
+    // A soft sub sine doubling an octave down for body.
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(520, t);
+    sub.frequency.exponentialRampToValueAtTime(340, t + 0.2);
+    const subGain = this._envGain(0.16, 0.005, 0.2, t);
+    sub.connect(subGain).connect(this.master);
+
+    // Twinkle sparkle on top.
     const spark = this.ctx.createOscillator();
     spark.type = 'sine';
-    spark.frequency.setValueAtTime(2640, t + 0.02);
-    spark.frequency.exponentialRampToValueAtTime(3960, t + 0.12);
-    const sGain = this._envGain(0.12, 0.002, 0.12, t + 0.02);
+    spark.frequency.setValueAtTime(2800, t + 0.02);
+    spark.frequency.exponentialRampToValueAtTime(4200, t + 0.14);
+    const sGain = this._envGain(0.13, 0.002, 0.14, t + 0.02);
     spark.connect(sGain).connect(this.master);
-    spark.start(t + 0.02);
-    spark.stop(t + 0.16);
+
+    lfo.start(t); osc.start(t); sub.start(t); spark.start(t + 0.02);
+    lfo.stop(t + 0.24); osc.stop(t + 0.24); sub.stop(t + 0.24); spark.stop(t + 0.18);
   }
 
   // Sci-fi laser zap — descending saw with a metallic ring.

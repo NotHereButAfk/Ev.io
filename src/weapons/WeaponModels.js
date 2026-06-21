@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
 
 // ---------------------------------------------------------------------------
@@ -9,24 +10,36 @@ import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTex
 //   metal  = barrels, rails, hardware (skin-recolored)
 //   wood   = wooden parts (untouched)
 //   special= optics, unique parts (untouched)
+//
+// Materials are MeshPhysicalMaterial: metal gets brushed scratches + anisotropy
+// (directional sheen), polymer/furniture get a clearcoat so they read as a real
+// coated surface rather than flat plastic.
 // ---------------------------------------------------------------------------
 function M(role, color, opts = {}) {
-  // Higher envMapIntensity makes metals catch the IBL and look physically real.
-  const defaults = { roughness: 0.5, metalness: 0.5, envMapIntensity: 1.8 };
-  const m = new THREE.MeshStandardMaterial({ color, ...defaults, ...opts });
+  const defaults = { roughness: 0.5, metalness: 0.5, envMapIntensity: 2.0 };
+  const m = new THREE.MeshPhysicalMaterial({ color, ...defaults, ...opts });
   m.userData.role = role;
 
-  // Tactile PBR surface detail — brushed scratches on metal, grain on polymer.
   if (role === 'metal') {
     m.normalMap = metalNormalMap();
     m.roughnessMap = metalRoughnessMap();
-    m.normalScale = new THREE.Vector2(0.35, 0.35);
+    m.normalScale = new THREE.Vector2(0.4, 0.4);
+    m.anisotropy = 0.5;                 // brushed directional reflection
+    m.clearcoat = 0.25;
+    m.clearcoatRoughness = 0.3;
   } else if (role === 'body') {
     m.normalMap = polymerNormalMap();
-    m.normalScale = new THREE.Vector2(0.18, 0.18);
+    m.normalScale = new THREE.Vector2(0.2, 0.2);
+    m.clearcoat = 0.55;                 // semi-gloss polymer coating
+    m.clearcoatRoughness = 0.42;
   } else if (role === 'accent') {
     m.normalMap = polymerNormalMap();
-    m.normalScale = new THREE.Vector2(0.12, 0.12);
+    m.normalScale = new THREE.Vector2(0.14, 0.14);
+    m.clearcoat = 0.35;
+    m.clearcoatRoughness = 0.5;
+  } else if (role === 'special') {
+    m.clearcoat = 0.8;                  // glassy optics
+    m.clearcoatRoughness = 0.1;
   }
   return m;
 }
@@ -39,8 +52,13 @@ function addMuzzle(group, x, y, z) {
 }
 
 // Primitives ---------------------------------------------------------------
+// Structural boxes get rounded/beveled edges so they catch light like a real
+// machined part; tiny detail boxes stay sharp (and cheap).
 function box(w, h, d, material) {
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  const minD = Math.min(w, h, d);
+  if (minD < 0.022) return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  const r = Math.min(minD * 0.16, minD * 0.48);
+  return new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, r), material);
 }
 
 function cyl(r1, r2, h, material, segs = 16, rotX = Math.PI / 2) {

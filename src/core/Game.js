@@ -49,6 +49,10 @@ export class Game {
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
+    // The first-person viewmodel (gun, arm, muzzle flash, viewmodel lights) is
+    // parented to the player camera. Three.js only renders objects reachable
+    // from the scene root, so the camera itself must live in the scene.
+    this.world.scene.add(this.player.camera);
     this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager      = new BotManager(this.world, this.world.scene);
     this.zombieManager   = new ZombieManager(this.world, this.world.scene);
@@ -397,7 +401,6 @@ export class Game {
     this.menu.hideGameOver();
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
-    document.getElementById('spectate-label').classList.add('hidden');
 
     this.state = 'playing';
     this.input.requestPointerLock();
@@ -487,7 +490,6 @@ export class Game {
     this.botManager.clear();
     this.zombieManager.clear();
     this._playerDowned = false;
-    document.getElementById('spectate-label').classList.remove('hidden');
     this.menu.showMain();
   }
 

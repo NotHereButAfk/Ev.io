@@ -86,6 +86,16 @@ export class WeaponSystem {
     this.weaponMount.position.set(0.32, -0.26, -0.5);
     this.camera.add(this.weaponMount);
 
+    // Dedicated viewmodel key light — a short-range light parented to the camera
+    // that rakes across the gun so its metal/clearcoat highlights always read.
+    this.vmLight = new THREE.PointLight(0xffffff, 4.5, 1.8, 2);
+    this.vmLight.position.set(0.5, 0.35, 0.0);
+    this.camera.add(this.vmLight);
+    // Cool fill from the other side to shape the form.
+    this.vmFill = new THREE.PointLight(0x88aaff, 1.6, 1.8, 2);
+    this.vmFill.position.set(-0.5, -0.1, -0.2);
+    this.camera.add(this.vmFill);
+
     this.swayGroup = new THREE.Object3D();
     this.weaponMount.add(this.swayGroup);
 
