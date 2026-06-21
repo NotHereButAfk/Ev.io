@@ -229,6 +229,15 @@ export class WeaponSystem {
     }
   }
 
+  // Resolve the cosmetic skin currently applied to a given weapon: prefer the
+  // per-weapon Armory entry, fall back to the global weapon/sword skin.
+  _activeSkinFor(weaponId) {
+    const entry = this._armoryMap?.get(weaponId);
+    if (entry) return entry.skin;
+    const def = this.loadout.find((w) => w.id === weaponId);
+    return def?.kind === 'melee' ? this.swordSkin : this.weaponSkin;
+  }
+
   _setActiveModel(index) {
     this.loadout.forEach((w, i) => {
       this.models.get(w.id).group.visible = i === index;
@@ -600,7 +609,11 @@ export class WeaponSystem {
 
     st.magAmmo -= 1;
     this.fireTimer = def.fireRate;
-    this.audio.playShot(def.sound || 'rifle');
+    // A themed skin can override the fire SFX (anime pew, laser, fire whoosh).
+    const skinSound = this._activeSkinFor(def.id)?.shootSound;
+    if (!(skinSound && this.audio.playSkinShot(skinSound))) {
+      this.audio.playShot(def.sound || 'rifle');
+    }
     if (def.kind === 'rocket') {
       this._spawnRocket(def);
     } else {

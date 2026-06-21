@@ -1,9 +1,15 @@
 import * as THREE from 'three';
+import { decalTexture } from './WeaponTextures.js';
 
-// Twenty cosmetic finishes for guns. Each skin recolors the material "roles"
+// Cosmetic finishes for guns. Each skin recolors the material "roles"
 // tagged on every gun model (body / accent / metal). Wood and special parts
 // are left untouched. Animated skins also update emissive properties each
 // frame via animateWeaponSkin().
+//
+// A skin may also carry:
+//   decal       — a seamless image pattern painted on the body ('fire'|'anime'|
+//                 'dragon'|'cyber'); 'fire'/'cyber' also glow via emissiveMap
+//   shootSound  — overrides the fire SFX ('anime' kawaii pew, 'laser', etc.)
 
 export const WEAPON_SKINS = [
   // ── Tactical/Military ──────────────────────────────────────────────────
@@ -52,6 +58,41 @@ export const WEAPON_SKINS = [
     metalness: 0.82, roughness: 0.15,
     emissive: 0x6600cc, emissiveIntensity: 0.3,
     animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.1, animMax: 0.85
+  },
+  // ── Themed image skins (painted decals + custom SFX) ─────────────────────
+  {
+    id: 'wildfire', name: 'Wildfire 🔥',
+    body: 0xff5a00, accent: 0x2a0a00, metal: 0xff7a1a,
+    metalness: 0.5, roughness: 0.4,
+    emissive: 0xff3300, emissiveIntensity: 0.6,
+    decal: 'fire', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 0.4, animMax: 1.4,
+    shootSound: 'fire'
+  },
+  {
+    id: 'sakura', name: 'Sakura Anime 🌸',
+    body: 0xff8fce, accent: 0x6a2a8c, metal: 0xe0a0ff,
+    metalness: 0.55, roughness: 0.35,
+    emissive: 0x000000, emissiveIntensity: 0,
+    decal: 'anime',
+    shootSound: 'anime'
+  },
+  {
+    id: 'dragonscale', name: 'Dragonscale 🐉',
+    body: 0x1a7a44, accent: 0x06160d, metal: 0x2fae6a,
+    metalness: 0.7, roughness: 0.28,
+    emissive: 0x0a3a1c, emissiveIntensity: 0.2,
+    decal: 'dragon',
+    shootSound: 'rifle'
+  },
+  {
+    id: 'cybernet', name: 'Cybernet 🤖',
+    body: 0x0a1014, accent: 0x04080c, metal: 0x0aa0c0,
+    metalness: 0.85, roughness: 0.18,
+    emissive: 0x00e5ff, emissiveIntensity: 0.5,
+    decal: 'cyber', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 4.0, animMin: 0.25, animMax: 0.9,
+    shootSound: 'laser'
   }
 ];
 
@@ -63,6 +104,7 @@ export function getWeaponSkin(id) {
 
 /** Recolor a built gun model group using the skin's material role tags. */
 export function applyWeaponSkin(group, skin) {
+  const decal = skin.decal ? decalTexture(skin.decal) : null;
   const seen = new Set();
   group.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
@@ -76,6 +118,15 @@ export function applyWeaponSkin(group, skin) {
       m.roughness = skin.roughness;
       m.emissive.setHex(skin.emissive ?? 0x000000);
       m.emissiveIntensity = skin.emissiveIntensity ?? 0;
+      // Painted decal pattern on the main shell.
+      m.map = decal || null;
+      if (skin.decalEmissive && decal) {
+        m.emissiveMap = decal;
+        m.emissive.setHex(0xffffff); // let the pattern's own colors glow
+      } else {
+        m.emissiveMap = null;
+      }
+      m.needsUpdate = true;
     } else if (role === 'accent') {
       m.color.setHex(skin.accent);
       m.metalness = skin.metalness;
@@ -100,6 +151,9 @@ export function applyWeaponSkin(group, skin) {
  */
 export function animateWeaponSkin(group, skin, t) {
   if (!skin?.animated) return;
+  // For glowing-decal skins the emissiveMap supplies the colour, so we keep
+  // emissive white on the body and only animate the glow intensity.
+  const glowDecal = skin.decalEmissive;
   const seen = new Set();
   group.traverse((obj) => {
     if (!obj.isMesh || !obj.material) return;
@@ -108,11 +162,12 @@ export function animateWeaponSkin(group, skin, t) {
     seen.add(m);
     const role = m.userData?.role;
     if (role !== 'body' && role !== 'metal') return;
+    const keepWhite = glowDecal && role === 'body';
 
     switch (skin.animType) {
       case 'pulse': {
         const pulse = (Math.sin(t * skin.animSpeed) + 1) * 0.5;
-        m.emissive.setHex(skin.emissive);
+        if (!keepWhite) m.emissive.setHex(skin.emissive);
         m.emissiveIntensity = skin.animMin + pulse * (skin.animMax - skin.animMin);
         break;
       }
@@ -121,7 +176,7 @@ export function animateWeaponSkin(group, skin, t) {
           + Math.sin(t * skin.animSpeed * 2.3) * 0.3
           + Math.sin(t * skin.animSpeed * 0.7) * 0.2;
         const f = (noise + 1) * 0.5;
-        m.emissive.setHex(skin.emissive);
+        if (!keepWhite) m.emissive.setHex(skin.emissive);
         m.emissiveIntensity = skin.animMin + f * (skin.animMax - skin.animMin);
         break;
       }

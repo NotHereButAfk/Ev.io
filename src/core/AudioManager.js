@@ -74,6 +74,81 @@ export class AudioManager {
     osc.stop(t + params.dur + 0.02);
   }
 
+  // Kawaii anime "pew!" — a cute pitch-bent chirp with a sparkle harmonic.
+  playAnimeShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // main chirp: quick rise then fall
+    const osc = this.ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.exponentialRampToValueAtTime(1760, t + 0.05);
+    osc.frequency.exponentialRampToValueAtTime(620, t + 0.18);
+    const gain = this._envGain(0.32, 0.004, 0.18, t);
+    osc.connect(gain).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.22);
+    // sparkle harmonic
+    const spark = this.ctx.createOscillator();
+    spark.type = 'sine';
+    spark.frequency.setValueAtTime(2640, t + 0.02);
+    spark.frequency.exponentialRampToValueAtTime(3960, t + 0.12);
+    const sGain = this._envGain(0.12, 0.002, 0.12, t + 0.02);
+    spark.connect(sGain).connect(this.master);
+    spark.start(t + 0.02);
+    spark.stop(t + 0.16);
+  }
+
+  // Sci-fi laser zap — descending saw with a metallic ring.
+  playLaserShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1400, t);
+    osc.frequency.exponentialRampToValueAtTime(180, t + 0.16);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 6;
+    const gain = this._envGain(0.3, 0.002, 0.16, t);
+    osc.connect(filter).connect(gain).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  // Fiery shot — whooshing filtered noise over a low boom.
+  playFireShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.3);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2600, t);
+    filter.frequency.exponentialRampToValueAtTime(400, t + 0.26);
+    const nGain = this._envGain(0.7, 0.003, 0.28, t);
+    noise.connect(filter).connect(nGain).connect(this.master);
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(160, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.22);
+    const oGain = this._envGain(0.55, 0.003, 0.22, t);
+    osc.connect(oGain).connect(this.master);
+    noise.start(t); osc.start(t);
+    noise.stop(t + 0.32); osc.stop(t + 0.26);
+  }
+
+  // Dispatch a skin's custom shoot sound; returns false if there's no override.
+  playSkinShot(soundId) {
+    switch (soundId) {
+      case 'anime': this.playAnimeShot(); return true;
+      case 'laser': this.playLaserShot(); return true;
+      case 'fire':  this.playFireShot();  return true;
+      default: return false;
+    }
+  }
+
   playExplosion() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;

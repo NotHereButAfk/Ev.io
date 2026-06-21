@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
+import { decalTexture } from '../weapons/WeaponTextures.js';
 
 const _cache = new Map();
 let _warmed  = false;
@@ -81,6 +82,16 @@ function _generate() {
     mat.roughness  = skin.roughness  ?? 0.5;
     mat.emissive.setHex(skin.animated ? (skin.emissive ?? bodyCol) : 0x000000);
     mat.emissiveIntensity = skin.animated ? Math.min(skin.emissiveIntensity ?? 0.4, 0.7) : 0;
+    // Show the painted decal pattern for themed skins.
+    const decal = !isSword && skin.decal ? decalTexture(skin.decal) : null;
+    mat.map = decal || null;
+    if (decal && skin.decalEmissive) {
+      mat.emissiveMap = decal;
+      mat.emissive.setHex(0xffffff);
+      mat.emissiveIntensity = 0.8;
+    } else {
+      mat.emissiveMap = null;
+    }
     mat.needsUpdate = true;
     renderer.render(scene, camera);
     return snap();

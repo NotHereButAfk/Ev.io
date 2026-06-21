@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
 
 // ---------------------------------------------------------------------------
 // Material helpers
@@ -14,6 +15,19 @@ function M(role, color, opts = {}) {
   const defaults = { roughness: 0.5, metalness: 0.5, envMapIntensity: 1.8 };
   const m = new THREE.MeshStandardMaterial({ color, ...defaults, ...opts });
   m.userData.role = role;
+
+  // Tactile PBR surface detail — brushed scratches on metal, grain on polymer.
+  if (role === 'metal') {
+    m.normalMap = metalNormalMap();
+    m.roughnessMap = metalRoughnessMap();
+    m.normalScale = new THREE.Vector2(0.35, 0.35);
+  } else if (role === 'body') {
+    m.normalMap = polymerNormalMap();
+    m.normalScale = new THREE.Vector2(0.18, 0.18);
+  } else if (role === 'accent') {
+    m.normalMap = polymerNormalMap();
+    m.normalScale = new THREE.Vector2(0.12, 0.12);
+  }
   return m;
 }
 
