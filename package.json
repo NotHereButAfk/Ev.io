@@ -1,7 +1,7 @@
 {
-  "name": "ev.io",
+  "name": "kyx.io",
   "version": "1.0.0",
-  "description": "Browser-based low-poly arena shooter with 5 guns, a sword and player skins.",
+  "description": "Browser-based low-poly arena FPS — deathmatch and zombie survival.",
   "type": "module",
   "scripts": {
     "dev": "vite",
