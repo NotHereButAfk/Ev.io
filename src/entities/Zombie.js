@@ -610,6 +610,10 @@ export class Zombie {
     this.shootCooldown = 0;
     this._muzzleFlash  = null;
 
+    // Audio (assigned after construction by ZombieManager)
+    this.audio = null;
+    this._growlTimer = 2 + Math.random() * 3; // first growl after 2-5s
+
     this.position = spawnPoint.clone();
 
     // Build rig — prefer the Blender GLB if already loaded
@@ -750,6 +754,7 @@ export class Zombie {
     this._deathBaseY= this.mesh.position.y;
     this.healthBarGroup.visible = false;
     if (this._muzzleFlash) this._muzzleFlash.intensity = 0;
+    if (this.audio) this.audio.playZombieDeath();
   }
 
   _fireAt(player, onAttack) {
@@ -769,6 +774,16 @@ export class Zombie {
     if (this._muzzleFlash && this._muzzleFlashTimer > 0) {
       this._muzzleFlashTimer -= dt;
       if (this._muzzleFlashTimer <= 0) this._muzzleFlash.intensity = 0;
+    }
+
+    // Periodic growl when alive and chasing
+    if (this.alive && this.audio) {
+      this._growlTimer -= dt;
+      if (this._growlTimer <= 0) {
+        this._growlTimer = 3.5 + Math.random() * 4;
+        const toP = new THREE.Vector3(player.position.x - this.position.x, 0, player.position.z - this.position.z);
+        if (toP.length() < DETECT_RADIUS + 4) this.audio.playZombieGrowl();
+      }
     }
 
     // Death animation
@@ -853,6 +868,7 @@ export class Zombie {
           if (this.attackCooldown <= 0) {
             this.attackCooldown = ATTACK_COOLDOWN;
             this.lungeTimer     = 0.2;
+            if (this.audio) this.audio.playZombieAttack();
             onAttack(this.attackDamage);
           }
         } else if (dist <= cfg.stopRange) {
@@ -878,6 +894,7 @@ export class Zombie {
         } else if (this.attackCooldown <= 0) {
           this.attackCooldown = ATTACK_COOLDOWN;
           this.lungeTimer     = 0.2;
+          if (this.audio) this.audio.playZombieAttack();
           onAttack(this.attackDamage);
         }
       }

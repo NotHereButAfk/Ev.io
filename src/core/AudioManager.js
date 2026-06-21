@@ -306,4 +306,256 @@ export class AudioManager {
     osc.start(t);
     osc.stop(t + 0.05);
   }
+
+  // Concrete footstep — low thud with scuff
+  playFootstep(sprint = false) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const g = sprint ? 0.20 : 0.12;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(sprint ? 90 : 68, t);
+    osc.frequency.exponentialRampToValueAtTime(28, t + 0.09);
+    const oGain = this._envGain(g, 0.002, 0.09, t);
+    osc.connect(oGain).connect(this.master);
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.06);
+    const nf = this.ctx.createBiquadFilter();
+    nf.type = 'bandpass';
+    nf.frequency.value = sprint ? 1600 : 1100;
+    nf.Q.value = 0.5;
+    const nGain = this._envGain(g * 0.35, 0.002, 0.05, t);
+    noise.connect(nf).connect(nGain).connect(this.master);
+    osc.start(t); noise.start(t);
+    osc.stop(t + 0.11); noise.stop(t + 0.07);
+  }
+
+  // Jump effort whoosh
+  playJump() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.12);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'highpass';
+    f.frequency.setValueAtTime(900, t);
+    f.frequency.exponentialRampToValueAtTime(220, t + 0.10);
+    const g = this._envGain(0.11, 0.005, 0.10, t);
+    noise.connect(f).connect(g).connect(this.master);
+    noise.start(t); noise.stop(t + 0.13);
+  }
+
+  // Landing impact thud
+  playLand(hard = false) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const gv = hard ? 0.50 : 0.28;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(hard ? 115 : 78, t);
+    osc.frequency.exponentialRampToValueAtTime(24, t + 0.19);
+    const oGain = this._envGain(gv, 0.001, 0.19, t);
+    osc.connect(oGain).connect(this.master);
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.10);
+    const nf = this.ctx.createBiquadFilter();
+    nf.type = 'lowpass';
+    nf.frequency.value = 1400;
+    const nGain = this._envGain(gv * 0.45, 0.001, 0.08, t);
+    noise.connect(nf).connect(nGain).connect(this.master);
+    osc.start(t); noise.start(t);
+    osc.stop(t + 0.21); noise.stop(t + 0.11);
+  }
+
+  // Weapon switch click-whoosh
+  playWeaponSwitch() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(780, t);
+    osc.frequency.exponentialRampToValueAtTime(280, t + 0.07);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 2200;
+    const g = this._envGain(0.14, 0.001, 0.07, t);
+    osc.connect(f).connect(g).connect(this.master);
+    osc.start(t); osc.stop(t + 0.09);
+  }
+
+  // Brass shell casing ejecting and bouncing on concrete
+  playShellCasing() {
+    if (!this.ctx) return;
+    const delay = 0.09 + Math.random() * 0.07;
+    const t = this.ctx.currentTime + delay;
+    [860, 1280, 2100].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq * (0.96 + Math.random() * 0.08);
+      const g = this._envGain(0.055 / (i + 1), 0.001, 0.11 - i * 0.02, t);
+      osc.connect(g).connect(this.master);
+      osc.start(t); osc.stop(t + 0.14);
+    });
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.04);
+    const nf = this.ctx.createBiquadFilter();
+    nf.type = 'highpass';
+    nf.frequency.value = 3200;
+    const nGain = this._envGain(0.07, 0.001, 0.03, t);
+    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.start(t); noise.stop(t + 0.04);
+  }
+
+  // Magazine drop clatter (first phase of reload)
+  playReloadMag() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    [0, 0.045, 0.09].forEach((off, i) => {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = 370 - i * 35;
+      const g = this._envGain(0.14, 0.001, 0.06, t + off);
+      osc.connect(g).connect(this.master);
+      osc.start(t + off); osc.stop(t + off + 0.08);
+    });
+  }
+
+  // Slide rack / bolt action (second phase of reload)
+  playReloadRack() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(860, t);
+    osc.frequency.exponentialRampToValueAtTime(290, t + 0.065);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 1700;
+    f.Q.value = 1.6;
+    const g = this._envGain(0.24, 0.001, 0.065, t);
+    osc.connect(f).connect(g).connect(this.master);
+    osc.start(t); osc.stop(t + 0.08);
+  }
+
+  // Zombie guttural growl
+  playZombieGrowl() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 7;
+    const lfoG = this.ctx.createGain();
+    lfoG.gain.value = 38;
+    lfo.connect(lfoG);
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(98, t);
+    osc.frequency.exponentialRampToValueAtTime(52, t + 0.65);
+    lfoG.connect(osc.frequency);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(560, t);
+    lp.frequency.exponentialRampToValueAtTime(180, t + 0.65);
+    const g = this._envGain(0.25, 0.08, 0.52, t);
+    osc.connect(lp).connect(g).connect(this.master);
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.7);
+    const nf = this.ctx.createBiquadFilter();
+    nf.type = 'bandpass';
+    nf.frequency.value = 380;
+    nf.Q.value = 0.55;
+    const nGain = this._envGain(0.16, 0.06, 0.52, t);
+    noise.connect(nf).connect(nGain).connect(this.master);
+    lfo.start(t); osc.start(t); noise.start(t);
+    lfo.stop(t + 0.72); osc.stop(t + 0.72); noise.stop(t + 0.72);
+  }
+
+  // Zombie death — wet splat + falling groan
+  playZombieDeath() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.28);
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'lowpass';
+    f1.frequency.setValueAtTime(820, t);
+    f1.frequency.exponentialRampToValueAtTime(110, t + 0.24);
+    const g1 = this._envGain(0.5, 0.002, 0.24, t);
+    noise.connect(f1).connect(g1).connect(this.master);
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(128, t + 0.04);
+    osc.frequency.exponentialRampToValueAtTime(32, t + 0.48);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 480;
+    const g2 = this._envGain(0.32, 0.01, 0.42, t + 0.04);
+    osc.connect(lp).connect(g2).connect(this.master);
+    noise.start(t); osc.start(t + 0.04);
+    noise.stop(t + 0.30); osc.stop(t + 0.52);
+  }
+
+  // Zombie melee strike impact
+  playZombieAttack() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(195, t);
+    osc.frequency.exponentialRampToValueAtTime(48, t + 0.13);
+    const g = this._envGain(0.42, 0.001, 0.13, t);
+    osc.connect(g).connect(this.master);
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.09);
+    const nf = this.ctx.createBiquadFilter();
+    nf.type = 'lowpass';
+    nf.frequency.value = 1100;
+    const nGain = this._envGain(0.28, 0.001, 0.07, t);
+    noise.connect(nf).connect(nGain).connect(this.master);
+    osc.start(t); noise.start(t);
+    osc.stop(t + 0.15); noise.stop(t + 0.10);
+  }
+
+  // Continuous ambient city — distant traffic + occasional siren
+  startAmbientCity() {
+    if (!this.ctx || this._ambientRunning) return;
+    this._ambientRunning = true;
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(6.0);
+    noise.loop = true;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 160;
+    const ambGain = this.ctx.createGain();
+    ambGain.gain.value = 0.055;
+    noise.connect(lp).connect(ambGain).connect(this.master);
+    noise.start();
+    this._ambientNoise = noise;
+    this._sirenInterval = setInterval(() => {
+      if (!this._ambientRunning || !this.ctx) return;
+      if (Math.random() > 0.28) return;
+      const t2 = this.ctx.currentTime;
+      const s = this.ctx.createOscillator();
+      s.type = 'sawtooth';
+      s.frequency.setValueAtTime(620, t2);
+      s.frequency.linearRampToValueAtTime(860, t2 + 0.55);
+      s.frequency.linearRampToValueAtTime(620, t2 + 1.1);
+      s.frequency.linearRampToValueAtTime(860, t2 + 1.65);
+      const lp2 = this.ctx.createBiquadFilter();
+      lp2.type = 'lowpass';
+      lp2.frequency.value = 1100;
+      const sGain = this.ctx.createGain();
+      sGain.gain.setValueAtTime(0, t2);
+      sGain.gain.linearRampToValueAtTime(0.019, t2 + 0.18);
+      sGain.gain.setValueAtTime(0.019, t2 + 1.65);
+      sGain.gain.linearRampToValueAtTime(0, t2 + 2.1);
+      s.connect(lp2).connect(sGain).connect(this.master);
+      s.start(t2); s.stop(t2 + 2.2);
+    }, 7000);
+  }
+
+  stopAmbientCity() {
+    this._ambientRunning = false;
+    if (this._ambientNoise) { try { this._ambientNoise.stop(); } catch {} this._ambientNoise = null; }
+    if (this._sirenInterval) { clearInterval(this._sirenInterval); this._sirenInterval = null; }
+  }
 }

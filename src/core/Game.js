@@ -64,6 +64,7 @@ export class Game {
     this._buildPostFX();
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
+    this.player.audio = this.audio;
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     // The first-person viewmodel (gun, arm, muzzle flash, viewmodel lights) is
     // parented to the player camera. Three.js only renders objects reachable
@@ -71,7 +72,7 @@ export class Game {
     this.world.scene.add(this.player.camera);
     this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager      = new BotManager(this.world, this.world.scene);
-    this.zombieManager   = new ZombieManager(this.world, this.world.scene);
+    this.zombieManager   = new ZombieManager(this.world, this.world.scene, this.audio);
     preloadZombieModel();   // start fetching zombie.glb during the 60s grace period
     this.survivalManager = new SurvivalManager();
     this.dmManager       = new DeathmatchManager();
@@ -421,6 +422,7 @@ export class Game {
 
     this.state = 'playing';
     this.input.requestPointerLock();
+    this.audio.startAmbientCity();
   }
 
   _wireSurvivalCallbacks() {
@@ -500,6 +502,7 @@ export class Game {
 
   _quitToMenu() {
     if (this.state === 'playing') this._saveStats();
+    this.audio.stopAmbientCity();
     this.state = 'menu';
     this.menu.hidePause();
     this.menu.hideGameOver();

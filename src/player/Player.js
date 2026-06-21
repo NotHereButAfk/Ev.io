@@ -43,6 +43,12 @@ export class Player {
     this.name = 'Recruit';
     this.skin = null;
     this.sensitivityMult = 1.0;
+    this.audio = null;
+
+    // Sound state
+    this._wasOnGround = true;
+    this._stepPhase = 0; // tracks bob cycle for footstep timing
+    this._lastBobSign = 1;
   }
 
   get isDead() {
@@ -142,6 +148,7 @@ export class Player {
     if (input.consumeJustPressed('Space') && this.onGround) {
       this.velocity.y = JUMP_SPEED;
       this.onGround = false;
+      if (this.audio) this.audio.playJump();
     }
     this.velocity.y += GRAVITY * dt;
 
@@ -149,19 +156,32 @@ export class Player {
     this.position.z += this.velocity.z * dt;
     this.position.y += this.velocity.y * dt;
 
+    const landingVel = this.velocity.y;
     if (this.position.y <= 0) {
       this.position.y = 0;
       this.velocity.y = 0;
+      if (!this._wasOnGround && this.audio) {
+        this.audio.playLand(landingVel < -12);
+      }
       this.onGround = true;
     }
+    this._wasOnGround = this.onGround;
 
     world.resolveCollisions(this.position, RADIUS);
 
-    // --- head bob ---
+    // --- head bob + footstep sounds ---
     if (moving && this.onGround) {
       this.bobTime += dt * (this.isSprinting ? 11 : 8);
+      // Footstep on each downward bob (sine crossing zero from positive)
+      const bobSin = Math.sin(this.bobTime);
+      const bobSign = bobSin >= 0 ? 1 : -1;
+      if (bobSign !== this._lastBobSign && bobSign < 0 && this.audio) {
+        this.audio.playFootstep(this.isSprinting);
+      }
+      this._lastBobSign = bobSign;
     } else {
       this.bobTime += dt * 4;
+      this._lastBobSign = 1;
     }
     const bobAmount = moving && this.onGround ? 0.045 : 0.012;
     const bobOffset = Math.sin(this.bobTime) * bobAmount;

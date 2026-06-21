@@ -271,6 +271,7 @@ export class WeaponSystem {
     this.currentIndex = index;
     this.fireTimer = Math.max(this.fireTimer, 0.12);
     this._setActiveModel(index);
+    this.audio.playWeaponSwitch();
   }
 
   resetState(baseFov) {
@@ -317,7 +318,9 @@ export class WeaponSystem {
     if (st.magAmmo >= def.magSize || st.reserveAmmo <= 0) return;
     st.isReloading = true;
     st.reloadTimer = def.reloadTime;
-    this.audio.playReload();
+    // Two-phase reload: mag drop immediately, rack/bolt halfway through
+    this.audio.playReloadMag();
+    setTimeout(() => { if (st.isReloading) this.audio.playReloadRack(); }, (def.reloadTime * 0.55) * 1000);
     if (this.onReloadStart) this.onReloadStart();
   }
 
@@ -672,6 +675,10 @@ export class WeaponSystem {
     const skinSound  = activeSkin?.shootSound;
     if (!(skinSound && this.audio.playSkinShot(skinSound))) {
       this.audio.playShot(def.sound || 'rifle');
+    }
+    // Shell casing clink (not for melee, rocket, or shotgun — they eject differently)
+    if (def.kind !== 'rocket' && def.kind !== 'melee' && def.sound !== 'shotgun') {
+      this.audio.playShellCasing();
     }
     if (def.kind === 'rocket') {
       this._spawnRocket(def);

@@ -13,10 +13,11 @@ function armedTypeForWave(wave) {
 }
 
 export class ZombieManager {
-  constructor(world, scene) {
+  constructor(world, scene, audio = null) {
     this.world   = world;
     this.scene   = scene;
     this.zombies = [];
+    this.audio   = audio;
   }
 
   // Compatibility getter so WeaponSystem/grenade callbacks can use .bots
@@ -40,6 +41,7 @@ export class ZombieManager {
       const armedType = isArmed ? armedTypeForWave(wave) : null;
 
       const z = new Zombie(this.world, base, hpMult, speedMult, wave, armedType);
+      z.audio = this.audio;
       this.scene.add(z.mesh);
       this.zombies.push(z);
     }
