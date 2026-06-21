@@ -49,6 +49,9 @@ export class Player {
     this._camDist = 0;           // 0 = FPS, >0 = TPS metres
     this._tpsTarget = new THREE.Vector3();
 
+    // Sprint blend (0..1) for camera roll
+    this._sprintT = 0;
+
     // Sound state
     this._wasOnGround = true;
     this._stepPhase = 0;
@@ -114,6 +117,9 @@ export class Player {
 
     const moving = moveX !== 0 || moveZ !== 0;
     this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ > 0 && this.stamina > 2;
+
+    // smooth sprint blend for camera roll
+    this._sprintT += ((this.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
 
     // stamina drain / regen
     if (this.isSprinting) {
@@ -217,7 +223,7 @@ export class Player {
       this.camera.rotation.order = 'YXZ';
       this.camera.rotation.y = this.yaw;
       this.camera.rotation.x = this.pitch + this.recoilPitch;
-      this.camera.rotation.z = 0;
+      this.camera.rotation.z = this._sprintT * -0.025; // slight COD-style lean while sprinting
     }
   }
 }

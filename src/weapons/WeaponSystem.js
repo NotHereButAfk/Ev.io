@@ -50,6 +50,7 @@ export class WeaponSystem {
     this.kickRotX = 0;
     this.swingPhase = 1;
     this.scopeT = 0; // 0..1 zoom blend
+    this._sprintT = 0; // 0..1 sprint carry blend
 
     this.tracers = [];
     this.rockets = [];
@@ -735,10 +736,14 @@ export class WeaponSystem {
     }
     this.prevMouseDown = input.mouseDown;
 
-    // scope zoom
-    const wantScope = !!def.scoped && input.rightMouseDown;
+    // Sprint blend for COD carry animation (blocks ADS)
+    this._sprintT += ((player.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
+
+    // scope zoom — disabled while sprinting
+    const wantScope = !!def.scoped && input.rightMouseDown && !player.isSprinting;
     this.scopeT += ((wantScope ? 1 : 0) - this.scopeT) * Math.min(1, dt * 10);
-    const targetFov = THREE.MathUtils.lerp(player.baseFov, 28, this.scopeT);
+    const sprintFovBoost = this._sprintT * 6;
+    const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, 28, this.scopeT);
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
@@ -782,11 +787,12 @@ export class WeaponSystem {
       this.kickGroup.rotation.y = -0.7;
     }
 
-    // idle breathing / weapon settle (subtle, only when not mid-swing or kicking)
+    // idle breathing / weapon settle — fades out during sprint
     this._idleT += dt;
     if (def.kind !== 'melee') {
-      const breathe = Math.sin(this._idleT * 1.6) * 0.004;
-      const swayB   = Math.cos(this._idleT * 1.1) * 0.003;
+      const breatheAmt = 1.0 - this._sprintT;
+      const breathe = Math.sin(this._idleT * 1.6) * 0.004 * breatheAmt;
+      const swayB   = Math.cos(this._idleT * 1.1) * 0.003 * breatheAmt;
       this.kickGroup.position.y += breathe;
       this.kickGroup.rotation.z = swayB;
     }
@@ -797,9 +803,20 @@ export class WeaponSystem {
     this.swayGroup.rotation.y += (swayTargetX - this.swayGroup.rotation.y) * Math.min(1, dt * 8);
     this.swayGroup.rotation.x += (swayTargetY - this.swayGroup.rotation.x) * Math.min(1, dt * 8);
 
-    // bob the weapon mount slightly with footstep timing
-    const bob = Math.sin(player.bobTime) * (player.onGround ? 0.012 : 0);
-    this.weaponMount.position.y = -0.26 + bob;
+    // COD-style weapon bob: larger amplitude, lateral sway component
+    const bobAmt = player.onGround ? (player.isSprinting ? 0.026 : 0.016) : 0;
+    const bobV   = Math.sin(player.bobTime) * bobAmt;
+    const bobH   = Math.sin(player.bobTime * 0.5) * bobAmt * 0.55;
+
+    // ADS: slide gun to center-screen when scoping
+    const adsShiftX = -this.scopeT * 0.32;
+
+    // Sprint carry: raise gun and tilt to side like COD
+    const sprintRaiseY = this._sprintT * 0.12;
+    const sprintShiftX = -this._sprintT * 0.12;
+    this.weaponMount.position.set(0.32 + sprintShiftX + adsShiftX + bobH, -0.26 + sprintRaiseY + bobV, -0.5);
+    this.weaponMount.rotation.x = this._sprintT * 0.22;
+    this.weaponMount.rotation.z = this._sprintT * -1.0;
 
     // muzzle flash decay
     if (this._flashTimer !== undefined && this._flashTimer > 0) {
