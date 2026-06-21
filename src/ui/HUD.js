@@ -20,8 +20,16 @@ export class HUD {
     this.damageFlash = document.getElementById('damage-flash');
     this.killfeed    = document.getElementById('killfeed');
     this.modeInfo    = document.getElementById('mode-info');
+    this.dmTimer        = document.getElementById('dm-timer');
+    this.streakBadge    = document.getElementById('streak-badge');
+    this.downedOverlay  = document.getElementById('downed-overlay');
+    this.downedBar      = document.getElementById('downed-bar');
+    this.downedCountdown = document.getElementById('downed-countdown');
+    this.waveBanner     = document.getElementById('wave-banner');
     this._hitmarkerTimeout = null;
     this._damageTimeout    = null;
+    this._waveBannerTimer  = null;
+    this._streakTimeout    = null;
   }
 
   show() { this.root?.classList.remove('hidden'); }
@@ -36,6 +44,40 @@ export class HUD {
   }
 
   hideModeHUD() { this.modeInfo.classList.add('hidden'); }
+
+  // Large centered deathmatch countdown timer
+  showDMTimer(timeStr, isLow = false) {
+    this.dmTimer.textContent = timeStr;
+    this.dmTimer.classList.remove('hidden');
+    this.dmTimer.classList.toggle('dm-low', isLow);
+  }
+  hideDMTimer() { this.dmTimer.classList.add('hidden'); }
+
+  // Kill streak badge (shown briefly above the DM timer)
+  showStreak(streak, coins) {
+    if (streak < 2) return;
+    this.streakBadge.textContent = `🔥 x${streak} KILL STREAK  +${coins} COINS`;
+    this.streakBadge.classList.remove('hidden');
+    clearTimeout(this._streakTimeout);
+    this._streakTimeout = setTimeout(() => this.streakBadge.classList.add('hidden'), 2500);
+  }
+
+  // Survival: downed overlay with countdown bar
+  showDowned(secsLeft, totalSecs) {
+    this.downedOverlay.classList.remove('hidden');
+    const pct = Math.max(0, (secsLeft / totalSecs) * 100);
+    if (this.downedBar) this.downedBar.style.width = pct + '%';
+    if (this.downedCountdown) this.downedCountdown.textContent = Math.ceil(Math.max(0, secsLeft));
+  }
+  hideDowned() { this.downedOverlay.classList.add('hidden'); }
+
+  // Survival: wave banner (auto-removes after animation)
+  showWaveBanner(text) {
+    this.waveBanner.textContent = text;
+    this.waveBanner.classList.remove('hidden');
+    clearTimeout(this._waveBannerTimer);
+    this._waveBannerTimer = setTimeout(() => this.waveBanner.classList.add('hidden'), 3000);
+  }
 
   buildWeaponSlots(labels, activeIndex) {
     this.weaponSlots.innerHTML = '';
@@ -59,7 +101,6 @@ export class HUD {
     this.healthBar.style.width  = `${hpct}%`;
     this.healthText.textContent = Math.ceil(player.health);
 
-    // shield — only shown when the player has armor that grants it
     if (player.maxShield > 0) {
       this.shieldWrap.classList.remove('hidden');
       const spct = Math.max(0, (player.shield / player.maxShield) * 100);
@@ -72,7 +113,6 @@ export class HUD {
     const spct = Math.max(0, (player.stamina / player.maxStamina) * 100);
     this.staminaBar.style.width  = `${spct}%`;
     this.staminaText.textContent = Math.ceil(player.stamina);
-    // pulse low-stamina warning
     this.staminaBar.classList.toggle('stamina-low', player.stamina < 25);
 
     this.weaponName.textContent = weaponInfo.name.toUpperCase();

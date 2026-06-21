@@ -1946,3 +1946,189 @@ html, body {
   transition: background 0.15s;
 }
 .bp-claim-btn:hover { background: rgba(0,207,255,1); }
+
+/* ===================== Modes Dropdown (replaces PUBLIC GAME + old MODES panel) ===================== */
+
+.nav-modes-wrap {
+  position: relative;
+}
+
+.nav-modes-btn {
+  color: #ff8060;
+  border: 1px solid rgba(255, 100, 60, 0.3);
+}
+.nav-modes-btn:hover,
+.nav-modes-btn.open {
+  background: rgba(255, 100, 60, 0.15);
+  border-color: rgba(255, 100, 60, 0.5);
+  color: #ff9070;
+}
+
+.modes-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 260px;
+  background: rgba(8, 10, 20, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 100, 60, 0.22);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.7);
+  overflow: hidden;
+  z-index: 100;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.mode-option:last-child { border-bottom: none; }
+.mode-option:hover { background: rgba(255, 100, 60, 0.1); }
+
+.mode-opt-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  width: 30px;
+  text-align: center;
+}
+.mode-opt-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #f0f4f8;
+}
+.mode-opt-sub {
+  font-size: 10px;
+  color: rgba(150, 170, 200, 0.65);
+  letter-spacing: 0.8px;
+  margin-top: 3px;
+}
+
+/* ===================== Deathmatch Center Timer ===================== */
+
+#dm-timer {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(255, 90, 70, 0.5), 0 2px 10px rgba(0,0,0,0.9);
+  z-index: 50;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+#dm-timer.dm-low {
+  color: #ff4444;
+  animation: dm-blink 0.6s ease-in-out infinite alternate;
+}
+@keyframes dm-blink {
+  from { opacity: 0.7; }
+  to   { opacity: 1;   }
+}
+
+/* ===================== Kill Streak Badge ===================== */
+
+#streak-badge {
+  position: absolute;
+  top: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #ffcc44;
+  text-shadow: 0 0 14px rgba(255, 200, 50, 0.7);
+  z-index: 50;
+  pointer-events: none;
+  animation: streak-pop 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes streak-pop {
+  from { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  to   { transform: translateX(-50%) scale(1);   opacity: 1; }
+}
+
+/* ===================== Survival: Downed Overlay ===================== */
+
+#downed-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 55;
+  pointer-events: none;
+  background: rgba(180, 0, 0, 0.07);
+}
+
+.downed-text {
+  font-size: 60px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  color: #ff2222;
+  text-shadow: 0 0 40px rgba(255, 40, 40, 0.8), 0 4px 16px rgba(0,0,0,0.9);
+  animation: downed-pulse 0.7s ease-in-out infinite alternate;
+}
+@keyframes downed-pulse {
+  from { opacity: 0.75; text-shadow: 0 0 20px rgba(255,40,40,0.5); }
+  to   { opacity: 1;    text-shadow: 0 0 50px rgba(255,40,40,0.9); }
+}
+.downed-sub {
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: rgba(255, 180, 180, 0.75);
+  margin-top: 12px;
+  text-transform: uppercase;
+}
+.downed-bar-wrap {
+  width: 240px;
+  height: 5px;
+  background: rgba(255, 40, 40, 0.18);
+  border-radius: 3px;
+  margin-top: 18px;
+  overflow: hidden;
+}
+#downed-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff2222, #ff8844);
+  border-radius: 3px;
+  transition: width 0.5s linear;
+  width: 100%;
+}
+.downed-countdown {
+  font-size: 44px;
+  font-weight: 800;
+  color: rgba(255, 100, 100, 0.9);
+  margin-top: 10px;
+  letter-spacing: 2px;
+}
+
+/* ===================== Survival: Wave Banner ===================== */
+
+#wave-banner {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  color: #44ff88;
+  text-shadow: 0 0 24px rgba(50, 255, 100, 0.65), 0 2px 12px rgba(0,0,0,0.9);
+  z-index: 54;
+  pointer-events: none;
+  text-transform: uppercase;
+}

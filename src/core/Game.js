@@ -21,6 +21,9 @@ import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin } from '../player/ArmorSkins.js';
+import { ZombieManager } from '../entities/ZombieManager.js';
+import { SurvivalManager } from './SurvivalManager.js';
+import { DeathmatchManager } from './DeathmatchManager.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -47,7 +50,15 @@ export class Game {
     this.audio        = new AudioManager();
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     this.deathEffects = new DeathEffectManager(this.world.scene);
-    this.botManager   = new BotManager(this.world, this.world.scene);
+    this.botManager      = new BotManager(this.world, this.world.scene);
+    this.zombieManager   = new ZombieManager(this.world, this.world.scene);
+    this.survivalManager = new SurvivalManager();
+    this.dmManager       = new DeathmatchManager();
+    this._activeManager  = this.botManager;  // switches between botManager / zombieManager
+    this._isSurvival     = false;
+    this._isDM           = false;
+    this._playerDowned   = false;
+    this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
     this.hud            = new HUD();
     this.grenadeSystem  = new GrenadeSystem(this.world.scene);
@@ -189,26 +200,23 @@ export class Game {
     this.weaponSystem.applyRecoilToPlayer = (amt) => this.player.applyRecoil(amt);
 
     this.grenadeSystem.onExplode = (point, radius, damage) => {
-      for (const bot of this.botManager.bots) {
-        if (!bot.alive) continue;
-        const d = bot.position.distanceTo(point);
+      for (const enemy of this._activeManager.bots) {
+        if (!enemy.alive) continue;
+        const d = enemy.position.distanceTo(point);
         if (d <= radius) {
           const f = THREE.MathUtils.lerp(1, 0.1, THREE.MathUtils.clamp(d / radius, 0, 1));
-          const killed = bot.takeDamage(damage * f);
+          const killed = enemy.takeDamage(damage * f);
           this.hud.flashHitmarker();
           if (killed) {
-            this.deathEffects.spawn(bot.mesh.position, null, null, false);
-            this.kills  += 1;
-            this.score  += 100;
-            this.audio.playKill();
-            this.hud.addKillFeed(`${this.player.name} fragged a target  +100`);
+            this.deathEffects.spawn(enemy.mesh.position, null, null, false);
+            this._onEnemyKilled(enemy, null);
           }
         }
       }
     };
 
-    this.weaponSystem.onHitBot = (bot, dmg) => {
-      const killed = bot.takeDamage(dmg);
+    this.weaponSystem.onHitBot = (enemy, dmg) => {
+      const killed = enemy.takeDamage(dmg);
       this.audio.playHit();
       this.hud.flashHitmarker();
       if (killed) {
@@ -216,19 +224,53 @@ export class Game {
         const isMelee = def.kind === 'melee';
         const entry   = this.weaponSystem._armoryMap?.get(def.id);
         this.deathEffects.spawn(
-          bot.mesh.position,
+          enemy.mesh.position,
           entry?.isSword ? null : entry?.skin?.id,
           entry?.isSword ? entry?.skin?.id : null,
           isMelee
         );
-        this.kills += 1;
-        this.score += 100;
         this.audio.playKill();
-        Shop.addCoins(10);
-        BattlePass.addXP(25);
-        this.hud.addKillFeed(`${this.player.name} eliminated a target  +100  💰+10`);
+        this._onEnemyKilled(enemy, entry);
       }
     };
+  }
+
+  _onEnemyKilled(enemy, weaponEntry) {
+    this.kills++;
+
+    if (this._isSurvival) {
+      const coins = this.survivalManager.zombieKillReward();
+      this.score += 50;
+      this._pendingCoins += coins;
+      if (this._pendingCoins >= 1) {
+        Shop.addCoins(Math.floor(this._pendingCoins));
+        this._pendingCoins -= Math.floor(this._pendingCoins);
+      }
+      BattlePass.addXP(10);
+      this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}`);
+    } else if (this._isDM) {
+      const { coins, streak } = this.dmManager.onKill();
+      this.score += 100;
+      Shop.addCoins(Math.round(coins));
+      BattlePass.addXP(25);
+      this._refreshNavCoins();
+      if (streak >= 2) {
+        this.hud.showStreak(streak, coins.toFixed(1));
+        this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${coins.toFixed(1)}`);
+      } else {
+        this.hud.addKillFeed(`ELIMINATED  💰+${coins.toFixed(1)}`);
+      }
+    } else {
+      this.score += 100;
+      Shop.addCoins(10);
+      BattlePass.addXP(25);
+      this.hud.addKillFeed(`${this.player.name} eliminated a target  +100  💰+10`);
+    }
+  }
+
+  _refreshNavCoins() {
+    const el = document.getElementById('nav-coins');
+    if (el) el.textContent = `💰 ${Shop.getCoins()}`;
   }
 
   _wireMenu() {
@@ -285,47 +327,107 @@ export class Game {
     applySkinToCharacter(this.previewCharacter, this.selectedSkin, this.selectedArmorSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
 
-    // Apply per-weapon skins from the armory
     const armoryMap = Armory.buildSkinMap(this.weaponSystem.loadout);
     this.weaponSystem.applyArmoryMap(armoryMap);
 
     this.player.name = name;
     this.player.skin = this.selectedSkin;
-    // Rarer equipped armor grants more shield
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this.player.respawn(SPAWN_POINT);
     this.weaponSystem.resetState(this.player.baseFov);
     this.grenadeSystem.reset();
 
-    // Apply selected game mode
     this._mode    = getMode(modeId);
-    this._wave    = 1;
-    this._lives   = this._mode.lives === Infinity ? Infinity : this._mode.lives;
-    this._modeTimer = this._mode.timeLimit || 0;
-
-    this.botManager.spawnAll(
-      this._mode.waves ? 3 : this._mode.botCount,
-      this._mode.noRespawn,
-      1
-    );
-
     this.kills    = 0;
     this.score    = 0;
     this.playTime = 0;
-    this._statsSaved = false;
-    this.previewCharacter.visible = false;
+    this._statsSaved   = false;
+    this._pendingCoins = 0;
+    this._playerDowned = false;
 
+    // Mode-specific setup
+    this._isDM       = modeId === 'deathmatch';
+    this._isSurvival = modeId === 'survival';
+
+    this.hud.hideDMTimer();
+    this.hud.hideDowned();
+    this.hud.hideModeHUD();
+    this.waveBanner?.classList?.add('hidden');
+
+    if (this._isDM) {
+      this._activeManager = this.botManager;
+      this.zombieManager.clear();
+      this.dmManager.reset();
+      this._modeTimer = 480; // 8 minutes
+      this.botManager.spawnAll(7, false, 1);
+      this.hud.showDMTimer('8:00');
+    } else if (this._isSurvival) {
+      this._activeManager = this.zombieManager;
+      this.botManager.clear();
+      this.zombieManager.clear();
+      this.survivalManager.reset();
+      this._modeTimer = 0;
+      this._wireSurvivalCallbacks();
+      this.hud.setModeHUD('GRACE PERIOD', '1:00 REMAINING');
+    } else {
+      // Legacy modes (kept for compatibility)
+      this._activeManager = this.botManager;
+      this.zombieManager.clear();
+      this._modeTimer = this._mode.timeLimit || 0;
+      this._lives     = this._mode.lives === Infinity ? Infinity : this._mode.lives;
+      this._wave      = 1;
+      this.botManager.spawnAll(
+        this._mode.waves ? 3 : this._mode.botCount,
+        this._mode.noRespawn, 1
+      );
+      this._refreshModeHUD();
+    }
+
+    this.previewCharacter.visible = false;
     this.menu.hideMain();
     this.menu.hideGameOver();
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
     document.getElementById('spectate-label').classList.add('hidden');
 
-    // Mode-specific HUD setup
-    this._refreshModeHUD();
-
     this.state = 'playing';
     this.input.requestPointerLock();
+  }
+
+  _wireSurvivalCallbacks() {
+    const sm = this.survivalManager;
+
+    sm.onGraceEnd = () => {
+      this.hud.addKillFeed('⚠ GRACE PERIOD OVER — FIRST WAVE INCOMING!');
+    };
+
+    sm.onWaveStart = (wave, count, hpMult, speedMult) => {
+      this.zombieManager.spawnWave(count, hpMult, speedMult, wave);
+      const bonus = Math.round((hpMult - 1) * 100);
+      this.hud.showWaveBanner(`WAVE ${wave} — ${count} ZOMBIES`);
+      this.hud.addKillFeed(`— WAVE ${wave}: ${count} zombies${bonus > 0 ? ` (+${bonus}% HP)` : ''}`);
+    };
+
+    sm.onWaveClear = (wave) => {
+      this.hud.showWaveBanner(`WAVE ${wave} CLEARED!`);
+      this.hud.addKillFeed(`WAVE ${wave} SURVIVED! Next wave in ${Math.round(sm.betweenTimer || 12)}s`);
+    };
+
+    sm.onRevive = () => {
+      this._playerDowned = false;
+      this.hud.hideDowned();
+      this.player.respawn(SPAWN_POINT);
+      this.player.health = 50;
+      this.player.shield = Math.min(this.player.maxShield, this.player.maxShield * 0.3);
+      this.hud.addKillFeed('REVIVED BY TEAMMATE — 50 HP');
+      this.hud.flashDamage();
+    };
+
+    sm.onGameOver = () => {
+      this._playerDowned = false;
+      this.hud.hideDowned();
+      this._endGame('GAME OVER', `SURVIVED ${sm.wave} WAVES`);
+    };
   }
 
   _refreshModeHUD() {
@@ -370,8 +472,12 @@ export class Game {
     this.menu.hideGameOver();
     this.hud.hide();
     this.hud.hideModeHUD();
+    this.hud.hideDMTimer();
+    this.hud.hideDowned();
     this.input.exitPointerLock();
     this.botManager.clear();
+    this.zombieManager.clear();
+    this._playerDowned = false;
     document.getElementById('spectate-label').classList.remove('hidden');
     this.menu.showMain();
   }
@@ -389,7 +495,7 @@ export class Game {
   // ── Player damage / death ───────────────────────────────────────────────────
 
   _onPlayerDamaged(dmg) {
-    if (this.player.isDead) return;
+    if (this.player.isDead || this._playerDowned) return;
     const died = this.player.takeDamage(dmg);
     this.audio.playHurt();
     this.hud.flashDamage();
@@ -397,10 +503,29 @@ export class Game {
   }
 
   _onPlayerDeath() {
+    // Survival: enter downed state instead of immediate death
+    if (this._isSurvival) {
+      if (this._playerDowned) return; // already downed
+      this._playerDowned = true;
+      this.survivalManager.playerDowned();
+      // survivalManager.onGameOver fires if no revives remain
+      return;
+    }
+
+    // Deathmatch: respawn immediately (infinite lives)
+    if (this._isDM) {
+      setTimeout(() => {
+        this.player.respawn(SPAWN_POINT);
+        this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+        this.hud.addKillFeed('RESPAWNING...');
+      }, 1200);
+      return;
+    }
+
+    // Legacy modes
     if (this._mode?.lives !== Infinity) {
       this._lives = Math.max(0, this._lives - 1);
       if (this._lives > 0 && this._mode?.waves) {
-        // Extra life — respawn in place
         setTimeout(() => {
           this.player.respawn(SPAWN_POINT);
           this._refreshModeHUD();
@@ -408,13 +533,19 @@ export class Game {
         return;
       }
     }
+    this._endGame('YOU DIED');
+  }
+
+  _endGame(title, subtitle = '') {
     this._saveStats();
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
+    this.hud.hideDMTimer();
+    this.hud.hideDowned();
     this.menu.showGameOver(
       { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
-      'YOU DIED'
+      subtitle ? `${title} — ${subtitle}` : title
     );
   }
 
@@ -433,11 +564,16 @@ export class Game {
 
   _updatePlaying(dt) {
     this.playTime += dt;
+
     this.player.update(dt, this.input, this.world);
     this.player.camera.updateMatrixWorld(true);
-    this.weaponSystem.update(dt, this.input, this.world, this.botManager, this.player);
+
+    // While downed in survival, block all shooting/weapon use
+    if (!this._playerDowned) {
+      this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
+    }
     this.deathEffects.update(dt);
-    this.botManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
+    this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
 
     // grenade input  Q = frag  E = smoke
     if (this.input.consumeJustPressed('KeyQ')) {
@@ -460,52 +596,70 @@ export class Game {
   _updateModeLogic(dt) {
     if (!this._mode || this.state !== 'playing') return;
 
-    // --- TIME ATTACK ---
+    // ─── DEATHMATCH ─────────────────────────────────────────────────────────────
+    if (this._isDM) {
+      this.dmManager.update(dt);
+      this._modeTimer = Math.max(0, this._modeTimer - dt);
+      const mins = Math.floor(this._modeTimer / 60);
+      const secs = Math.floor(this._modeTimer % 60);
+      this.hud.showDMTimer(`${mins}:${String(secs).padStart(2, '0')}`, this._modeTimer <= 30);
+      if (this._modeTimer <= 0) {
+        this._endGame('MATCH OVER', `${this.kills} KILLS`);
+      }
+      return;
+    }
+
+    // ─── SURVIVAL ───────────────────────────────────────────────────────────────
+    if (this._isSurvival) {
+      const sm = this.survivalManager;
+      sm.update(dt, this.zombieManager.allDead());
+
+      // Downed HUD
+      if (this._playerDowned && sm.isDowned) {
+        this.hud.showDowned(sm.downedTimer, sm.AUTO_REVIVE_TIME);
+      } else if (!sm.isDowned && this._playerDowned) {
+        // revive callback already fired; make sure overlay hides
+        this._playerDowned = false;
+        this.hud.hideDowned();
+      }
+
+      // Mode info panel
+      if (sm.graceActive) {
+        const m = Math.floor(sm.graceTimer / 60);
+        const s = Math.floor(sm.graceTimer % 60);
+        this.hud.setModeHUD('GRACE PERIOD', `${m}:${String(s).padStart(2,'0')} REMAINING`);
+      } else if (sm.betweenWave) {
+        this.hud.setModeHUD(`WAVE ${sm.wave} CLEARED`, `NEXT WAVE IN ${Math.ceil(sm.betweenTimer)}s`);
+      } else {
+        this.hud.setModeHUD(`WAVE ${sm.wave}`, `${Math.ceil(Math.max(0, sm.waveTimer))}s REMAINING`);
+      }
+      return;
+    }
+
+    // ─── LEGACY MODES ───────────────────────────────────────────────────────────
     if (this._mode.timeLimit > 0) {
       this._modeTimer = Math.max(0, this._modeTimer - dt);
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);
       this.hud.setModeHUD(`${mins}:${String(secs).padStart(2, '0')}`, 'TIME REMAINING');
-      if (this._modeTimer <= 0) {
-        this._saveStats();
-        this.state = 'gameover';
-        this.input.exitPointerLock();
-        this.hud.hide();
-        this.menu.showGameOver(
-          { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
-          'TIME\'S UP'
-        );
-      }
+      if (this._modeTimer <= 0) this._endGame("TIME'S UP");
       return;
     }
-
-    // --- WAVE SURVIVAL ---
     if (this._mode.waves && this.botManager.allDead()) {
       this._wave += 1;
       const count = 3 + (this._wave - 1) * 2;
-      const healthMult = 1 + (this._wave - 1) * 0.18;
-      this.botManager.spawnAll(count, true, healthMult);
-      this.hud.addKillFeed(`— WAVE ${this._wave} — (+${Math.round((healthMult - 1) * 100)}% HP)`);
+      const hm = 1 + (this._wave - 1) * 0.18;
+      this.botManager.spawnAll(count, true, hm);
+      this.hud.addKillFeed(`— WAVE ${this._wave} — (+${Math.round((hm - 1) * 100)}% HP)`);
       this._refreshModeHUD();
       return;
     }
-
-    // --- ELIMINATION ---
     if (this._mode.noRespawn && !this._mode.waves && this.botManager.allDead()) {
-      this._saveStats();
-      this.state = 'gameover';
-      this.input.exitPointerLock();
-      this.hud.hide();
-      this.menu.showGameOver(
-        { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
-        'VICTORY'
-      );
+      this._endGame('VICTORY');
       return;
     }
-
-    // Update elimination counter
     if (this._mode.id === 'elimination') {
-      const alive = this.botManager.bots.filter((b) => b.alive).length;
+      const alive = this.botManager.bots.filter(b => b.alive).length;
       this.hud.setModeHUD('ELIMINATION', `${alive} REMAINING`);
     }
   }

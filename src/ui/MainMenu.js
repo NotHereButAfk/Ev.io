@@ -84,25 +84,51 @@ export class MenuUI {
   // ── Nav wiring ──────────────────────────────────────────────────────────────
 
   _wireNav() {
-    // PUBLIC GAME button and center CLICK TO PLAY both start the game
-    const startGame = () => {
+    const startGame = (modeId) => {
       const name = this.nameInput.value.trim() || 'Recruit';
+      if (modeId) this.selectedModeId = modeId;
       this._closeAllPanels();
+      this._closeModeDropdown();
       this.onPlay?.(name, this.selectedSkinId, this.selectedModeId, this.selectedArmorId);
     };
-    document.getElementById('nav-public-btn')?.addEventListener('click', startGame);
-    this.playBtn?.addEventListener('click', startGame);
 
-    // Nav dropdown items
+    // Center CLICK TO PLAY — starts last selected mode
+    this.playBtn?.addEventListener('click', () => startGame());
+
+    // Modes dropdown toggle
+    const modesBtn = document.getElementById('nav-modes-btn');
+    const modesDd  = document.getElementById('modes-dropdown');
+    modesBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = !modesDd.classList.contains('hidden');
+      this._closeModeDropdown();
+      if (!open) {
+        modesDd.classList.remove('hidden');
+        modesBtn.classList.add('open');
+        this._closeAllPanels();
+      }
+    });
+
+    // Mode option buttons inside dropdown — select mode and start immediately
+    document.querySelectorAll('.mode-option[data-mode]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startGame(btn.dataset.mode);
+      });
+    });
+
+    // Nav dropdown items (panels)
     document.querySelectorAll('[data-panel]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        this._closeModeDropdown();
         this._togglePanel(btn.dataset.panel);
       });
     });
 
-    // Click anywhere outside a panel closes it
+    // Click anywhere outside closes panels and modes dropdown
     document.addEventListener('click', (e) => {
+      if (!e.target.closest('.nav-modes-wrap')) this._closeModeDropdown();
       if (this._activePanel && !e.target.closest('.nav-panel') && !e.target.closest('[data-panel]')) {
         this._closeAllPanels();
       }
@@ -114,6 +140,11 @@ export class MenuUI {
     this.restartBtn.addEventListener('click', () => this.onRestart?.());
     this.menuBtn.addEventListener('click',    () => this.onBackToMenu?.());
     document.getElementById('profile-logout-btn').addEventListener('click', () => this.onLogout?.());
+  }
+
+  _closeModeDropdown() {
+    document.getElementById('modes-dropdown')?.classList.add('hidden');
+    document.getElementById('nav-modes-btn')?.classList.remove('open');
   }
 
   _togglePanel(id) {

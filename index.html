@@ -66,9 +66,27 @@
     <div id="top-nav" class="hidden">
       <div class="nav-brand">STRIKER<span>.IO</span></div>
       <nav class="nav-items">
-        <button class="nav-item nav-play-btn" id="nav-public-btn">PUBLIC GAME</button>
+        <!-- MODES dropdown — replaces PUBLIC GAME + old MODES panel button -->
+        <div class="nav-modes-wrap" id="nav-modes-wrap">
+          <button class="nav-item nav-modes-btn" id="nav-modes-btn">MODES &#9660;</button>
+          <div class="modes-dropdown hidden" id="modes-dropdown">
+            <button class="mode-option" data-mode="deathmatch">
+              <span class="mode-opt-icon">&#9876;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">DEATHMATCH</div>
+                <div class="mode-opt-sub">FFA &bull; 8 Players &bull; 8 Minutes</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="survival">
+              <span class="mode-opt-icon">&#129503;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">SURVIVAL</div>
+                <div class="mode-opt-sub">Co-op &bull; Up to 5 Players &bull; Zombie Waves</div>
+              </div>
+            </button>
+          </div>
+        </div>
         <button class="nav-item" data-panel="loadout">LOADOUT &#9660;</button>
-        <button class="nav-item" data-panel="modes">MODES &#9660;</button>
         <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
         <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
         <button class="nav-item" data-panel="settings">SETTINGS</button>
@@ -329,6 +347,23 @@
 
       <div id="weapon-slots"></div>
       <div id="killfeed"></div>
+
+      <!-- Large center timer for deathmatch -->
+      <div id="dm-timer" class="hidden"></div>
+
+      <!-- Kill streak badge -->
+      <div id="streak-badge" class="hidden"></div>
+
+      <!-- Survival: downed overlay -->
+      <div id="downed-overlay" class="hidden">
+        <div class="downed-text">DOWNED</div>
+        <div class="downed-sub">TEAMMATE REVIVING...</div>
+        <div class="downed-bar-wrap"><div id="downed-bar"></div></div>
+        <div id="downed-countdown" class="downed-countdown"></div>
+      </div>
+
+      <!-- Survival: wave incoming banner (auto-hides) -->
+      <div id="wave-banner" class="hidden"></div>
     </div>
   </div>
 

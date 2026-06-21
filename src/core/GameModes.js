@@ -1,59 +1,34 @@
-// Game mode definitions — read by both the menu UI and the Game logic.
 export const GAME_MODES = [
   {
     id:        'deathmatch',
     name:      'DEATHMATCH',
     icon:      '⚔',
-    tag:       'CLASSIC',
-    desc:      'Kill bots for 100 pts each. Bots respawn. Survive as long as possible.',
+    tag:       'FFA',
+    desc:      'Free-for-all. 8 players, 8 minutes. Kill for coins — streaks multiply rewards.',
     color:     '#ff5c5c',
     botCount:  7,
     noRespawn: false,
-    timeLimit: 0,        // 0 = no limit
+    timeLimit: 480,    // 8 minutes
     lives:     Infinity,
     waves:     false,
+    isZombie:  false,
   },
   {
-    id:        'time_attack',
-    name:      'TIME ATTACK',
-    icon:      '⏱',
-    tag:       'SPEED',
-    desc:      'Maximum kills in 2 minutes. Score big before the clock hits zero.',
-    color:     '#ffd27a',
-    botCount:  7,
-    noRespawn: false,
-    timeLimit: 120,
+    id:        'survival',
+    name:      'SURVIVAL',
+    icon:      '🧟',
+    tag:       'CO-OP',
+    desc:      'Zombie apocalypse. Up to 5 players. Survive escalating waves — revive fallen teammates.',
+    color:     '#44cc22',
+    botCount:  0,      // zombies are spawned by SurvivalManager, not botManager
+    noRespawn: true,
+    timeLimit: 0,
     lives:     Infinity,
-    waves:     false,
-  },
-  {
-    id:        'wave_survival',
-    name:      'WAVE SURVIVAL',
-    icon:      '〰',
-    tag:       'CHALLENGE',
-    desc:      'Clear escalating bot waves. Each wave adds more bots with higher health. 3 lives.',
-    color:     '#4fc3f7',
-    botCount:  3,        // starting bot count; grows by +2 per wave
-    noRespawn: true,
-    timeLimit: 0,
-    lives:     3,
-    waves:     true,
-  },
-  {
-    id:        'elimination',
-    name:      'ELIMINATION',
-    icon:      '◈',
-    tag:       'HARDCORE',
-    desc:      'Eliminate all 8 bots — no respawns for either side. One life. No mercy.',
-    color:     '#ce93d8',
-    botCount:  8,
-    noRespawn: true,
-    timeLimit: 0,
-    lives:     1,
-    waves:     false,
+    waves:     false,  // handled by SurvivalManager
+    isZombie:  true,
   },
 ];
 
 export function getMode(id) {
-  return GAME_MODES.find((m) => m.id === id) || GAME_MODES[0];
+  return GAME_MODES.find(m => m.id === id) || GAME_MODES[0];
 }
