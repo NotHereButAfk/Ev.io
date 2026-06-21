@@ -283,11 +283,265 @@ function cyberDecal() {
   return c;
 }
 
+// CARBON — woven carbon-fibre twill.
+function carbonDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#0c0d10';
+  ctx.fillRect(0, 0, size, size);
+  const cell = 16;
+  for (let y = 0; y < size; y += cell) {
+    for (let x = 0; x < size; x += cell) {
+      const odd = ((x / cell) + (y / cell)) % 2 === 0;
+      const g = ctx.createLinearGradient(x, y, x + cell, y + cell);
+      if (odd) { g.addColorStop(0, '#34373d'); g.addColorStop(1, '#15171b'); }
+      else     { g.addColorStop(0, '#15171b'); g.addColorStop(1, '#34373d'); }
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+  return c;
+}
+
+// DIGICAMO — pixelated digital camouflage.
+function digicamoDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const cols = ['#3a4a2a', '#566b3a', '#222c18', '#7a8a55'];
+  const px = 16;
+  for (let y = 0; y < size; y += px) {
+    for (let x = 0; x < size; x += px) {
+      ctx.fillStyle = cols[(Math.random() * cols.length) | 0];
+      ctx.fillRect(x, y, px, px);
+    }
+  }
+  // scatter a few half-size pixels for a finer pattern
+  for (let i = 0; i < 120; i++) {
+    ctx.fillStyle = cols[(Math.random() * cols.length) | 0];
+    ctx.fillRect((Math.random() * size) | 0, (Math.random() * size) | 0, px / 2, px / 2);
+  }
+  return c;
+}
+
+// HEXTECH — glowing hexagon honeycomb.
+function hextechDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#06121a';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#18e0ff';
+  ctx.lineWidth = 1.4;
+  ctx.shadowColor = '#18e0ff';
+  ctx.shadowBlur = 5;
+  const r = 22, h = Math.sqrt(3) * r;
+  for (let row = -1; row * (h / 2) < size + h; row++) {
+    for (let col = -1; col * (1.5 * r) < size + r; col++) {
+      const x = col * 1.5 * r;
+      const y = row * h + (col % 2 ? h / 2 : 0);
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i;
+        const px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// FROST — icy crystals + frost speckle.
+function frostDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#0a2230');
+  bg.addColorStop(1, '#123a4e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(190,235,255,0.85)';
+  ctx.shadowColor = '#bdeeff';
+  ctx.shadowBlur = 4;
+  for (let i = 0; i < 9; i++) {
+    const cx = Math.random() * size, cy = Math.random() * size, len = 18 + Math.random() * 28;
+    for (let a = 0; a < 6; a++) {
+      const ang = (Math.PI / 3) * a;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      const ex = cx + Math.cos(ang) * len, ey = cy + Math.sin(ang) * len;
+      ctx.lineTo(ex, ey);
+      // barbs
+      ctx.lineTo(ex - Math.cos(ang - 0.5) * 6, ey - Math.sin(ang - 0.5) * 6);
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - Math.cos(ang + 0.5) * 6, ey - Math.sin(ang + 0.5) * 6);
+      ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < 150; i++) {
+    ctx.fillStyle = 'rgba(220,245,255,0.6)';
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+  }
+  return c;
+}
+
+// GALAXY — nebula clouds + starfield.
+function galaxyDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#06030f';
+  ctx.fillRect(0, 0, size, size);
+  const clouds = ['#5a1e9c', '#1e3a9c', '#9c1e6e', '#2a8ccc'];
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 30 + Math.random() * 70;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, clouds[(Math.random() * clouds.length) | 0] + 'cc');
+    g.addColorStop(1, 'rgba(6,3,15,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  for (let i = 0; i < 220; i++) {
+    const b = Math.random();
+    ctx.fillStyle = b > 0.9 ? '#bfe0ff' : `rgba(255,255,255,${0.4 + b * 0.6})`;
+    const s = b > 0.95 ? 2 : 1;
+    ctx.fillRect(Math.random() * size, Math.random() * size, s, s);
+  }
+  return c;
+}
+
+// GOLD FILIGREE — ornate damascus swirls on gold.
+function goldDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#caa23a');
+  bg.addColorStop(0.5, '#f3d678');
+  bg.addColorStop(1, '#9c7a1e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(90,60,8,0.55)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 22; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 8 + Math.random() * 22;
+    ctx.beginPath();
+    for (let a = 0; a <= Math.PI * 2; a += 0.3) {
+      const rr = r * (0.6 + 0.4 * Math.sin(a * 3));
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      a ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  return c;
+}
+
+// SKULL — repeating skull motif.
+function skullDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#14151a';
+  ctx.fillRect(0, 0, size, size);
+  const drawSkull = (x, y, s) => {
+    ctx.fillStyle = '#d8d8d0';
+    ctx.beginPath();
+    ctx.arc(x, y, s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(x - s * 0.7, y, s * 1.4, s * 1.1);
+    ctx.fillStyle = '#14151a';
+    ctx.beginPath(); ctx.arc(x - s * 0.4, y - s * 0.1, s * 0.32, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + s * 0.4, y - s * 0.1, s * 0.32, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(x - s * 0.1, y + s * 0.2, s * 0.2, s * 0.4);
+    for (let i = -2; i <= 2; i++) ctx.fillRect(x + i * s * 0.22 - 1, y + s * 0.9, 2, s * 0.3);
+  };
+  const step = 64;
+  for (let y = step / 2; y < size + step; y += step)
+    for (let x = step / 2; x < size + step; x += step)
+      drawSkull(x + ((y / step) % 2 ? step / 2 : 0), y, 14);
+  return c;
+}
+
+// TOXIC — acid splatter + bubbles, glows green.
+function toxicDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#0a1206';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 16; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 12 + Math.random() * 34;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, '#aaff33');
+    g.addColorStop(0.6, '#3a9c1a');
+    g.addColorStop(1, 'rgba(10,18,6,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 60; i++) {
+    ctx.strokeStyle = 'rgba(180,255,90,0.7)';
+    ctx.lineWidth = 1;
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.beginPath(); ctx.arc(x, y, 1 + Math.random() * 4, 0, Math.PI * 2); ctx.stroke();
+  }
+  return c;
+}
+
+// LIGHTNING — branching electric arcs, glows.
+function lightningDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#070a16';
+  ctx.fillRect(0, 0, size, size);
+  ctx.shadowColor = '#aef0ff';
+  ctx.shadowBlur = 6;
+  const bolt = (x, y, ang, len, w) => {
+    if (len < 8 || w < 0.4) return;
+    ctx.strokeStyle = w > 1.5 ? '#ffffff' : '#7fd8ff';
+    ctx.lineWidth = w;
+    const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+    bolt(nx, ny, ang + (Math.random() - 0.5) * 1.1, len * 0.7, w * 0.7);
+    if (Math.random() < 0.5) bolt(nx, ny, ang + (Math.random() - 0.5) * 1.6, len * 0.5, w * 0.5);
+  };
+  for (let i = 0; i < 5; i++) bolt(Math.random() * size, 0, Math.PI / 2 + (Math.random() - 0.5), 50, 2.4);
+  ctx.shadowBlur = 0;
+  return c;
+}
+
+// TIGER — orange coat with black stripes.
+function tigerDecal() {
+  const size = 256, c = makeCanvas(size), ctx = c.getContext('2d');
+  const bg = ctx.createLinearGradient(0, 0, 0, size);
+  bg.addColorStop(0, '#ff9a2a');
+  bg.addColorStop(1, '#e8761a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#1a1208';
+  for (let i = 0; i < 22; i++) {
+    const y = Math.random() * size, x = Math.random() * size;
+    const w = 4 + Math.random() * 8, h = 30 + Math.random() * 50, tilt = (Math.random() - 0.5) * 0.6;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(w, h * 0.5, 0, h);
+    ctx.quadraticCurveTo(-w * 0.4, h * 0.5, 0, 0);
+    ctx.fill();
+    ctx.restore();
+  }
+  return c;
+}
+
 const DECALS = {
-  fire:   fireDecal,
-  anime:  animeDecal,
-  dragon: dragonDecal,
-  cyber:  cyberDecal,
+  fire:      fireDecal,
+  anime:     animeDecal,
+  dragon:    dragonDecal,
+  cyber:     cyberDecal,
+  carbon:    carbonDecal,
+  digicamo:  digicamoDecal,
+  hextech:   hextechDecal,
+  frost:     frostDecal,
+  galaxy:    galaxyDecal,
+  gold:      goldDecal,
+  skull:     skullDecal,
+  toxic:     toxicDecal,
+  lightning: lightningDecal,
+  tiger:     tigerDecal,
 };
 
 // Returns a seamless color CanvasTexture for the given decal type (cached).

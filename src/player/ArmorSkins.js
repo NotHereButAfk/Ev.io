@@ -1,4 +1,6 @@
-export const RARITY_SHIELD = { common: 20, rare: 40, epic: 60, legendary: 80 };
+import { RARITY_ORDER, RARITY_COLORS } from '../core/Rarity.js';
+
+export const RARITY_SHIELD = { common: 20, uncommon: 30, rare: 40, epic: 60, legendary: 80, mythic: 100 };
 
 export const ARMOR_SKINS = [
   // ── COMMON ──────────────────────────────────────────────────────────────────
@@ -58,13 +60,8 @@ export const ARMOR_SKINS = [
     emissive: 0x080028, emissiveIntensity: 0.55 },
 ];
 
-export const RARITY_ORDER  = ['common', 'rare', 'epic', 'legendary'];
-export const RARITY_COLORS = {
-  common:    '#9aabb8',
-  rare:      '#4a9aff',
-  epic:      '#b04af0',
-  legendary: '#f0a820',
-};
+// Re-exported from the shared rarity module so every cosmetic system agrees.
+export { RARITY_ORDER, RARITY_COLORS };
 
 export function getArmorSkin(id) {
   return ARMOR_SKINS.find(s => s.id === id) || null;

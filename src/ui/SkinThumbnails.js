@@ -82,8 +82,8 @@ function _generate() {
     mat.roughness  = skin.roughness  ?? 0.5;
     mat.emissive.setHex(skin.animated ? (skin.emissive ?? bodyCol) : 0x000000);
     mat.emissiveIntensity = skin.animated ? Math.min(skin.emissiveIntensity ?? 0.4, 0.7) : 0;
-    // Show the painted decal pattern for themed skins.
-    const decal = !isSword && skin.decal ? decalTexture(skin.decal) : null;
+    // Show the painted decal pattern for themed skins (guns and swords).
+    const decal = skin.decal ? decalTexture(skin.decal) : null;
     mat.map = decal || null;
     if (decal && skin.decalEmissive) {
       mat.emissiveMap = decal;

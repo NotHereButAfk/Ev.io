@@ -1055,6 +1055,55 @@ html, body {
   color: rgba(200, 150, 255, 0.9);
 }
 
+/* ── Rarity grouping + swatch tiers ─────────────────────────────────────── */
+.armory-rarity-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  margin: 8px 2px 1px;
+  text-transform: uppercase;
+}
+.armory-rarity-header:first-child { margin-top: 2px; }
+.ar-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+.ar-count {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(200, 215, 235, 0.45);
+  letter-spacing: 0.5px;
+}
+
+/* Rarity corner pip on each swatch */
+.swatch-rarity-pip {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px currentColor, 0 0 0 1px rgba(0,0,0,0.5);
+  z-index: 3;
+}
+
+/* Tier borders + glow (skip while hovered/selected so those states win) */
+.armory-swatch[data-rarity="common"]:not(:hover):not(.selected)    { border-color: rgba(154,171,184,0.30); }
+.armory-swatch[data-rarity="uncommon"]:not(:hover):not(.selected)  { border-color: rgba(84,214,92,0.55); }
+.armory-swatch[data-rarity="rare"]:not(:hover):not(.selected)      { border-color: rgba(58,155,255,0.7);  box-shadow: 0 0 8px rgba(58,155,255,0.28); }
+.armory-swatch[data-rarity="epic"]:not(:hover):not(.selected)      { border-color: rgba(177,77,240,0.8);  box-shadow: 0 0 11px rgba(177,77,240,0.4); }
+.armory-swatch[data-rarity="legendary"]:not(:hover):not(.selected) { border-color: rgba(245,166,35,0.9);  box-shadow: 0 0 14px rgba(245,166,35,0.5); }
+.armory-swatch[data-rarity="mythic"]:not(:hover):not(.selected)    { border-color: rgba(255,46,99,1);      box-shadow: 0 0 18px rgba(255,46,99,0.6); }
+.armory-swatch[data-rarity="mythic"] { animation: mythicShimmer 2.4s ease-in-out infinite; }
+
+@keyframes mythicShimmer {
+  0%, 100% { box-shadow: 0 0 14px rgba(255,46,99,0.5); }
+  50%      { box-shadow: 0 0 22px rgba(255,90,140,0.85); }
+}
+
 .armory-equip-btn {
   margin-top: 4px !important;
   padding: 10px !important;

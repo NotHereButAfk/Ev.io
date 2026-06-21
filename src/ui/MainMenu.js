@@ -292,9 +292,10 @@ export class MenuUI {
     const grid       = document.getElementById('armory-skin-grid');
     grid.innerHTML   = '';
 
-    skins.forEach((skin) => {
+    const makeSwatch = (skin) => {
       const el = document.createElement('div');
       el.className = 'armory-swatch';
+      el.dataset.rarity = skin.rarity || 'common';
       if (skin.animated)          el.classList.add('animated');
       if (skin.id === equippedId) el.classList.add('equipped');
 
@@ -311,10 +312,16 @@ export class MenuUI {
       }
       el.appendChild(imgEl);
 
+      // Rarity corner pip
+      const pip = document.createElement('span');
+      pip.className = 'swatch-rarity-pip';
+      pip.style.background = RARITY_COLORS[skin.rarity] || RARITY_COLORS.common;
+      el.appendChild(pip);
+
       // Skin name label
       const nameEl = document.createElement('div');
       nameEl.className = 'swatch-name';
-      nameEl.textContent = skin.name.replace(/[🔥⚡👻💀🌊]/u, '').trim();
+      nameEl.textContent = skin.name.replace(/[🔥⚡👻💀🌊🌸🐉🤖✦❄☣☠🌈💥🔵🌋]/gu, '').trim();
       el.appendChild(nameEl);
 
       el.addEventListener('mouseenter', () => { this._armoryHoverSkin = skin; this._previewSkin(skin); });
@@ -331,7 +338,19 @@ export class MenuUI {
         this._previewSkin(skin);
         document.getElementById('armory-equip-btn').disabled = false;
       });
-      grid.appendChild(el);
+      return el;
+    };
+
+    // Group swatches under rarity headers, strongest tier first.
+    [...RARITY_ORDER].reverse().forEach((rarity) => {
+      const tierSkins = skins.filter((s) => (s.rarity || 'common') === rarity);
+      if (!tierSkins.length) return;
+      const hdr = document.createElement('div');
+      hdr.className = 'armory-rarity-header';
+      hdr.style.color = RARITY_COLORS[rarity];
+      hdr.innerHTML = `<span class="ar-dot" style="background:${RARITY_COLORS[rarity]}"></span>${rarity.toUpperCase()} <span class="ar-count">${tierSkins.length}</span>`;
+      grid.appendChild(hdr);
+      tierSkins.forEach((skin) => grid.appendChild(makeSwatch(skin)));
     });
 
     const equippedSkin = skins.find((s) => s.id === equippedId);
@@ -350,12 +369,16 @@ export class MenuUI {
   _previewSkin(skin) {
     if (!this._preview) return;
     this._preview.previewSkin(skin);
-    document.getElementById('preview-skin-name').textContent = skin.name;
-    const tags = [];
+    const nameEl = document.getElementById('preview-skin-name');
+    nameEl.textContent = skin.name;
+    const rar = skin.rarity || 'common';
+    nameEl.style.color = RARITY_COLORS[rar];
+    const tags = [rar.toUpperCase()];
+    if (skin.decal)    tags.push('CUSTOM DESIGN');
     if (skin.animated) tags.push('✦ ANIMATED');
+    if (skin.shootSound) tags.push('✦ CUSTOM SFX');
     if (skin.metalness >= 0.85) tags.push('HIGH GLOSS');
     else if (skin.roughness >= 0.7) tags.push('MATTE');
-    tags.push(`METAL ${Math.round((skin.metalness ?? 0) * 100)}%`);
     document.getElementById('preview-skin-tags').textContent = tags.join('  ·  ');
   }
 
@@ -553,6 +576,7 @@ export class MenuUI {
 
     RARITY_ORDER.forEach(rarity => {
       const skins = ARMOR_SKINS.filter(s => s.rarity === rarity);
+      if (!skins.length) return; // skip tiers with no armor (e.g. uncommon/mythic)
       const color = RARITY_COLORS[rarity];
 
       const section = document.createElement('div');
