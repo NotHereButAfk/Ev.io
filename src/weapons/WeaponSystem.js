@@ -7,6 +7,10 @@ import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 const TRACER_LIFE = 0.07;
 const FLASH_LIFE = 0.05;
 
+// Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
+// get the pink muzzle flash + sparkle-heart burst treatment.
+const CUTE_SOUNDS = new Set(['anime', 'meow', 'uwu', 'bark', 'sparkle']);
+
 function createTracerMesh() {
   const geo = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1, true);
   geo.translate(0, 0.5, 0);
@@ -345,7 +349,7 @@ export class WeaponSystem {
   }
 
   _flash() {
-    const animeActive = this._activeSkinFor?.(this.currentDef?.id)?.shootSound === 'anime';
+    const animeActive = CUTE_SOUNDS.has(this._activeSkinFor?.(this.currentDef?.id)?.shootSound);
     this.flashLight.color.setHex(animeActive ? 0xff69b4 : 0xffcc66);
     this.flashLight.intensity = animeActive ? 12 : 8;
     const muzzleWorld = new THREE.Vector3();
@@ -687,8 +691,8 @@ export class WeaponSystem {
       this._spawnShell();
     }
     this._flash();
-    // Anime skin: spawn pink sparkle hearts at the muzzle
-    if (skinSound === 'anime') this._spawnAnimeSparkles();
+    // Kawaii skins: spawn pink sparkle hearts at the muzzle
+    if (CUTE_SOUNDS.has(skinSound)) this._spawnAnimeSparkles();
 
     this.kickPos.z += def.recoil * 2.2;
     this.kickPos.y += def.recoil * 0.4;

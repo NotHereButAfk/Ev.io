@@ -215,6 +215,104 @@ export const WEAPON_SKINS = [
     body: 0x9fd8ec, accent: 0x123040, metal: 0xeafaff, metalness: 0.8, roughness: 0.12,
     emissive: 0x7fe0ff, emissiveIntensity: 1.7, decal: 'ice', decalEmissive: true,
     animated: true, animType: 'pulse', animSpeed: 2.0, animMin: 0.9, animMax: 2.4
+  },
+
+  // ══ EXPANSION PACK: 5 per tier (common→mythic) ═══════════════════════════════
+
+  // ── COMMON (5) ───────────────────────────────────────────────────────────────
+  { id: 'slate',    name: 'Slate Blue',    rarity: 'common', body: 0x4a5663, accent: 0x262d35, metal: 0x7e8a98, metalness: 0.5,  roughness: 0.5  },
+  { id: 'sand',     name: 'Sandstorm',     rarity: 'common', body: 0xc9b487, accent: 0x7a6a44, metal: 0xa89a78, metalness: 0.4,  roughness: 0.6  },
+  { id: 'moss',     name: 'Moss Green',    rarity: 'common', body: 0x4c5a36, accent: 0x29331d, metal: 0x6c7a52, metalness: 0.42, roughness: 0.56 },
+  { id: 'charcoal', name: 'Charcoal',      rarity: 'common', body: 0x2c2e31, accent: 0x161719, metal: 0x595d62, metalness: 0.6,  roughness: 0.4  },
+  { id: 'rust',     name: 'Rustic Iron',   rarity: 'common', body: 0x7a4a32, accent: 0x3a2218, metal: 0x9a6a4a, metalness: 0.55, roughness: 0.52 },
+
+  // ── UNCOMMON (5) ─────────────────────────────────────────────────────────────
+  { id: 'coral',    name: 'Coral Reef',    rarity: 'uncommon', body: 0xe07a6a, accent: 0x6e3028, metal: 0xf0a090, metalness: 0.5, roughness: 0.4 },
+  { id: 'mint',     name: 'Mint Fresh',    rarity: 'uncommon', body: 0x7ad4b0, accent: 0x2c5a48, metal: 0xa8ead4, metalness: 0.55, roughness: 0.35 },
+  { id: 'copper',   name: 'Copper Patina', rarity: 'uncommon', body: 0x4a8a78, accent: 0x6a4a2a, metal: 0xc97a4a, metalness: 0.85, roughness: 0.3 },
+  { id: 'graphite', name: 'Graphite Weave',rarity: 'uncommon', body: 0x202227, accent: 0x35383f, metal: 0x70767e, metalness: 0.82, roughness: 0.22, decal: 'carbon' },
+  { id: 'amethyst', name: 'Amethyst',      rarity: 'uncommon', body: 0x6a4a8c, accent: 0x331f4a, metal: 0x9a6acc, metalness: 0.7, roughness: 0.3 },
+
+  // ── RARE (5) ─────────────────────────────────────────────────────────────────
+  { id: 'sapphire', name: 'Sapphire',      rarity: 'rare', body: 0x1a3a8c, accent: 0x0a1a44, metal: 0x3a6ad0, metalness: 0.88, roughness: 0.16 },
+  {
+    id: 'amber', name: 'Amber Glass', rarity: 'rare',
+    body: 0xd08a1a, accent: 0x5a3a08, metal: 0xf0b84a, metalness: 0.7, roughness: 0.22,
+    emissive: 0xff9a00, emissiveIntensity: 0.5,
+    animated: true, animType: 'pulse', animSpeed: 1.5, animMin: 0.3, animMax: 0.9
+  },
+  { id: 'jade',     name: 'Jade Dynasty',  rarity: 'rare', body: 0x1f7a5a, accent: 0x0c3328, metal: 0x3aae84, metalness: 0.8, roughness: 0.2, decal: 'dragon' },
+  { id: 'blush',    name: 'Blush Pink',    rarity: 'rare', body: 0xe69ac0, accent: 0x8c3a66, metal: 0xf4bcd8, metalness: 0.75, roughness: 0.22 },
+  { id: 'stormsteel', name: 'Storm Steel', rarity: 'rare', body: 0x586878, accent: 0x2a333c, metal: 0xaebcca, metalness: 0.92, roughness: 0.14 },
+
+  // ── LEGENDARY (5) ────────────────────────────────────────────────────────────
+  {
+    id: 'solarflare', name: 'Solar Flare ☀', rarity: 'legendary',
+    body: 0x2a1200, accent: 0x4a2200, metal: 0xffaa1a, metalness: 0.6, roughness: 0.32,
+    emissive: 0xff8800, emissiveIntensity: 1.4, decal: 'lava', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 6.5, animMin: 0.8, animMax: 2.4,
+    shootSound: 'fire'
+  },
+  {
+    id: 'venomstrike', name: 'Venomstrike ☣', rarity: 'legendary',
+    body: 0x081404, accent: 0x041002, metal: 0x4ad81a, metalness: 0.78, roughness: 0.24,
+    emissive: 0x7aff2a, emissiveIntensity: 1.3, decal: 'toxic', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 3.4, animMin: 0.7, animMax: 2.1
+  },
+  {
+    id: 'nebula', name: 'Nebula 🌌', rarity: 'legendary',
+    body: 0x0a0518, accent: 0x05030c, metal: 0x7a4ad0, metalness: 0.82, roughness: 0.18,
+    emissive: 0xb060ff, emissiveIntensity: 1.3, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 2.0, animMin: 0.7, animMax: 2.2
+  },
+  {
+    id: 'neonpulse', name: 'Neon Pulse ⚡', rarity: 'legendary',
+    body: 0x0a0014, accent: 0x05000a, metal: 0xff2ad0, metalness: 0.85, roughness: 0.18,
+    emissive: 0xff40e0, emissiveIntensity: 1.4, decal: 'cyber', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 8.0, animMin: 0.6, animMax: 2.3,
+    shootSound: 'laser'
+  },
+  {
+    id: 'royalgold', name: 'Royal Gold 👑', rarity: 'legendary',
+    body: 0x3a2c08, accent: 0x1a1404, metal: 0xffd24a, metalness: 0.97, roughness: 0.1,
+    emissive: 0xffc800, emissiveIntensity: 0.7, decal: 'gold', decalEmissive: true
+  },
+
+  // ── MYTHIC (5) — with cute custom shoot sounds! ──────────────────────────────
+  {
+    id: 'nekomata', name: 'Nekomata 🐱', rarity: 'mythic',
+    body: 0xffb0d8, accent: 0x7a2a5a, metal: 0xff80c0, metalness: 0.6, roughness: 0.3,
+    emissive: 0xff3aa0, emissiveIntensity: 1.4, decal: 'anime', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 3.0, animMin: 0.8, animMax: 2.2,
+    shootSound: 'meow'
+  },
+  {
+    id: 'kawaiicore', name: 'Kawaii Core 💖', rarity: 'mythic',
+    body: 0xffc8e8, accent: 0x8c3a6a, metal: 0xffa0d0, metalness: 0.7, roughness: 0.22,
+    emissive: 0xffffff, emissiveIntensity: 1.7, decal: 'anime', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.4, animMin: 1.1, animMax: 2.4,
+    shootSound: 'uwu'
+  },
+  {
+    id: 'puppylove', name: 'Puppy Love 🐶', rarity: 'mythic',
+    body: 0xf0c89a, accent: 0x7a4a2a, metal: 0xffdcb0, metalness: 0.6, roughness: 0.3,
+    emissive: 0xffb860, emissiveIntensity: 1.3,
+    animated: true, animType: 'pulse', animSpeed: 2.6, animMin: 0.7, animMax: 2.0,
+    shootSound: 'bark'
+  },
+  {
+    id: 'stardust', name: 'Stardust ✨', rarity: 'mythic',
+    body: 0x0a0820, accent: 0x040310, metal: 0x9c8aff, metalness: 0.85, roughness: 0.14,
+    emissive: 0xc0b0ff, emissiveIntensity: 1.8, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.16, animMin: 1.2, animMax: 2.5,
+    shootSound: 'sparkle'
+  },
+  {
+    id: 'chromaflare', name: 'Chroma Flare 🌈', rarity: 'mythic',
+    body: 0x161616, accent: 0x0c0c0c, metal: 0xb8b8b8, metalness: 0.92, roughness: 0.1,
+    emissive: 0xffffff, emissiveIntensity: 1.9, decal: 'holographic', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.5, animMin: 1.3, animMax: 2.5,
+    shootSound: 'laser'
   }
 ];
 

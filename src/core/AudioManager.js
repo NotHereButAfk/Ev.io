@@ -196,8 +196,134 @@ export class AudioManager {
       case 'anime': this.playAnimeShot(); return true;
       case 'laser': this.playLaserShot(); return true;
       case 'fire':  this.playFireShot();  return true;
+      case 'meow':  this.playMeowShot();  return true;
+      case 'uwu':   this.playUwuShot();   return true;
+      case 'bark':  this.playBarkShot();  return true;
+      case 'sparkle': this.playSparkleShot(); return true;
       default: return false;
     }
+  }
+
+  // Anime cat-girl "nya~!" — a cute meow with a rising-then-falling pitch arch,
+  // twin vowel formants and gentle vibrato so it reads as a voice, not a buzz.
+  playMeowShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Vibrato LFO for the kitty "voice" wobble.
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 22;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 34;
+    lfo.connect(lfoGain);
+
+    // Fundamental — "ny-aa-ow" pitch arch: up then down.
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(620, t);
+    osc.frequency.exponentialRampToValueAtTime(960, t + 0.09);
+    osc.frequency.exponentialRampToValueAtTime(560, t + 0.30);
+    lfoGain.connect(osc.frequency);
+
+    // Two vowel formants sweeping from "eh" → "ah" make the meow vocal.
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.Q.value = 5;
+    f1.frequency.setValueAtTime(820, t);
+    f1.frequency.linearRampToValueAtTime(1050, t + 0.30);
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.Q.value = 7;
+    f2.frequency.setValueAtTime(2600, t);
+    f2.frequency.linearRampToValueAtTime(2200, t + 0.30);
+    const gain = this._envGain(0.34, 0.012, 0.30, t);
+    osc.connect(f1).connect(f2).connect(gain).connect(this.master);
+
+    // A soft "breath" of noise at the very start ("ny" consonant).
+    const breath = this.ctx.createBufferSource();
+    breath.buffer = this._noiseBuffer(0.05);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 1.2;
+    const bGain = this._envGain(0.10, 0.002, 0.045, t);
+    breath.connect(bp).connect(bGain).connect(this.master);
+
+    lfo.start(t); osc.start(t); breath.start(t);
+    lfo.stop(t + 0.34); osc.stop(t + 0.34); breath.stop(t + 0.06);
+  }
+
+  // Kawaii "uwu~" squeak — a cute two-note rise with a giggly wobble.
+  playUwuShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 36;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 70;
+    lfo.connect(lfoGain);
+    const osc = this.ctx.createOscillator();
+    osc.type = 'triangle';
+    // "u-wu": dip then two little bumps up.
+    osc.frequency.setValueAtTime(560, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.07);
+    osc.frequency.exponentialRampToValueAtTime(700, t + 0.13);
+    osc.frequency.exponentialRampToValueAtTime(1180, t + 0.2);
+    lfoGain.connect(osc.frequency);
+    const formant = this.ctx.createBiquadFilter();
+    formant.type = 'bandpass'; formant.frequency.value = 900; formant.Q.value = 2.2;
+    const gain = this._envGain(0.32, 0.006, 0.2, t);
+    osc.connect(formant).connect(gain).connect(this.master);
+    // sparkle on top
+    const spark = this.ctx.createOscillator();
+    spark.type = 'sine';
+    spark.frequency.setValueAtTime(3200, t + 0.04);
+    spark.frequency.exponentialRampToValueAtTime(4600, t + 0.16);
+    const sGain = this._envGain(0.11, 0.002, 0.14, t + 0.04);
+    spark.connect(sGain).connect(this.master);
+    lfo.start(t); osc.start(t); spark.start(t + 0.04);
+    lfo.stop(t + 0.24); osc.stop(t + 0.24); spark.stop(t + 0.2);
+  }
+
+  // Cute anime puppy "yip!" — a short sharp bark with a quick down-glide.
+  playBarkShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(820, t);
+    osc.frequency.exponentialRampToValueAtTime(1300, t + 0.025);
+    osc.frequency.exponentialRampToValueAtTime(420, t + 0.13);
+    const formant = this.ctx.createBiquadFilter();
+    formant.type = 'bandpass'; formant.frequency.value = 1400; formant.Q.value = 3;
+    const gain = this._envGain(0.36, 0.003, 0.13, t);
+    osc.connect(formant).connect(gain).connect(this.master);
+    const breath = this.ctx.createBufferSource();
+    breath.buffer = this._noiseBuffer(0.04);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'highpass'; bp.frequency.value = 2000;
+    const bGain = this._envGain(0.12, 0.001, 0.035, t);
+    breath.connect(bp).connect(bGain).connect(this.master);
+    osc.start(t); breath.start(t);
+    osc.stop(t + 0.15); breath.stop(t + 0.05);
+  }
+
+  // Magical sparkle "kira~" — ascending bell arpeggio with shimmer.
+  playSparkleShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    [1568, 2093, 2637, 3136].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const g = this._envGain(0.16 - i * 0.02, 0.002, 0.16, t + i * 0.025);
+      osc.connect(g).connect(this.master);
+      osc.start(t + i * 0.025); osc.stop(t + i * 0.025 + 0.2);
+    });
+    // airy shimmer tail
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.2);
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 5000;
+    const nGain = this._envGain(0.07, 0.01, 0.18, t + 0.03);
+    noise.connect(hp).connect(nGain).connect(this.master);
+    noise.start(t + 0.03); noise.stop(t + 0.24);
   }
 
   playExplosion() {
