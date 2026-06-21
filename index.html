@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>STRIKER.IO</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- ===================== CONNECT SCREEN ===================== -->
+    <div id="connect-screen" class="overlay">
+      <div class="connect-panel">
+        <h1 class="logo">STRIKER<span>.IO</span></h1>
+        <p class="tagline">zombie arena &mdash; guns &bull; blades &bull; glory</p>
+        <div class="connect-status-row">
+          <div class="connect-dots"><span></span><span></span><span></span></div>
+          <div id="connect-status-text">CONNECTING TO SERVER</div>
+        </div>
+        <div class="connect-bar-wrap">
+          <div id="connect-bar" class="connect-bar"></div>
+        </div>
+        <div class="connect-server-info">SERVER: us-east-1 &bull; PING: <span id="connect-ping">--</span>ms</div>
+      </div>
+    </div>
+
+    <!-- ===================== AUTH SCREEN ===================== -->
+    <div id="auth-screen" class="overlay hidden">
+      <div class="menu-panel auth-panel">
+        <h1 class="logo">STRIKER<span>.IO</span></h1>
+        <p class="tagline">zombie arena &mdash; guns &bull; blades &bull; glory</p>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">LOGIN</button>
+          <button class="auth-tab" data-tab="register">REGISTER</button>
+        </div>
+
+        <div id="auth-login" class="auth-form">
+          <label class="field-label" for="auth-login-name">username</label>
+          <input id="auth-login-name" class="text-input" placeholder="Your username" autocomplete="username" />
+          <label class="field-label" for="auth-login-pass">password</label>
+          <input id="auth-login-pass" class="text-input" type="password" placeholder="Your password" autocomplete="current-password" />
+          <div id="auth-login-err" class="auth-error hidden"></div>
+          <button id="auth-login-btn" class="play-btn" style="margin-top:14px">LOGIN</button>
+        </div>
+
+        <div id="auth-register" class="auth-form hidden">
+          <label class="field-label" for="auth-reg-name">choose username</label>
+          <input id="auth-reg-name" class="text-input" placeholder="Letters, numbers, _" autocomplete="username" />
+          <label class="field-label" for="auth-reg-pass">password</label>
+          <input id="auth-reg-pass" class="text-input" type="password" placeholder="Min 3 characters" autocomplete="new-password" />
+          <label class="field-label" for="auth-reg-pass2">confirm password</label>
+          <input id="auth-reg-pass2" class="text-input" type="password" placeholder="Repeat password" autocomplete="new-password" />
+          <div id="auth-reg-err" class="auth-error hidden"></div>
+          <button id="auth-reg-btn" class="play-btn" style="margin-top:14px">CREATE ACCOUNT</button>
+        </div>
+
+        <div class="auth-divider"><span>or</span></div>
+        <button id="auth-guest-btn" class="ghost-btn">PLAY AS GUEST</button>
+      </div>
+    </div>
+
+    <!-- ===================== TOP NAV ===================== -->
+    <div id="top-nav" class="hidden">
+      <div class="nav-brand">STRIKER<span>.IO</span></div>
+      <nav class="nav-items">
+        <!-- MODES dropdown — replaces PUBLIC GAME + old MODES panel button -->
+        <div class="nav-modes-wrap" id="nav-modes-wrap">
+          <button class="nav-item nav-modes-btn" id="nav-modes-btn">MODES &#9660;</button>
+          <div class="modes-dropdown hidden" id="modes-dropdown">
+            <button class="mode-option" data-mode="deathmatch">
+              <span class="mode-opt-icon">&#9876;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">DEATHMATCH</div>
+                <div class="mode-opt-sub">FFA &bull; 8 Players &bull; 8 Minutes</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="survival">
+              <span class="mode-opt-icon">&#129503;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">SURVIVAL</div>
+                <div class="mode-opt-sub">Co-op &bull; Up to 5 Players &bull; Zombie Waves</div>
+              </div>
+            </button>
+          </div>
+        </div>
+        <button class="nav-item" data-panel="loadout">LOADOUT &#9660;</button>
+        <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
+        <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
+        <button class="nav-item" data-panel="settings">SETTINGS</button>
+        <button class="nav-item" data-panel="profile">PROFILE &#9660;</button>
+      </nav>
+      <div class="nav-right">
+        <span id="nav-coins" class="nav-coins">&#128176; 500</span>
+        <span id="nav-username" class="nav-username"></span>
+      </div>
+    </div>
+
+    <!-- ===================== CENTER PLAY ===================== -->
+    <div id="center-play" class="hidden">
+      <button id="play-btn" class="click-to-play">CLICK TO PLAY</button>
+      <div class="spectate-hint">[ SPECTATING ]</div>
+    </div>
+
+    <!-- ===================== PANEL: LOADOUT ===================== -->
+    <div id="panel-loadout" class="nav-panel nav-panel-wide hidden">
+
+      <div class="panel-top-row">
+        <div class="panel-section">
+          <div class="panel-label">CALLSIGN</div>
+          <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
+          <div class="panel-label" style="margin-top:14px">PLAYER SKIN</div>
+          <div id="skin-grid" class="skin-grid"></div>
+        </div>
+        <div class="panel-section panel-section-grow">
+          <div class="panel-label">ARMOR TYPE</div>
+          <div id="armor-type-grid" class="armor-type-grid"></div>
+        </div>
+      </div>
+
+      <div class="panel-divider"></div>
+      <div class="panel-label" style="margin-bottom:10px">WEAPON FINISHES</div>
+
+      <div class="armory-layout">
+        <div class="armory-weapon-list">
+          <div class="armory-section-label">WEAPONS</div>
+          <div id="armory-weapon-list"></div>
+        </div>
+        <div class="armory-skin-panel">
+          <div class="armory-preview-wrap">
+            <canvas id="skin-preview-canvas" width="360" height="202"></canvas>
+            <div class="armory-preview-info">
+              <div id="preview-skin-name" class="preview-skin-name">Select a skin</div>
+              <div id="preview-skin-tags" class="preview-skin-tags"></div>
+            </div>
+          </div>
+          <div class="armory-skin-header">
+            <span class="armory-section-label">FINISHES</span>
+            <span id="armory-equipped-chip" class="equipped-chip">— none equipped —</span>
+          </div>
+          <div id="armory-skin-grid" class="armory-skin-grid"></div>
+          <button id="armory-equip-btn" class="play-btn armory-equip-btn" disabled>EQUIP FINISH</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== PANEL: MODES ===================== -->
+    <div id="panel-modes" class="nav-panel hidden">
+      <p class="modes-intro">Choose a game mode for your next session.</p>
+      <div id="mode-cards" class="mode-cards"></div>
+    </div>
+
+    <!-- ===================== PANEL: SETTINGS ===================== -->
+    <div id="panel-settings" class="nav-panel hidden">
+
+      <div class="settings-section">CONTROLS</div>
+
+      <label class="field-label">Mouse Sensitivity</label>
+      <div class="setting-row">
+        <input type="range" id="set-sens" min="30" max="300" step="5" value="100" class="setting-slider" />
+        <span id="set-sens-val" class="setting-val">1.0×</span>
+      </div>
+
+      <label class="field-label">Field of View</label>
+      <div class="setting-row">
+        <input type="range" id="set-fov" min="60" max="110" step="5" value="78" class="setting-slider" />
+        <span id="set-fov-val" class="setting-val">78°</span>
+      </div>
+
+      <div class="settings-section">AUDIO</div>
+
+      <label class="field-label">Master Volume</label>
+      <div class="setting-row">
+        <input type="range" id="set-vol" min="0" max="100" step="5" value="50" class="setting-slider" />
+        <span id="set-vol-val" class="setting-val">50%</span>
+      </div>
+
+      <div class="settings-section">GRAPHICS</div>
+
+      <label class="field-label">Render Quality</label>
+      <div class="quality-btns" id="quality-btns">
+        <button class="quality-btn" data-q="low">LOW</button>
+        <button class="quality-btn active" data-q="medium">MEDIUM</button>
+        <button class="quality-btn" data-q="high">HIGH</button>
+      </div>
+
+      <button id="settings-save-btn" class="play-btn" style="margin-top:22px">SAVE SETTINGS</button>
+    </div>
+
+    <!-- ===================== PANEL: PROFILE ===================== -->
+    <div id="panel-profile" class="nav-panel hidden">
+      <div class="profile-header">
+        <div id="profile-avatar" class="profile-avatar"></div>
+        <div class="profile-info">
+          <div id="profile-username" class="profile-name">RECRUIT</div>
+          <div id="profile-badge" class="profile-badge">RECRUIT</div>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-kills">0</div>
+          <div class="stat-label">KILLS</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-score">0</div>
+          <div class="stat-label">SCORE</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-games">0</div>
+          <div class="stat-label">GAMES</div>
+        </div>
+      </div>
+
+      <label class="field-label">equipped finishes</label>
+      <div class="equipped-skins">
+        <div class="equipped-slot">
+          <div id="profile-weapon-skin" class="equipped-preview"></div>
+          <div class="equipped-text">
+            <div id="profile-weapon-skin-name" class="equipped-name">Midnight Black</div>
+            <div class="equipped-type">GUN SKIN</div>
+          </div>
+        </div>
+        <div class="equipped-slot">
+          <div id="profile-sword-skin" class="equipped-preview"></div>
+          <div class="equipped-text">
+            <div id="profile-sword-skin-name" class="equipped-name">Iron</div>
+            <div class="equipped-type">SWORD SKIN</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="profile-logout-btn" class="ghost-btn" style="margin-top:20px;display:none">LOGOUT</button>
+    </div>
+
+    <!-- ===================== PANEL: SHOP ===================== -->
+    <div id="panel-shop" class="nav-panel nav-panel-wide hidden">
+      <div class="shop-header">
+        <div>
+          <div class="panel-label">ARMOR SHOP</div>
+          <div class="shop-subtitle">Buy armor finishes to customize your look</div>
+        </div>
+        <div class="shop-balance">
+          <span class="shop-coin-icon">&#128176;</span>
+          <span id="shop-coin-balance">500</span>
+          <span class="shop-coin-label">COINS</span>
+        </div>
+      </div>
+      <div id="shop-grid-root"></div>
+      <div class="shop-earn-tip">&#9660; Earn coins by playing — 10 per kill, 100 per game</div>
+    </div>
+
+    <!-- ===================== PANEL: BATTLE PASS ===================== -->
+    <div id="panel-battlepass" class="nav-panel nav-panel-wide hidden">
+      <div class="bp-header-row">
+        <div>
+          <div class="panel-label">BATTLE PASS <span class="bp-season-tag">SEASON 1</span></div>
+          <div id="bp-tier-label" class="bp-tier-label">Tier 1 / 30</div>
+          <div class="bp-xp-bar-wrap">
+            <div class="bp-xp-bar-bg"><div id="bp-xp-bar" class="bp-xp-bar-fill"></div></div>
+            <span id="bp-xp-text" class="bp-xp-text">0 / 500 XP</span>
+          </div>
+        </div>
+        <div class="bp-premium-box" id="bp-premium-box">
+          <div class="bp-prem-label">PREMIUM PASS</div>
+          <div class="bp-prem-desc">Unlock 14 extra skins + bonus coins</div>
+          <button id="bp-unlock-btn" class="bp-unlock-btn">UNLOCK — &#128176; 1000</button>
+        </div>
+      </div>
+      <div id="bp-track" class="bp-track"></div>
+    </div>
+
+    <!-- ===================== PAUSE MENU ===================== -->
+    <div id="pause-menu" class="overlay hidden">
+      <div class="menu-panel small">
+        <h2>PAUSED</h2>
+        <button id="resume-btn" class="play-btn">RESUME</button>
+        <button id="quit-btn" class="ghost-btn">QUIT TO MENU</button>
+      </div>
+    </div>
+
+    <!-- ===================== GAME OVER ===================== -->
+    <div id="gameover-menu" class="overlay hidden">
+      <div class="menu-panel small">
+        <h2 id="gameover-title">YOU DIED</h2>
+        <div class="stats" id="gameover-stats"></div>
+        <button id="restart-btn" class="play-btn">RESPAWN</button>
+        <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
+      </div>
+    </div>
+
+    <!-- ===================== HUD ===================== -->
+    <div id="hud" class="hidden">
+      <div id="crosshair">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div id="hitmarker"></div>
+      <div id="damage-flash"></div>
+
+      <div id="mode-info" class="hidden"></div>
+
+      <div id="health-wrap" class="hud-panel">
+        <div class="hud-icon health-icon">&hearts;</div>
+        <div class="bar-bg"><div id="health-bar" class="bar-fill"></div></div>
+        <span id="health-text">100</span>
+      </div>
+
+      <div id="shield-wrap" class="hud-panel hidden">
+        <div class="hud-icon shield-icon">&#128737;</div>
+        <div class="bar-bg"><div id="shield-bar" class="bar-fill shield-fill"></div></div>
+        <span id="shield-text">0</span>
+      </div>
+
+      <div id="stamina-wrap" class="hud-panel">
+        <div class="hud-icon stamina-icon">&#9889;</div>
+        <div class="bar-bg"><div id="stamina-bar" class="bar-fill stamina-fill"></div></div>
+        <span id="stamina-text">100</span>
+      </div>
+
+      <div id="grenade-wrap" class="hud-panel">
+        <div class="grenade-slot">
+          <span class="grenade-icon frag-icon">&#128163;</span>
+          <span id="frag-count">2</span>
+          <span class="grenade-label">FRAG</span>
+        </div>
+        <div class="grenade-divider"></div>
+        <div class="grenade-slot">
+          <span class="grenade-icon smoke-icon">&#127787;</span>
+          <span id="smoke-count">2</span>
+          <span class="grenade-label">SMOKE</span>
+        </div>
+      </div>
+
+      <div id="weapon-wrap" class="hud-panel">
+        <div id="weapon-name">SIDEARM</div>
+        <div id="ammo-text">12 / 60</div>
+        <div id="reload-text" class="hidden">RELOADING...</div>
+      </div>
+
+      <div id="score-wrap" class="hud-panel">
+        <div>KILLS <span id="kill-count">0</span></div>
+        <div>SCORE <span id="score-count">0</span></div>
+      </div>
+
+      <div id="weapon-slots"></div>
+      <div id="killfeed"></div>
+
+      <!-- Large center timer for deathmatch -->
+      <div id="dm-timer" class="hidden"></div>
+
+      <!-- Kill streak badge -->
+      <div id="streak-badge" class="hidden"></div>
+
+      <!-- Survival: downed overlay -->
+      <div id="downed-overlay" class="hidden">
+        <div class="downed-text">DOWNED</div>
+        <div class="downed-sub">TEAMMATE REVIVING...</div>
+        <div class="downed-bar-wrap"><div id="downed-bar"></div></div>
+        <div id="downed-countdown" class="downed-countdown"></div>
+      </div>
+
+      <!-- Survival: wave incoming banner (auto-hides) -->
+      <div id="wave-banner" class="hidden"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
