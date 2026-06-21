@@ -173,20 +173,59 @@ export class Bot {
 
   die() {
     this.alive = false;
-    this.mesh.visible = false;
-    this.respawnTimer = RESPAWN_DELAY;
+    this._dying      = true;
+    this._deathT     = 0;
+    this._deathSide  = Math.random() < 0.5 ? 1 : -1;
+    this._deathBaseY = this.mesh.position.y;
+    this.healthBarGroup.visible = false;
   }
 
   respawnAt(point) {
     this.position.copy(point);
+    this.mesh.position.set(point.x, point.y, point.z);
+    this.mesh.rotation.set(0, 0, 0);
+    this.mesh.scale.setScalar(1);
     this.health = this.maxHealth;
     this.healthBarFg.scale.x = 1;
     this.healthBarFg.position.x = 0;
+    this.healthBarGroup.visible = true;
+    this._dying = false;
     this.alive = true;
     this.mesh.visible = true;
   }
 
   update(dt, player, camera, onAttack) {
+    // ── death animation ──────────────────────────────────────────────────────
+    if (this._dying) {
+      this._deathT += dt;
+      const p = Math.min(1, this._deathT / 0.65);
+      // ease-in fall
+      const eased = p * p;
+      this.mesh.rotation.z = eased * (Math.PI / 2) * this._deathSide;
+      this.mesh.rotation.x = eased * 0.25;
+      this.mesh.position.y = this._deathBaseY - eased * 0.55;
+      // fade out
+      if (p > 0.55) {
+        const fade = 1 - (p - 0.55) / 0.45;
+        this.mesh.traverse(o => { if (o.isMesh && o.material) {
+          o.material.transparent = true;
+          o.material.opacity = fade;
+        }});
+      }
+      if (p >= 1) {
+        this._dying = false;
+        this.mesh.visible = false;
+        this.mesh.rotation.set(0, 0, 0);
+        this.mesh.position.y = this._deathBaseY;
+        // restore opacity on all meshes for next respawn
+        this.mesh.traverse(o => { if (o.isMesh && o.material) {
+          o.material.transparent = false; o.material.opacity = 1;
+        }});
+        if (!this.noRespawn) this.respawnTimer = RESPAWN_DELAY;
+      }
+      return;
+    }
+
     if (!this.alive) {
       if (!this.noRespawn) {
         this.respawnTimer -= dt;

@@ -291,6 +291,8 @@ export class Game {
 
     this.player.name = name;
     this.player.skin = this.selectedSkin;
+    // Rarer equipped armor grants more shield
+    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this.player.respawn(SPAWN_POINT);
     this.weaponSystem.resetState(this.player.baseFov);
     this.grenadeSystem.reset();

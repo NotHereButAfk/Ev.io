@@ -3,6 +3,9 @@ export class HUD {
     this.root        = document.getElementById('hud');
     this.healthBar   = document.getElementById('health-bar');
     this.healthText  = document.getElementById('health-text');
+    this.shieldWrap  = document.getElementById('shield-wrap');
+    this.shieldBar   = document.getElementById('shield-bar');
+    this.shieldText  = document.getElementById('shield-text');
     this.staminaBar  = document.getElementById('stamina-bar');
     this.staminaText = document.getElementById('stamina-text');
     this.fragCount   = document.getElementById('frag-count');
@@ -55,6 +58,16 @@ export class HUD {
     const hpct = Math.max(0, (player.health / player.maxHealth) * 100);
     this.healthBar.style.width  = `${hpct}%`;
     this.healthText.textContent = Math.ceil(player.health);
+
+    // shield — only shown when the player has armor that grants it
+    if (player.maxShield > 0) {
+      this.shieldWrap.classList.remove('hidden');
+      const spct = Math.max(0, (player.shield / player.maxShield) * 100);
+      this.shieldBar.style.width  = `${spct}%`;
+      this.shieldText.textContent = Math.ceil(player.shield);
+    } else {
+      this.shieldWrap.classList.add('hidden');
+    }
 
     const spct = Math.max(0, (player.stamina / player.maxStamina) * 100);
     this.staminaBar.style.width  = `${spct}%`;

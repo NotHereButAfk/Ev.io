@@ -42,6 +42,14 @@ export class DeathEffectManager {
     const preset = PRESETS[ID_PRESET[key] || 'default'];
     const parts = [];
 
+    // expanding shockwave ring at the kill point
+    const ringColor = preset.colors ? preset.colors[0] : 0xffffff;
+    const ringMat = new THREE.MeshBasicMaterial({ color: ringColor, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+    const ringMesh = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.22, 20), ringMat);
+    ringMesh.position.set(position.x, position.y + 0.9, position.z);
+    ringMesh.rotation.x = -Math.PI / 2;
+    this.scene.add(ringMesh);
+
     for (let i = 0; i < N; i++) {
       const hex = preset.colors
         ? preset.colors[i % preset.colors.length]
@@ -64,7 +72,7 @@ export class DeathEffectManager {
       const s = preset.spd * (0.35 + Math.random() * 0.9);
       parts.push({ mesh, mat, vx: sinP * Math.cos(theta) * s, vy: cosP * s, vz: sinP * Math.sin(theta) * s });
     }
-    this._fx.push({ parts, preset, t: 0 });
+    this._fx.push({ parts, preset, t: 0, ring: { mesh: ringMesh, mat: ringMat } });
   }
 
   update(dt) {
@@ -85,11 +93,24 @@ export class DeathEffectManager {
         p.mat.opacity = opacity;
       }
 
+      // shockwave ring expands fast and fades in the first half of the effect
+      if (f.ring) {
+        const rp = Math.min(1, f.t / (f.preset.life * 0.6));
+        const scale = 1 + rp * 7;
+        f.ring.mesh.scale.set(scale, scale, scale);
+        f.ring.mat.opacity = Math.max(0, 0.9 * (1 - rp));
+      }
+
       if (prog >= 1) {
         for (const p of f.parts) {
           this.scene.remove(p.mesh);
           p.mesh.geometry.dispose();
           p.mat.dispose();
+        }
+        if (f.ring) {
+          this.scene.remove(f.ring.mesh);
+          f.ring.mesh.geometry.dispose();
+          f.ring.mat.dispose();
         }
         this._fx.splice(i, 1);
       }

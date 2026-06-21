@@ -9,9 +9,12 @@ const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
 
 const MAX_STAMINA = 100;
-const STAMINA_DRAIN = 28;     // per second while sprinting
-const STAMINA_REGEN = 14;     // per second when idle/walking
-const STAMINA_REGEN_DELAY = 1.2; // seconds before regen kicks in after sprint ends
+const STAMINA_DRAIN = 28;
+const STAMINA_REGEN = 14;
+const STAMINA_REGEN_DELAY = 1.2;
+
+const SHIELD_REGEN      = 6;    // per second
+const SHIELD_REGEN_DELAY = 3.0; // seconds before regen kicks in
 
 export class Player {
   constructor(aspect) {
@@ -29,6 +32,9 @@ export class Player {
     this.maxStamina = MAX_STAMINA;
     this.stamina = MAX_STAMINA;
     this._staminaRegenDelay = 0;
+    this.maxShield = 0;
+    this.shield = 0;
+    this._shieldRegenDelay = 0;
     this.isSprinting = false;
     this.bobTime = 0;
     this.recoilPitch = 0;
@@ -43,16 +49,28 @@ export class Player {
     return this.health <= 0;
   }
 
+  setMaxShield(max) {
+    this.maxShield = max;
+    this.shield = max;
+    this._shieldRegenDelay = 0;
+  }
+
   respawn(position) {
     this.health   = this.maxHealth;
     this.stamina  = this.maxStamina;
+    this.shield   = this.maxShield;
     this._staminaRegenDelay = 0;
+    this._shieldRegenDelay  = 0;
     this.position.copy(position);
     this.velocity.set(0, 0, 0);
   }
 
   takeDamage(amount) {
-    this.health = Math.max(0, this.health - amount);
+    this._shieldRegenDelay = SHIELD_REGEN_DELAY;
+    const absorbed = Math.min(this.shield, amount);
+    this.shield = Math.max(0, this.shield - absorbed);
+    const remaining = amount - absorbed;
+    if (remaining > 0) this.health = Math.max(0, this.health - remaining);
     return this.health <= 0;
   }
 
@@ -93,6 +111,13 @@ export class Player {
       } else {
         this.stamina = Math.min(this.maxStamina, this.stamina + STAMINA_REGEN * dt);
       }
+    }
+
+    // shield regen
+    if (this._shieldRegenDelay > 0) {
+      this._shieldRegenDelay = Math.max(0, this._shieldRegenDelay - dt);
+    } else if (this.shield < this.maxShield) {
+      this.shield = Math.min(this.maxShield, this.shield + SHIELD_REGEN * dt);
     }
 
     const len = Math.hypot(moveX, moveZ);

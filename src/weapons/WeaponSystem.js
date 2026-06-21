@@ -50,6 +50,8 @@ export class WeaponSystem {
     this.tracers = [];
     this.rockets = [];
     this.explosions = [];
+    this.shells = [];
+    this._idleT = 0;
     this.weaponSkin = null;
     this.swordSkin = null;
     this.animTime = 0;
@@ -210,6 +212,12 @@ export class WeaponSystem {
       this.scene.remove(e.light);
     }
     this.explosions.length = 0;
+    for (const s of this.shells) {
+      this.scene.remove(s.mesh);
+      s.mesh.geometry.dispose();
+      s.mesh.material.dispose();
+    }
+    this.shells.length = 0;
   }
 
   startReload() {
@@ -250,6 +258,40 @@ export class WeaponSystem {
     this.camera.worldToLocal(muzzleWorld);
     this.flashLight.position.copy(muzzleWorld);
     this._flashTimer = FLASH_LIFE;
+  }
+
+  _spawnShell() {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xd4a520, roughness: 0.28, metalness: 0.9 });
+    const geo = new THREE.CylinderGeometry(0.0048, 0.0035, 0.02, 6);
+    const mesh = new THREE.Mesh(geo, mat);
+    const muzzleWorld = new THREE.Vector3();
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    mesh.position.copy(muzzleWorld).addScaledVector(right, 0.12).addScaledVector(up, -0.05);
+    this.scene.add(mesh);
+    const vel = right.clone().multiplyScalar(2.8 + Math.random() * 1.4);
+    vel.addScaledVector(up, 1.8 + Math.random() * 1.0);
+    vel.x += (Math.random() - 0.5) * 0.8;
+    vel.z += (Math.random() - 0.5) * 0.8;
+    this.shells.push({ mesh, vel, life: 0.55 });
+  }
+
+  _updateShells(dt) {
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const s = this.shells[i];
+      s.vel.y -= 14 * dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.rotation.x += dt * 18;
+      s.mesh.rotation.z += dt * 14;
+      s.life -= dt;
+      if (s.life <= 0) {
+        this.scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        s.mesh.material.dispose();
+        this.shells.splice(i, 1);
+      }
+    }
   }
 
   _doHitscanShot(world, botMeshes) {
@@ -484,10 +526,12 @@ export class WeaponSystem {
       this._spawnRocket(def);
     } else {
       this._doHitscanShot(world, botMeshes);
+      this._spawnShell();
     }
     this._flash();
 
     this.kickPos.z += def.recoil * 2.2;
+    this.kickPos.y += def.recoil * 0.4;
     this.kickRotX -= def.recoil * 3.2;
     if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
 
@@ -541,15 +585,45 @@ export class WeaponSystem {
     this.kickGroup.position.set(this.kickPos.x, this.kickPos.y, this.kickPos.z);
     this.kickGroup.rotation.x = this.kickRotX;
 
-    // sword swing animation (overrides kick rotation/position while active)
+    // sword swing animation — windup → fast diagonal slash → recover
     if (def.kind === 'melee' && this.swingPhase < 1) {
       this.swingPhase = Math.min(1, this.swingPhase + dt / def.fireRate);
-      const s = Math.sin(this.swingPhase * Math.PI);
-      this.kickGroup.rotation.y = -0.7 + s * 1.1;
-      this.kickGroup.rotation.x = -s * 0.4;
-      this.kickGroup.position.z = -s * 0.18;
+      const ph = this.swingPhase;
+      if (ph < 0.22) {
+        // windup: raise blade up and back
+        const w = ph / 0.22;
+        this.kickGroup.rotation.y = -0.7 - w * 0.5;
+        this.kickGroup.rotation.x = w * 0.55;
+        this.kickGroup.rotation.z = -w * 0.4;
+        this.kickGroup.position.z = w * 0.12;
+      } else if (ph < 0.5) {
+        // slash: snap down-across fast
+        const s = (ph - 0.22) / 0.28;
+        const e = s * s * (3 - 2 * s); // smoothstep
+        this.kickGroup.rotation.y = -1.2 + e * 2.0;
+        this.kickGroup.rotation.x = 0.55 - e * 1.1;
+        this.kickGroup.rotation.z = -0.4 + e * 0.9;
+        this.kickGroup.position.z = 0.12 - e * 0.3;
+      } else {
+        // recover back to rest
+        const r = (ph - 0.5) / 0.5;
+        const e = r * r * (3 - 2 * r);
+        this.kickGroup.rotation.y = 0.8 - e * 1.5;
+        this.kickGroup.rotation.x = -0.55 + e * 0.55;
+        this.kickGroup.rotation.z = 0.5 - e * 0.5;
+        this.kickGroup.position.z = -0.18 + e * 0.18;
+      }
     } else if (def.kind === 'melee') {
       this.kickGroup.rotation.y = -0.7;
+    }
+
+    // idle breathing / weapon settle (subtle, only when not mid-swing or kicking)
+    this._idleT += dt;
+    if (def.kind !== 'melee') {
+      const breathe = Math.sin(this._idleT * 1.6) * 0.004;
+      const swayB   = Math.cos(this._idleT * 1.1) * 0.003;
+      this.kickGroup.position.y += breathe;
+      this.kickGroup.rotation.z = swayB;
     }
 
     // viewmodel sway based on mouse movement (weighty feel)
@@ -581,9 +655,10 @@ export class WeaponSystem {
       }
     }
 
-    // rockets + explosions
+    // rockets + explosions + ejected shells
     this._updateRockets(dt, world, botManager);
     this._updateExplosions(dt);
+    this._updateShells(dt);
 
     // skin animations (only on the currently visible weapon)
     this.animTime += dt;

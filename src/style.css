@@ -423,9 +423,31 @@ html, body {
   text-align: right;
 }
 
-#stamina-wrap {
+#shield-wrap {
   left: 22px;
   bottom: 68px;
+}
+
+.shield-icon {
+  color: #4aa8ff;
+  font-size: 17px;
+}
+
+.shield-fill {
+  background: linear-gradient(90deg, #2a6ad4, #5ab0ff);
+  transition: width 0.12s ease;
+}
+
+#shield-text {
+  font-weight: 700;
+  width: 30px;
+  text-align: right;
+  color: #5ab0ff;
+}
+
+#stamina-wrap {
+  left: 22px;
+  bottom: 114px;
 }
 
 .stamina-icon {
@@ -452,7 +474,7 @@ html, body {
 
 #grenade-wrap {
   left: 22px;
-  bottom: 114px;
+  bottom: 160px;
   gap: 14px;
   padding: 8px 14px;
 }
