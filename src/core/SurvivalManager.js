@@ -24,7 +24,7 @@ export class SurvivalManager {
     this.gameOver      = false;
 
     // Callbacks — set by Game.js before calling update()
-    this.onWaveStart  = null; // (wave, count, hpMult, speedMult) => void
+    this.onWaveStart  = null; // (wave, count, hpMult, speedMult, armedRatio) => void
     this.onWaveClear  = null; // (wave) => void
     this.onRevive     = null; // () => void
     this.onGameOver   = null; // () => void
@@ -56,7 +56,16 @@ export class SurvivalManager {
     const count     = 4 + (this.wave - 1) * 2;          // wave1=4, wave2=6, …
     const hpMult    = 1 + (this.wave - 1) * 0.25;        // +25 % HP per wave
     const speedMult = 1 + (this.wave - 1) * 0.07;        // +7 % speed per wave
-    this.onWaveStart?.(this.wave, count, hpMult, speedMult);
+
+    // Armed escalation: waves 1-5 = melee only, 6-8 = 20% pistols,
+    // 9-11 = 40%, 12-14 = 60% rifle mix, 15+ = 80% heavy mix
+    let armedRatio = 0;
+    if      (this.wave >= 15) armedRatio = 0.80;
+    else if (this.wave >= 12) armedRatio = 0.60;
+    else if (this.wave >=  9) armedRatio = 0.40;
+    else if (this.wave >=  6) armedRatio = 0.20;
+
+    this.onWaveStart?.(this.wave, count, hpMult, speedMult, armedRatio);
   }
 
   _waveClear() {

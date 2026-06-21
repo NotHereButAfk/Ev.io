@@ -5,7 +5,16 @@ const ATTACK_RADIUS  = 1.7;
 const ATTACK_COOLDOWN = 1.5;
 const RADIUS = 0.5;
 
+// Ranged attack configs per weapon type
+const ARMED_CFG = {
+  pistol:  { stopRange: 7,  chaseRange: 13, cooldown: 2.0,  damage: 8,  accuracy: 0.68, color: 0x2a2a2a },
+  rifle:   { stopRange: 11, chaseRange: 17, cooldown: 1.1,  damage: 12, accuracy: 0.80, color: 0x1a1a1a },
+  shotgun: { stopRange: 5,  chaseRange: 11, cooldown: 2.4,  damage: 22, accuracy: 0.55, color: 0x3d2a10 },
+};
+
 let _nextId = 5000;
+
+// ─── Mesh builders ────────────────────────────────────────────────────────────
 
 function buildZombieMesh() {
   const group = new THREE.Group();
@@ -43,21 +52,28 @@ function buildZombieMesh() {
   const torsoBg = Cap(0.28, 0.48, ragMat); torsoBg.position.y = 1.56; group.add(torsoBg);
   const wound   = B(0.14, 0.09, 0.06, darkMat); wound.position.set(-0.09, 1.61, -0.17); group.add(wound);
 
-  // Arms — outstretched forward (zombie reach pose)
-  [[-1, -0.38], [1, 0.38]].forEach(([, ax]) => {
+  // Arms — outstretched for melee, adjusted at arm attachment point for armed
+  const armGroups = [];
+  [[-1, -0.38], [1, 0.38]].forEach(([side, ax]) => {
+    const armGroup = new THREE.Group();
+    armGroup.position.set(ax, 1.56, -0.14);
+
     const uArm = Cap(0.09, 0.34, fleshMat);
-    uArm.position.set(ax, 1.56, -0.14);
+    uArm.position.set(0, 0, 0);
     uArm.rotation.x = -0.55;
-    group.add(uArm);
+    armGroup.add(uArm);
 
     const fArm = Cap(0.08, 0.28, fleshMat);
-    fArm.position.set(ax, 1.32, -0.32);
+    fArm.position.set(0, -0.24, -0.18);
     fArm.rotation.x = -0.28;
-    group.add(fArm);
+    armGroup.add(fArm);
 
     const hand = B(0.17, 0.14, 0.18, fleshMat);
-    hand.position.set(ax, 1.13, -0.42);
-    group.add(hand);
+    hand.position.set(0, -0.43, -0.28);
+    armGroup.add(hand);
+
+    group.add(armGroup);
+    armGroups.push({ side, group: armGroup });
   });
 
   // Neck
@@ -81,7 +97,48 @@ function buildZombieMesh() {
 
   group.traverse(obj => { if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; } });
 
-  return { group, bodyMat: ragMat, torso: torsoBg, head };
+  // Right arm group = index 1 (side=1)
+  const rightArmGroup = armGroups[1].group;
+
+  return { group, bodyMat: ragMat, torso: torsoBg, head, rightArmGroup };
+}
+
+function buildGunMesh(type) {
+  const group = new THREE.Group();
+  const gunMat  = new THREE.MeshStandardMaterial({ color: ARMED_CFG[type].color, roughness: 0.55, metalness: 0.85 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.88, metalness: 0.05 });
+  const B = (w, h, d, m) => { const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); return mesh; };
+
+  let muzzleOffset; // local Z of barrel tip (negative = forward)
+
+  if (type === 'pistol') {
+    const body   = B(0.065, 0.075, 0.20, gunMat); body.position.z = -0.04; group.add(body);
+    const barrel = B(0.030, 0.028, 0.14, gunMat); barrel.position.set(0, 0.028, -0.17); group.add(barrel);
+    const grip   = B(0.052, 0.11,  0.05, gunMat); grip.position.set(0, -0.082, -0.02); group.add(grip);
+    muzzleOffset = new THREE.Vector3(0, 0.028, -0.245);
+  } else if (type === 'rifle') {
+    const body   = B(0.060, 0.065, 0.36, gunMat); body.position.z = -0.07; group.add(body);
+    const barrel = B(0.026, 0.026, 0.20, gunMat); barrel.position.set(0, 0.026, -0.29); group.add(barrel);
+    const stock  = B(0.055, 0.050, 0.15, woodMat); stock.position.set(0, -0.01, 0.115); group.add(stock);
+    const grip   = B(0.044, 0.10,  0.044, gunMat); grip.position.set(0, -0.072, 0.01); group.add(grip);
+    const mag    = B(0.030, 0.08,  0.032, gunMat); mag.position.set(0, -0.08, -0.04); group.add(mag);
+    muzzleOffset = new THREE.Vector3(0, 0.026, -0.39);
+  } else { // shotgun
+    const body   = B(0.075, 0.075, 0.28, gunMat); body.position.z = -0.04; group.add(body);
+    const barrel = B(0.065, 0.040, 0.12, gunMat); barrel.position.set(0, 0.035, -0.22); group.add(barrel);
+    const stock  = B(0.065, 0.055, 0.15, woodMat); stock.position.set(0, -0.01, 0.105); group.add(stock);
+    const grip   = B(0.055, 0.10,  0.048, gunMat); grip.position.set(0, -0.082, 0.005); group.add(grip);
+    muzzleOffset = new THREE.Vector3(0, 0.035, -0.285);
+  }
+
+  // Muzzle flash light (off by default)
+  const flash = new THREE.PointLight(0xff8822, 0, 4, 2);
+  flash.position.copy(muzzleOffset);
+  group.add(flash);
+
+  group.traverse(obj => { if (obj.isMesh) { obj.castShadow = false; } });
+
+  return { group, flash, muzzleOffset };
 }
 
 function buildHealthBar() {
@@ -97,15 +154,25 @@ function buildHealthBar() {
   return { group, fg };
 }
 
+// ─── Zombie class ─────────────────────────────────────────────────────────────
+
 export class Zombie {
-  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1) {
+  /**
+   * @param {object}       world
+   * @param {THREE.Vector3} spawnPoint
+   * @param {number}       hpMult
+   * @param {number}       speedMult
+   * @param {number}       wave
+   * @param {string|null}  armedType  — null | 'pistol' | 'rifle' | 'shotgun'
+   */
+  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null) {
     this.id           = _nextId++;
     this.world        = world;
     this.maxHealth    = Math.round(80 * hpMult);
     this.health       = this.maxHealth;
     this.alive        = true;
     this.noRespawn    = true;
-    this.attackCooldown = 0;
+    this.attackCooldown  = 0;
     this.flashTimer   = 0;
     this.wanderTarget = spawnPoint.clone();
     this.wanderCooldown = 0;
@@ -117,15 +184,43 @@ export class Zombie {
     this._deathSide   = 1;
     this._deathBaseY  = 0;
 
+    // Armed state
+    this.armedType     = armedType;
+    this.shootCooldown = 0;
+    this._muzzleFlash  = null; // PointLight ref
+
     this.position = spawnPoint.clone();
 
-    const { group, bodyMat, torso, head } = buildZombieMesh();
-    this.mesh    = group;
-    this.bodyMat = bodyMat;
-    this.torso   = torso;
-    this.head    = head;
+    const { group, bodyMat, torso, head, rightArmGroup } = buildZombieMesh();
+    this.mesh         = group;
+    this.bodyMat      = bodyMat;
+    this.torso        = torso;
+    this.head         = head;
     this.mesh.userData.bot = this;
     this.mesh.traverse(obj => { obj.userData.bot = this; });
+
+    // Attach gun to right arm if armed
+    if (armedType) {
+      const { group: gunGroup, flash } = buildGunMesh(armedType);
+      // Position gun at hand level, pointing forward (-Z in arm-local space)
+      gunGroup.position.set(0.0, -0.52, -0.32);
+      gunGroup.rotation.set(-0.18, 0, 0);
+      rightArmGroup.add(gunGroup);
+      this._muzzleFlash = flash;
+
+      // Raise right arm into aiming pose
+      rightArmGroup.rotation.x = 0.3;
+
+      // Armed zombies have a bit more HP
+      this.maxHealth = Math.round(this.maxHealth * 1.2);
+      this.health    = this.maxHealth;
+
+      // Armed zombies deal less melee damage (they prefer to shoot)
+      this.attackDamage = Math.round(this.attackDamage * 0.6);
+
+      const cfg = ARMED_CFG[armedType];
+      this.shootCooldown = cfg.cooldown * (0.5 + Math.random() * 0.5); // stagger initial shot
+    }
 
     const { group: hpGroup, fg } = buildHealthBar();
     this.healthBarFg    = fg;
@@ -151,9 +246,29 @@ export class Zombie {
     this._deathSide  = Math.random() < 0.5 ? 1 : -1;
     this._deathBaseY = this.mesh.position.y;
     this.healthBarGroup.visible = false;
+    if (this._muzzleFlash) this._muzzleFlash.intensity = 0;
+  }
+
+  _fireAt(player, onAttack) {
+    const cfg = ARMED_CFG[this.armedType];
+    if (Math.random() < cfg.accuracy) {
+      onAttack(cfg.damage);
+    }
+    // Muzzle flash
+    if (this._muzzleFlash) {
+      this._muzzleFlash.intensity = 5.5;
+      this._flashTimer = 0.09;
+    }
+    this.shootCooldown = cfg.cooldown;
   }
 
   update(dt, player, camera, onAttack) {
+    // Muzzle flash decay
+    if (this._muzzleFlash && this._flashTimer > 0) {
+      this._flashTimer -= dt;
+      if (this._flashTimer <= 0) this._muzzleFlash.intensity = 0;
+    }
+
     if (this._dying) {
       this._deathT += dt;
       const p = Math.min(1, this._deathT / 0.65);
@@ -197,22 +312,52 @@ export class Zombie {
       this.mesh.scale.setScalar(1);
     }
 
-    if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    if (this.attackCooldown  > 0) this.attackCooldown  -= dt;
+    if (this.shootCooldown   > 0) this.shootCooldown   -= dt;
 
     const toPlayer = new THREE.Vector3(player.position.x - this.position.x, 0, player.position.z - this.position.z);
     const dist = toPlayer.length();
 
     let moveDir = null;
-    if (!player.isDead && dist < DETECT_RADIUS) {
+
+    if (!player.isDead && dist < (this.armedType ? ARMED_CFG[this.armedType].chaseRange : DETECT_RADIUS)) {
       this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
-      if (dist > ATTACK_RADIUS * 0.85) {
-        moveDir = toPlayer.normalize();
-      } else if (this.attackCooldown <= 0) {
-        this.attackCooldown = ATTACK_COOLDOWN;
-        this.lungeTimer = 0.2;
-        onAttack(this.attackDamage);
+
+      if (this.armedType) {
+        const cfg = ARMED_CFG[this.armedType];
+
+        if (dist < ATTACK_RADIUS * 0.9) {
+          // Too close — melee fallback
+          if (this.attackCooldown <= 0) {
+            this.attackCooldown = ATTACK_COOLDOWN;
+            this.lungeTimer = 0.2;
+            onAttack(this.attackDamage);
+          }
+        } else if (dist <= cfg.stopRange) {
+          // In shooting range — stand and fire
+          if (this.shootCooldown <= 0) {
+            this._fireAt(player, onAttack);
+          }
+          // Strafe slightly for realism (small sideways drift)
+          const strafe = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
+          const strafeSign = Math.sin(Date.now() * 0.0007 + this.id) > 0 ? 1 : -1;
+          moveDir = strafe.multiplyScalar(strafeSign * 0.35);
+        } else {
+          // Out of range — chase
+          moveDir = toPlayer.normalize();
+        }
+      } else {
+        // Pure melee
+        if (dist > ATTACK_RADIUS * 0.85) {
+          moveDir = toPlayer.normalize();
+        } else if (this.attackCooldown <= 0) {
+          this.attackCooldown = ATTACK_COOLDOWN;
+          this.lungeTimer = 0.2;
+          onAttack(this.attackDamage);
+        }
       }
-    } else {
+    } else if (!this.armedType) {
+      // Melee wander
       this.wanderCooldown -= dt;
       if (this.wanderCooldown <= 0 || this.position.distanceTo(this.wanderTarget) < 1.5) {
         const r = this.world.arenaHalf - 4;
