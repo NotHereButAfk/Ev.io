@@ -420,7 +420,16 @@ export class Game {
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
 
+    // Build a third-person body mesh matching the player's current loadout
+    if (this._playerBody) this.world.scene.remove(this._playerBody);
+    this._playerBody = buildPreviewCharacter(
+      this.selectedSkin, armorTypeId || this.selectedArmorType || 'assault', this.selectedArmorSkin
+    );
+    this._playerBody.visible = false;
+    this.world.scene.add(this._playerBody);
+
     this.state = 'playing';
+    this.player._camDist = 0;  // always start in FPS on new game
     this.input.requestPointerLock();
     this.audio.startAmbientCity();
   }
@@ -503,6 +512,8 @@ export class Game {
   _quitToMenu() {
     if (this.state === 'playing') this._saveStats();
     this.audio.stopAmbientCity();
+    if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
     this.state = 'menu';
     this.menu.hidePause();
     this.menu.hideGameOver();
@@ -632,6 +643,17 @@ export class Game {
 
     this.player.update(dt, this.input, this.world);
     this.player.camera.updateMatrixWorld(true);
+
+    // Sync third-person body mesh and hide/show viewmodel
+    const inTPS = this.player._camDist > 0;
+    if (this._playerBody) {
+      this._playerBody.visible = inTPS;
+      if (inTPS) {
+        this._playerBody.position.copy(this.player.position);
+        this._playerBody.rotation.y = this.player.yaw + Math.PI; // face same direction as camera
+      }
+    }
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
     // While downed in survival, block all shooting/weapon use
     if (!this._playerDowned) {

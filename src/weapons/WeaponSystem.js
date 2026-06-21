@@ -712,7 +712,8 @@ export class WeaponSystem {
     for (const [code, index] of this.keyMap) {
       if (input.consumeJustPressed(code)) this.switchTo(index);
     }
-    if (input.wheelDelta !== 0) {
+    // Scroll switches weapons only in FPS mode; in TPS the wheel zooms the camera.
+    if (input.wheelDelta !== 0 && !(player?._camDist > 0)) {
       const dir = input.wheelDelta > 0 ? 1 : -1;
       this.switchTo((this.currentIndex + dir + this.loadout.length) % this.loadout.length);
     }

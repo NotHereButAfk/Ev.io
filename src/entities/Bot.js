@@ -9,98 +9,124 @@ const RADIUS = 0.5;
 
 let nextId = 1;
 
+// Three distinct hostile soldier archetypes with visible human faces + layered armour.
+const BOT_TYPES = [
+  { primary: 0x5c1010, secondary: 0x100304, trim: 0x2a1010, visor: 0xff2200 }, // Crimson Hunter
+  { primary: 0x102040, secondary: 0x060c18, trim: 0x1a2a3a, visor: 0x00aaff }, // Steel Ghost
+  { primary: 0x182810, secondary: 0x080e04, trim: 0x1e3010, visor: 0x44ff22 }, // Forest Stalker
+];
+let _botTypeIdx = 0; // round-robin so each new bot picks the next type
+
 function buildBotMesh() {
+  const cfg = BOT_TYPES[_botTypeIdx++ % BOT_TYPES.length];
+
+  // Materials
+  const skinMat  = new THREE.MeshStandardMaterial({ color: 0xc49a72, roughness: 0.78, metalness: 0 });
+  const suitMat  = new THREE.MeshStandardMaterial({ color: cfg.secondary, roughness: 0.84, metalness: 0.06 });
+  const armorMat = new THREE.MeshStandardMaterial({ color: cfg.primary,   roughness: 0.50, metalness: 0.58 });
+  const trimMat  = new THREE.MeshStandardMaterial({ color: cfg.trim,      roughness: 0.40, metalness: 0.72 });
+  const visorMat = new THREE.MeshStandardMaterial({
+    color: cfg.visor, emissive: cfg.visor, emissiveIntensity: 1.4,
+    roughness: 0.04, metalness: 0, transparent: true, opacity: 0.86
+  });
+  const eyeMat   = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9, metalness: 0 });
+  const lipMat   = new THREE.MeshStandardMaterial({ color: 0x8a5252, roughness: 0.9, metalness: 0 });
+
   const group = new THREE.Group();
 
-  // Corrupted sci-fi trooper — dark armour, cracked red visor
-  const armorMat  = new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 0.58, metalness: 0.55 });
-  const suitMat   = new THREE.MeshStandardMaterial({ color: 0x0d0e10, roughness: 0.82, metalness: 0.08 });
-  const eyeMat    = new THREE.MeshStandardMaterial({ color: 0xff2200, roughness: 0.1,  metalness: 0.0,
-                                                     emissive: 0xff2200, emissiveIntensity: 1.2 });
-  const trimMat   = new THREE.MeshStandardMaterial({ color: 0x3a3a42, roughness: 0.4,  metalness: 0.7  });
+  function B(w,h,d,m)  { return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m); }
+  function Cap(r,h,m)  { return new THREE.Mesh(new THREE.CapsuleGeometry(r,h,6,10), m); }
+  function Sph(r,m)    { return new THREE.Mesh(new THREE.SphereGeometry(r,10,8), m); }
+  function add(mesh,x,y,z){ mesh.position.set(x,y,z); group.add(mesh); return mesh; }
 
-  function B(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); }
-  function Cap(r, h, mat)  { return new THREE.Mesh(new THREE.CapsuleGeometry(r, h, 6, 10), mat); }
-  function C(r, h, mat)    { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 10), mat); return m; }
-
-  // Boots
+  // ── Boots ─────────────────────────────────────────────────────────────────
   [[-0.15], [0.15]].forEach(([bx]) => {
-    const boot = B(0.2, 0.22, 0.3, armorMat); boot.position.set(bx, 0.11, 0.02); group.add(boot);
-    const sole = B(0.22, 0.04, 0.32, trimMat); sole.position.set(bx, 0.01, 0.02); group.add(sole);
-    const ankle = B(0.22, 0.09, 0.28, armorMat); ankle.position.set(bx, 0.23, 0.01); group.add(ankle);
+    add(B(0.21,0.22,0.31,armorMat), bx,  0.11,  0.02);
+    add(B(0.23,0.04,0.33,trimMat),  bx,  0.01,  0.02);
+    add(B(0.23,0.09,0.29,armorMat), bx,  0.23,  0.01);
   });
 
-  // Lower legs
-  [[-0.15], [0.15]].forEach(([lx]) => {
-    const shin = Cap(0.1, 0.38, suitMat); shin.position.set(lx, 0.54, 0); group.add(shin);
-    const greave = B(0.18, 0.38, 0.07, armorMat); greave.position.set(lx, 0.54, -0.1); group.add(greave);
-    const knee = B(0.22, 0.14, 0.16, armorMat); knee.position.set(lx, 0.77, -0.06); group.add(knee);
+  // ── Lower legs ────────────────────────────────────────────────────────────
+  [[-0.15],[0.15]].forEach(([lx]) => {
+    add(Cap(0.095,0.38,suitMat),    lx,  0.53,  0);
+    add(B(0.17,0.38,0.06,armorMat), lx,  0.53, -0.1);
+    add(B(0.21,0.13,0.15,armorMat), lx,  0.76, -0.06);
   });
 
-  // Thighs
-  [[-0.15, -1], [0.15, 1]].forEach(([tx, side]) => {
-    const thigh = Cap(0.13, 0.36, suitMat); thigh.position.set(tx, 1.04, 0); group.add(thigh);
-    const plate = B(0.14, 0.34, 0.1, armorMat); plate.position.set(tx - side * 0.12, 1.04, 0); group.add(plate);
+  // ── Thighs ────────────────────────────────────────────────────────────────
+  [[-0.15,-1],[0.15,1]].forEach(([tx,s]) => {
+    add(Cap(0.12,0.36,suitMat),         tx,             1.04, 0);
+    add(B(0.14,0.34,0.1,armorMat),      tx-s*0.13,      1.04, 0);
+    add(B(0.12,0.006,0.1,trimMat),      tx-s*0.13,      1.14, 0);
   });
 
-  // Hips
-  const hip = B(0.46, 0.12, 0.28, armorMat); hip.position.set(0, 1.22, 0); group.add(hip);
-  const belt = B(0.48, 0.07, 0.3, suitMat);  belt.position.set(0, 1.27, 0); group.add(belt);
+  // ── Hips ──────────────────────────────────────────────────────────────────
+  add(B(0.47,0.12,0.29,armorMat), 0, 1.21, 0);
+  add(B(0.49,0.07,0.31,suitMat),  0, 1.27, 0);
 
-  // Torso — hunched slightly (rotation applied to whole group later)
-  const torsoBg = Cap(0.3, 0.52, suitMat);  torsoBg.position.y = 1.57; group.add(torsoBg);
-  const chest   = B(0.52, 0.52, 0.1, armorMat); chest.position.set(0, 1.57, -0.18); group.add(chest);
-  const groove  = B(0.024, 0.48, 0.014, trimMat); groove.position.set(0, 1.57, -0.238); group.add(groove);
-  const back    = B(0.5, 0.46, 0.09, armorMat);  back.position.set(0, 1.57, 0.18); group.add(back);
-  const collar  = B(0.32, 0.09, 0.32, armorMat); collar.position.set(0, 1.86, 0); group.add(collar);
+  // ── Torso (body + layered plates) ─────────────────────────────────────────
+  add(Cap(0.28,0.50,suitMat),          0, 1.56,  0);     // undersuit body
+  add(B(0.51,0.51,0.10,armorMat),      0, 1.56, -0.18);  // front chest plate
+  add(B(0.025,0.47,0.014,trimMat),     0, 1.56, -0.237); // centre groove
+  [-0.16,0.16].forEach((px) => add(B(0.17,0.18,0.016,armorMat), px, 1.64, -0.192));
+  add(B(0.49,0.44,0.09,armorMat),      0, 1.56,  0.18);  // back plate
+  add(B(0.31,0.08,0.31,armorMat),      0, 1.85,  0);     // collar
 
-  // Pauldrons
-  [[-1, -0.35], [1, 0.35]].forEach(([side, ax]) => {
-    const socket = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), suitMat);
-    socket.position.set(ax, 1.77, 0); group.add(socket);
-    const pau = B(0.24, 0.22, 0.34, armorMat); pau.position.set(ax * 1.26, 1.77, 0); group.add(pau);
-    const pauTop = B(0.26, 0.07, 0.36, armorMat); pauTop.position.set(ax * 1.26, 1.88, 0); group.add(pauTop);
+  // ── Pauldrons ─────────────────────────────────────────────────────────────
+  [[-1,-0.35],[1,0.35]].forEach(([s,ax]) => {
+    const sock = Sph(0.11,suitMat); sock.position.set(ax,1.76,0); group.add(sock);
+    add(B(0.23,0.21,0.33,armorMat), s*0.44, 1.76, 0);
+    add(B(0.26,0.06,0.35,armorMat), s*0.44, 1.87, 0);
+    add(B(0.008,0.19,0.33,visorMat),s*0.555,1.76, 0);   // coloured shoulder stripe
   });
 
-  // Arms — extended slightly outward (zombie menace pose)
-  [[-1, -0.4], [1, 0.4]].forEach(([side, ax]) => {
-    const uArm = Cap(0.095, 0.34, suitMat); uArm.position.set(ax, 1.52, 0); group.add(uArm);
-    const elbow = B(0.18, 0.12, 0.18, armorMat); elbow.position.set(ax, 1.3, 0); group.add(elbow);
-    const fArm = Cap(0.085, 0.28, suitMat); fArm.position.set(ax, 1.1, 0); group.add(fArm);
-    const vambrace = B(0.17, 0.28, 0.06, armorMat); vambrace.position.set(ax, 1.1, -0.09); group.add(vambrace);
-    const glove = B(0.19, 0.15, 0.17, suitMat); glove.position.set(ax, 0.86, 0); group.add(glove);
+  // ── Arms ──────────────────────────────────────────────────────────────────
+  [[-1,-0.38],[1,0.38]].forEach(([s,ax]) => {
+    add(Cap(0.09,0.34,suitMat),     ax, 1.52, 0);
+    add(B(0.18,0.12,0.18,armorMat), ax, 1.31, 0);   // elbow guard
+    add(Cap(0.08,0.28,suitMat),     ax, 1.10, 0);
+    add(B(0.16,0.28,0.06,armorMat), ax, 1.10,-0.09);// vambrace
+    add(B(0.18,0.14,0.16,skinMat),  ax, 0.85, 0);   // bare hand / glove
   });
 
-  // Helmet — boxy, battle-scarred
-  const helmMain = B(0.4, 0.44, 0.42, armorMat); helmMain.position.y = 2.05; group.add(helmMain);
-  const helmTop  = B(0.34, 0.1, 0.38, armorMat); helmTop.position.y  = 2.27; group.add(helmTop);
-  const crest    = B(0.05, 0.09, 0.4, trimMat);  crest.position.set(0, 2.33, 0); group.add(crest);
-  [-1, 1].forEach((s) => {
-    const cheek = B(0.07, 0.22, 0.32, armorMat); cheek.position.set(s * 0.235, 2.0, 0); group.add(cheek);
+  // ── Human head (visible face + tactical helmet on top) ────────────────────
+  // Neck
+  const neck = Cap(0.075,0.12,skinMat); neck.position.set(0,1.90,0); group.add(neck);
+
+  // Skull — slightly oval
+  const skull = Sph(0.20,skinMat); skull.scale.set(1,1.05,0.96);
+  skull.position.set(0,2.10,0); group.add(skull);
+
+  // Brow ridge
+  add(B(0.28,0.06,0.06,skinMat), 0, 2.22,-0.17);
+
+  // Eyes (dark irises set into the face)
+  [-0.07,0.07].forEach((ex) => {
+    add(Sph(0.024,eyeMat), ex, 2.12,-0.185);
   });
-  const chin = B(0.3, 0.1, 0.1, armorMat); chin.position.set(0, 1.84, -0.17); group.add(chin);
-  const helmBack = B(0.36, 0.4, 0.08, armorMat); helmBack.position.set(0, 2.05, 0.25); group.add(helmBack);
-  const neckSeal = C(0.145, 0.06, suitMat); neckSeal.position.y = 1.88; group.add(neckSeal);
 
-  // Red cracked visor — enemy signature
-  const visor = B(0.36, 0.11, 0.06, eyeMat); visor.position.set(0, 2.1, -0.22); group.add(visor);
-  const visorSlot = B(0.38, 0.13, 0.02, suitMat); visorSlot.position.set(0, 2.1, -0.2); group.add(visorSlot);
-  // Crack detail
-  const crack = B(0.006, 0.13, 0.008, suitMat); crack.position.set(0.08, 2.1, -0.228); crack.rotation.z = 0.3; group.add(crack);
+  // Nose bridge
+  add(B(0.035,0.06,0.05,skinMat), 0, 2.05,-0.20);
 
-  // Expose bodyMat alias so health-damage tinting still works
-  const bodyMat = armorMat;
-  const torso   = torsoBg;
-  const head    = helmMain;
+  // Mouth / lips
+  add(B(0.09,0.025,0.02,lipMat), 0, 1.97,-0.197);
 
+  // Low-profile combat helmet (sits on top of skull)
+  add(B(0.40,0.14,0.40,armorMat), 0, 2.27,  0);
+  add(B(0.42,0.05,0.24,armorMat), 0, 2.20, -0.12); // visor brim
+  add(B(0.36,0.11,0.045,visorMat),0, 2.12, -0.22); // glowing visor strip
+  add(B(0.38,0.13,0.02,suitMat),  0, 2.12, -0.20); // visor slot shadow
+  // Ear cheek guards
+  [-1,1].forEach((s) => add(B(0.06,0.20,0.28,armorMat), s*0.23, 2.07, 0));
+  // Helmet back
+  add(B(0.36,0.26,0.08,armorMat), 0, 2.18,  0.24);
+
+  // ── Shadow + light casting on all meshes ──────────────────────────────────
   group.traverse((obj) => {
-    if (obj.isMesh) {
-      obj.castShadow   = true;
-      obj.receiveShadow = true;
-    }
+    if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
   });
 
-  return { group, bodyMat, torso, head };
+  return { group, bodyMat: armorMat, torso: skull, head: skull };
 }
 
 function buildHealthBar() {

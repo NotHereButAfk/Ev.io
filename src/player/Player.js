@@ -45,9 +45,13 @@ export class Player {
     this.sensitivityMult = 1.0;
     this.audio = null;
 
+    // Third-person camera
+    this._camDist = 0;           // 0 = FPS, >0 = TPS metres
+    this._tpsTarget = new THREE.Vector3();
+
     // Sound state
     this._wasOnGround = true;
-    this._stepPhase = 0; // tracks bob cycle for footstep timing
+    this._stepPhase = 0;
     this._lastBobSign = 1;
   }
 
@@ -85,6 +89,11 @@ export class Player {
   }
 
   update(dt, input, world) {
+    // --- third-person camera zoom (scroll wheel) ---
+    if (input.wheelDelta !== 0) {
+      this._camDist = THREE.MathUtils.clamp(this._camDist + input.wheelDelta * 0.9, 0, 6.0);
+    }
+
     // --- look ---
     this.yaw -= input.mouseDX * MOUSE_SENSITIVITY * this.sensitivityMult;
     this.pitch -= input.mouseDY * MOUSE_SENSITIVITY * this.sensitivityMult;
@@ -98,13 +107,13 @@ export class Player {
     // --- movement input ---
     let moveX = 0;
     let moveZ = 0;
-    if (input.isDown('KeyW')) moveZ -= 1;
-    if (input.isDown('KeyS')) moveZ += 1;
+    if (input.isDown('KeyW')) moveZ += 1;   // forward
+    if (input.isDown('KeyS')) moveZ -= 1;   // backward
     if (input.isDown('KeyA')) moveX -= 1;
     if (input.isDown('KeyD')) moveX += 1;
 
     const moving = moveX !== 0 || moveZ !== 0;
-    this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ < 0 && this.stamina > 2;
+    this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ > 0 && this.stamina > 2;
 
     // stamina drain / regen
     if (this.isSprinting) {
@@ -187,10 +196,28 @@ export class Player {
     const bobOffset = Math.sin(this.bobTime) * bobAmount;
 
     // --- apply to camera ---
-    this.camera.position.set(this.position.x, this.position.y + EYE_HEIGHT + bobOffset, this.position.z);
-    this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch + this.recoilPitch;
-    this.camera.rotation.z = 0;
+    if (this._camDist > 0) {
+      // Third-person: orbit camera behind and above the player.
+      // "behind" in our coord system = +sin(yaw) X, +cos(yaw) Z (opposite of camera forward).
+      const d   = this._camDist;
+      const sinY = Math.sin(this.yaw);
+      const cosY = Math.cos(this.yaw);
+      // Slight vertical arc based on pitch so looking up lifts the camera.
+      const pitchBlend = Math.sin(Math.max(0, this.pitch) * 0.5);
+      this.camera.position.set(
+        this.position.x + sinY * d * (1 - pitchBlend * 0.4),
+        this.position.y + 1.4 + 0.5 * d * 0.18 + pitchBlend * d * 0.6,
+        this.position.z + cosY * d * (1 - pitchBlend * 0.4)
+      );
+      this._tpsTarget.set(this.position.x, this.position.y + 1.2, this.position.z);
+      this.camera.lookAt(this._tpsTarget);
+    } else {
+      // First-person: camera sits at eye height with head-bob.
+      this.camera.position.set(this.position.x, this.position.y + EYE_HEIGHT + bobOffset, this.position.z);
+      this.camera.rotation.order = 'YXZ';
+      this.camera.rotation.y = this.yaw;
+      this.camera.rotation.x = this.pitch + this.recoilPitch;
+      this.camera.rotation.z = 0;
+    }
   }
 }
