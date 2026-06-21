@@ -25,6 +25,8 @@ import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
+import { preloadPlayerModel } from '../player/PreviewCharacter.js';
+import { preloadWeaponModels } from '../weapons/WeaponModels.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -40,6 +42,10 @@ export class Game {
     this.renderer.toneMappingExposure = 1.05;
 
     GameSettings.load();
+
+    // Kick off Blender GLB fetches immediately so models are ready before first use
+    preloadPlayerModel();
+    preloadWeaponModels();
 
     this.world        = new World();
 

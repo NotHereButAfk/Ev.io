@@ -1,6 +1,65 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ── Blender GLB weapon loader ─────────────────────────────────────────────────
+let _weaponTemplate = null, _weaponLoading = false;
+
+export function preloadWeaponModels() {
+  if (_weaponTemplate || _weaponLoading) return;
+  _weaponLoading = true;
+  new GLTFLoader().load('/weapons.glb',
+    (gltf) => { _weaponTemplate = gltf.scene; _weaponLoading = false; },
+    undefined,
+    (err) => { console.warn('[WeaponGLB] load failed:', err.message); _weaponLoading = false; }
+  );
+}
+
+function _buildFromGLB(weaponDef) {
+  const weaponRoot = _weaponTemplate?.getObjectByName(`weapon_${weaponDef.id}`);
+  if (!weaponRoot) return null;
+
+  const cloned = weaponRoot.clone(true);
+  cloned.position.set(0, 0, 0);
+
+  const color = weaponDef.color ?? 0x2a2a2a;
+  const body  = M('body',   color,    { roughness: 0.55, metalness: 0.35 });
+  const metal = M('metal',  0x808890, { metalness: 0.92, roughness: 0.18 });
+  const dark  = M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
+  const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
+  const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
+                                        clearcoat: 0.8, clearcoatRoughness: 0.08 });
+  const scope = M('special', 0x060a10, { roughness: 0.08, metalness: 0.2,
+                                         clearcoat: 0.9, clearcoatRoughness: 0.05 });
+
+  cloned.traverse(obj => {
+    if (!obj.isMesh) return;
+    const n = (obj.material?.name || '').toLowerCase();
+    if      (n.includes('dark_metal'))  obj.material = dark;
+    else if (n.includes('wood'))        obj.material = wood;
+    else if (n.includes('blade'))       obj.material = blade;
+    else if (n.includes('scope_glass')) obj.material = scope;
+    else if (n.includes('rubber'))      obj.material = body;
+    else if (n.includes('metal') || n.includes('brass')) obj.material = metal;
+    else                                obj.material = body;
+    obj.castShadow = true;
+  });
+
+  // Find muzzle point (Blender auto-renames duplicates to muzzle_point.001 etc.)
+  let muzzle = null;
+  cloned.traverse(obj => { if (!muzzle && /^muzzle_point/.test(obj.name)) muzzle = obj; });
+
+  if (!muzzle) {
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.062, -0.32);
+    cloned.add(muzzle);
+  }
+
+  const group = new THREE.Group();
+  group.add(cloned);
+  return { group, muzzle };
+}
 
 // ---------------------------------------------------------------------------
 // Material helpers
@@ -1501,6 +1560,11 @@ const BUILDERS = {
 };
 
 export function buildWeaponModel(weaponDef) {
+  // Prefer Blender GLB when already loaded
+  const glb = _buildFromGLB(weaponDef);
+  if (glb) return glb;
+
+  // Fall back to procedural
   const builder = BUILDERS[weaponDef.id];
   const { group, muzzle } = builder(weaponDef.color);
   group.traverse((obj) => {

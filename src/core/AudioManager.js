@@ -43,15 +43,23 @@ export class AudioManager {
   playShot(kind = 'rifle') {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    // Per-weapon character: punch (low body), crack (filtered noise), tail.
+    // Per-weapon profile: punch (body tone), crack (filtered noise burst), tail (reverb decay).
+    // Values tuned to match each weapon's real acoustic signature.
     const P = {
-      sidearm: { dur: 0.14, body: 300, crackHz: 3200, tail: 0.10, gain: 0.9 },
-      smg:     { dur: 0.10, body: 250, crackHz: 3600, tail: 0.07, gain: 0.85 },
-      shotgun: { dur: 0.26, body: 130, crackHz: 1900, tail: 0.22, gain: 1.0 },
-      rifle:   { dur: 0.13, body: 220, crackHz: 4200, tail: 0.12, gain: 0.95 },
-      lmg:     { dur: 0.16, body: 170, crackHz: 3000, tail: 0.14, gain: 1.0 },
-      sniper:  { dur: 0.36, body: 100, crackHz: 5200, tail: 0.30, gain: 1.0 },
-      rpg:     { dur: 0.4,  body: 80,  crackHz: 1400, tail: 0.34, gain: 1.0 },
+      // Pistols — tight crack, medium body, short tail
+      sidearm:  { dur: 0.14, body: 310, crackHz: 3400, tail: 0.10, gain: 0.88 },
+      // SMGs — high rate, bright crack, little body
+      smg:      { dur: 0.09, body: 240, crackHz: 3800, tail: 0.06, gain: 0.82 },
+      // Shotgun — low frequency boom, wide crack, long reverb
+      shotgun:  { dur: 0.28, body: 110, crackHz: 1600, tail: 0.26, gain: 1.0  },
+      // Assault rifles — punchy mid body, sharp crack
+      rifle:    { dur: 0.13, body: 230, crackHz: 4500, tail: 0.12, gain: 0.94 },
+      // LMG — heavy sustained body, rumbling tail
+      lmg:      { dur: 0.18, body: 160, crackHz: 2800, tail: 0.16, gain: 1.0  },
+      // Sniper — ultra-low body boom, piercing supersonic crack, very long tail
+      sniper:   { dur: 0.40, body:  85, crackHz: 6000, tail: 0.38, gain: 1.0  },
+      // RPG — deep sub-bass thump (explosion handled by playExplosion separately)
+      rpg:      { dur: 0.42, body:  70, crackHz: 1200, tail: 0.36, gain: 1.0  },
     }[kind] || { dur: 0.13, body: 220, crackHz: 4000, tail: 0.12, gain: 0.95 };
 
     // 1) Transient crack — short bright noise burst (the "snap").

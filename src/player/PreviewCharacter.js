@@ -1,4 +1,56 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ── Blender GLB player model loader ─────────────────────────────────────────
+let _playerTemplate = null, _playerLoading = false;
+
+export function preloadPlayerModel() {
+  if (_playerTemplate || _playerLoading) return;
+  _playerLoading = true;
+  new GLTFLoader().load('/player.glb',
+    (gltf) => { _playerTemplate = gltf.scene; _playerLoading = false; },
+    undefined,
+    (err) => { console.warn('[PlayerGLB] load failed:', err.message); _playerLoading = false; }
+  );
+}
+
+function _buildFromGLB(skin, armorTypeId, armorSkin) {
+  const armorRoot = _playerTemplate?.getObjectByName(`armor_${armorTypeId}`);
+  if (!armorRoot) return null;
+
+  const cloned = armorRoot.clone(true);
+  cloned.position.set(0, 0, 0);
+  // Blender -Y face → Three.js +Z; rotate 180° to match existing -Z facing convention
+  cloned.rotation.y = Math.PI;
+
+  const src = armorSkin || {};
+  const P = new THREE.MeshStandardMaterial({
+    color:             armorSkin ? armorSkin.primary   : skin.primary,
+    roughness:         src.roughness         ?? 0.42,
+    metalness:         src.metalness         ?? 0.52,
+    emissive:          new THREE.Color(src.emissive ?? 0x000000),
+    emissiveIntensity: src.emissiveIntensity ?? 0,
+  });
+  const S = new THREE.MeshStandardMaterial({
+    color:     armorSkin ? armorSkin.secondary : skin.secondary,
+    roughness: (src.roughness ?? 0.72) * 1.3,
+    metalness: (src.metalness ?? 0.18) * 0.35,
+  });
+
+  cloned.traverse(obj => {
+    if (!obj.isMesh || !obj.material) return;
+    const n = obj.material.name || '';
+    if      (n.endsWith('_Primary'))   obj.material = P;
+    else if (n.endsWith('_Secondary')) obj.material = S;
+    // Trim, DarkJoint, Visor materials kept from GLB
+    obj.castShadow = obj.receiveShadow = true;
+  });
+
+  const g = new THREE.Group();
+  g.add(cloned);
+  g.userData = { primaryMat: P, secondaryMat: S, armorTypeId };
+  return g;
+}
 
 // ---------------------------------------------------------------------------
 // Shared fixed materials (not recolored by skins)
@@ -411,6 +463,11 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null) {
+  // Prefer Blender GLB when loaded
+  const glbResult = _buildFromGLB(skin, armorTypeId, armorSkin);
+  if (glbResult) return glbResult;
+
+  // Fall back to procedural
   const g = new THREE.Group();
 
   const src = armorSkin || {};

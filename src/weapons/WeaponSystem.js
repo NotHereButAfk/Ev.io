@@ -342,17 +342,20 @@ export class WeaponSystem {
   }
 
   _flash() {
-    this.flashLight.intensity = 8;
+    const animeActive = this._activeSkinFor?.(this.currentDef?.id)?.shootSound === 'anime';
+    this.flashLight.color.setHex(animeActive ? 0xff69b4 : 0xffcc66);
+    this.flashLight.intensity = animeActive ? 12 : 8;
     const muzzleWorld = new THREE.Vector3();
     this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
     this.camera.worldToLocal(muzzleWorld);
     this.flashLight.position.copy(muzzleWorld);
     this._flashTimer = FLASH_LIFE;
 
-    // Show sprite meshes at muzzle
+    // Show sprite meshes at muzzle (pink tint for anime)
     const muzzleObj = this.models.get(this.currentDef.id).muzzle;
     this._flashMeshes.forEach((m) => {
       muzzleObj.add(m);
+      m.material.color.setHex(animeActive ? 0xff9de0 : 0xfff0a0);
       m.material.opacity = 0.92;
       m.rotation.z += Math.random() * Math.PI;
     });
@@ -373,6 +376,51 @@ export class WeaponSystem {
     vel.x += (Math.random() - 0.5) * 0.8;
     vel.z += (Math.random() - 0.5) * 0.8;
     this.shells.push({ mesh, vel, life: 0.55 });
+  }
+
+  _spawnAnimeSparkles() {
+    if (!this._animeSparkles) this._animeSparkles = [];
+    const colors = [0xff69b4, 0xff1493, 0xffa0d0, 0xffd700, 0xffffff];
+    const muzzleWorld = new THREE.Vector3();
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
+    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    for (let i = 0; i < 8; i++) {
+      const geo = new THREE.SphereGeometry(0.015 + Math.random() * 0.02, 4, 3);
+      const mat = new THREE.MeshBasicMaterial({
+        color: colors[Math.floor(Math.random() * colors.length)],
+        transparent: true, opacity: 1.0, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(muzzleWorld);
+      this.scene.add(mesh);
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 4,
+        1.5 + Math.random() * 3,
+        (Math.random() - 0.5) * 4
+      );
+      vel.addScaledVector(up,    Math.random() * 2.5);
+      vel.addScaledVector(right, (Math.random() - 0.5) * 2);
+      this._animeSparkles.push({ mesh, vel, life: 0.5 + Math.random() * 0.3, spin: Math.random() * 10 });
+    }
+  }
+
+  _updateAnimeSparkles(dt) {
+    if (!this._animeSparkles?.length) return;
+    for (let i = this._animeSparkles.length - 1; i >= 0; i--) {
+      const s = this._animeSparkles[i];
+      s.vel.y -= 8 * dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.rotation.z += s.spin * dt;
+      s.life -= dt;
+      s.mesh.material.opacity = Math.max(0, s.life / 0.5);
+      if (s.life <= 0) {
+        this.scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        s.mesh.material.dispose();
+        this._animeSparkles.splice(i, 1);
+      }
+    }
   }
 
   _updateShells(dt) {
@@ -620,7 +668,8 @@ export class WeaponSystem {
     st.magAmmo -= 1;
     this.fireTimer = def.fireRate;
     // A themed skin can override the fire SFX (anime pew, laser, fire whoosh).
-    const skinSound = this._activeSkinFor(def.id)?.shootSound;
+    const activeSkin = this._activeSkinFor(def.id);
+    const skinSound  = activeSkin?.shootSound;
     if (!(skinSound && this.audio.playSkinShot(skinSound))) {
       this.audio.playShot(def.sound || 'rifle');
     }
@@ -631,6 +680,8 @@ export class WeaponSystem {
       this._spawnShell();
     }
     this._flash();
+    // Anime skin: spawn pink sparkle hearts at the muzzle
+    if (skinSound === 'anime') this._spawnAnimeSparkles();
 
     this.kickPos.z += def.recoil * 2.2;
     this.kickPos.y += def.recoil * 0.4;
@@ -766,6 +817,7 @@ export class WeaponSystem {
     this._updateRockets(dt, world, botManager);
     this._updateExplosions(dt);
     this._updateShells(dt);
+    this._updateAnimeSparkles(dt);
 
     // skin animations (only on the currently visible weapon)
     this.animTime += dt;
