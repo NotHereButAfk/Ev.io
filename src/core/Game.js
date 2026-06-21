@@ -118,12 +118,13 @@ export class Game {
       if (!locked && this.state === 'playing') this._pause();
     };
 
-    requestAnimationFrame(() => this._loop());
+    this._rafId = requestAnimationFrame(() => this._loop());
     this._runConnectSequence();
   }
 
-  // Release all global event listeners (call if the Game instance is discarded).
+  // Release all global event listeners and cancel the render loop.
   dispose() {
+    cancelAnimationFrame(this._rafId);
     this.input.dispose();
     this.renderer.dispose();
     this.botManager.clear();
@@ -695,7 +696,7 @@ export class Game {
   }
 
   _loop() {
-    requestAnimationFrame(() => this._loop());
+    this._rafId = requestAnimationFrame(() => this._loop());
     this.timer.update();
     const dt = Math.min(0.05, this.timer.getDelta());
 
