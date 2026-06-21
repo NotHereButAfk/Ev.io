@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const DETECT_RADIUS   = 22;
 const ATTACK_RADIUS   = 1.7;
@@ -13,6 +14,79 @@ const ARMED_CFG = {
 };
 
 let _nextId = 5000;
+
+// ─── GLB model loader (preloaded once, shared across all zombie instances) ────
+
+let _glbTemplate = null;   // THREE.Group — the raw loaded GLB scene
+let _glbLoading  = false;
+
+export function preloadZombieModel() {
+  if (_glbTemplate || _glbLoading) return;
+  _glbLoading = true;
+  new GLTFLoader().load(
+    '/zombie.glb',
+    (gltf) => { _glbTemplate = gltf.scene; _glbLoading = false; },
+    undefined,
+    (err) => { console.warn('[Zombie] GLB load failed, using procedural:', err.message); _glbLoading = false; }
+  );
+}
+
+function buildZombieRigFromGLB(mat) {
+  if (!_glbTemplate) return null;
+
+  const glbScene = _glbTemplate.clone(true);
+
+  // Replace Blender-exported materials with our canvas-PBR Three.js materials
+  glbScene.traverse(obj => {
+    if (!obj.isMesh) return;
+    const n = obj.name;
+    if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
+      obj.material = mat.bone;
+    else if (/Wound|Blood/.test(n))
+      obj.material = mat.blood;
+    else if (/Claw|Thumb/.test(n))
+      obj.material = mat.dark;
+    else if (/Vest|Pant/.test(n))
+      obj.material = mat.rag;
+    else if (/EyeGlow/.test(n))
+      obj.material = mat.eye;
+    else if (/EyeDark|Socket/.test(n))
+      obj.material = mat.dark;
+    else
+      obj.material = mat.flesh;
+    obj.castShadow = true;
+  });
+
+  // Wrapper group so torsoGroup.position.y bob works without disturbing spineGroup
+  const root       = new THREE.Group();
+  const torsoGroup = new THREE.Group();
+  root.add(torsoGroup);
+  torsoGroup.add(glbScene);
+
+  const spineGroup = glbScene.getObjectByName('spineGroup') || torsoGroup;
+  const neckGroup  = glbScene.getObjectByName('neckGroup')  || spineGroup;
+  const headGroup  = glbScene.getObjectByName('headGroup')  || neckGroup;
+
+  // Eye glow light attached to the glowing eye mesh
+  const eyeGlowMesh = glbScene.getObjectByName('ZEyeGlow');
+  const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
+  (eyeGlowMesh || headGroup).add(eyeGlow);
+
+  const get = (name) => glbScene.getObjectByName(name) || spineGroup;
+
+  return {
+    root, torsoGroup, spineGroup, neckGroup, headGroup,
+    arms: {
+      left:  { shoulder: get('L_shoulder'), elbow: get('L_elbow'), wrist: get('L_wrist') },
+      right: { shoulder: get('R_shoulder'), elbow: get('R_elbow'), wrist: get('R_wrist') },
+    },
+    legs: {
+      left:  { hip: get('L_hip'), knee: get('L_knee'), ankle: get('L_ankle') },
+      right: { hip: get('R_hip'), knee: get('R_knee'), ankle: get('R_ankle') },
+    },
+    mat, eyeGlow,
+  };
+}
 
 // ─── Canvas PBR texture generators (cached at module level) ──────────────────
 
@@ -538,8 +612,9 @@ export class Zombie {
 
     this.position = spawnPoint.clone();
 
-    // Build rig
-    const rig = buildZombieRig();
+    // Build rig — prefer the Blender GLB if already loaded
+    const mat = makeMats();
+    const rig = buildZombieRigFromGLB(mat) ?? buildZombieRig();
     this._rig       = rig;
     this._fleshMat  = rig.mat.flesh;
 

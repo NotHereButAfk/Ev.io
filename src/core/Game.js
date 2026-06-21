@@ -24,6 +24,7 @@ import { getArmorSkin } from '../player/ArmorSkins.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
+import { preloadZombieModel } from '../entities/Zombie.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -56,6 +57,7 @@ export class Game {
     this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager      = new BotManager(this.world, this.world.scene);
     this.zombieManager   = new ZombieManager(this.world, this.world.scene);
+    preloadZombieModel();   // start fetching zombie.glb during the 60s grace period
     this.survivalManager = new SurvivalManager();
     this.dmManager       = new DeathmatchManager();
     this._activeManager  = this.botManager;  // switches between botManager / zombieManager
