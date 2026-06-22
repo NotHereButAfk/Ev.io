@@ -964,6 +964,37 @@ html, body {
   gap: 18px;
 }
 
+.loadout-equip-col-wide  { /* gun col — takes full left half */ }
+.loadout-equip-col-fixed { /* fixed melee col */ }
+
+.loadout-melee-fixed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  background: rgba(0, 229, 255, 0.07);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.12);
+}
+
+.loadout-melee-fixed-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #00e5ff;
+}
+
+.loadout-melee-fixed-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #001a22;
+  background: #00e5ff;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
 .loadout-pick-grid {
   display: flex;
   flex-direction: column;
@@ -2622,9 +2653,8 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 120;
-  /* The overlay itself passes through taps; only children with pointer-events
-     capture touches, routed in MobileControls.js */
-  pointer-events: none;
+  /* Capture ALL touches so look-zone swipes (right half, empty space) register */
+  pointer-events: auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
@@ -2633,8 +2663,7 @@ html, body {
 
 #mobile-controls.hidden { display: none; }
 
-/* The entire surface must be interactive for global touch routing */
-#mobile-controls > * { pointer-events: auto; }
+/* Visual-only children (joy ring, nub) must stay non-interactive */
 
 /* === Left-half joystick zone (transparent, just catches taps) === */
 #joy-zone {

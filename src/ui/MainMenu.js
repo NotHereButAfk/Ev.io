@@ -281,9 +281,8 @@ export class MenuUI {
   // ── Loadout pickers (1 gun + 1 melee) ────────────────────────────────────────
 
   _buildLoadoutPickers() {
-    const gunGrid   = document.getElementById('loadout-gun-grid');
-    const meleeGrid = document.getElementById('loadout-melee-grid');
-    if (!gunGrid || !meleeGrid) return;
+    const gunGrid = document.getElementById('loadout-gun-grid');
+    if (!gunGrid) return;
 
     const build = (grid, list, getSel, setSel) => {
       grid.innerHTML = '';
@@ -303,8 +302,8 @@ export class MenuUI {
       });
     };
 
-    build(gunGrid,   GUNS,  () => Loadout.getGun(),   (id) => Loadout.setGun(id));
-    build(meleeGrid, MELEE, () => Loadout.getMelee(), (id) => Loadout.setMelee(id));
+    build(gunGrid, GUNS, () => Loadout.getGun(), (id) => Loadout.setGun(id));
+    // Melee is always Arc Blade — no picker needed
   }
 
   // ── Armory ─────────────────────────────────────────────────────────────────

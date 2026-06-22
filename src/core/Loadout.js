@@ -5,9 +5,10 @@ import { WEAPONS } from '../weapons/weaponDefs.js';
 const _KEY = 'sio_loadout';
 
 export const GUNS  = WEAPONS.filter((w) => w.kind !== 'melee');
-export const MELEE = WEAPONS.filter((w) => w.kind === 'melee');
+// Only the Arc Blade is available in the standard loadout melee slot
+export const MELEE = WEAPONS.filter((w) => w.id === 'sword');
 
-const DEFAULTS = { gun: 'm4', melee: 'knife' };
+const DEFAULTS = { gun: 'm4', melee: 'sword' };
 
 function _load() {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(_KEY) || '{}') }; }
