@@ -6,6 +6,7 @@ import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Armory } from '../core/Armory.js';
+import { Loadout, GUNS, MELEE } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings, DEFAULTS } from '../core/GameSettings.js';
@@ -76,6 +77,7 @@ export class MenuUI {
     warmThumbnails(); // kick off async thumbnail generation immediately
     this._buildSkinGrid();
     this._buildArmorGrid();
+    this._buildLoadoutPickers();
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -250,6 +252,35 @@ export class MenuUI {
       });
       grid.appendChild(card);
     });
+  }
+
+  // ── Loadout pickers (1 gun + 1 melee) ────────────────────────────────────────
+
+  _buildLoadoutPickers() {
+    const gunGrid   = document.getElementById('loadout-gun-grid');
+    const meleeGrid = document.getElementById('loadout-melee-grid');
+    if (!gunGrid || !meleeGrid) return;
+
+    const build = (grid, list, getSel, setSel) => {
+      grid.innerHTML = '';
+      const selId = getSel();
+      list.forEach((w) => {
+        const el = document.createElement('div');
+        el.className = 'loadout-pick' + (w.id === selId ? ' selected' : '');
+        el.dataset.id = w.id;
+        const tag = w.throwable ? '<span class="loadout-pick-tag">THROW · 3×</span>' : '';
+        el.innerHTML = `<span class="loadout-pick-name">${w.name}</span>${tag}`;
+        el.addEventListener('click', () => {
+          setSel(w.id);
+          grid.querySelectorAll('.loadout-pick').forEach((p) => p.classList.remove('selected'));
+          el.classList.add('selected');
+        });
+        grid.appendChild(el);
+      });
+    };
+
+    build(gunGrid,   GUNS,  () => Loadout.getGun(),   (id) => Loadout.setGun(id));
+    build(meleeGrid, MELEE, () => Loadout.getMelee(), (id) => Loadout.setMelee(id));
   }
 
   // ── Armory ─────────────────────────────────────────────────────────────────

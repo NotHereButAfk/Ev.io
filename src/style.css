@@ -863,6 +863,65 @@ html, body {
   text-transform: uppercase;
 }
 
+/* ===================== Loadout pickers (1 gun + 1 melee) ===================== */
+
+.loadout-equip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.loadout-pick-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.loadout-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.07);
+  background: rgba(10, 14, 24, 0.55);
+  cursor: pointer;
+  transition: border-color 0.13s, background 0.13s, transform 0.08s;
+}
+.loadout-pick:hover {
+  border-color: rgba(0, 207, 255, 0.35);
+  background: rgba(0, 207, 255, 0.06);
+  transform: translateX(2px);
+}
+.loadout-pick.selected {
+  border-color: rgba(0, 207, 255, 0.75);
+  background: rgba(0, 207, 255, 0.1);
+  box-shadow: 0 0 12px rgba(0, 207, 255, 0.2);
+}
+
+.loadout-pick-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #c8dff0;
+}
+.loadout-pick.selected .loadout-pick-name { color: #00cfff; }
+
+.loadout-pick-tag {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #1a1200;
+  background: linear-gradient(90deg, #f0a820, #f0c840);
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+
 /* ===================== Armory Tab ===================== */
 
 .armory-layout {

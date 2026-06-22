@@ -261,6 +261,22 @@ export const WEAPONS = [
     color: 0x1f2228
   },
   {
+    id: 'knife',
+    name: 'Combat Knife',
+    key: 'C',
+    kind: 'melee',
+    damage: 55,            // melee stab damage
+    fireRate: 0.32,
+    range: 2.2,
+    arc: 0.9,
+    throwable: true,
+    throwSpeed: 42,
+    throwDamage: 9999,     // one-hit kill on throw
+    throwCooldown: 0.85,   // seconds before you pull a fresh knife
+    throwRewardMult: 3,    // 3x coins/score/xp — only on a thrown kill
+    color: 0x9aa0a8
+  },
+  {
     id: 'sword',
     name: 'Reaver Blade',
     key: 'V',

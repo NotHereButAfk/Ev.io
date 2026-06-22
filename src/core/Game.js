@@ -23,6 +23,7 @@ import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
+import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin } from '../player/ArmorSkins.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
@@ -251,7 +252,7 @@ export class Game {
       }
     };
 
-    this.weaponSystem.onHitBot = (enemy, dmg) => {
+    this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
       const killed = enemy.takeDamage(dmg);
       this.audio.playHit();
       this.hud.flashHitmarker();
@@ -266,41 +267,43 @@ export class Game {
           isMelee
         );
         this.audio.playKill();
-        this._onEnemyKilled(enemy, entry);
+        this._onEnemyKilled(enemy, entry, meta?.rewardMult || 1);
       }
     };
   }
 
-  _onEnemyKilled(enemy, weaponEntry) {
+  _onEnemyKilled(enemy, weaponEntry, rewardMult = 1) {
     this.kills++;
+    const knifeTag = rewardMult > 1 ? `  🔪 KNIFE THROW x${rewardMult}!` : '';
 
     if (this._isSurvival) {
-      const coins = this.survivalManager.zombieKillReward();
-      this.score += 50;
+      const coins = this.survivalManager.zombieKillReward() * rewardMult;
+      this.score += 50 * rewardMult;
       this._pendingCoins += coins;
       if (this._pendingCoins >= 1) {
         Shop.addCoins(Math.floor(this._pendingCoins));
         this._pendingCoins -= Math.floor(this._pendingCoins);
       }
-      BattlePass.addXP(10);
-      this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}`);
+      BattlePass.addXP(10 * rewardMult);
+      this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}${knifeTag}`);
     } else if (this._isDM) {
       const { coins, streak } = this.dmManager.onKill();
-      this.score += 100;
-      Shop.addCoins(Math.round(coins));
-      BattlePass.addXP(25);
+      const reward = coins * rewardMult;
+      this.score += 100 * rewardMult;
+      Shop.addCoins(Math.round(reward));
+      BattlePass.addXP(25 * rewardMult);
       this._refreshNavCoins();
       if (streak >= 2) {
-        this.hud.showStreak(streak, coins.toFixed(1));
-        this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${coins.toFixed(1)}`);
+        this.hud.showStreak(streak, reward.toFixed(1));
+        this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${reward.toFixed(1)}${knifeTag}`);
       } else {
-        this.hud.addKillFeed(`ELIMINATED  💰+${coins.toFixed(1)}`);
+        this.hud.addKillFeed(`ELIMINATED  💰+${reward.toFixed(1)}${knifeTag}`);
       }
     } else {
-      this.score += 100;
-      Shop.addCoins(10);
-      BattlePass.addXP(25);
-      this.hud.addKillFeed(`${this.player.name} eliminated a target  +100  💰+10`);
+      this.score += 100 * rewardMult;
+      Shop.addCoins(10 * rewardMult);
+      BattlePass.addXP(25 * rewardMult);
+      this.hud.addKillFeed(`${this.player.name} eliminated a target  +${100 * rewardMult}  💰+${10 * rewardMult}${knifeTag}`);
     }
   }
 
@@ -321,7 +324,7 @@ export class Game {
     this.menu.onLoadoutClose  = () => { this.previewCharacter.visible = false; };
     this.menu.onArmoryChanged = () => {
       // Re-apply armory skins to live weapon models
-      const map = Armory.buildSkinMap(this.weaponSystem.loadout);
+      const map = Armory.buildSkinMap(this.weaponSystem.allWeapons);
       this.weaponSystem.applyArmoryMap(map);
     };
     this.menu.onSettingsSaved = (s) => {
@@ -363,7 +366,10 @@ export class Game {
     applySkinToCharacter(this.previewCharacter, this.selectedSkin, this.selectedArmorSkin);
     this.weaponSystem.setSkin(this.selectedSkin);
 
-    const armoryMap = Armory.buildSkinMap(this.weaponSystem.loadout);
+    // Equip exactly the chosen gun + melee for this match.
+    this.weaponSystem.setLoadout(Loadout.getGun(), Loadout.getMelee());
+
+    const armoryMap = Armory.buildSkinMap(this.weaponSystem.allWeapons);
     this.weaponSystem.applyArmoryMap(armoryMap);
 
     this.player.name = name;

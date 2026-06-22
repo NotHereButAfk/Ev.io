@@ -70,6 +70,28 @@ export const SWORD_SKINS = [
     id: 'prism_blade', name: 'Prismatic 🌈', rarity: 'mythic',
     blade: 0xdddddd, fuller: 0x101010, guard: 0x808080, metalness: 0.9, roughness: 0.1,
     emissive: 0xffffff, emissiveIntensity: 0.5, animated: true, animType: 'cycle'
+  },
+
+  // ── SCI-FI MELEE FINISHES ───────────────────────────────────────────────────
+  { id: 'tactical_blk', name: 'Tactical Black', rarity: 'common', blade: 0x23262b, fuller: 0x111316, guard: 0x16181c, metalness: 0.6, roughness: 0.42, emissive: 0x000000, emissiveIntensity: 0 },
+  { id: 'titanium', name: 'Titanium', rarity: 'uncommon', blade: 0xb8bec6, fuller: 0x5a5e66, guard: 0x7a8088, metalness: 0.95, roughness: 0.22, emissive: 0x000000, emissiveIntensity: 0 },
+  {
+    id: 'plasma_edge', name: 'Plasma Edge ⚡', rarity: 'epic',
+    blade: 0x0a2030, fuller: 0x003a5a, guard: 0x06141e, metalness: 0.85, roughness: 0.16,
+    emissive: 0x00ccff, emissiveIntensity: 0.7,
+    animated: true, animType: 'pulse', animSpeed: 3.2, animMin: 0.35, animMax: 1.3
+  },
+  {
+    id: 'neon_tanto', name: 'Neon Tanto 🌈', rarity: 'legendary',
+    blade: 0x12081e, fuller: 0x2a0a40, guard: 0x0c0616, metalness: 0.8, roughness: 0.2,
+    emissive: 0xff2db4, emissiveIntensity: 0.7,
+    animated: true, animType: 'cycle'
+  },
+  {
+    id: 'quantum_blade', name: 'Quantum ✦', rarity: 'mythic',
+    blade: 0x0c1428, fuller: 0x0040ff, guard: 0x081024, metalness: 0.88, roughness: 0.12,
+    emissive: 0xffffff, emissiveIntensity: 0.6, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'storm', animSpeed: 6.0, animMin: 0.2, animMax: 1.6
   }
 ];
 

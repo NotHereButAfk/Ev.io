@@ -1537,6 +1537,62 @@ function buildSword(color) {
   return { group: g, muzzle };
 }
 
+// Tactical combat knife — sci-fi tanto. Roles match the sword so melee skins
+// (blade=metal, groove=accent, guard=special, grip=wood) recolor it identically.
+function buildKnife(color) {
+  const g = new THREE.Group();
+  const bladeMat = M('metal',   color,    { metalness: 0.9,  roughness: 0.14 });
+  const gripMat  = M('wood',    0x16181c, { metalness: 0.1,  roughness: 0.82 });
+  const guardMat = M('special', 0x2a2e34, { metalness: 0.78, roughness: 0.32 });
+  const darkMat  = M('accent',  0x101216, { metalness: 0.5,  roughness: 0.5  });
+
+  // Grip — wrapped paracord handle (alternating bands)
+  const handle = cyl(0.016, 0.014, 0.13, gripMat);
+  handle.position.set(0, -0.02, 0.12);
+  g.add(handle);
+  for (let i = 0; i < 6; i++) {
+    const wrap = cyl(0.018, 0.018, 0.012, i % 2 === 0 ? darkMat : gripMat);
+    wrap.position.set(0, -0.02, 0.07 + i * 0.018);
+    g.add(wrap);
+  }
+  // Pommel / lanyard hole cap
+  const pommel = box(0.024, 0.024, 0.022, guardMat);
+  pommel.position.set(0, -0.02, 0.19);
+  g.add(pommel);
+
+  // Finger guard
+  const guard = box(0.07, 0.02, 0.022, guardMat);
+  guard.position.set(0, -0.02, 0.045);
+  g.add(guard);
+
+  // Ricasso (base of blade)
+  const ricasso = box(0.028, 0.012, 0.05, bladeMat);
+  ricasso.position.set(0, -0.02, 0.01);
+  g.add(ricasso);
+
+  // Main blade — tanto profile, tapering
+  const blade = box(0.03, 0.01, 0.26, bladeMat);
+  blade.position.set(0, -0.02, -0.14);
+  g.add(blade);
+  // Blade flat / fuller groove
+  const groove = box(0.009, 0.0035, 0.22, darkMat);
+  groove.position.set(0, -0.014, -0.13);
+  g.add(groove);
+  // Angled tanto tip
+  const tip = cone(0.016, 0.07, bladeMat, 6, -Math.PI / 2);
+  tip.position.set(0, -0.02, -0.3);
+  g.add(tip);
+  // Serration spine detail
+  for (let i = 0; i < 5; i++) {
+    const serr = box(0.006, 0.012, 0.01, bladeMat);
+    serr.position.set(0, -0.012, -0.04 - i * 0.022);
+    g.add(serr);
+  }
+
+  const muzzle = addMuzzle(g, 0, -0.02, -0.34);
+  return { group: g, muzzle };
+}
+
 // ===========================================================================
 // Registry + export
 // ===========================================================================
@@ -1556,7 +1612,8 @@ const BUILDERS = {
   rpg:          buildRPG,
   sniper:       buildSniper,
   boltsniper:   buildBoltSniper,
-  sword:        buildSword
+  sword:        buildSword,
+  knife:        buildKnife
 };
 
 export function buildWeaponModel(weaponDef) {

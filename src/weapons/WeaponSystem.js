@@ -25,17 +25,17 @@ export class WeaponSystem {
     this.scene = scene;
     this.audio = audio;
 
-    this.loadout = WEAPONS;
-    // map keyboard codes to loadout indices from each weapon's `key` field
+    // Every weapon model/state is kept so any can be brought into a match, but
+    // the ACTIVE loadout is exactly one gun + one melee (set via setLoadout).
+    this.allWeapons = WEAPONS;
+    const defGun   = WEAPONS.find((w) => w.kind !== 'melee');
+    const defMelee = WEAPONS.find((w) => w.kind === 'melee');
+    this.loadout = [defGun, defMelee].filter(Boolean);
     this.keyMap = new Map();
-    this.loadout.forEach((w, i) => {
-      if (!w.key) return;
-      const code = /^[0-9]$/.test(w.key) ? `Digit${w.key}` : `Key${w.key.toUpperCase()}`;
-      this.keyMap.set(code, i);
-    });
+    this._rebuildKeyMap();
     this.currentIndex = 0;
     this.state = new Map();
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       this.state.set(w.id, {
         magAmmo: w.kind === 'melee' ? 0 : w.magSize,
         reserveAmmo: w.kind === 'melee' ? 0 : w.reserveMax,
@@ -43,6 +43,11 @@ export class WeaponSystem {
         reloadTimer: 0
       });
     }
+
+    // Thrown-knife projectiles
+    this.thrownKnives = [];
+    this._knifeCooldown = 0;
+    this._prevRightMouse = false;
 
     this.fireTimer = 0;
     this.prevMouseDown = false;
@@ -108,7 +113,7 @@ export class WeaponSystem {
     this.swayGroup.add(this.kickGroup);
 
     this.models = new Map();
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       const { group, muzzle } = buildWeaponModel(w);
       group.visible = false;
       this.kickGroup.add(group);
@@ -208,17 +213,17 @@ export class WeaponSystem {
   setWeaponSkin(skin) {
     this.weaponSkin = skin;
     if (!skin) return;
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       if (w.kind === 'melee') continue;
       applyWeaponSkin(this.models.get(w.id).group, skin);
     }
   }
 
-  /** Apply a cosmetic finish to the sword model only. */
+  /** Apply a cosmetic finish to every melee model. */
   setSwordSkin(skin) {
     this.swordSkin = skin;
     if (!skin) return;
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       if (w.kind !== 'melee') continue;
       applySwordSkin(this.models.get(w.id).group, skin);
     }
@@ -230,7 +235,7 @@ export class WeaponSystem {
    */
   applyArmoryMap(map) {
     this._armoryMap = map;
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       const entry = map.get(w.id);
       if (!entry) continue;
       const { group } = this.models.get(w.id);
@@ -253,10 +258,32 @@ export class WeaponSystem {
     return def?.kind === 'melee' ? this.swordSkin : this.weaponSkin;
   }
 
+  _rebuildKeyMap() {
+    // Active loadout maps to slots 1 (gun) and 2 (melee).
+    this.keyMap = new Map();
+    this.loadout.forEach((w, i) => this.keyMap.set(`Digit${i + 1}`, i));
+  }
+
+  /** Set the active loadout to a single gun + single melee weapon. */
+  setLoadout(gunId, meleeId) {
+    const gun = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee')
+             || this.allWeapons.find((w) => w.kind !== 'melee');
+    const melee = this.allWeapons.find((w) => w.id === meleeId && w.kind === 'melee')
+               || this.allWeapons.find((w) => w.kind === 'melee');
+    this.loadout = [gun, melee].filter(Boolean);
+    this.currentIndex = 0;
+    this._rebuildKeyMap();
+    this._setActiveModel(0);
+  }
+
   _setActiveModel(index) {
-    this.loadout.forEach((w, i) => {
-      this.models.get(w.id).group.visible = i === index;
-    });
+    // Hide every model, then show the active loadout slot.
+    for (const w of this.allWeapons) {
+      const m = this.models.get(w.id);
+      if (m) m.group.visible = false;
+    }
+    const cur = this.loadout[index];
+    if (cur) this.models.get(cur.id).group.visible = true;
   }
 
   get currentDef() {
@@ -282,7 +309,7 @@ export class WeaponSystem {
   resetState(baseFov) {
     this.currentIndex = 0;
     this._setActiveModel(0);
-    for (const w of this.loadout) {
+    for (const w of this.allWeapons) {
       const st = this.state.get(w.id);
       st.magAmmo = w.kind === 'melee' ? 0 : w.magSize;
       st.reserveAmmo = w.kind === 'melee' ? 0 : w.reserveMax;
@@ -294,8 +321,17 @@ export class WeaponSystem {
     this.kickRotX = 0;
     this.swingPhase = 1;
     this.scopeT = 0;
+    this._knifeCooldown = 0;
+    this._prevRightMouse = false;
     this.camera.fov = baseFov;
     this.camera.updateProjectionMatrix();
+
+    // drop any in-flight thrown knives from a previous round
+    for (const k of this.thrownKnives) {
+      this.scene.remove(k.mesh);
+      k.mesh.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    }
+    this.thrownKnives.length = 0;
 
     // drop any in-flight rockets / explosions from a previous round
     for (const r of this.rockets) {
@@ -522,6 +558,93 @@ export class WeaponSystem {
     }
   }
 
+  _makeThrownKnifeMesh(def) {
+    const skin = this._activeSkinFor(def.id);
+    const bladeColor = skin?.blade ?? 0xc0c6ce;
+    const g = new THREE.Group();
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: bladeColor, metalness: 0.9, roughness: 0.18,
+      emissive: new THREE.Color(skin?.emissive ?? 0x000000),
+      emissiveIntensity: skin?.emissiveIntensity ?? 0,
+    });
+    const gripMat = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.82, metalness: 0.1 });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.01, 0.26), bladeMat);
+    blade.position.z = -0.1;
+    g.add(blade);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.07, 6), bladeMat);
+    tip.rotation.x = -Math.PI / 2; tip.position.z = -0.27;
+    g.add(tip);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, 0.1), gripMat);
+    grip.position.z = 0.08;
+    g.add(grip);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return g;
+  }
+
+  _throwKnife(def) {
+    const muzzleWorld = new THREE.Vector3();
+    this.models.get(def.id).muzzle.getWorldPosition(muzzleWorld);
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir).normalize();
+
+    const mesh = this._makeThrownKnifeMesh(def);
+    mesh.position.copy(muzzleWorld);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+    this.scene.add(mesh);
+
+    this.thrownKnives.push({
+      mesh, pos: muzzleWorld.clone(), dir: dir.clone(),
+      speed: def.throwSpeed || 40, life: 3, def
+    });
+
+    this._knifeCooldown = def.throwCooldown || 0.9;
+    // hide the in-hand knife until a fresh one is pulled (cooldown end)
+    const m = this.models.get(def.id);
+    if (m) m.group.visible = false;
+    if (this.audio.playSwing) this.audio.playSwing();
+  }
+
+  _updateThrownKnives(dt, world, botManager) {
+    if (!this.thrownKnives.length) return;
+    const worldMeshes = world.colliders.map((c) => c.mesh);
+    const botMeshes = botManager.getRaycastTargets();
+    const ray = new THREE.Raycaster();
+    const spinAxis = new THREE.Vector3(1, 0, 0);
+
+    for (let i = this.thrownKnives.length - 1; i >= 0; i--) {
+      const k = this.thrownKnives[i];
+      const prev = k.pos.clone();
+      const step = k.speed * dt;
+      k.pos.addScaledVector(k.dir, step);
+      k.life -= dt;
+
+      let hitPoint = null, hitBot = null;
+      ray.set(prev, k.dir);
+      ray.far = step + 0.2;
+      const hits = ray
+        .intersectObjects([...botMeshes, ...worldMeshes], true)
+        .filter((h) => !h.object.userData.noHit);
+      if (hits.length) { hitPoint = hits[0].point; hitBot = hits[0].object.userData.bot; }
+
+      const oob = Math.abs(k.pos.x) > world.arenaHalf || Math.abs(k.pos.z) > world.arenaHalf;
+      if (!hitPoint && (k.pos.y <= 0.05 || oob || k.life <= 0)) hitPoint = k.pos.clone();
+
+      if (hitPoint) {
+        if (hitBot && this.onHitBot) {
+          // one-hit kill + 3x reward (only thrown knives carry rewardMult)
+          this.onHitBot(hitBot, k.def.throwDamage || 9999, hitPoint,
+            { rewardMult: k.def.throwRewardMult || 3, thrown: true });
+        }
+        this.scene.remove(k.mesh);
+        k.mesh.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+        this.thrownKnives.splice(i, 1);
+      } else {
+        k.mesh.position.copy(k.pos);
+        k.mesh.rotateOnAxis(spinAxis, dt * 24); // tumbling throw
+      }
+    }
+  }
+
   _spawnRocket(def) {
     const muzzleWorld = new THREE.Vector3();
     this.models.get(def.id).muzzle.getWorldPosition(muzzleWorld);
@@ -736,6 +859,21 @@ export class WeaponSystem {
     }
     this.prevMouseDown = input.mouseDown;
 
+    // Knife throw (right-click): one-hit kill + 3x reward. Cooldown hides the
+    // in-hand knife until a fresh one is pulled.
+    if (this._knifeCooldown > 0) {
+      this._knifeCooldown -= dt;
+      if (this._knifeCooldown <= 0 && def.kind === 'melee') {
+        const m = this.models.get(def.id);
+        if (m) m.group.visible = true;
+      }
+    }
+    const rightJustPressed = input.rightMouseDown && !this._prevRightMouse;
+    if (def.kind === 'melee' && def.throwable && rightJustPressed && this._knifeCooldown <= 0) {
+      this._throwKnife(def);
+    }
+    this._prevRightMouse = input.rightMouseDown;
+
     // Sprint blend for COD carry animation (blocks ADS)
     this._sprintT += ((player.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
 
@@ -842,8 +980,9 @@ export class WeaponSystem {
       }
     }
 
-    // rockets + explosions + ejected shells
+    // rockets + explosions + ejected shells + thrown knives
     this._updateRockets(dt, world, botManager);
+    this._updateThrownKnives(dt, world, botManager);
     this._updateExplosions(dt);
     this._updateShells(dt);
     this._updateAnimeSparkles(dt);
@@ -870,7 +1009,7 @@ export class WeaponSystem {
       reserveAmmo: st.reserveAmmo,
       isReloading: st.isReloading,
       currentIndex: this.currentIndex,
-      slots: this.loadout.map((w, i) => w.key || String(i + 1))
+      slots: this.loadout.map((_, i) => String(i + 1))
     };
   }
 }
