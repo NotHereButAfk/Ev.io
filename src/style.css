@@ -863,6 +863,32 @@ html, body {
   text-transform: uppercase;
 }
 
+/* ===================== Live armor preview ===================== */
+
+/* Loadout panel is wider so callsign+skin / armor type / live preview all fit. */
+#panel-loadout {
+  width: min(96vw, 900px);
+}
+
+.armor-preview-section {
+  flex-shrink: 0;
+  width: 200px;
+}
+
+.armor-preview-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 207, 255, 0.18);
+  background: #0a0e16;
+  box-shadow: 0 0 18px rgba(0, 207, 255, 0.08) inset;
+}
+
+#armor-preview-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* ===================== Loadout pickers (1 gun + 1 melee) ===================== */
 
 .loadout-equip {

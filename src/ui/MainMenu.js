@@ -1,4 +1,4 @@
-import { SKINS } from '../player/skins.js';
+import { SKINS, getSkin } from '../player/skins.js';
 import { ARMOR_TYPES, loadArmorType, saveArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
@@ -12,6 +12,7 @@ import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings, DEFAULTS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { WeaponPreviewRenderer } from './WeaponPreviewRenderer.js';
+import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { warmThumbnails, getThumbnail } from './SkinThumbnails.js';
 
 function _hex(n) { return n.toString(16).padStart(6, '0'); }
@@ -53,6 +54,7 @@ export class MenuUI {
     this.selectedModeId   = GAME_MODES[0].id;
     this._currentUser     = null;
     this._preview         = null;
+    this._armorPreview    = null;
 
     // Callback: called when armor type changes so Game.js can rebuild preview
     this.onArmorChanged = null; // (armorTypeId) => void
@@ -161,6 +163,7 @@ export class MenuUI {
 
     if (id === 'loadout') {
       this._initArmory();
+      this._startArmorPreview();
       this.onLoadoutOpen?.();
     }
     if (id === 'profile')     this._renderProfile();
@@ -172,6 +175,7 @@ export class MenuUI {
   _closeAllPanels() {
     if (this._activePanel === 'loadout') {
       this._stopPreview();
+      this._armorPreview?.stop();
       this.onLoadoutClose?.();
     }
     this._activePanel = null;
@@ -219,6 +223,7 @@ export class MenuUI {
         this.selectedSkinId = skin.id;
         this.skinGrid.querySelectorAll('.skin-swatch').forEach((s) => s.classList.remove('selected'));
         el.classList.add('selected');
+        this._updateArmorPreview();
       });
       this.skinGrid.appendChild(el);
     });
@@ -249,9 +254,27 @@ export class MenuUI {
         grid.querySelectorAll('.armor-card').forEach((c) => c.classList.remove('selected'));
         card.classList.add('selected');
         this.onArmorChanged?.(armor.id);
+        this._updateArmorPreview();
       });
       grid.appendChild(card);
     });
+  }
+
+  // ── Live 3D armor preview ─────────────────────────────────────────────────────
+
+  _startArmorPreview() {
+    const canvas = document.getElementById('armor-preview-canvas');
+    if (!canvas) return;
+    if (!this._armorPreview) this._armorPreview = new ArmorPreviewRenderer(canvas);
+    this._updateArmorPreview();
+    this._armorPreview.start();
+  }
+
+  _updateArmorPreview() {
+    if (!this._armorPreview) return;
+    const playerSkin = getSkin(this.selectedSkinId);
+    const armorSkin  = getArmorSkin(Shop.getEquipped());
+    this._armorPreview.loadArmor(playerSkin, this.selectedArmorId, armorSkin);
   }
 
   // ── Loadout pickers (1 gun + 1 melee) ────────────────────────────────────────

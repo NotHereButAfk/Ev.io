@@ -1,0 +1,114 @@
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { buildPreviewCharacter } from '../player/PreviewCharacter.js';
+
+// Dedicated Three.js renderer for the loadout panel's live armor preview.
+// Shows the full character (selected player skin + armor type + armor finish)
+// rotating on a small turntable. Runs its own RAF loop while LOADOUT is open.
+export class ArmorPreviewRenderer {
+  constructor(canvas) {
+    this._canvas   = canvas;
+    this._renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    this._renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    // updateStyle=false: keep the CSS width:100% so the canvas fits its column
+    // (the drawing buffer stays crisp at the canvas's intrinsic resolution).
+    this._renderer.setSize(canvas.width, canvas.height, false);
+    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this._renderer.toneMappingExposure = 1.05;
+
+    this._scene = new THREE.Scene();
+    this._scene.background = new THREE.Color(0x0a0e16);
+
+    // image-based lighting so the metal/emissive armor reads correctly
+    const pmrem = new THREE.PMREMGenerator(this._renderer);
+    this._scene.environment = pmrem.fromScene(new RoomEnvironment(0.5)).texture;
+    pmrem.dispose();
+
+    // sci-fi turntable disc + glow ring under the figure
+    const disc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.95, 1.05, 0.06, 40),
+      new THREE.MeshStandardMaterial({ color: 0x0e1622, roughness: 0.5, metalness: 0.6 })
+    );
+    disc.position.y = -0.03;
+    this._scene.add(disc);
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.96, 1.08, 48),
+      new THREE.MeshBasicMaterial({ color: 0x00cfff, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.012;
+    this._scene.add(ring);
+
+    this._camera = new THREE.PerspectiveCamera(34, canvas.width / canvas.height, 0.01, 50);
+
+    this._scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const key = new THREE.DirectionalLight(0xffffff, 1.5);
+    key.position.set(2.5, 4, 3);
+    this._scene.add(key);
+    const fill = new THREE.DirectionalLight(0x40a0ff, 0.6);
+    fill.position.set(-3, 1, 2);
+    this._scene.add(fill);
+    const rim = new THREE.DirectionalLight(0x00cfff, 0.7);
+    rim.position.set(0, 2, -3);
+    this._scene.add(rim);
+
+    this._group = null;
+    this._t     = 0;
+    this._raf   = null;
+  }
+
+  // Build (or rebuild) the character for the given player skin + armor.
+  loadArmor(playerSkin, armorTypeId, armorSkin) {
+    if (this._group) {
+      this._scene.remove(this._group);
+      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      this._group = null;
+    }
+    const g = buildPreviewCharacter(playerSkin, armorTypeId, armorSkin);
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+
+    // center horizontally, sit feet on the disc, frame the whole body
+    const box = new THREE.Box3().setFromObject(g);
+    const c   = box.getCenter(new THREE.Vector3());
+    const sz  = box.getSize(new THREE.Vector3());
+    g.position.x -= c.x;
+    g.position.z -= c.z;
+    g.position.y -= box.min.y; // feet on disc
+
+    const targetH = 2.3;
+    const s = sz.y > 0 ? targetH / sz.y : 1;
+    g.scale.setScalar(s);
+
+    this._group = g;
+    this._scene.add(g);
+
+    // frame the full body with a little headroom/legroom
+    const midY = targetH * 0.5;
+    this._camera.position.set(0.0, midY + 0.15, 4.3);
+    this._camera.lookAt(0, midY, 0);
+    this._lookY = midY;
+  }
+
+  start() {
+    if (this._raf !== null) return;
+    const loop = () => {
+      this._raf = requestAnimationFrame(loop);
+      this._t += 0.016;
+      if (this._group) this._group.rotation.y = this._t * 0.6;
+      this._renderer.render(this._scene, this._camera);
+    };
+    loop();
+  }
+
+  stop() {
+    if (this._raf !== null) { cancelAnimationFrame(this._raf); this._raf = null; }
+  }
+
+  dispose() {
+    this.stop();
+    if (this._group) {
+      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    }
+    this._renderer.dispose();
+  }
+}
