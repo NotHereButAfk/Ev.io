@@ -385,10 +385,10 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0814);
-    // Purple-magenta night haze; pushed back so the skyline reads, with a soft
-    // near-field so distant neon glows through atmosphere.
-    this.scene.fog = new THREE.Fog(0x1a1228, 26, 165);
+    this.scene.background = new THREE.Color(0x05030f);
+    // Deep cyber-indigo haze; pushed back so the neon skyline reads, with a soft
+    // near-field so distant holograms and signage glow through the atmosphere.
+    this.scene.fog = new THREE.Fog(0x0c0a26, 26, 170);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -463,6 +463,10 @@ export class World {
     };
     this._flowerMats = new Map();
     this._carMats = new Map();
+    // Sci-fi neon accent palette + cached emissive materials (bloom does the glow,
+    // so these are cheap unlit-looking emissives, no extra point lights).
+    this._neonColors = [0x00e5ff, 0xff2db4, 0xb24bff, 0x39ff9e, 0xffc400, 0x2a6bff];
+    this._neonMats = new Map();
 
     this._buildLighting();
     this._buildGround();
@@ -498,14 +502,13 @@ export class World {
     moon.shadow.normalBias = 0.02;
     this.scene.add(moon);
 
-    // Warm magenta city-glow fill from the horizon — the neon haze of a
-    // living city bouncing back up. Reads beautifully once bloom is on.
-    const fill = new THREE.DirectionalLight(0xff5a9c, 0.16);
+    // Magenta city-glow fill from the horizon — neon haze bouncing back up.
+    const fill = new THREE.DirectionalLight(0xff2db4, 0.22);
     fill.position.set(20, 8, -30);
     this.scene.add(fill);
 
     // Cyan rim light from the opposite side to sculpt silhouettes
-    const rim = new THREE.DirectionalLight(0x33d4ff, 0.12);
+    const rim = new THREE.DirectionalLight(0x00e5ff, 0.2);
     rim.position.set(60, 18, 50);
     this.scene.add(rim);
   }
@@ -611,6 +614,21 @@ export class World {
     return m;
   }
 
+  _neonMat(c) {
+    let m = this._neonMats.get(c);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({
+        color: c, emissive: c, emissiveIntensity: 2.4, roughness: 0.4, metalness: 0.3
+      });
+      this._neonMats.set(c, m);
+    }
+    return m;
+  }
+
+  _randNeon() {
+    return this._neonColors[Math.floor(Math.random() * this._neonColors.length)];
+  }
+
   _flower(x, y, z, scale = 1) {
     const c = this._flowerColors[Math.floor(Math.random() * this._flowerColors.length)];
     const f = new THREE.Mesh(this._geo.flower, this._flowerMat(c));
@@ -633,16 +651,27 @@ export class World {
     for (let ix = -range; ix <= range; ix++) {
       for (let iz = -range; iz <= range; iz++) {
         if (ix === 0 || iz === 0) continue; // keep the cross avenues open
-        const cx = ix * cell;
-        const cz = iz * cell;
+
+        // Randomized sci-fi skyline: ~18% of lots are left as empty plazas so
+        // the city no longer reads as a perfect grid, and every tower is jittered
+        // off its cell centre (clamped so it never spills into an avenue).
+        if (Math.random() < 0.18) continue;
+        const jx = (Math.random() - 0.5) * 4.2;
+        const jz = (Math.random() - 0.5) * 4.2;
+        const cx = ix * cell + jx;
+        const cz = iz * cell + jz;
 
         // footprint, leaving room for sidewalks + streets
-        const fw = 9 + Math.random() * 4;
-        const fd = 9 + Math.random() * 4;
+        const fw = 8 + Math.random() * 4;
+        const fd = 8 + Math.random() * 4;
 
-        // mix of tall glass towers and shorter brick low-rises
-        const brick = Math.random() < 0.5;
-        const height = brick ? 8 + Math.random() * 10 : 20 + Math.random() * 22;
+        // Mostly sleek glass arcologies; a few squat brick relics for contrast.
+        // Heights vary hard — from low blocks to the odd mega-spire.
+        const brick = Math.random() < 0.22;
+        let height;
+        if (brick)                       height = 9  + Math.random() * 9;
+        else if (Math.random() < 0.16)   height = 56 + Math.random() * 28; // mega-tower
+        else                             height = 20 + Math.random() * 28;
         const ring = Math.max(Math.abs(ix), Math.abs(iz));
 
         this._buildBuilding(cx, cz, fw, fd, height, brick ? 'brick' : 'glass', ring);
@@ -723,11 +752,42 @@ export class World {
     cap.position.set(cx, height + base + 0.3, cz);
     this.scene.add(cap);
 
-    // rooftop aircraft-warning light on tall towers
-    if (height > 22 && Math.random() < 0.7) {
-      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), this._mats.beacon);
-      beacon.position.set(cx, height + base + 0.9, cz);
-      this.scene.add(beacon);
+    // ── Sci-fi neon trim (emissive only — bloom makes it glow, no extra lights) ──
+    const neon = this._randNeon();
+    const neonMat = this._neonMat(neon);
+
+    // glowing roof band wrapping the parapet
+    const roofBand = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.5, 0.16, fd + 0.5), neonMat);
+    roofBand.position.set(cx, height + base + 0.65, cz);
+    this.scene.add(roofBand);
+
+    // vertical neon edge strips up the four corners of glass towers
+    if (style === 'glass') {
+      const hx = fw / 2, hz = fd / 2;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const strip = new THREE.Mesh(new THREE.BoxGeometry(0.12, height * 0.96, 0.12), neonMat);
+          strip.position.set(cx + sx * hx, base + height / 2, cz + sz * hz);
+          this.scene.add(strip);
+        }
+      }
+      // a couple of horizontal accent bands partway up
+      const bandY = base + height * (0.4 + Math.random() * 0.3);
+      const accent = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.18, 0.1, fd + 0.18), neonMat);
+      accent.position.set(cx, bandY, cz);
+      this.scene.add(accent);
+    }
+
+    // antenna spire with a glowing tip on the taller towers
+    if (height > 26) {
+      const spireH = 2 + Math.random() * 4;
+      const spire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.06, 0.16, spireH, 6), this._mats.poleMetal);
+      spire.position.set(cx, height + base + spireH / 2, cz);
+      this.scene.add(spire);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 10), neonMat);
+      tip.position.set(cx, height + base + spireH, cz);
+      this.scene.add(tip);
     }
 
     // street-level entrance facing the nearest avenue
@@ -1522,12 +1582,80 @@ export class World {
     this.colliders.push({ box, mesh: group });
   }
 
-  // Scattered street furniture players can duck behind — carts, newsstands,
-  // scaffolding, dumpsters, mailboxes and barrier rows down the two main
-  // avenues, on top of the existing parked cars/planters/trees. Kept within
-  // the open avenue corridors (small cross-axis offset) so nothing clips
-  // into a building footprint. Abandoned trucks and barbed-wire checkpoints
-  // guard each avenue's far end, with loose crate stacks for closer cover.
+  // Sci-fi energy barrier: two emitter pylons holding a translucent glowing
+  // force-field, with horizontal scan lines. Solid cover (full collider).
+  _buildEnergyBarrier(x, z, rotY, length = 4) {
+    const group = new THREE.Group();
+    const neon = this._randNeon();
+    const nm = this._neonMat(neon);
+    const h = 1.7;
+    for (const lx of [-length / 2, length / 2]) {
+      const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, h, 8), this._mats.poleMetal);
+      pylon.position.set(lx, h / 2, 0);
+      pylon.castShadow = true;
+      group.add(pylon);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), nm);
+      cap.position.set(lx, h, 0);
+      group.add(cap);
+    }
+    const fieldMat = new THREE.MeshStandardMaterial({
+      color: neon, emissive: neon, emissiveIntensity: 1.3,
+      transparent: true, opacity: 0.26, roughness: 0.3, metalness: 0.1, side: THREE.DoubleSide
+    });
+    const field = new THREE.Mesh(new THREE.BoxGeometry(length, h * 0.82, 0.08), fieldMat);
+    field.position.set(0, h * 0.5, 0);
+    group.add(field);
+    for (let i = 0; i < 3; i++) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(length, 0.05, 0.1), nm);
+      line.position.set(0, 0.45 + i * 0.42, 0);
+      group.add(line);
+    }
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Sci-fi supply crate: dark metallic box with glowing neon edge banding and a
+  // lit data panel, plus a smaller stacked crate. Solid cover.
+  _buildSciCrate(x, z, rotY) {
+    const group = new THREE.Group();
+    const neon = this._randNeon();
+    const nm = this._neonMat(neon);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x14171e, roughness: 0.5, metalness: 0.7 });
+    const s = 1.1;
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), bodyMat);
+    crate.position.y = s / 2;
+    crate.castShadow = true;
+    group.add(crate);
+    for (const dy of [0.08, s - 0.08]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(s + 0.04, 0.05, s + 0.04), nm);
+      band.position.y = dy;
+      group.add(band);
+    }
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(s * 0.5, s * 0.5, 0.04), nm);
+    panel.position.set(0, s * 0.5, s / 2 + 0.01);
+    group.add(panel);
+    const small = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), bodyMat);
+    small.position.set(0.55, 0.35, 0.15);
+    small.rotation.y = 0.4;
+    small.castShadow = true;
+    group.add(small);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = rotY;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // Scattered cover down the two main avenues — civilian street furniture plus
+  // sci-fi energy barriers and supply crates, kept within the open corridors so
+  // nothing clips into a building footprint. Glowing energy checkpoints seal
+  // each avenue's far end.
   _buildObstacles() {
     this._buildHotDogCart(3, 16, 0);
     this._buildHotDogCart(-3, -16, Math.PI);
@@ -1546,33 +1674,28 @@ export class World {
     this._buildMailbox(58, 3, Math.PI / 2);
     this._buildMailbox(-58, -3, -Math.PI / 2);
 
-    this._buildBarrierRow(3, -22, 0, 3);
-    this._buildBarrierRow(-3, 38, 0, 3);
-    this._buildBarrierRow(22, -3, Math.PI / 2, 3);
-    this._buildBarrierRow(-22, 3, Math.PI / 2, 3);
+    // sci-fi energy barriers give mid-avenue cover (replacing concrete barriers)
+    this._buildEnergyBarrier(3, -22, 0, 3.4);
+    this._buildEnergyBarrier(-3, 38, 0, 3.4);
+    this._buildEnergyBarrier(22, -3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier(-22, 3, Math.PI / 2, 3.4);
 
     this._buildTktsSteps(0, -66);
     this._buildSubwayEntrance(0, 66, 0);
 
-    // abandoned trucks blocking each avenue's far end, paired with a
-    // barbed-wire barricade — like a checkpoint nobody came back to staff
-    this._buildTruck(3, 76, 0, false);
-    this._buildTruck(-3, -76, Math.PI, true);
-    this._buildTruck(76, -3, Math.PI / 2, true);
-    this._buildTruck(-76, 3, -Math.PI / 2, false);
+    // glowing energy checkpoints seal each avenue's far end (no more army trucks)
+    this._buildEnergyBarrier(0, 76, 0, 6);
+    this._buildEnergyBarrier(0, -76, 0, 6);
+    this._buildEnergyBarrier(76, 0, Math.PI / 2, 6);
+    this._buildEnergyBarrier(-76, 0, Math.PI / 2, 6);
 
-    this._buildBarbedWire(-5, 76, 0, 4);
-    this._buildBarbedWire(5, -76, Math.PI, 4);
-    this._buildBarbedWire(76, 5, Math.PI / 2, 4);
-    this._buildBarbedWire(-76, -5, Math.PI / 2, 4);
-
-    // loose crates dropped for closer-range cover
-    this._buildCrateStack(4, 4, 0.2);
-    this._buildCrateStack(-4, -4, 0.2 + Math.PI);
-    this._buildCrateStack(-4, 54, -0.3);
-    this._buildCrateStack(4, -52, -0.3 + Math.PI);
-    this._buildCrateStack(54, -4, Math.PI / 2);
-    this._buildCrateStack(-54, 4, -Math.PI / 2);
+    // sci-fi supply crates for closer-range cover
+    this._buildSciCrate(4, 4, 0.2);
+    this._buildSciCrate(-4, -4, 0.2 + Math.PI);
+    this._buildSciCrate(-4, 54, -0.3);
+    this._buildSciCrate(4, -52, -0.3 + Math.PI);
+    this._buildSciCrate(54, -4, Math.PI / 2);
+    this._buildSciCrate(-54, 4, -Math.PI / 2);
   }
 
   _buildBoundary() {
