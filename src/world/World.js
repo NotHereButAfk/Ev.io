@@ -7,63 +7,65 @@ const TAXI_YELLOW = 0xffcf3d;
 // Procedural textures
 // ---------------------------------------------------------------------------
 
-// Asphalt road surface with faded lane markings.
-function makeRoadTexture() {
+function makeTechFloorTexture() {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#101216';
+  ctx.fillStyle = '#04070d';
   ctx.fillRect(0, 0, size, size);
-  // grain
-  for (let i = 0; i < 5000; i++) {
-    const v = 16 + Math.random() * 26;
-    ctx.fillStyle = `rgb(${v},${v + 2},${v + 5})`;
-    ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+  // minor grid
+  ctx.strokeStyle = 'rgba(0,130,190,0.11)';
+  ctx.lineWidth = 0.7;
+  for (let i = 0; i < size; i += 16) {
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
   }
-  // centre dashed line
-  ctx.fillStyle = 'rgba(210,200,150,0.55)';
-  for (let y = 0; y < size; y += 64) {
-    ctx.fillRect(size / 2 - 4, y + 12, 8, 36);
+  // major grid
+  ctx.strokeStyle = 'rgba(0,200,255,0.42)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < size; i += 64) {
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
   }
+  // intersection dots
+  ctx.fillStyle = 'rgba(0,230,255,0.72)';
+  for (let x = 0; x < size; x += 64)
+    for (let y = 0; y < size; y += 64) {
+      ctx.beginPath(); ctx.arc(x,y,2.4,0,Math.PI*2); ctx.fill();
+    }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(ARENA_HALF / 6, ARENA_HALF / 6);
+  tex.repeat.set(ARENA_HALF / 8, ARENA_HALF / 8);
   return tex;
 }
 
-// Roughness map for wet asphalt: dark = glossy puddle, light = dry. Big soft
-// blobs of low roughness scattered across the road give realistic wet patches.
-function makeWetRoughnessTexture() {
+function makeTechFloorEmissiveTexture() {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // base = mostly damp (mid roughness)
-  ctx.fillStyle = '#888888';
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, size, size);
-  // puddles — very dark = very glossy/reflective
-  for (let i = 0; i < 26; i++) {
-    const x = Math.random() * size, y = Math.random() * size;
-    const r = 22 + Math.random() * 70;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(20,20,20,0.92)');
-    g.addColorStop(0.6, 'rgba(60,60,60,0.5)');
-    g.addColorStop(1, 'rgba(136,136,136,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < size; i += 64) {
+    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
   }
-  // dry scuffs (high roughness)
-  for (let i = 0; i < 40; i++) {
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillStyle = `rgba(200,200,200,${0.2 + Math.random() * 0.3})`;
-    ctx.fillRect(x, y, 8 + Math.random() * 30, 4 + Math.random() * 12);
-  }
+  ctx.fillStyle = '#ffffff';
+  for (let x = 0; x < size; x += 64)
+    for (let y = 0; y < size; y += 64) {
+      ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+    }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(ARENA_HALF / 12, ARENA_HALF / 12);
+  tex.repeat.set(ARENA_HALF / 8, ARENA_HALF / 8);
   return tex;
 }
+
+// (removed — replaced by tech floor)
+function makeWetRoughnessTexture() { return null; }
 
 // Vertical gradient skydome — deep indigo zenith fading to a warm neon-haze
 // horizon, so the city sits under a moody, colorful night sky instead of flat black.
@@ -73,11 +75,11 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0.0, '#05060f');   // zenith — near black indigo
-  grad.addColorStop(0.45, '#0a0e1e');  // upper
-  grad.addColorStop(0.72, '#1a1430');  // mid — purple
-  grad.addColorStop(0.88, '#3a1c3e');  // lower — magenta haze
-  grad.addColorStop(1.0, '#5a2438');   // horizon — warm city glow
+  grad.addColorStop(0.0,  '#010208');
+  grad.addColorStop(0.35, '#01050f');
+  grad.addColorStop(0.65, '#020814');
+  grad.addColorStop(0.85, '#040b1e');
+  grad.addColorStop(1.0,  '#070e28');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -385,10 +387,10 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x05030f);
+    this.scene.background = new THREE.Color(0x020308);
     // Deep cyber-indigo haze; pushed back so the neon skyline reads, with a soft
     // near-field so distant holograms and signage glow through the atmosphere.
-    this.scene.fog = new THREE.Fog(0x0c0a26, 26, 170);
+    this.scene.fog = new THREE.Fog(0x040a18, 30, 160);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -483,48 +485,48 @@ export class World {
   }
 
   _buildLighting() {
-    // Cool sky bounce — a teal-blue night ambient that lets neon read against it
-    const hemi = new THREE.HemisphereLight(0x2a3a52, 0x0a0806, 0.34);
+    // Cold star-field ambient — deep space tech bounce
+    const hemi = new THREE.HemisphereLight(0x1a2a4a, 0x030806, 0.40);
     this.scene.add(hemi);
 
-    // moonlight — cool blue key light, casts the scene's shadows
-    const moon = new THREE.DirectionalLight(0xaec4e8, 0.55);
-    moon.position.set(-50, 70, 40);
-    moon.castShadow = true;
-    moon.shadow.mapSize.set(2048, 2048);
-    moon.shadow.camera.left = -95;
-    moon.shadow.camera.right = 95;
-    moon.shadow.camera.top = 95;
-    moon.shadow.camera.bottom = -95;
-    moon.shadow.camera.near = 1;
-    moon.shadow.camera.far = 260;
-    moon.shadow.bias = -0.0012;
-    moon.shadow.normalBias = 0.02;
-    this.scene.add(moon);
+    // Primary star light — cold white-blue key, casts shadows
+    const star = new THREE.DirectionalLight(0xb8d4ff, 0.72);
+    star.position.set(-50, 70, 40);
+    star.castShadow = true;
+    star.shadow.mapSize.set(2048, 2048);
+    star.shadow.camera.left   = -95;
+    star.shadow.camera.right  =  95;
+    star.shadow.camera.top    =  95;
+    star.shadow.camera.bottom = -95;
+    star.shadow.camera.near   =  1;
+    star.shadow.camera.far    = 260;
+    star.shadow.bias        = -0.0012;
+    star.shadow.normalBias  =  0.02;
+    this.scene.add(star);
 
-    // Magenta city-glow fill from the horizon — neon haze bouncing back up.
-    const fill = new THREE.DirectionalLight(0xff2db4, 0.22);
+    // Deep-violet fill from the opposite side — energy field bounce
+    const fill = new THREE.DirectionalLight(0x4428cc, 0.18);
     fill.position.set(20, 8, -30);
     this.scene.add(fill);
 
-    // Cyan rim light from the opposite side to sculpt silhouettes
-    const rim = new THREE.DirectionalLight(0x00e5ff, 0.2);
+    // Cyan rim — sculpts silhouettes against the dark background
+    const rim = new THREE.DirectionalLight(0x00e5ff, 0.30);
     rim.position.set(60, 18, 50);
     this.scene.add(rim);
   }
 
   _buildGround() {
-    // Rain-slicked asphalt: low roughness + a roughness map of "puddles" makes
-    // the road wet and mirror-like in patches, so neon and lamps reflect off it.
-    const roadTex = makeRoadTexture();
-    const roughTex = makeWetRoughnessTexture();
+    const floorTex  = makeTechFloorTexture();
+    const emitTex   = makeTechFloorEmissiveTexture();
     const roadMat = new THREE.MeshStandardMaterial({
-      map: roadTex,
-      roughnessMap: roughTex,
-      roughness: 0.5,
-      metalness: 0.55,
-      color: 0x6b7178,
-      envMapIntensity: 1.4,
+      map:          floorTex,
+      emissiveMap:  emitTex,
+      emissive:     new THREE.Color(0x003448),
+      emissiveIntensity: 0.14,
+      roughness:    0.85,
+      metalness:    0.22,
+      color:        0x07111a,
+      envMapIntensity: 0.7,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;
@@ -667,7 +669,7 @@ export class World {
 
         // Mostly sleek glass arcologies; a few squat brick relics for contrast.
         // Heights vary hard — from low blocks to the odd mega-spire.
-        const brick = Math.random() < 0.22;
+        const brick = false;
         let height;
         if (brick)                       height = 9  + Math.random() * 9;
         else if (Math.random() < 0.16)   height = 56 + Math.random() * 28; // mega-tower

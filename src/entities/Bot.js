@@ -9,11 +9,10 @@ const RADIUS = 0.5;
 
 let nextId = 1;
 
-// Three distinct hostile soldier archetypes with visible human faces + layered armour.
 const BOT_TYPES = [
-  { primary: 0x5c1010, secondary: 0x100304, trim: 0x2a1010, visor: 0xff2200 }, // Crimson Hunter
-  { primary: 0x102040, secondary: 0x060c18, trim: 0x1a2a3a, visor: 0x00aaff }, // Steel Ghost
-  { primary: 0x182810, secondary: 0x080e04, trim: 0x1e3010, visor: 0x44ff22 }, // Forest Stalker
+  { primary: 0x0a1a2a, secondary: 0x040810, trim: 0x0e2a3e, visor: 0x00e5ff }, // Sentinel Mk-VII
+  { primary: 0x1e0a2a, secondary: 0x0a0418, trim: 0x2e0a42, visor: 0xaa44ff }, // Vex Construct
+  { primary: 0x0a1a0a, secondary: 0x030803, trim: 0x102e10, visor: 0x39ff9e }, // Null Enforcer
 ];
 let _botTypeIdx = 0; // round-robin so each new bot picks the next type
 
@@ -21,7 +20,6 @@ function buildBotMesh() {
   const cfg = BOT_TYPES[_botTypeIdx++ % BOT_TYPES.length];
 
   // Materials
-  const skinMat  = new THREE.MeshStandardMaterial({ color: 0xc49a72, roughness: 0.78, metalness: 0 });
   const suitMat  = new THREE.MeshStandardMaterial({ color: cfg.secondary, roughness: 0.84, metalness: 0.06 });
   const armorMat = new THREE.MeshStandardMaterial({ color: cfg.primary,   roughness: 0.50, metalness: 0.58 });
   const trimMat  = new THREE.MeshStandardMaterial({ color: cfg.trim,      roughness: 0.40, metalness: 0.72 });
@@ -29,8 +27,6 @@ function buildBotMesh() {
     color: cfg.visor, emissive: cfg.visor, emissiveIntensity: 1.4,
     roughness: 0.04, metalness: 0, transparent: true, opacity: 0.86
   });
-  const eyeMat   = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9, metalness: 0 });
-  const lipMat   = new THREE.MeshStandardMaterial({ color: 0x8a5252, roughness: 0.9, metalness: 0 });
 
   const group = new THREE.Group();
 
@@ -86,47 +82,45 @@ function buildBotMesh() {
     add(B(0.18,0.12,0.18,armorMat), ax, 1.31, 0);   // elbow guard
     add(Cap(0.08,0.28,suitMat),     ax, 1.10, 0);
     add(B(0.16,0.28,0.06,armorMat), ax, 1.10,-0.09);// vambrace
-    add(B(0.18,0.14,0.16,skinMat),  ax, 0.85, 0);   // bare hand / glove
+    add(B(0.18,0.14,0.16,suitMat),  ax, 0.85, 0);   // bare hand / glove
   });
 
-  // ── Human head (visible face + tactical helmet on top) ────────────────────
-  // Neck
-  const neck = Cap(0.075,0.12,skinMat); neck.position.set(0,1.90,0); group.add(neck);
+  // ── Android head unit ─────────────────────────────────────────────────────
+  // Neck connector (mechanical joints)
+  add(B(0.22,0.10,0.20,trimMat),    0, 1.91,  0.00);
+  add(B(0.14,0.08,0.14,suitMat),    0, 1.83,  0.00);
 
-  // Skull — slightly oval
-  const skull = Sph(0.20,skinMat); skull.scale.set(1,1.05,0.96);
-  skull.position.set(0,2.10,0); group.add(skull);
+  // Main head chassis — angular, box-like
+  const headBox = add(B(0.40,0.32,0.38,armorMat), 0, 2.13, 0.00);
 
-  // Brow ridge
-  add(B(0.28,0.06,0.06,skinMat), 0, 2.22,-0.17);
+  // Brow plate (angled edge)
+  add(B(0.42,0.055,0.14,trimMat),   0, 2.30, -0.06);
+  // Chin module
+  add(B(0.34,0.07,0.32,trimMat),    0, 1.96,  0.00);
 
-  // Eyes (dark irises set into the face)
-  [-0.07,0.07].forEach((ex) => {
-    add(Sph(0.024,eyeMat), ex, 2.12,-0.185);
+  // Full-width sensor visor strip
+  add(B(0.38,0.10,0.03,visorMat),   0, 2.13, -0.19);
+
+  // Side sensor nodes
+  [-0.20,0.20].forEach(sx => add(Sph(0.028,visorMat), sx, 2.13, -0.18));
+
+  // Side panel detail
+  [-1,1].forEach(s => {
+    add(B(0.04,0.26,0.36,trimMat),  s*0.21, 2.13,  0.00);
+    add(B(0.035,0.055,0.08,visorMat), s*0.21, 2.20, -0.06);
   });
 
-  // Nose bridge
-  add(B(0.035,0.06,0.05,skinMat), 0, 2.05,-0.20);
-
-  // Mouth / lips
-  add(B(0.09,0.025,0.02,lipMat), 0, 1.97,-0.197);
-
-  // Low-profile combat helmet (sits on top of skull)
-  add(B(0.40,0.14,0.40,armorMat), 0, 2.27,  0);
-  add(B(0.42,0.05,0.24,armorMat), 0, 2.20, -0.12); // visor brim
-  add(B(0.36,0.11,0.045,visorMat),0, 2.12, -0.22); // glowing visor strip
-  add(B(0.38,0.13,0.02,suitMat),  0, 2.12, -0.20); // visor slot shadow
-  // Ear cheek guards
-  [-1,1].forEach((s) => add(B(0.06,0.20,0.28,armorMat), s*0.23, 2.07, 0));
-  // Helmet back
-  add(B(0.36,0.26,0.08,armorMat), 0, 2.18,  0.24);
+  // Top sensor/antenna array
+  add(B(0.10,0.04,0.10,trimMat),    0, 2.30,  0.06);
+  add(B(0.025,0.14,0.025,visorMat), 0, 2.39,  0.06);
+  add(B(0.06,0.035,0.06,trimMat),   0, 2.47,  0.06);
 
   // ── Shadow + light casting on all meshes ──────────────────────────────────
   group.traverse((obj) => {
     if (obj.isMesh) { obj.castShadow = true; obj.receiveShadow = true; }
   });
 
-  return { group, bodyMat: armorMat, torso: skull, head: skull };
+  return { group, bodyMat: armorMat, torso: headBox, head: headBox };
 }
 
 function buildHealthBar() {

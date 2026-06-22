@@ -5,7 +5,7 @@
 export const WEAPONS = [
   {
     id: 'sidearm',
-    name: 'Sheriff',
+    name: 'Pulse Pistol',
     key: '1',
     kind: 'hitscan',
     sound: 'sidearm',
@@ -20,11 +20,11 @@ export const WEAPONS = [
     reloadTime: 1.4,
     range: 140,
     recoil: 0.035,
-    color: 0x2b2f36
+    color: 0x061a2a
   },
   {
     id: 'uzi',
-    name: 'Uzi',
+    name: 'Scatter Blaster',
     key: '2',
     kind: 'hitscan',
     sound: 'smg',
@@ -38,11 +38,11 @@ export const WEAPONS = [
     reloadTime: 1.5,
     range: 80,
     recoil: 0.013,
-    color: 0x202227
+    color: 0x0c1520
   },
   {
     id: 'levershotgun',
-    name: 'Lever Shotgun',
+    name: 'Volt Cannon',
     key: '3',
     kind: 'hitscan',
     sound: 'shotgun',
@@ -56,11 +56,11 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 30,
     recoil: 0.05,
-    color: 0x6b4a2f
+    color: 0x1a0e2e
   },
   {
     id: 'm4',
-    name: 'M4 Carbine',
+    name: 'AR-9 Assault',
     key: '4',
     kind: 'hitscan',
     sound: 'rifle',
@@ -74,11 +74,11 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 150,
     recoil: 0.02,
-    color: 0x2a2d33
+    color: 0x0a1520
   },
   {
     id: 'm16',
-    name: 'M16A2',
+    name: 'Ion Repeater',
     key: '5',
     kind: 'hitscan',
     sound: 'rifle',
@@ -92,11 +92,11 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 160,
     recoil: 0.02,
-    color: 0x1a1c20
+    color: 0x080e1a
   },
   {
     id: 'rifle',
-    name: 'Falcon Rifle',
+    name: 'Comet Rifle',
     key: '6',
     kind: 'hitscan',
     sound: 'rifle',
@@ -110,11 +110,11 @@ export const WEAPONS = [
     reloadTime: 1.9,
     range: 140,
     recoil: 0.022,
-    color: 0x3f4a3a
+    color: 0x0f1a14
   },
   {
     id: 'lmg',
-    name: 'M240 Bravo',
+    name: 'Plasma Suppressor',
     key: 'H',
     kind: 'hitscan',
     sound: 'lmg',
@@ -128,11 +128,11 @@ export const WEAPONS = [
     reloadTime: 4.5,
     range: 160,
     recoil: 0.03,
-    color: 0x23262b
+    color: 0x0a1018
   },
   {
     id: 'rpg',
-    name: 'RPG-7',
+    name: 'Nova Launcher',
     key: 'G',
     kind: 'rocket',
     sound: 'rpg',
@@ -149,11 +149,11 @@ export const WEAPONS = [
     reloadTime: 3.2,
     range: 220,
     recoil: 0.09,
-    color: 0x33363b
+    color: 0x180a22
   },
   {
     id: 'boltsniper',
-    name: 'Precision Bolt',
+    name: 'Rail Driver',
     key: 'B',
     kind: 'hitscan',
     sound: 'sniper',
@@ -168,11 +168,11 @@ export const WEAPONS = [
     range: 320,
     recoil: 0.06,
     scoped: true,
-    color: 0x1f2228
+    color: 0x050e20
   },
   {
     id: 'knife',
-    name: 'Combat Knife',
+    name: 'Plasma Blade',
     key: 'C',
     kind: 'melee',
     damage: 55,            // melee stab damage
@@ -184,18 +184,18 @@ export const WEAPONS = [
     throwDamage: 9999,     // one-hit kill on throw
     throwCooldown: 0.85,   // seconds before you pull a fresh knife
     throwRewardMult: 3,    // 3x coins/score/xp — only on a thrown kill
-    color: 0x9aa0a8
+    color: 0x00aaff
   },
   {
     id: 'sword',
-    name: 'Reaver Blade',
+    name: 'Arc Blade',
     key: 'V',
     kind: 'melee',
     damage: 65,
     fireRate: 0.45,
     range: 2.6,
     arc: 1.0,
-    color: 0xc7ccd1
+    color: 0x00e5ff
   }
 ];
 
