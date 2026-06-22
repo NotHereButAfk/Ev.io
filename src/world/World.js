@@ -301,7 +301,7 @@ function makeBillboardTexture(seed) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = pal[1]; ctx.shadowColor = pal[0];
-  ctx.fillText(['SALE', 'NEON', 'CITY', '24/7', 'LIVE'][seed % 5], w / 2, h * 0.5);
+  ctx.fillText(['NEURAL LINK', 'VOID RUNNER', 'QUANTUM', 'NEXUS', 'SYNAPSE'][seed % 5], w / 2, h * 0.5);
   // glowing accent stripes
   ctx.shadowBlur = 14;
   ctx.fillStyle = pal[0]; ctx.shadowColor = pal[0];
@@ -319,7 +319,7 @@ function makeBillboardTexture(seed) {
   return new THREE.CanvasTexture(canvas);
 }
 
-// Bright neon "TIMES SQUARE" marquee — glowing red-and-gold, blooms strongly.
+// Sci-fi mega-sign: cyan-on-black "KYX.IO // FORERUNNER DISTRICT" marquee
 function makeTimesSquareSignTexture() {
   const w = 512;
   const h = 128;
@@ -327,22 +327,31 @@ function makeTimesSquareSignTexture() {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0a0205';
+  ctx.fillStyle = '#020b14';
   ctx.fillRect(0, 0, w, h);
-  // glowing border
-  ctx.shadowColor = '#ff2a4a';
-  ctx.shadowBlur = 18;
-  ctx.strokeStyle = '#ff2a4a';
-  ctx.lineWidth = 6;
-  ctx.strokeRect(10, 10, w - 20, h - 20);
-  // neon text
-  ctx.font = 'bold 62px Arial';
+  // outer glow border
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 20;
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(8, 8, w - 16, h - 16);
+  // inner accent line
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(0,229,255,0.35)';
+  ctx.strokeRect(16, 16, w - 32, h - 32);
+  // main text
+  ctx.font = 'bold 46px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = '#ffd24a';
-  ctx.shadowBlur = 24;
-  ctx.fillStyle = '#ffe27a';
-  ctx.fillText('TIMES SQUARE', w / 2, h / 2);
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 28;
+  ctx.fillStyle = '#00e5ff';
+  ctx.fillText('KYX.IO  //  FORERUNNER DISTRICT', w / 2, h / 2 - 8);
+  // subtitle
+  ctx.font = 'bold 18px Arial';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = 'rgba(0,229,255,0.65)';
+  ctx.fillText('HALO OF WEB3  ·  PVP  ·  PVE  ·  5 GAME MODES', w / 2, h / 2 + 28);
   ctx.shadowBlur = 0;
   return new THREE.CanvasTexture(canvas);
 }
@@ -481,6 +490,8 @@ export class World {
     this._buildBoundary();
     this._buildOrbitalRing();
     this._buildArenaCore();
+    this._buildLandingPads();
+    this._buildGroundChannels();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -1862,6 +1873,104 @@ export class World {
     orb2.rotation.x = -Math.PI * 0.25;
     orb2.rotation.z =  Math.PI * 0.15;
     this.scene.add(orb2);
+  }
+
+  // Circular landing pads with neon edge markings scattered around the arena
+  _buildLandingPad(x, z, radius = 5.5, color) {
+    const c     = color || this._randNeon();
+    const nm    = this._neonMat(c);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x050d18, roughness: 0.35, metalness: 0.85 });
+
+    // Pad disc
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius + 0.3, 0.14, 16), metal);
+    pad.position.set(x, 0.07, z);
+    pad.receiveShadow = true;
+    this.scene.add(pad);
+
+    // Outer glow ring
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.14, 8, 40), nm);
+    ring.position.set(x, 0.18, z);
+    ring.rotation.x = Math.PI / 2;
+    this.scene.add(ring);
+
+    // Inner dashed circle (8 arc segments)
+    const innerR = radius * 0.6;
+    for (let i = 0; i < 8; i++) {
+      if (i % 2 === 0) continue;
+      const arc = new THREE.Mesh(
+        new THREE.TorusGeometry(innerR, 0.06, 6, 8, Math.PI / 4),
+        nm
+      );
+      arc.position.set(x, 0.18, z);
+      arc.rotation.x = Math.PI / 2;
+      arc.rotation.z = (i / 8) * Math.PI * 2;
+      this.scene.add(arc);
+    }
+
+    // Corner triangle markers
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2;
+      const mx = x + Math.cos(angle) * (radius - 0.8);
+      const mz = z + Math.sin(angle) * (radius - 0.8);
+      const marker = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.5, 3), nm);
+      marker.position.set(mx, 0.32, mz);
+      marker.rotation.y = angle;
+      this.scene.add(marker);
+    }
+
+    // Ambient pad light
+    const light = new THREE.PointLight(c, 3, 18, 2);
+    light.position.set(x, 1.2, z);
+    this.scene.add(light);
+  }
+
+  _buildLandingPads() {
+    this._buildLandingPad( 36,   0, 5.5, 0x00e5ff);
+    this._buildLandingPad(-36,   0, 5.5, 0x00e5ff);
+    this._buildLandingPad(  0,  36, 5.5, 0xff2db4);
+    this._buildLandingPad(  0, -36, 5.5, 0xff2db4);
+    this._buildLandingPad( 60,  60, 4.5, 0xb24bff);
+    this._buildLandingPad(-60, -60, 4.5, 0xb24bff);
+    this._buildLandingPad( 60, -60, 4.5, 0x39ff9e);
+    this._buildLandingPad(-60,  60, 4.5, 0x39ff9e);
+  }
+
+  // Glowing energy channels running down both main avenues, like runway strips
+  _buildGroundChannels() {
+    const channelMat = (c) => new THREE.MeshStandardMaterial({
+      color: c, emissive: c, emissiveIntensity: 2.0, roughness: 0.3, metalness: 0.1
+    });
+    const cyan   = channelMat(0x00b4d8);
+    const violet = channelMat(0x8844ff);
+
+    // N-S avenue channel strips (parallel to Z axis, offset ±1.5 from centre)
+    for (const xOff of [-1.5, 1.5]) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.02, ARENA_HALF * 1.8), cyan);
+      strip.position.set(xOff, 0.02, 0);
+      this.scene.add(strip);
+    }
+
+    // E-W avenue strips
+    for (const zOff of [-1.5, 1.5]) {
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(ARENA_HALF * 1.8, 0.02, 0.18), violet);
+      strip.position.set(0, 0.02, zOff);
+      this.scene.add(strip);
+    }
+
+    // Intersection diamond at the plaza centre
+    const diag = Math.sqrt(2);
+    const pts = [
+      [0,  0.02,  3.5],
+      [3.5, 0.02,  0],
+      [0,  0.02, -3.5],
+      [-3.5, 0.02,  0],
+    ];
+    pts.forEach(([px, py, pz]) => {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(3.5 * diag, 0.025, 0.22), cyan);
+      bar.position.set(px / 2, py, pz / 2);
+      bar.rotation.y = Math.atan2(pz, px) + Math.PI / 4;
+      this.scene.add(bar);
+    });
   }
 
   _buildSpawnPoints() {

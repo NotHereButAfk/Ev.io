@@ -2652,132 +2652,142 @@ html, body {
 #mobile-controls {
   position: fixed;
   inset: 0;
-  z-index: 120;
-  /* Capture ALL touches so look-zone swipes (right half, empty space) register */
+  z-index: 500;
   pointer-events: auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
 }
-
 #mobile-controls.hidden { display: none; }
 
-/* Visual-only children (joy ring, nub) must stay non-interactive */
-
-/* === Left-half joystick zone (transparent, just catches taps) === */
-#joy-zone {
-  position: absolute;
-  left: 0; top: 0;
-  width: 46%; height: 100%;
-  touch-action: none;
-}
-
-/* Joystick ring — appears at touch origin, hidden by default */
+/* ── Joystick: fixed bottom-left, always visible ── */
 #joy-outer {
   position: fixed;
-  width: 104px;
-  height: 104px;
+  left: 28px;
+  bottom: 48px;
+  width: 144px;
+  height: 144px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 229, 255, 0.45);
-  background: rgba(0, 229, 255, 0.06);
-  opacity: 0;
+  background: rgba(0, 20, 35, 0.55);
+  border: 2.5px solid rgba(0, 229, 255, 0.55);
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.18), inset 0 0 18px rgba(0, 229, 255, 0.06);
   pointer-events: none;
-  transition: opacity 0.1s ease;
+  backdrop-filter: blur(3px);
+}
+
+#joy-ring {
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  pointer-events: none;
 }
 
 #joy-inner {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  top: calc(50% - 20px);
-  left: calc(50% - 20px);
+  width: 56px;
+  height: 56px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: rgba(0, 229, 255, 0.70);
-  box-shadow: 0 0 14px rgba(0, 229, 255, 0.75), inset 0 0 6px rgba(255,255,255,0.3);
-  transform: translate(0px, 0px);
+  background: radial-gradient(circle at 38% 38%, rgba(80,230,255,0.9), rgba(0,180,220,0.75));
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.8), inset 0 2px 4px rgba(255,255,255,0.35);
   pointer-events: none;
+  transition: transform 0.04s ease-out;
 }
 
-/* === Right-side action buttons === */
-#mobile-btns {
-  position: absolute;
-  right: 18px;
-  bottom: 28px;
+/* ── Top-right utility buttons ── */
+#m-top-btns {
+  position: fixed;
+  right: 16px;
+  bottom: 168px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  touch-action: none;
-}
-
-#mobile-btns-top, #mobile-btns-bot {
-  display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
+  pointer-events: auto;
 }
 
-.mobile-btn {
+/* ── Bottom-right action buttons ── */
+#m-bot-btns {
+  position: fixed;
+  right: 16px;
+  bottom: 48px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+
+/* ── Base button style ── */
+.mbtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 229, 255, 0.45);
-  background: rgba(4, 12, 22, 0.72);
+  border: 2px solid rgba(0, 229, 255, 0.5);
+  background: rgba(3, 12, 22, 0.78);
   color: #00e5ff;
-  font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   font-family: 'Rajdhani', 'Orbitron', sans-serif;
-  letter-spacing: 0.05em;
   cursor: pointer;
   outline: none;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
-  transition: background 0.06s, box-shadow 0.06s;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+  transition: background 0.05s, box-shadow 0.05s;
+  width: 52px;
+  height: 52px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.mbtn:active {
+  background: rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 22px rgba(0, 229, 255, 0.6);
 }
 
-.mobile-btn:active {
-  background: rgba(0, 229, 255, 0.22);
-  box-shadow: 0 0 18px rgba(0, 229, 255, 0.55);
+/* Jump */
+.mbtn-jump {
+  width: 66px;
+  height: 66px;
+  font-size: 26px;
+  border-color: rgba(80, 180, 255, 0.7);
+  background: rgba(2, 10, 28, 0.80);
+  color: #60c8ff;
+  box-shadow: 0 0 12px rgba(80, 180, 255, 0.28);
+}
+.mbtn-jump:active {
+  background: rgba(80, 180, 255, 0.25);
+  box-shadow: 0 0 26px rgba(80, 180, 255, 0.65);
 }
 
-/* Jump — slightly larger */
-.btn-jump {
-  width: 62px;
-  height: 62px;
-  font-size: 22px;
-}
-
-/* Fire — prominent, red accent */
-.btn-fire {
-  width: 76px;
-  height: 76px;
-  font-size: 28px;
-  border-color: rgba(255, 55, 55, 0.65);
-  background: rgba(28, 4, 4, 0.80);
+/* Fire — big red */
+.mbtn-fire {
+  width: 82px;
+  height: 82px;
+  font-size: 34px;
+  border-color: rgba(255, 55, 55, 0.7);
+  background: rgba(28, 3, 3, 0.82);
   color: #ff4444;
-  box-shadow: 0 0 14px rgba(255, 55, 55, 0.28);
+  box-shadow: 0 0 16px rgba(255, 55, 55, 0.32);
+}
+.mbtn-fire:active {
+  background: rgba(255, 40, 40, 0.30);
+  box-shadow: 0 0 30px rgba(255, 55, 55, 0.75);
 }
 
-.btn-fire:active {
-  background: rgba(255, 40, 40, 0.28);
-  box-shadow: 0 0 28px rgba(255, 55, 55, 0.70);
-}
-
-/* Menu button — small, top-right of button group */
-#btn-menu-m {
+/* Menu pill */
+.mbtn-menu {
   width: 44px;
   height: 44px;
   font-size: 20px;
-  border-color: rgba(255,255,255,0.22);
-  color: rgba(255,255,255,0.6);
+  border-color: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.55);
 }
 
-/* On desktop, never show mobile controls even if DOM node exists */
+/* Hide on true pointer devices (desktops/laptops with mouse) */
 @media (hover: hover) and (pointer: fine) {
   #mobile-controls { display: none !important; }
 }

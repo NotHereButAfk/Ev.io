@@ -1,68 +1,74 @@
-// Touch sensitivity: how many radians per CSS pixel of swipe
-// Mouse sensitivity is 0.0024 rad/px; touch pixels are finer so we scale up.
-const TOUCH_SENSITIVITY = 3.8;
-const JOY_RADIUS  = 58;  // max nub travel in CSS px
-const JOY_DEAD    = 9;   // ignore micro-trembles below this px distance
-const SPRINT_THRESH = JOY_RADIUS * 0.55; // full-tilt forward = auto-sprint
+// Touch sensitivity relative to existing mouse sensitivity (0.0024 rad/px)
+const TOUCH_SENS  = 4.0;
+const JOY_RADIUS  = 62;  // max nub travel in px
+const JOY_DEAD    = 8;   // deadzone
+const JOY_CENTER_X = 90; // fixed joystick center from left edge
+const JOY_CENTER_Y_FROM_BOTTOM = 110; // from bottom edge
 
 export class MobileControls {
   constructor(input, callbacks = {}) {
-    this.input = input;
-    this.onMenu = callbacks.onMenu || null;
+    this.input   = input;
+    this.onMenu  = callbacks.onMenu || null;
 
-    // id → { role, startX, startY, lastX, lastY }
+    // id → { role, lastX, lastY }
     this._touches = new Map();
-    this._joyCenter = { x: 0, y: 0 };
+    this._joyActive = false;
 
     this._el       = null;
-    this._joyOuter = null;
     this._joyInner = null;
+    this._joyCenter = { x: 0, y: 0 }; // set on first show / resize
 
     this._build();
     this._wire();
+    window.addEventListener('resize', () => this._updateJoyCenter());
   }
 
-  // ── DOM construction ───────────────────────────────────────────────────────
+  // ── DOM ────────────────────────────────────────────────────────────────────
 
   _build() {
     const el = document.createElement('div');
     el.id = 'mobile-controls';
     el.className = 'hidden';
     el.innerHTML = `
-      <div id="joy-zone"></div>
-      <div id="joy-outer"><div id="joy-inner"></div></div>
-      <div id="mobile-btns">
-        <div id="mobile-btns-top">
-          <button id="btn-ability" class="mobile-btn" data-role="ability">Q</button>
-          <button id="btn-reload"  class="mobile-btn" data-role="reload">R</button>
-          <button id="btn-grenade" class="mobile-btn" data-role="grenade">G</button>
-          <button id="btn-menu-m"  class="mobile-btn" data-role="menu">≡</button>
-        </div>
-        <div id="mobile-btns-bot">
-          <button id="btn-jump" class="mobile-btn btn-jump" data-role="jump">↑</button>
-          <button id="btn-fire" class="mobile-btn btn-fire" data-role="fire">●</button>
-        </div>
+      <!-- Joystick (fixed position, always visible) -->
+      <div id="joy-outer">
+        <div id="joy-ring"></div>
+        <div id="joy-inner"></div>
+      </div>
+
+      <!-- Action buttons — right side -->
+      <div id="m-top-btns">
+        <button class="mbtn mbtn-sm" data-role="ability">Q</button>
+        <button class="mbtn mbtn-sm" data-role="reload">R</button>
+        <button class="mbtn mbtn-sm" data-role="grenade">G</button>
+        <button class="mbtn mbtn-sm mbtn-menu" data-role="menu">≡</button>
+      </div>
+      <div id="m-bot-btns">
+        <button class="mbtn mbtn-jump" data-role="jump">↑</button>
+        <button class="mbtn mbtn-fire" data-role="fire">●</button>
       </div>
     `;
     document.body.appendChild(el);
     this._el       = el;
-    this._joyOuter = el.querySelector('#joy-outer');
     this._joyInner = el.querySelector('#joy-inner');
   }
 
-  // ── Event wiring ───────────────────────────────────────────────────────────
-
-  _wire() {
-    // All touch routing is handled on the overlay itself so multi-touch works
-    // across zone boundaries (e.g. holding fire while swiping to look).
-    const opts = { passive: false };
-    this._el.addEventListener('touchstart',  this._onStart.bind(this), opts);
-    this._el.addEventListener('touchmove',   this._onMove.bind(this),  opts);
-    this._el.addEventListener('touchend',    this._onEnd.bind(this),   opts);
-    this._el.addEventListener('touchcancel', this._onEnd.bind(this),   opts);
+  _updateJoyCenter() {
+    this._joyCenter = {
+      x: JOY_CENTER_X,
+      y: window.innerHeight - JOY_CENTER_Y_FROM_BOTTOM,
+    };
   }
 
-  // ── Touch classification ───────────────────────────────────────────────────
+  // ── Events ─────────────────────────────────────────────────────────────────
+
+  _wire() {
+    const o = { passive: false };
+    this._el.addEventListener('touchstart',  this._onStart.bind(this), o);
+    this._el.addEventListener('touchmove',   this._onMove.bind(this),  o);
+    this._el.addEventListener('touchend',    this._onEnd.bind(this),   o);
+    this._el.addEventListener('touchcancel', this._onEnd.bind(this),   o);
+  }
 
   _roleOf(touch) {
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -70,21 +76,16 @@ export class MobileControls {
       const btn = el.closest('[data-role]');
       if (btn) return btn.dataset.role;
     }
-    // Left 46 % → joystick zone; right side → camera look
-    return touch.clientX < window.innerWidth * 0.46 ? 'joy' : 'look';
+    // Generous joystick zone: left 44% of screen width
+    if (touch.clientX < window.innerWidth * 0.44) return 'joy';
+    return 'look';
   }
-
-  // ── Touch handlers ─────────────────────────────────────────────────────────
 
   _onStart(e) {
     e.preventDefault();
     for (const t of e.changedTouches) {
       const role = this._roleOf(t);
-      this._touches.set(t.identifier, {
-        role,
-        startX: t.clientX, startY: t.clientY,
-        lastX:  t.clientX, lastY:  t.clientY,
-      });
+      this._touches.set(t.identifier, { role, lastX: t.clientX, lastY: t.clientY });
       this._handleDown(role, t);
     }
   }
@@ -94,7 +95,12 @@ export class MobileControls {
     for (const t of e.changedTouches) {
       const rec = this._touches.get(t.identifier);
       if (!rec) continue;
-      this._handleMove(rec, t);
+      if (rec.role === 'joy') {
+        this._updateJoy(t.clientX, t.clientY);
+      } else if (rec.role === 'look') {
+        this.input.mouseDX += (t.clientX - rec.lastX) * TOUCH_SENS;
+        this.input.mouseDY += (t.clientY - rec.lastY) * TOUCH_SENS;
+      }
       rec.lastX = t.clientX;
       rec.lastY = t.clientY;
     }
@@ -105,23 +111,21 @@ export class MobileControls {
     for (const t of e.changedTouches) {
       const rec = this._touches.get(t.identifier);
       if (rec) {
-        this._handleUp(rec.role);
+        if (rec.role === 'joy')  this._releaseJoy();
+        if (rec.role === 'fire') this.input.mouseDown = false;
         this._touches.delete(t.identifier);
       }
     }
   }
 
-  // ── Down / move / up per role ──────────────────────────────────────────────
+  // ── Per-role handling ──────────────────────────────────────────────────────
 
   _handleDown(role, touch) {
     const inp = this.input;
     switch (role) {
       case 'joy':
-        this._joyCenter = { x: touch.clientX, y: touch.clientY };
-        // Anchor the visual ring at the touch point
-        this._joyOuter.style.left    = (touch.clientX - 52) + 'px';
-        this._joyOuter.style.top     = (touch.clientY - 52) + 'px';
-        this._joyOuter.style.opacity = '1';
+        this._joyActive = true;
+        this._updateJoy(touch.clientX, touch.clientY);
         break;
       case 'fire':
         inp.mouseDown = true;
@@ -144,68 +148,41 @@ export class MobileControls {
     }
   }
 
-  _handleMove(rec, touch) {
-    if (rec.role === 'joy') {
-      this._updateJoy(touch.clientX, touch.clientY);
-    } else if (rec.role === 'look') {
-      const dx = touch.clientX - rec.lastX;
-      const dy = touch.clientY - rec.lastY;
-      this.input.mouseDX += dx * TOUCH_SENSITIVITY;
-      this.input.mouseDY += dy * TOUCH_SENSITIVITY;
-    }
-  }
-
   _updateJoy(cx, cy) {
-    let dx = cx - this._joyCenter.x;
-    let dy = cy - this._joyCenter.y;
+    const { x: ox, y: oy } = this._joyCenter;
+    let dx = cx - ox;
+    let dy = cy - oy;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > JOY_RADIUS) { dx = dx / dist * JOY_RADIUS; dy = dy / dist * JOY_RADIUS; }
 
-    // Clamp nub to ring radius
-    if (dist > JOY_RADIUS) {
-      const s = JOY_RADIUS / dist;
-      dx *= s; dy *= s;
-    }
+    // Move the nub visually
+    this._joyInner.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
-    // Move the inner nub (CSS transform, relative to outer center)
-    this._joyInner.style.transform = `translate(${dx}px,${dy}px)`;
-
-    // Map to virtual WASD keys
+    // Inject WASD virtual keys
     const inp = this.input;
-    const forward = -dy;
-    inp.setVirtualKey('KeyW', forward >  JOY_DEAD);
-    inp.setVirtualKey('KeyS', forward < -JOY_DEAD);
-    inp.setVirtualKey('KeyA', dx < -JOY_DEAD);
-    inp.setVirtualKey('KeyD', dx >  JOY_DEAD);
-
-    // Auto-sprint: full-tilt forward or diagonal = hold Shift
-    inp.setVirtualKey('ShiftLeft', forward > SPRINT_THRESH && Math.abs(dx) < JOY_RADIUS * 0.7);
+    const fwd = -dy;
+    inp.setVirtualKey('KeyW', fwd >  JOY_DEAD);
+    inp.setVirtualKey('KeyS', fwd < -JOY_DEAD);
+    inp.setVirtualKey('KeyA', dx  < -JOY_DEAD);
+    inp.setVirtualKey('KeyD', dx  >  JOY_DEAD);
+    inp.setVirtualKey('ShiftLeft', fwd > JOY_RADIUS * 0.5 && Math.abs(dx) < JOY_RADIUS * 0.75);
   }
 
-  _handleUp(role) {
+  _releaseJoy() {
+    this._joyActive = false;
+    this._joyInner.style.transform = 'translate(-50%, -50%)';
     const inp = this.input;
-    if (role === 'joy') {
-      // Release all movement keys
-      inp.setVirtualKey('KeyW',     false);
-      inp.setVirtualKey('KeyS',     false);
-      inp.setVirtualKey('KeyA',     false);
-      inp.setVirtualKey('KeyD',     false);
-      inp.setVirtualKey('ShiftLeft', false);
-      // Hide joystick visual
-      this._joyOuter.style.opacity = '0';
-      this._joyInner.style.transform = 'translate(0px,0px)';
-    } else if (role === 'fire') {
-      inp.mouseDown = false;
-    }
+    ['KeyW','KeyS','KeyA','KeyD','ShiftLeft'].forEach(k => inp.setVirtualKey(k, false));
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   show() {
+    this._updateJoyCenter();
     this._el.classList.remove('hidden');
   }
 
   hide() {
-    // Release everything when hidden so controls don't get stuck
     const inp = this.input;
     ['KeyW','KeyS','KeyA','KeyD','ShiftLeft'].forEach(k => inp.setVirtualKey(k, false));
     inp.mouseDown = false;
