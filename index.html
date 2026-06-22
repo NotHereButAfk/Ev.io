@@ -364,8 +364,33 @@
 
       <!-- Survival: wave incoming banner (auto-hides) -->
       <div id="wave-banner" class="hidden"></div>
+
+      <!-- Scope overlay: visible when ADS on scoped weapons -->
+      <div id="scope-overlay">
+        <div class="scope-ring">
+          <div class="scope-ch-v"></div>
+          <div class="scope-ch-h"></div>
+          <div class="scope-mildot scope-mildot-l"></div>
+          <div class="scope-mildot scope-mildot-r"></div>
+          <div class="scope-mildot scope-mildot-t"></div>
+          <div class="scope-mildot scope-mildot-b"></div>
+          <div class="scope-ch-dot"></div>
+        </div>
+      </div>
     </div>
-  </div>
+
+    <!-- In-game buy shop — Tab to open during gameplay, outside #hud so pointer-events work -->
+    <div id="ingame-shop" class="hidden">
+      <div class="igs-panel">
+        <div class="igs-header">
+          <span class="igs-title">&#x1F6D2; BUY MENU</span>
+          <span class="igs-balance">&#x1F4B0; <span id="igs-coins">0</span></span>
+          <span class="igs-hint">TAB / ESC TO CLOSE</span>
+        </div>
+        <div id="igs-grid" class="igs-grid"></div>
+        <div class="igs-footer">Earn coins: 10 per kill · 100 per game</div>
+      </div>
+    </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

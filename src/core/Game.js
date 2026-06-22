@@ -23,6 +23,7 @@ import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCh
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
+import { InGameShop } from '../ui/InGameShop.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin } from '../player/ArmorSkins.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
@@ -83,6 +84,11 @@ export class Game {
     this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
     this.hud            = new HUD();
+    this.inGameShop     = new InGameShop();
+    this.inGameShop.onBuy = (id) => this._handleInGameShopBuy(id);
+    this._shopOpen      = false;
+    this._scopeOverlay  = document.getElementById('scope-overlay');
+    this._hudCrosshair  = document.getElementById('crosshair');
     this.grenadeSystem  = new GrenadeSystem(this.world.scene);
     this.menu           = new MenuUI();
     this.authUI       = new AuthUI();
@@ -133,11 +139,22 @@ export class Game {
 
     this.canvas.addEventListener('click', () => {
       this.audio.resume();
-      if (this.state === 'paused') this._resume();
+      if (this.state === 'paused' && !this._shopOpen) this._resume();
     });
+
+    // Tab / Escape toggle in-game buy shop
+    window.addEventListener('keydown', (e) => {
+      const isTab = e.code === 'Tab';
+      const isEsc = e.code === 'Escape' && this._shopOpen;
+      if (!isTab && !isEsc) return;
+      e.preventDefault();
+      if (this.state === 'playing' || (this.state === 'paused' && this._shopOpen)) {
+        this._toggleInGameShop();
+      }
+    }, { capture: true });
     window.addEventListener('resize', () => this._onResize());
     this.input.onLockChange = (locked) => {
-      if (!locked && this.state === 'playing') this._pause();
+      if (!locked && this.state === 'playing' && !this._shopOpen) this._pause();
     };
 
     this._rafId = requestAnimationFrame(() => this._loop());
@@ -512,6 +529,9 @@ export class Game {
   _quitToMenu() {
     if (this.state === 'playing') this._saveStats();
     this.audio.stopAmbientCity();
+    if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
+    if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
+    if (this._shopOpen) { this._shopOpen = false; this.inGameShop.hide(); }
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
     this.state = 'menu';
@@ -584,6 +604,9 @@ export class Game {
 
   _endGame(title, subtitle = '') {
     this._saveStats();
+    if (this._shopOpen) { this._shopOpen = false; this.inGameShop.hide(); }
+    if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
+    if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
@@ -593,6 +616,64 @@ export class Game {
       { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
       subtitle ? `${title} — ${subtitle}` : title
     );
+  }
+
+  // ── In-Game Shop ────────────────────────────────────────────────────────────
+
+  _toggleInGameShop() {
+    if (!this._shopOpen) {
+      this._shopOpen = true;
+      this.inGameShop.show(Shop.getCoins());
+      this.input.exitPointerLock();
+      this.state = 'paused'; // freeze game while shopping
+    } else {
+      this._shopOpen = false;
+      this.inGameShop.hide();
+      this._resume();
+    }
+  }
+
+  _handleInGameShopBuy(itemId) {
+    const PRICES = { health_sm: 50, health_lg: 100, ammo: 75, armor: 80, frags: 60, smokes: 40, speed: 120 };
+    const price = PRICES[itemId];
+    if (!price || Shop.getCoins() < price) return;
+
+    switch (itemId) {
+      case 'health_sm':
+        if (this.player.health >= this.player.maxHealth) return;
+        this.player.health = Math.min(this.player.maxHealth, this.player.health + 50);
+        break;
+      case 'health_lg':
+        if (this.player.health >= this.player.maxHealth) return;
+        this.player.health = this.player.maxHealth;
+        break;
+      case 'ammo':
+        for (const w of this.weaponSystem.loadout) {
+          const st = this.weaponSystem.state.get(w.id);
+          if (st && w.kind !== 'melee') st.reserveAmmo = w.reserveMax;
+        }
+        break;
+      case 'armor':
+        if (!this.player.maxShield || this.player.shield >= this.player.maxShield) return;
+        this.player.shield = this.player.maxShield;
+        break;
+      case 'frags':
+        this.grenadeSystem.frags = Math.min(this.grenadeSystem.frags + 2, 8);
+        break;
+      case 'smokes':
+        this.grenadeSystem.smokes = Math.min(this.grenadeSystem.smokes + 2, 8);
+        break;
+      case 'speed':
+        this.player.speedBoost = 1.4;
+        this.player._speedBoostTimer = 30;
+        break;
+      default: return;
+    }
+
+    Shop.addCoins(-price);
+    this._refreshNavCoins();
+    this.inGameShop.refresh(Shop.getCoins());
+    this.audio.playWeaponSwitch(); // satisfying purchase click
   }
 
   // ── Post-processing (bloom) ──────────────────────────────────────────────
@@ -676,6 +757,13 @@ export class Game {
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
+
+    // Scope overlay — shown when ADS on a scoped weapon
+    if (this._scopeOverlay) {
+      const showScope = !!this.weaponSystem.currentDef.scoped && this.weaponSystem.scopeT > 0.5;
+      this._scopeOverlay.classList.toggle('active', showScope);
+      if (this._hudCrosshair) this._hudCrosshair.classList.toggle('hidden', showScope);
+    }
 
     this._updateModeLogic(dt);
   }
