@@ -69,6 +69,10 @@ export class Game {
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
     this.player.audio = this.audio;
+    this.player.onTeleport = () => {
+      this.audio.playTeleport();
+      this.hud.flashTeleport();
+    };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     // The first-person viewmodel (gun, arm, muzzle flash, viewmodel lights) is
     // parented to the player camera. Three.js only renders objects reachable
@@ -712,8 +716,8 @@ export class Game {
     this.deathEffects.update(dt);
     this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
 
-    // grenade input  Q = frag  E = smoke (ignored while the menu is open)
-    if (!menuOpen && this.input.consumeJustPressed('KeyQ')) {
+    // grenade input  F = frag  E = smoke (ignored while the menu is open)
+    if (!menuOpen && this.input.consumeJustPressed('KeyF')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
@@ -726,6 +730,7 @@ export class Game {
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
+    this.hud.updateTeleport(1 - this.player.teleportCooldown / this.player.teleportMaxCooldown);
 
     // Scope overlay — shown when ADS on a scoped weapon (hidden while menu open)
     if (this._scopeOverlay) {

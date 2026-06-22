@@ -26,10 +26,13 @@ export class HUD {
     this.downedBar      = document.getElementById('downed-bar');
     this.downedCountdown = document.getElementById('downed-countdown');
     this.waveBanner     = document.getElementById('wave-banner');
-    this._hitmarkerTimeout = null;
-    this._damageTimeout    = null;
-    this._waveBannerTimer  = null;
-    this._streakTimeout    = null;
+    this._teleportFlash = document.getElementById('teleport-flash');
+    this._abilityQ      = document.getElementById('ability-q');
+    this._hitmarkerTimeout    = null;
+    this._damageTimeout       = null;
+    this._waveBannerTimer     = null;
+    this._streakTimeout       = null;
+    this._teleportFlashTimeout = null;
   }
 
   show() { this.root?.classList.remove('hidden'); }
@@ -155,6 +158,21 @@ export class HUD {
     el.textContent = '🎯 HEADSHOT';
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1200);
+  }
+
+  flashTeleport() {
+    if (!this._teleportFlash) return;
+    this._teleportFlash.classList.remove('show');
+    void this._teleportFlash.offsetWidth;
+    this._teleportFlash.classList.add('show');
+    clearTimeout(this._teleportFlashTimeout);
+    this._teleportFlashTimeout = setTimeout(() => this._teleportFlash.classList.remove('show'), 300);
+  }
+
+  updateTeleport(ratio) {
+    if (!this._abilityQ) return;
+    this._abilityQ.style.setProperty('--ratio', Math.max(0, Math.min(1, ratio)));
+    this._abilityQ.classList.toggle('ready', ratio >= 1);
   }
 
   flashDamage() {

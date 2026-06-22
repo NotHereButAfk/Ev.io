@@ -493,6 +493,42 @@ export class AudioManager {
     osc.stop(t + 0.21); noise.stop(t + 0.11);
   }
 
+  // Sci-fi teleport blink — ascending sweep + resonant pop + shimmer tail.
+  playTeleport() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Ascending chirp: the "charge" just before blink.
+    const sweep = this.ctx.createOscillator();
+    sweep.type = 'sine';
+    sweep.frequency.setValueAtTime(280, t);
+    sweep.frequency.exponentialRampToValueAtTime(2800, t + 0.08);
+    const sweepGain = this._envGain(0.28, 0.002, 0.08, t);
+    sweep.connect(sweepGain).connect(this.master);
+
+    // Hard pop at the blink moment.
+    const pop = this.ctx.createOscillator();
+    pop.type = 'square';
+    pop.frequency.setValueAtTime(1200, t + 0.07);
+    pop.frequency.exponentialRampToValueAtTime(60, t + 0.22);
+    const popFilter = this.ctx.createBiquadFilter();
+    popFilter.type = 'lowpass';
+    popFilter.frequency.value = 800;
+    const popGain = this._envGain(0.45, 0.001, 0.15, t + 0.07);
+    pop.connect(popFilter).connect(popGain).connect(this.master);
+
+    // Resonant shimmer tail.
+    const ring = this.ctx.createOscillator();
+    ring.type = 'sine';
+    ring.frequency.setValueAtTime(820, t + 0.09);
+    ring.frequency.exponentialRampToValueAtTime(340, t + 0.38);
+    const ringGain = this._envGain(0.18, 0.003, 0.32, t + 0.09);
+    ring.connect(ringGain).connect(this.master);
+
+    sweep.start(t);        pop.start(t + 0.07);  ring.start(t + 0.09);
+    sweep.stop(t + 0.10);  pop.stop(t + 0.25);   ring.stop(t + 0.42);
+  }
+
   // Weapon switch click-whoosh
   playWeaponSwitch() {
     if (!this.ctx) return;

@@ -4,9 +4,12 @@ const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
 const WALK_SPEED = 6.2;
 const SPRINT_MULT = 1.55;
-const JUMP_SPEED = 7.5;
+const JUMP_SPEED = 12.0;   // sci-fi boosted (was 7.5)
 const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
+
+const TELEPORT_RANGE    = 22;
+const TELEPORT_COOLDOWN = 5.0;
 
 const MAX_STAMINA = 100;
 const STAMINA_DRAIN = 28;
@@ -51,6 +54,11 @@ export class Player {
 
     // Sprint blend (0..1) for camera roll
     this._sprintT = 0;
+
+    // Teleport ability (Q key)
+    this.teleportCooldown    = 0;
+    this.teleportMaxCooldown = TELEPORT_COOLDOWN;
+    this.onTeleport = null; // (fromPos, toPos) => void
 
     // Sound state
     this._wasOnGround = true;
@@ -158,6 +166,37 @@ export class Player {
 
     this.velocity.x = desired.x;
     this.velocity.z = desired.z;
+
+    // --- teleport blink (Q key) ---
+    if (this.teleportCooldown > 0) this.teleportCooldown = Math.max(0, this.teleportCooldown - dt);
+    if (input.consumeJustPressed('KeyQ') && this.teleportCooldown <= 0) {
+      const camPos = new THREE.Vector3();
+      this.camera.getWorldPosition(camPos);
+      const camDir = new THREE.Vector3();
+      this.camera.getWorldDirection(camDir);
+
+      const raycaster = new THREE.Raycaster(camPos, camDir, 0.1, TELEPORT_RANGE);
+      const meshes = world.colliders.map((c) => c.mesh).filter(Boolean);
+      const hits = raycaster.intersectObjects(meshes, true);
+
+      let destEye;
+      if (hits.length > 0) {
+        const safeDist = Math.max(0.1, hits[0].distance - 0.9);
+        destEye = camPos.clone().addScaledVector(camDir, safeDist);
+      } else {
+        destEye = camPos.clone().addScaledVector(camDir, TELEPORT_RANGE);
+      }
+      // Eye → foot position, clamped to ground
+      destEye.y -= EYE_HEIGHT;
+      destEye.y = Math.max(0, destEye.y);
+
+      const fromPos = this.position.clone();
+      this.position.copy(destEye);
+      this.velocity.set(0, 0, 0);
+      this.onGround = false;
+      this.teleportCooldown = TELEPORT_COOLDOWN;
+      this.onTeleport?.(fromPos, this.position.clone());
+    }
 
     // --- jump / gravity ---
     if (input.consumeJustPressed('Space') && this.onGround) {
