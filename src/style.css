@@ -2615,3 +2615,140 @@ html, body {
 .private-mode-btn.active {
   background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.45); color: #00e5ff;
 }
+
+/* ===================== Mobile Controls ===================== */
+
+#mobile-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  /* The overlay itself passes through taps; only children with pointer-events
+     capture touches, routed in MobileControls.js */
+  pointer-events: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#mobile-controls.hidden { display: none; }
+
+/* The entire surface must be interactive for global touch routing */
+#mobile-controls > * { pointer-events: auto; }
+
+/* === Left-half joystick zone (transparent, just catches taps) === */
+#joy-zone {
+  position: absolute;
+  left: 0; top: 0;
+  width: 46%; height: 100%;
+  touch-action: none;
+}
+
+/* Joystick ring — appears at touch origin, hidden by default */
+#joy-outer {
+  position: fixed;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 229, 255, 0.45);
+  background: rgba(0, 229, 255, 0.06);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
+#joy-inner {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  top: calc(50% - 20px);
+  left: calc(50% - 20px);
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.70);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.75), inset 0 0 6px rgba(255,255,255,0.3);
+  transform: translate(0px, 0px);
+  pointer-events: none;
+}
+
+/* === Right-side action buttons === */
+#mobile-btns {
+  position: absolute;
+  right: 18px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  touch-action: none;
+}
+
+#mobile-btns-top, #mobile-btns-bot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 229, 255, 0.45);
+  background: rgba(4, 12, 22, 0.72);
+  color: #00e5ff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Rajdhani', 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.2);
+  transition: background 0.06s, box-shadow 0.06s;
+  backdrop-filter: blur(4px);
+}
+
+.mobile-btn:active {
+  background: rgba(0, 229, 255, 0.22);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.55);
+}
+
+/* Jump — slightly larger */
+.btn-jump {
+  width: 62px;
+  height: 62px;
+  font-size: 22px;
+}
+
+/* Fire — prominent, red accent */
+.btn-fire {
+  width: 76px;
+  height: 76px;
+  font-size: 28px;
+  border-color: rgba(255, 55, 55, 0.65);
+  background: rgba(28, 4, 4, 0.80);
+  color: #ff4444;
+  box-shadow: 0 0 14px rgba(255, 55, 55, 0.28);
+}
+
+.btn-fire:active {
+  background: rgba(255, 40, 40, 0.28);
+  box-shadow: 0 0 28px rgba(255, 55, 55, 0.70);
+}
+
+/* Menu button — small, top-right of button group */
+#btn-menu-m {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  border-color: rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.6);
+}
+
+/* On desktop, never show mobile controls even if DOM node exists */
+@media (hover: hover) and (pointer: fine) {
+  #mobile-controls { display: none !important; }
+}

@@ -28,6 +28,7 @@ import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
+import { MobileControls } from '../ui/MobileControls.js';
 import { KILL_MULT_BONUS, GUN_PERKS, ARMOR_PERKS } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
@@ -90,6 +91,9 @@ export class Game {
     this._playerDowned   = false;
     this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
+    this.mobileControls = this.input.isMobile
+      ? new MobileControls(this.input, { onMenu: () => this._openMenu() })
+      : null;
     this.hud            = new HUD();
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
@@ -469,6 +473,7 @@ export class Game {
     this.state = 'playing';
     this.player._camDist = 0;  // always start in FPS on new game
     this.input.requestPointerLock();
+    this.mobileControls?.show();
     this.audio.startAmbientCity();
   }
 
@@ -540,12 +545,14 @@ export class Game {
     this.menu.hidePause();
     this._menuOpen = false;
     this.input.requestPointerLock();
+    this.mobileControls?.show();
   }
 
   // ESC during a match opens the menu as an overlay. The state stays 'playing'
   // so zombies/bots/timers keep running — you can't freeze a multiplayer match.
   _openMenu() {
     this._menuOpen = true;
+    this.mobileControls?.hide();
     this.menu.showPause();
   }
 
@@ -558,6 +565,7 @@ export class Game {
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
     this.state = 'menu';
+    this.mobileControls?.hide();
     this.menu.hidePause();
     this.menu.hideGameOver();
     this.hud.hide();

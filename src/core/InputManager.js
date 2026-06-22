@@ -10,6 +10,10 @@ export class InputManager {
     this.pointerLocked = false;
     this.justPressed = new Set();
 
+    // Mobile detection + virtual key state (set by MobileControls)
+    this.isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    this._virtualKeys = new Set();
+
     this._onKeyDown = (e) => {
       if (!this.keys.has(e.code)) this.justPressed.add(e.code);
       this.keys.add(e.code);
@@ -53,7 +57,7 @@ export class InputManager {
   }
 
   isDown(code) {
-    return this.keys.has(code);
+    return this.keys.has(code) || this._virtualKeys.has(code);
   }
 
   consumeJustPressed(code) {
@@ -64,11 +68,28 @@ export class InputManager {
     return false;
   }
 
+  /**
+   * Set a virtual key state from touch controls.
+   * Also fires a justPressed event on the leading edge so consumeJustPressed works.
+   */
+  setVirtualKey(code, pressed) {
+    if (pressed) {
+      if (!this._virtualKeys.has(code) && !this.keys.has(code)) {
+        this.justPressed.add(code);
+      }
+      this._virtualKeys.add(code);
+    } else {
+      this._virtualKeys.delete(code);
+    }
+  }
+
   requestPointerLock() {
+    if (this.isMobile) return;
     this.domElement.requestPointerLock();
   }
 
   exitPointerLock() {
+    if (this.isMobile) return;
     if (document.pointerLockElement) document.exitPointerLock();
   }
 

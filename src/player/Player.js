@@ -124,7 +124,9 @@ export class Player {
     if (input.isDown('KeyD')) moveX += 1;
 
     const moving = moveX !== 0 || moveZ !== 0;
-    this.isSprinting = moving && input.isDown('ShiftLeft') && moveZ > 0 && this.stamina > 2;
+    // On mobile the joystick sets ShiftLeft virtually; also auto-sprint any forward motion
+    const wantSprint = input.isDown('ShiftLeft') || (input.isMobile && moveZ > 0);
+    this.isSprinting = moving && wantSprint && moveZ > 0 && this.stamina > 2;
 
     // smooth sprint blend for camera roll
     this._sprintT += ((this.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
