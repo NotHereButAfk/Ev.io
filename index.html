@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>KYX.IO</title>
+  <title>KYX.IO — The Halo of Web3</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -14,7 +14,7 @@
     <div id="connect-screen" class="overlay">
       <div class="connect-panel">
         <h1 class="logo">KYX<span>.IO</span></h1>
-        <p class="tagline">neural arena &mdash; plasma &bull; blades &bull; glory</p>
+        <p class="tagline">The Halo of Web3 &mdash; PvP &bull; PvE &bull; 5 Game Modes</p>
         <div class="connect-status-row">
           <div class="connect-dots"><span></span><span></span><span></span></div>
           <div id="connect-status-text">CONNECTING TO SERVER</div>
@@ -30,7 +30,7 @@
     <div id="auth-screen" class="overlay hidden">
       <div class="menu-panel auth-panel">
         <h1 class="logo">KYX<span>.IO</span></h1>
-        <p class="tagline">neural arena &mdash; plasma &bull; blades &bull; glory</p>
+        <p class="tagline">The Halo of Web3 &mdash; PvP &bull; PvE &bull; 5 Game Modes</p>
 
         <div class="auth-tabs">
           <button class="auth-tab active" data-tab="login">LOGIN</button>
@@ -73,15 +73,36 @@
             <button class="mode-option" data-mode="deathmatch">
               <span class="mode-opt-icon">&#9876;</span>
               <div class="mode-opt-body">
-                <div class="mode-opt-name">DEATHMATCH</div>
+                <div class="mode-opt-name">FREE FOR ALL</div>
                 <div class="mode-opt-sub">FFA &bull; 8 Players &bull; 8 Minutes</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="teamslayer">
+              <span class="mode-opt-icon">&#128737;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">TEAM SLAYER</div>
+                <div class="mode-opt-sub">4v4 &bull; First to 50 Kills</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="ctf">
+              <span class="mode-opt-icon">&#127988;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">CAPTURE THE FLAG</div>
+                <div class="mode-opt-sub">4v4 &bull; First to 3 Captures</div>
+              </div>
+            </button>
+            <button class="mode-option" data-mode="koth">
+              <span class="mode-opt-icon">&#11088;</span>
+              <div class="mode-opt-body">
+                <div class="mode-opt-name">KING OF THE HILL</div>
+                <div class="mode-opt-sub">FFA &bull; Hold 60s to Win</div>
               </div>
             </button>
             <button class="mode-option" data-mode="survival">
               <span class="mode-opt-icon">&#129503;</span>
               <div class="mode-opt-body">
-                <div class="mode-opt-name">SURVIVAL</div>
-                <div class="mode-opt-sub">Co-op &bull; Up to 5 Players &bull; Zombie Waves</div>
+                <div class="mode-opt-name">FIREFIGHT</div>
+                <div class="mode-opt-sub">Co-op &bull; Up to 5 &bull; Wave Defense</div>
               </div>
             </button>
           </div>
@@ -89,6 +110,8 @@
         <button class="nav-item" data-panel="loadout">LOADOUT &#9660;</button>
         <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
         <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
+        <button class="nav-item" data-panel="party">FIRETEAM &#9660;</button>
+        <button class="nav-item" data-panel="private">PRIVATE &#9660;</button>
         <button class="nav-item" data-panel="settings">SETTINGS</button>
         <button class="nav-item" data-panel="profile">PROFILE &#9660;</button>
       </nav>
@@ -207,6 +230,79 @@
       </div>
 
       <button id="settings-save-btn" class="play-btn" style="margin-top:22px">SAVE SETTINGS</button>
+    </div>
+
+    <!-- ===================== PANEL: FIRETEAM ===================== -->
+    <div id="panel-party" class="nav-panel hidden">
+      <div class="party-header">
+        <div class="panel-label">YOUR FIRETEAM</div>
+        <div class="party-size-badge" id="party-size-badge">1 / 4</div>
+      </div>
+      <div id="party-slots" class="party-slots">
+        <div class="party-slot party-slot-you">
+          <div class="party-slot-avatar"></div>
+          <div class="party-slot-name">You</div>
+          <div class="party-slot-badge">LEADER</div>
+        </div>
+        <div class="party-slot party-slot-empty">
+          <div class="party-slot-plus">+</div>
+          <div class="party-slot-name">Open Slot</div>
+        </div>
+        <div class="party-slot party-slot-empty">
+          <div class="party-slot-plus">+</div>
+          <div class="party-slot-name">Open Slot</div>
+        </div>
+        <div class="party-slot party-slot-empty">
+          <div class="party-slot-plus">+</div>
+          <div class="party-slot-name">Open Slot</div>
+        </div>
+      </div>
+      <div class="panel-divider"></div>
+      <div class="panel-label" style="margin-bottom:10px">INVITE SPARTAN</div>
+      <div class="party-invite-row">
+        <input id="party-invite-input" class="text-input" placeholder="Enter callsign" style="flex:1" />
+        <button class="play-btn" style="width:auto;margin:0;padding:10px 18px">INVITE</button>
+      </div>
+      <div class="panel-divider"></div>
+      <div class="panel-label" style="margin-bottom:10px">FIRETEAM CODE</div>
+      <div class="party-code-wrap">
+        <div class="party-code" id="party-code">KYX-4F2A</div>
+        <button class="ghost-btn" style="width:auto;padding:8px 14px;margin:0">COPY</button>
+      </div>
+      <p class="party-hint">Share this code so squadmates can join your fireteam directly.</p>
+    </div>
+
+    <!-- ===================== PANEL: PRIVATE GAME ===================== -->
+    <div id="panel-private" class="nav-panel hidden">
+      <div class="panel-label" style="margin-bottom:6px">PRIVATE MATCH</div>
+      <p class="private-desc">Create a custom game for your fireteam. Only players with the room code can join.</p>
+
+      <div class="private-section-label">CREATE ROOM</div>
+      <div class="private-form">
+        <label class="field-label">Game Mode</label>
+        <div class="private-mode-select">
+          <button class="private-mode-btn active" data-mode="deathmatch">FFA</button>
+          <button class="private-mode-btn" data-mode="teamslayer">TEAM SLAYER</button>
+          <button class="private-mode-btn" data-mode="ctf">CTF</button>
+          <button class="private-mode-btn" data-mode="koth">KING OF HILL</button>
+          <button class="private-mode-btn" data-mode="survival">FIREFIGHT</button>
+        </div>
+        <label class="field-label" style="margin-top:14px">Max Players</label>
+        <div class="private-mode-select">
+          <button class="private-mode-btn" data-count="2">2</button>
+          <button class="private-mode-btn active" data-count="4">4</button>
+          <button class="private-mode-btn" data-count="8">8</button>
+          <button class="private-mode-btn" data-count="16">16</button>
+        </div>
+        <button class="play-btn" style="margin-top:18px">CREATE PRIVATE MATCH</button>
+      </div>
+
+      <div class="panel-divider"></div>
+      <div class="private-section-label">JOIN ROOM</div>
+      <div class="party-invite-row">
+        <input class="text-input" placeholder="Room code (e.g. KYX-4F2A)" style="flex:1" />
+        <button class="play-btn" style="width:auto;margin:0;padding:10px 18px">JOIN</button>
+      </div>
     </div>
 
     <!-- ===================== PANEL: PROFILE ===================== -->

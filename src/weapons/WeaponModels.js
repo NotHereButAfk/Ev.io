@@ -1594,6 +1594,51 @@ function buildKnife(color) {
 }
 
 // ===========================================================================
+// Energy / Halo-style weapon builder (shared by all new Spartan weapons)
+// ===========================================================================
+
+function buildEnergyWeapon(color) {
+  const g    = new THREE.Group();
+  const body = M('body', color,    { roughness: 0.35, metalness: 0.75 });
+  const trim = M('trim', 0x44aaff, { roughness: 0.20, metalness: 0.90,
+                                      emissive: 0x003366, emissiveIntensity: 0.4 });
+  const glow = M('glow', 0x00ccff, { roughness: 0.10, metalness: 0.50,
+                                      emissive: 0x00aaff, emissiveIntensity: 1.2,
+                                      transparent: true, opacity: 0.85 });
+  const dark = M('dark', 0x080c14, { roughness: 0.60, metalness: 0.50 });
+
+  const frame = box(0.06,  0.11, 0.40, body);  g.add(frame);
+  const rail  = box(0.04,  0.04, 0.44, trim);  rail.position.set(0, 0.08, 0); g.add(rail);
+  const grip  = box(0.055, 0.14, 0.07, dark);  grip.position.set(0, -0.10, 0.08); g.add(grip);
+  const brl   = cyl(0.018, 0.018, 0.14, body, 8, 0); brl.position.set(0, 0.01, -0.27); g.add(brl);
+  const core  = box(0.03,  0.07, 0.18, glow);  core.position.set(0, 0.02, 0.02); g.add(core);
+  const tg    = box(0.03,  0.03, 0.09, trim);  tg.position.set(0, -0.04, 0.04); g.add(tg);
+
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.01, -0.34); g.add(muzzle);
+  g.position.set(0.06, -0.10, -0.30);
+  return { group: g, muzzle };
+}
+
+function buildGravityHammer(color) {
+  const g    = new THREE.Group();
+  const body = M('body', color,    { roughness: 0.40, metalness: 0.70 });
+  const glow = M('glow', 0xff6600, { roughness: 0.10, metalness: 0.30,
+                                      emissive: 0xff4400, emissiveIntensity: 1.5,
+                                      transparent: true, opacity: 0.90 });
+  const dark = M('dark', 0x0a0804, { roughness: 0.60, metalness: 0.50 });
+
+  const shaft = cyl(0.025, 0.025, 0.70, body, 8, 0); shaft.position.set(0, -0.05, 0.10); g.add(shaft);
+  const head  = box(0.22,  0.18, 0.14, body); head.position.set(0,  0.03, -0.28); g.add(head);
+  const gl1   = box(0.24,  0.04, 0.16, glow); gl1.position.set(0,   0.10, -0.28); g.add(gl1);
+  const gl2   = box(0.24,  0.04, 0.16, glow); gl2.position.set(0,  -0.04, -0.28); g.add(gl2);
+  const grip  = box(0.06,  0.14, 0.06, dark); grip.position.set(0, -0.12,  0.18); g.add(grip);
+
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.03, -0.36); g.add(muzzle);
+  g.position.set(0.10, -0.12, -0.20);
+  return { group: g, muzzle };
+}
+
+// ===========================================================================
 // Registry + export
 // ===========================================================================
 
@@ -1608,7 +1653,17 @@ const BUILDERS = {
   rpg:          buildRPG,
   boltsniper:   buildBoltSniper,
   sword:        buildSword,
-  knife:        buildKnife
+  knife:        buildKnife,
+  // Halo/Destiny expanded arsenal
+  magnum:       buildEnergyWeapon,
+  battlerifle:  buildEnergyWeapon,
+  needler:      buildEnergyWeapon,
+  plasmarifle:  buildEnergyWeapon,
+  dmr:          buildEnergyWeapon,
+  fuelrod:      buildEnergyWeapon,
+  concussion:   buildEnergyWeapon,
+  energyshotgun: buildEnergyWeapon,
+  ghammer:      buildGravityHammer,
 };
 
 export function buildWeaponModel(weaponDef) {
@@ -1617,7 +1672,7 @@ export function buildWeaponModel(weaponDef) {
   if (glb) return glb;
 
   // Fall back to procedural
-  const builder = BUILDERS[weaponDef.id];
+  const builder = BUILDERS[weaponDef.id] ?? buildEnergyWeapon;
   const { group, muzzle } = builder(weaponDef.color);
   group.traverse((obj) => {
     if (obj.isMesh) obj.castShadow = true;

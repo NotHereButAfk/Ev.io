@@ -413,7 +413,7 @@ export class Game {
     this._playerDowned = false;
 
     // Mode-specific setup
-    this._isDM       = modeId === 'deathmatch';
+    this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
     this._isSurvival = modeId === 'survival';
 
     this.hud.hideDMTimer();

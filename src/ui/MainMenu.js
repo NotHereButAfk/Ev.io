@@ -474,7 +474,7 @@ export class MenuUI {
       card.innerHTML = `
         <div class="mode-icon">${mode.icon}</div>
         <div class="mode-body">
-          <div class="mode-name">${mode.name}</div>
+          <div class="mode-name">${mode.name}${mode.comingSoon ? ' <span class="mode-soon">SOON</span>' : ''}</div>
           <div class="mode-tag">${mode.tag}</div>
           <div class="mode-desc">${mode.desc}</div>
         </div>`;

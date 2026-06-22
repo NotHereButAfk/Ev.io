@@ -2549,3 +2549,69 @@ html, body {
   box-shadow: 0 0 5px #ff4444;
   transform: translate(-50%, -50%);
 }
+
+/* ===================== Mode Cards: Coming Soon badge ===================== */
+.mode-soon {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.5px;
+  background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.55);
+  padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle;
+}
+
+/* ===================== Fireteam Panel ===================== */
+.party-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+}
+.party-size-badge {
+  font-size: 12px; font-weight: 700; color: #00e5ff;
+  background: rgba(0,200,255,0.1); border: 1px solid rgba(0,200,255,0.3);
+  padding: 4px 12px; border-radius: 20px; letter-spacing: 1px;
+}
+.party-slots {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px;
+}
+.party-slot {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 14px 12px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; min-height: 90px; justify-content: center;
+}
+.party-slot-you { border-color: rgba(0,200,255,0.35); background: rgba(0,150,200,0.08); }
+.party-slot-empty { opacity: 0.45; }
+.party-slot-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #005ec4, #00b4e8);
+}
+.party-slot-plus { font-size: 24px; color: rgba(255,255,255,0.3); line-height: 1; }
+.party-slot-name { font-size: 12px; font-weight: 600; color: #e8edf2; letter-spacing: 0.5px; }
+.party-slot-badge {
+  font-size: 9px; font-weight: 700; color: #00e5ff; letter-spacing: 1.5px;
+  background: rgba(0,200,255,0.12); padding: 2px 8px; border-radius: 4px;
+}
+.party-invite-row { display: flex; gap: 8px; align-items: center; }
+.party-code-wrap  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.party-code {
+  font-size: 22px; font-weight: 700; letter-spacing: 4px; color: #00e5ff;
+  background: rgba(0,200,255,0.08); border: 1px solid rgba(0,200,255,0.25);
+  padding: 10px 18px; border-radius: 8px; flex: 1; text-align: center;
+}
+.party-hint { font-size: 11px; color: rgba(255,255,255,0.38); margin-top: 4px; line-height: 1.5; }
+
+/* ===================== Private Game Panel ===================== */
+.private-desc {
+  font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.6; margin-bottom: 18px;
+}
+.private-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 2px;
+  color: rgba(255,255,255,0.4); margin-bottom: 10px; text-transform: uppercase;
+}
+.private-form { margin-bottom: 6px; }
+.private-mode-select { display: flex; flex-wrap: wrap; gap: 6px; }
+.private-mode-btn {
+  padding: 7px 13px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; color: rgba(255,255,255,0.6); cursor: pointer; transition: all 0.15s;
+}
+.private-mode-btn:hover { background: rgba(255,255,255,0.09); color: #fff; }
+.private-mode-btn.active {
+  background: rgba(0,200,255,0.15); border-color: rgba(0,200,255,0.45); color: #00e5ff;
+}
