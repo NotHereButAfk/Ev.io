@@ -140,12 +140,21 @@ export class HUD {
     this.smokeCount.classList.toggle('grenade-empty', smokes === 0);
   }
 
-  flashHitmarker() {
-    this.hitmarker.classList.remove('show');
+  flashHitmarker(headshot = false) {
+    this.hitmarker.classList.remove('show', 'headshot');
     void this.hitmarker.offsetWidth;
     this.hitmarker.classList.add('show');
+    if (headshot) this.hitmarker.classList.add('headshot');
     clearTimeout(this._hitmarkerTimeout);
-    this._hitmarkerTimeout = setTimeout(() => this.hitmarker.classList.remove('show'), 120);
+    this._hitmarkerTimeout = setTimeout(() => this.hitmarker.classList.remove('show', 'headshot'), 160);
+  }
+
+  showHeadshotFlair() {
+    const el = document.createElement('div');
+    el.className = 'hs-flair';
+    el.textContent = '🎯 HEADSHOT';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1200);
   }
 
   flashDamage() {

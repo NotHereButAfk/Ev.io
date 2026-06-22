@@ -174,6 +174,8 @@ export class Bot {
     this.mesh.userData.bot = this;
     this.mesh.traverse((obj) => {
       obj.userData.bot = this;
+      // Tag head-zone parts for headshot detection (y ≥ 1.90 = neck and above)
+      if (obj.isMesh && obj.position.y >= 1.90) obj.userData.isHead = true;
     });
 
     const { group: hpGroup, fg } = buildHealthBar();

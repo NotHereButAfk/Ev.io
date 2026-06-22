@@ -271,7 +271,7 @@ function buildSidearm(color) {
   return { group: g, muzzle };
 }
 
-function buildGlock(color) {
+function _buildGlock_REMOVED(color) {
   const g = new THREE.Group();
   const frame  = M('body',   color,    { roughness: 0.72, metalness: 0.12 });
   const slide  = M('accent', 0x141619, { roughness: 0.38, metalness: 0.68 });
@@ -1598,19 +1598,14 @@ function buildKnife(color) {
 // ===========================================================================
 
 const BUILDERS = {
-  glock:        buildGlock,
   sidearm:      buildSidearm,
   uzi:          buildUzi,
-  smg:          buildSMG,
   levershotgun: buildLeverShotgun,
-  shotgun:      buildShotgun,
   m4:           buildM4,
-  ar10:         buildAR10,
   m16:          buildM16,
   rifle:        buildRifle,
   lmg:          buildLMG,
   rpg:          buildRPG,
-  sniper:       buildSniper,
   boltsniper:   buildBoltSniper,
   sword:        buildSword,
   knife:        buildKnife

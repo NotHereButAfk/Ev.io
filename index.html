@@ -256,20 +256,37 @@
     </div>
 
     <!-- ===================== PANEL: SHOP ===================== -->
-    <div id="panel-shop" class="nav-panel nav-panel-wide hidden">
-      <div class="shop-header">
-        <div>
-          <div class="panel-label">ARMOR SHOP</div>
-          <div class="shop-subtitle">Buy armor finishes to customize your look</div>
+    <div id="panel-shop" class="nav-panel nav-panel-shop hidden">
+      <!-- Top bar: title + currency -->
+      <div class="stp-topbar">
+        <div class="stp-branding">
+          <span class="stp-logo-word">EV</span><span class="stp-logo-accent">.IO</span>
+          <span class="stp-store-label">STORE</span>
         </div>
-        <div class="shop-balance">
-          <span class="shop-coin-icon">&#128176;</span>
-          <span id="shop-coin-balance">500</span>
-          <span class="shop-coin-label">COINS</span>
+        <div class="stp-currency">
+          <span class="stp-coin-icon">&#9670;</span>
+          <span id="shop-coin-balance">0</span>
+          <span class="stp-coin-name">E-COINS</span>
         </div>
       </div>
-      <div id="shop-grid-root"></div>
-      <div class="shop-earn-tip">&#9660; Earn coins by playing — 10 per kill, 100 per game</div>
+
+      <!-- Guest / not-logged-in wall -->
+      <div id="shop-auth-wall" class="shop-auth-wall hidden">
+        <div class="saw-lock">&#128274;</div>
+        <div class="saw-title">SIGN IN TO ACCESS THE STORE</div>
+        <div class="saw-sub">Create a free account to browse and purchase exclusive skins.</div>
+      </div>
+
+      <!-- Main store content (shown when logged in) -->
+      <div id="shop-content" class="hidden">
+        <div class="stp-filter-row" id="shop-filter-row">
+          <button class="stp-filter active" data-filter="all">ALL</button>
+          <button class="stp-filter" data-filter="armor">ARMOR</button>
+          <button class="stp-filter" data-filter="weapon">WEAPONS</button>
+        </div>
+        <div id="shop-grid-root"></div>
+        <div class="shop-earn-tip">Earn E-Coins in-game &middot; 10 per kill &middot; 100 match bonus &middot; Daily challenges</div>
+      </div>
     </div>
 
     <!-- ===================== PANEL: BATTLE PASS ===================== -->

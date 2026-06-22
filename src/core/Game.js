@@ -25,7 +25,10 @@ import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
-import { getArmorSkin } from '../player/ArmorSkins.js';
+import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
+import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { SWORD_SKINS } from '../weapons/SwordSkins.js';
+import { KILL_MULT_BONUS, GUN_PERKS, ARMOR_PERKS } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
@@ -255,7 +258,8 @@ export class Game {
     this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
       const killed = enemy.takeDamage(dmg);
       this.audio.playHit();
-      this.hud.flashHitmarker();
+      this.hud.flashHitmarker(meta?.headshot);
+      if (meta?.headshot) this.hud.showHeadshotFlair?.();
       if (killed) {
         const def     = this.weaponSystem.currentDef;
         const isMelee = def.kind === 'melee';
@@ -267,14 +271,31 @@ export class Game {
           isMelee
         );
         this.audio.playKill();
-        this._onEnemyKilled(enemy, entry, meta?.rewardMult || 1);
+        const skinMult = this._computeSkinKillMult();
+        const baseMult = meta?.rewardMult || 1;
+        this._onEnemyKilled(enemy, entry, baseMult * skinMult, meta?.headshot);
       }
     };
   }
 
-  _onEnemyKilled(enemy, weaponEntry, rewardMult = 1) {
+  _computeSkinKillMult() {
+    const bonus = (skinList, id) => {
+      const s = skinList.find(s => s.id === id);
+      return KILL_MULT_BONUS[s?.rarity] ?? 0;
+    };
+    const gunId    = Loadout.getGun();
+    const meleeId  = Loadout.getMelee();
+    const armorId  = Shop.getEquipped();
+    const gunBonus   = bonus(WEAPON_SKINS, Armory.getSkinId(gunId,   false));
+    const meleeBonus = bonus(SWORD_SKINS,  Armory.getSkinId(meleeId, true));
+    const armorBonus = bonus(ARMOR_SKINS,  armorId);
+    return Math.min(5.0, 1.0 + gunBonus + meleeBonus + armorBonus);
+  }
+
+  _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {
     this.kills++;
-    const knifeTag = rewardMult > 1 ? `  🔪 KNIFE THROW x${rewardMult}!` : '';
+    const hsTag    = headshot  ? '  🎯 HEADSHOT!' : '';
+    const knifeTag = rewardMult > 1 ? `  🔪 KNIFE THROW x${rewardMult.toFixed(1)}!` : '';
 
     if (this._isSurvival) {
       const coins = this.survivalManager.zombieKillReward() * rewardMult;
@@ -285,7 +306,7 @@ export class Game {
         this._pendingCoins -= Math.floor(this._pendingCoins);
       }
       BattlePass.addXP(10 * rewardMult);
-      this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}${knifeTag}`);
+      this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}${hsTag}${knifeTag}`);
     } else if (this._isDM) {
       const { coins, streak } = this.dmManager.onKill();
       const reward = coins * rewardMult;
@@ -295,7 +316,7 @@ export class Game {
       this._refreshNavCoins();
       if (streak >= 2) {
         this.hud.showStreak(streak, reward.toFixed(1));
-        this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${reward.toFixed(1)}${knifeTag}`);
+        this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${reward.toFixed(1)}${hsTag}${knifeTag}`);
       } else {
         this.hud.addKillFeed(`ELIMINATED  💰+${reward.toFixed(1)}${knifeTag}`);
       }
@@ -303,7 +324,7 @@ export class Game {
       this.score += 100 * rewardMult;
       Shop.addCoins(10 * rewardMult);
       BattlePass.addXP(25 * rewardMult);
-      this.hud.addKillFeed(`${this.player.name} eliminated a target  +${100 * rewardMult}  💰+${10 * rewardMult}${knifeTag}`);
+      this.hud.addKillFeed(`${this.player.name} eliminated a target  +${100 * rewardMult}  💰+${10 * rewardMult}${hsTag}${knifeTag}`);
     }
   }
 

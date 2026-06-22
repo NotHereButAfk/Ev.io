@@ -8,6 +8,7 @@ import { UserAccount } from '../core/UserAccount.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout, GUNS, MELEE } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
+import { describePerk } from '../core/RarityPerks.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings, DEFAULTS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
@@ -620,85 +621,163 @@ export class MenuUI {
 
   _renderShop() {
     this._refreshCoins();
-    const root = document.getElementById('shop-grid-root');
-    const bal  = document.getElementById('shop-coin-balance');
-    if (!root) return;
+    const bal = document.getElementById('shop-coin-balance');
     if (bal) bal.textContent = Shop.getCoins().toLocaleString();
 
+    const authWall  = document.getElementById('shop-auth-wall');
+    const content   = document.getElementById('shop-content');
+    const root      = document.getElementById('shop-grid-root');
+    if (!root) return;
+
+    const isGuest = !this._currentUser || this._currentUser === '__guest__';
+    if (isGuest) {
+      authWall?.classList.remove('hidden');
+      content?.classList.add('hidden');
+      return;
+    }
+    authWall?.classList.add('hidden');
+    content?.classList.remove('hidden');
+
+    // Wire filter buttons (once)
+    if (!this._shopFilterWired) {
+      this._shopFilterWired = true;
+      this._shopFilter = 'all';
+      document.querySelectorAll('.stp-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.stp-filter').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this._shopFilter = btn.dataset.filter;
+          this._renderShopGrid(root);
+        });
+      });
+    }
+    this._renderShopGrid(root);
+  }
+
+  _renderShopGrid(root) {
     root.innerHTML = '';
-    const equipped = Shop.getEquipped();
+    const equipped  = Shop.getEquipped();
+    const filter    = this._shopFilter || 'all';
 
-    RARITY_ORDER.forEach(rarity => {
-      const skins = ARMOR_SKINS.filter(s => s.rarity === rarity);
-      if (!skins.length) return; // skip tiers with no armor (e.g. uncommon/mythic)
-      const color = RARITY_COLORS[rarity];
+    const _hex6 = n => n.toString(16).padStart(6, '0');
 
-      const section = document.createElement('div');
-      section.className = 'shop-section';
+    const makeCard = (skin, isArmor) => {
+      const rarity   = skin.rarity || 'common';
+      const color    = RARITY_COLORS[rarity];
+      const owned    = Shop.isOwned(skin.id);
+      const isEquip  = equipped === skin.id;
 
-      const hdr = document.createElement('div');
-      hdr.className = 'shop-rarity-header';
-      hdr.innerHTML = `<span class="shop-rarity-dot" style="background:${color}"></span>${rarity.toUpperCase()}`;
-      section.appendChild(hdr);
+      const card = document.createElement('div');
+      card.className = 'shop-skin-card' + (isEquip ? ' equipped' : owned ? ' owned' : '');
+      card.dataset.rarity = rarity;
 
-      const grid = document.createElement('div');
-      grid.className = 'shop-skin-grid';
+      // Swatch
+      const swatch = document.createElement('div');
+      swatch.className = 'shop-swatch';
+      const inner = document.createElement('div');
+      inner.className = 'shop-swatch-inner';
+      const c1 = isArmor ? _hex6(skin.primary) : _hex6(skin.body ?? skin.primary ?? 0x2a2a2a);
+      const c2 = isArmor ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.secondary ?? 0x111111);
+      inner.style.background = `linear-gradient(145deg,#${c1},#${c2})`;
+      if (skin.emissive) {
+        const gc = '#' + _hex6(skin.emissive);
+        inner.style.boxShadow = `inset 0 0 20px ${gc}55`;
+      }
+      swatch.appendChild(inner);
 
-      skins.forEach(skin => {
-        const owned    = Shop.isOwned(skin.id);
-        const isEquip  = equipped === skin.id;
-        const card     = document.createElement('div');
-        card.className = 'shop-skin-card' + (isEquip ? ' equipped' : '');
+      // Rarity ribbon
+      const ribbon = document.createElement('span');
+      ribbon.className = 'shop-rarity-ribbon';
+      ribbon.style.color = color;
+      ribbon.style.borderLeft = `2px solid ${color}`;
+      ribbon.textContent = rarity.toUpperCase();
+      swatch.appendChild(ribbon);
 
-        const swatch = document.createElement('div');
-        swatch.className = 'shop-swatch';
-        swatch.style.background = `linear-gradient(145deg,#${skin.primary.toString(16).padStart(6,'0')},#${skin.secondary.toString(16).padStart(6,'0')})`;
-        if (skin.emissive) {
-          const glowColor = '#' + skin.emissive.toString(16).padStart(6,'0');
-          swatch.style.boxShadow = `0 0 14px ${glowColor}88`;
-        }
-        card.appendChild(swatch);
+      // Status badge
+      if (isEquip || owned) {
+        const badge = document.createElement('span');
+        badge.className = 'shop-status-badge';
+        badge.style.color = isEquip ? '#00cfff' : '#4a8aaa';
+        badge.textContent = isEquip ? '✓ EQUIPPED' : 'OWNED';
+        swatch.appendChild(badge);
+      }
+      card.appendChild(swatch);
 
-        const info = document.createElement('div');
-        info.className = 'shop-skin-info';
-        info.innerHTML = `<div class="shop-skin-name">${skin.name}</div>
-          <div class="shop-rarity-tag" style="color:${color}">${rarity.toUpperCase()}</div>`;
-        card.appendChild(info);
+      // Card body
+      const body = document.createElement('div');
+      body.className = 'shop-card-body';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'shop-skin-name';
+      nameEl.textContent = skin.name;
+      body.appendChild(nameEl);
+      const perkEl = document.createElement('div');
+      perkEl.className = 'shop-perk-line';
+      perkEl.textContent = describePerk(rarity, isArmor);
+      body.appendChild(perkEl);
+      card.appendChild(body);
 
-        const btn = document.createElement('button');
-        if (isEquip) {
-          btn.className = 'shop-btn shop-btn-equip';
-          btn.textContent = 'EQUIPPED';
-        } else if (owned) {
-          btn.className = 'shop-btn shop-btn-owned';
-          btn.textContent = 'EQUIP';
-          btn.addEventListener('click', () => {
+      // CTA
+      const ctaWrap = document.createElement('div');
+      ctaWrap.className = 'shop-card-cta';
+      const btn = document.createElement('button');
+      btn.className = 'shop-btn';
+      if (isEquip) {
+        btn.classList.add('shop-btn-equip');
+        btn.textContent = 'EQUIPPED';
+        btn.disabled = true;
+      } else if (owned) {
+        btn.classList.add('shop-btn-owned');
+        btn.textContent = 'EQUIP';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Shop.equip(skin.id);
+          this.onArmorSkinEquipped?.(skin.id);
+          this._renderShop();
+        });
+      } else {
+        btn.classList.add('shop-btn-buy');
+        btn.innerHTML = `&#9670; ${skin.price.toLocaleString()} E-COINS`;
+        btn.disabled = Shop.getCoins() < skin.price;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const res = Shop.buy(skin.id, skin.price);
+          if (res.ok) {
             Shop.equip(skin.id);
             this.onArmorSkinEquipped?.(skin.id);
             this._renderShop();
-          });
-        } else {
-          btn.className = 'shop-btn shop-btn-buy';
-          btn.textContent = `\u{1F4B0} ${skin.price.toLocaleString()}`;
-          const enough = Shop.getCoins() >= skin.price;
-          if (!enough) btn.classList.add('shop-btn-disabled');
-          btn.addEventListener('click', () => {
-            const res = Shop.buy(skin.id, skin.price);
-            if (res.ok) {
-              this.onArmorSkinEquipped?.(skin.id);
-              Shop.equip(skin.id);
-              this._renderShop();
-              this._refreshCoins();
-            } else {
-              btn.textContent = res.err.toUpperCase();
-              setTimeout(() => { btn.textContent = `\u{1F4B0} ${skin.price.toLocaleString()}`; }, 1500);
-            }
-          });
-        }
-        card.appendChild(btn);
-        grid.appendChild(card);
-      });
+            this._refreshCoins();
+          } else {
+            btn.textContent = res.err.toUpperCase();
+            setTimeout(() => {
+              btn.innerHTML = `&#9670; ${skin.price.toLocaleString()} E-COINS`;
+            }, 1500);
+          }
+        });
+      }
+      ctaWrap.appendChild(btn);
+      card.appendChild(ctaWrap);
+      return card;
+    };
 
+    // Build combined list based on filter
+    const armorItems  = filter !== 'weapon' ? ARMOR_SKINS.map(s => ({ ...s, _isArmor: true })) : [];
+    const weaponItems = filter !== 'armor'  ? WEAPON_SKINS.map(s => ({ ...s, _isArmor: false })) : [];
+    const allItems = [...armorItems, ...weaponItems];
+
+    // Render by rarity section, highest first
+    [...RARITY_ORDER].reverse().forEach(rarity => {
+      const tier = allItems.filter(s => (s.rarity || 'common') === rarity);
+      if (!tier.length) return;
+      const color = RARITY_COLORS[rarity];
+      const section = document.createElement('div');
+      section.className = 'shop-section';
+      const hdr = document.createElement('div');
+      hdr.className = 'shop-rarity-header';
+      hdr.innerHTML = `<span class="shop-rarity-dot" style="background:${color}"></span>${rarity.toUpperCase()} <span style="color:#2a3a50;margin-left:4px">${tier.length} ITEMS</span>`;
+      section.appendChild(hdr);
+      const grid = document.createElement('div');
+      grid.className = 'shop-skin-grid';
+      tier.forEach(s => grid.appendChild(makeCard(s, s._isArmor)));
       section.appendChild(grid);
       root.appendChild(section);
     });

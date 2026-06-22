@@ -522,7 +522,9 @@ export class WeaponSystem {
         const bot = hit.object.userData.bot;
         if (bot) {
           anyHitBot = true;
-          if (this.onHitBot) this.onHitBot(bot, def.damage, hit.point);
+          const isHead = !!hit.object.userData.isHead;
+          const mult   = isHead && def.headshotMultiplier ? def.headshotMultiplier : 1;
+          if (this.onHitBot) this.onHitBot(bot, def.damage * mult, hit.point, { headshot: isHead });
         } else if (this.onHitWorld) {
           this.onHitWorld(hit.point);
         }
