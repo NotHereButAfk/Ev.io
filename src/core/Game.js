@@ -19,11 +19,10 @@ import { GameSettings } from './GameSettings.js';
 import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
-import { buildPreviewCharacter, applySkinToCharacter } from '../player/PreviewCharacter.js';
+import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
-import { InGameShop } from '../ui/InGameShop.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin } from '../player/ArmorSkins.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
@@ -84,11 +83,9 @@ export class Game {
     this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
     this.hud            = new HUD();
-    this.inGameShop     = new InGameShop();
-    this.inGameShop.onBuy = (id) => this._handleInGameShopBuy(id);
-    this._shopOpen      = false;
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
+    this._menuOpen      = false; // in-match menu overlay (the match keeps running)
     this.grenadeSystem  = new GrenadeSystem(this.world.scene);
     this.menu           = new MenuUI();
     this.authUI       = new AuthUI();
@@ -139,22 +136,13 @@ export class Game {
 
     this.canvas.addEventListener('click', () => {
       this.audio.resume();
-      if (this.state === 'paused' && !this._shopOpen) this._resume();
+      if (this._menuOpen) this._resume();
     });
-
-    // Tab / Escape toggle in-game buy shop
-    window.addEventListener('keydown', (e) => {
-      const isTab = e.code === 'Tab';
-      const isEsc = e.code === 'Escape' && this._shopOpen;
-      if (!isTab && !isEsc) return;
-      e.preventDefault();
-      if (this.state === 'playing' || (this.state === 'paused' && this._shopOpen)) {
-        this._toggleInGameShop();
-      }
-    }, { capture: true });
     window.addEventListener('resize', () => this._onResize());
     this.input.onLockChange = (locked) => {
-      if (!locked && this.state === 'playing' && !this._shopOpen) this._pause();
+      // Losing pointer lock (e.g. pressing ESC) opens the in-match menu, but the
+      // match keeps simulating in the background — this is a multiplayer game.
+      if (!locked && this.state === 'playing' && !this._menuOpen) this._openMenu();
     };
 
     this._rafId = requestAnimationFrame(() => this._loop());
@@ -437,11 +425,13 @@ export class Game {
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
 
-    // Build a third-person body mesh matching the player's current loadout
+    // Build a third-person body mesh matching the player's current loadout,
+    // then rig its limbs so it can walk/run in third person.
     if (this._playerBody) this.world.scene.remove(this._playerBody);
     this._playerBody = buildPreviewCharacter(
       this.selectedSkin, armorTypeId || this.selectedArmorType || 'assault', this.selectedArmorSkin
     );
+    rigCharacterLimbs(this._playerBody);
     this._playerBody.visible = false;
     this.world.scene.add(this._playerBody);
 
@@ -517,21 +507,23 @@ export class Game {
 
   _resume() {
     this.menu.hidePause();
-    this.state = 'playing';
+    this._menuOpen = false;
     this.input.requestPointerLock();
   }
 
-  _pause()  {
-    this.state = 'paused';
+  // ESC during a match opens the menu as an overlay. The state stays 'playing'
+  // so zombies/bots/timers keep running — you can't freeze a multiplayer match.
+  _openMenu() {
+    this._menuOpen = true;
     this.menu.showPause();
   }
 
   _quitToMenu() {
     if (this.state === 'playing') this._saveStats();
     this.audio.stopAmbientCity();
+    this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
-    if (this._shopOpen) { this._shopOpen = false; this.inGameShop.hide(); }
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
     this.state = 'menu';
@@ -604,7 +596,7 @@ export class Game {
 
   _endGame(title, subtitle = '') {
     this._saveStats();
-    if (this._shopOpen) { this._shopOpen = false; this.inGameShop.hide(); }
+    this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
     this.state = 'gameover';
@@ -616,64 +608,6 @@ export class Game {
       { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
       subtitle ? `${title} — ${subtitle}` : title
     );
-  }
-
-  // ── In-Game Shop ────────────────────────────────────────────────────────────
-
-  _toggleInGameShop() {
-    if (!this._shopOpen) {
-      this._shopOpen = true;
-      this.inGameShop.show(Shop.getCoins());
-      this.input.exitPointerLock();
-      this.state = 'paused'; // freeze game while shopping
-    } else {
-      this._shopOpen = false;
-      this.inGameShop.hide();
-      this._resume();
-    }
-  }
-
-  _handleInGameShopBuy(itemId) {
-    const PRICES = { health_sm: 50, health_lg: 100, ammo: 75, armor: 80, frags: 60, smokes: 40, speed: 120 };
-    const price = PRICES[itemId];
-    if (!price || Shop.getCoins() < price) return;
-
-    switch (itemId) {
-      case 'health_sm':
-        if (this.player.health >= this.player.maxHealth) return;
-        this.player.health = Math.min(this.player.maxHealth, this.player.health + 50);
-        break;
-      case 'health_lg':
-        if (this.player.health >= this.player.maxHealth) return;
-        this.player.health = this.player.maxHealth;
-        break;
-      case 'ammo':
-        for (const w of this.weaponSystem.loadout) {
-          const st = this.weaponSystem.state.get(w.id);
-          if (st && w.kind !== 'melee') st.reserveAmmo = w.reserveMax;
-        }
-        break;
-      case 'armor':
-        if (!this.player.maxShield || this.player.shield >= this.player.maxShield) return;
-        this.player.shield = this.player.maxShield;
-        break;
-      case 'frags':
-        this.grenadeSystem.frags = Math.min(this.grenadeSystem.frags + 2, 8);
-        break;
-      case 'smokes':
-        this.grenadeSystem.smokes = Math.min(this.grenadeSystem.smokes + 2, 8);
-        break;
-      case 'speed':
-        this.player.speedBoost = 1.4;
-        this.player._speedBoostTimer = 30;
-        break;
-      default: return;
-    }
-
-    Shop.addCoins(-price);
-    this._refreshNavCoins();
-    this.inGameShop.refresh(Shop.getCoins());
-    this.audio.playWeaponSwitch(); // satisfying purchase click
   }
 
   // ── Post-processing (bloom) ──────────────────────────────────────────────
@@ -722,7 +656,14 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
 
-    this.player.update(dt, this.input, this.world);
+    // While the in-match menu is open the local player stops responding to
+    // input, but the world (zombies, bots, timers) keeps simulating — there is
+    // no pausing in a multiplayer match.
+    const menuOpen = this._menuOpen;
+
+    if (!menuOpen) {
+      this.player.update(dt, this.input, this.world);
+    }
     this.player.camera.updateMatrixWorld(true);
 
     // Sync third-person body mesh and hide/show viewmodel
@@ -732,23 +673,24 @@ export class Game {
       if (inTPS) {
         this._playerBody.position.copy(this.player.position);
         this._playerBody.rotation.y = this.player.yaw + Math.PI; // face same direction as camera
+        this._animatePlayerBody(dt);
       }
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
-    // While downed in survival, block all shooting/weapon use
-    if (!this._playerDowned) {
+    // While downed in survival, or while the menu is open, block weapon use.
+    if (!this._playerDowned && !menuOpen) {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
     this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
 
-    // grenade input  Q = frag  E = smoke
-    if (this.input.consumeJustPressed('KeyQ')) {
+    // grenade input  Q = frag  E = smoke (ignored while the menu is open)
+    if (!menuOpen && this.input.consumeJustPressed('KeyQ')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
-    if (this.input.consumeJustPressed('KeyE')) {
+    if (!menuOpen && this.input.consumeJustPressed('KeyE')) {
       this.grenadeSystem.throwSmoke(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
@@ -758,14 +700,38 @@ export class Game {
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
 
-    // Scope overlay — shown when ADS on a scoped weapon
+    // Scope overlay — shown when ADS on a scoped weapon (hidden while menu open)
     if (this._scopeOverlay) {
-      const showScope = !!this.weaponSystem.currentDef.scoped && this.weaponSystem.scopeT > 0.5;
+      const showScope = !menuOpen && !!this.weaponSystem.currentDef.scoped && this.weaponSystem.scopeT > 0.5;
       this._scopeOverlay.classList.toggle('active', showScope);
       if (this._hudCrosshair) this._hudCrosshair.classList.toggle('hidden', showScope);
     }
 
     this._updateModeLogic(dt);
+  }
+
+  // Drive the third-person body's walk cycle: swing the rigged arm/leg pivots
+  // when moving, gentle breathing sway when standing still.
+  _animatePlayerBody(dt) {
+    const rig = this._playerBody?.userData?.rig;
+    if (!rig) return;
+    const p = this.player;
+    const speed = Math.hypot(p.velocity.x, p.velocity.z);
+    const moving = speed > 0.6 && p.onGround;
+    if (moving) {
+      const swing = Math.sin(p.bobTime) * (p.isSprinting ? 0.85 : 0.55);
+      rig.legL.rotation.x =  swing;
+      rig.legR.rotation.x = -swing;
+      rig.armL.rotation.x = -swing * 0.7;
+      rig.armR.rotation.x =  swing * 0.7;
+    } else {
+      // idle breathing — tiny arm sway, legs return to neutral
+      const breathe = Math.sin(this.playTime * 1.6) * 0.04;
+      rig.armL.rotation.x += (breathe - rig.armL.rotation.x) * Math.min(1, dt * 4);
+      rig.armR.rotation.x += (breathe - rig.armR.rotation.x) * Math.min(1, dt * 4);
+      rig.legL.rotation.x += (0 - rig.legL.rotation.x) * Math.min(1, dt * 6);
+      rig.legR.rotation.x += (0 - rig.legR.rotation.x) * Math.min(1, dt * 6);
+    }
   }
 
   _updateModeLogic(dt) {

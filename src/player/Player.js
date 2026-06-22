@@ -44,8 +44,6 @@ export class Player {
     this.skin = null;
     this.sensitivityMult = 1.0;
     this.audio = null;
-    this.speedBoost = 1.0;
-    this._speedBoostTimer = 0;
 
     // Third-person camera
     this._camDist = 0;           // 0 = FPS, >0 = TPS metres
@@ -136,12 +134,6 @@ export class Player {
       }
     }
 
-    // speed boost countdown
-    if (this._speedBoostTimer > 0) {
-      this._speedBoostTimer = Math.max(0, this._speedBoostTimer - dt);
-      if (this._speedBoostTimer <= 0) this.speedBoost = 1.0;
-    }
-
     // shield regen
     if (this._shieldRegenDelay > 0) {
       this._shieldRegenDelay = Math.max(0, this._shieldRegenDelay - dt);
@@ -155,7 +147,7 @@ export class Player {
       moveZ /= len;
     }
 
-    const speed = WALK_SPEED * (this.isSprinting ? SPRINT_MULT : 1) * this.speedBoost;
+    const speed = WALK_SPEED * (this.isSprinting ? SPRINT_MULT : 1);
     const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
 

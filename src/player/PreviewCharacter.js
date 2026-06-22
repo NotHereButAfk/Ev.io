@@ -30,11 +30,13 @@ function _buildFromGLB(skin, armorTypeId, armorSkin) {
     metalness:         src.metalness         ?? 0.52,
     emissive:          new THREE.Color(src.emissive ?? 0x000000),
     emissiveIntensity: src.emissiveIntensity ?? 0,
+    envMapIntensity:   1.15,
   });
   const S = new THREE.MeshStandardMaterial({
     color:     armorSkin ? armorSkin.secondary : skin.secondary,
     roughness: (src.roughness ?? 0.72) * 1.3,
     metalness: (src.metalness ?? 0.18) * 0.35,
+    envMapIntensity: 0.8,
   });
 
   cloned.traverse(obj => {
@@ -510,5 +512,61 @@ export function applySkinToCharacter(group, skin, armorSkin = null) {
     primaryMat.metalness         = armorSkin.metalness         ?? 0.52;
     primaryMat.emissive.setHex(armorSkin.emissive ?? 0x000000);
     primaryMat.emissiveIntensity = armorSkin.emissiveIntensity ?? 0;
+  }
+}
+
+// ===========================================================================
+// Limb rigging for the third-person body
+// ---------------------------------------------------------------------------
+// The character is a flat collection of armour plates (named GLB nodes). To
+// animate a walk cycle we regroup those plates into four pivots — left/right
+// shoulder and left/right hip — so each limb can swing about its joint.
+// Returns a rig object { armL, armR, legL, legR } or null when it can't rig
+// (e.g. the procedural fallback, whose meshes are unnamed).
+// ===========================================================================
+const _ARM_RE = /uarm|farm|elbow|hand|shoulder|pau|pvs/i;
+const _LEG_RE = /thigh|lleg|knee|boot|shinp|sole|grv|kn_|knsph|tpl|cg_/i;
+
+export function rigCharacterLimbs(group) {
+  try {
+    group.updateWorldMatrix(true, true);
+
+    const meshes = [];
+    group.traverse((o) => { if (o.isMesh && o.name) meshes.push(o); });
+    if (!meshes.length) return null; // procedural / unnamed — leave un-rigged
+
+    const buckets = { armL: [], armR: [], legL: [], legR: [] };
+    const wp = new THREE.Vector3();
+    for (const m of meshes) {
+      m.getWorldPosition(wp);
+      const side = wp.x < 0 ? 'L' : 'R';
+      if      (_ARM_RE.test(m.name) && Math.abs(wp.x) > 0.12) buckets['arm' + side].push(m);
+      else if (_LEG_RE.test(m.name) && Math.abs(wp.x) > 0.04) buckets['leg' + side].push(m);
+    }
+
+    const makePivot = (parts, jointY) => {
+      if (parts.length < 2) return null;
+      let ax = 0;
+      for (const m of parts) { m.getWorldPosition(wp); ax += wp.x; }
+      ax /= parts.length;
+      const pivot = new THREE.Group();
+      pivot.position.set(ax, jointY, 0);
+      group.add(pivot);
+      for (const m of parts) pivot.attach(m); // attach() preserves world transform
+      return pivot;
+    };
+
+    const rig = {
+      armL: makePivot(buckets.armL, 1.76),
+      armR: makePivot(buckets.armR, 1.76),
+      legL: makePivot(buckets.legL, 1.21),
+      legR: makePivot(buckets.legR, 1.21),
+    };
+    if (!rig.armL || !rig.armR || !rig.legL || !rig.legR) return null;
+    group.userData.rig = rig;
+    return rig;
+  } catch (e) {
+    console.warn('[rigCharacterLimbs] failed:', e.message);
+    return null;
   }
 }
