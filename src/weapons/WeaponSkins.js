@@ -313,6 +313,20 @@ export const WEAPON_SKINS = [
     emissive: 0xffffff, emissiveIntensity: 1.9, decal: 'holographic', decalEmissive: true,
     animated: true, animType: 'rainbow', animSpeed: 0.5, animMin: 1.3, animMax: 2.5,
     shootSound: 'laser'
+  },
+  {
+    id: 'nya_blaster', name: 'Nya Blaster 😺', rarity: 'mythic',
+    body: 0xff70d8, accent: 0x8a006a, metal: 0xffb0f0, metalness: 0.62, roughness: 0.28,
+    emissive: 0xff22cc, emissiveIntensity: 2.0, decal: 'anime', decalEmissive: true,
+    animated: true, animType: 'cycle',
+    shootSound: 'meow'
+  },
+  {
+    id: 'pyroclasm', name: 'Pyroclasm 🔥', rarity: 'mythic',
+    body: 0x0c0400, accent: 0x1a0600, metal: 0xff6a00, metalness: 0.52, roughness: 0.38,
+    emissive: 0xff2200, emissiveIntensity: 2.2, decal: 'fire', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 10.0, animMin: 0.8, animMax: 3.0,
+    shootSound: 'fire', fireEmbers: true
   }
 ];
 

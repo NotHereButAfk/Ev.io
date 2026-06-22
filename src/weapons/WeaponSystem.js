@@ -10,6 +10,8 @@ const FLASH_LIFE = 0.05;
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
 // get the pink muzzle flash + sparkle-heart burst treatment.
 const CUTE_SOUNDS = new Set(['anime', 'meow', 'uwu', 'bark', 'sparkle']);
+// Fire-sound skins get an orange/red muzzle flash + ember burst.
+const FIRE_SOUNDS = new Set(['fire']);
 
 function createTracerMesh() {
   const geo = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1, true);
@@ -386,20 +388,24 @@ export class WeaponSystem {
   }
 
   _flash() {
-    const animeActive = CUTE_SOUNDS.has(this._activeSkinFor?.(this.currentDef?.id)?.shootSound);
-    this.flashLight.color.setHex(animeActive ? 0xff69b4 : 0xffcc66);
-    this.flashLight.intensity = animeActive ? 12 : 8;
+    const skinSound  = this._activeSkinFor?.(this.currentDef?.id)?.shootSound;
+    const animeActive = CUTE_SOUNDS.has(skinSound);
+    const fireActive  = FIRE_SOUNDS.has(skinSound);
+    const flashColor  = animeActive ? 0xff69b4 : fireActive ? 0xff4400 : 0xffcc66;
+    const flashHex    = animeActive ? 0xff9de0 : fireActive ? 0xff6600 : 0xfff0a0;
+    this.flashLight.color.setHex(flashColor);
+    this.flashLight.intensity = animeActive ? 12 : fireActive ? 14 : 8;
     const muzzleWorld = new THREE.Vector3();
     this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
     this.camera.worldToLocal(muzzleWorld);
     this.flashLight.position.copy(muzzleWorld);
     this._flashTimer = FLASH_LIFE;
 
-    // Show sprite meshes at muzzle (pink tint for anime)
+    // Show sprite meshes at muzzle
     const muzzleObj = this.models.get(this.currentDef.id).muzzle;
     this._flashMeshes.forEach((m) => {
       muzzleObj.add(m);
-      m.material.color.setHex(animeActive ? 0xff9de0 : 0xfff0a0);
+      m.material.color.setHex(flashHex);
       m.material.opacity = 0.92;
       m.rotation.z += Math.random() * Math.PI;
     });
@@ -463,6 +469,53 @@ export class WeaponSystem {
         s.mesh.geometry.dispose();
         s.mesh.material.dispose();
         this._animeSparkles.splice(i, 1);
+      }
+    }
+  }
+
+  _spawnFireEmbers() {
+    if (!this._fireEmbers) this._fireEmbers = [];
+    const colors = [0xff2200, 0xff6600, 0xff9900, 0xffcc00, 0xff4400];
+    const muzzleWorld = new THREE.Vector3();
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
+    const fwd   = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 2).negate();
+    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    for (let i = 0; i < 12; i++) {
+      const size = 0.012 + Math.random() * 0.022;
+      const geo = new THREE.SphereGeometry(size, 4, 3);
+      const mat = new THREE.MeshBasicMaterial({
+        color: colors[Math.floor(Math.random() * colors.length)],
+        transparent: true, opacity: 1.0, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(muzzleWorld);
+      this.scene.add(mesh);
+      const spread = 0.8 + Math.random() * 1.6;
+      const vel = fwd.clone().multiplyScalar(5 + Math.random() * 8);
+      vel.addScaledVector(up,    (Math.random() - 0.3) * spread * 4);
+      vel.addScaledVector(right, (Math.random() - 0.5) * spread * 4);
+      this._fireEmbers.push({ mesh, vel, life: 0.28 + Math.random() * 0.22, spin: Math.random() * 14 });
+    }
+  }
+
+  _updateFireEmbers(dt) {
+    if (!this._fireEmbers?.length) return;
+    for (let i = this._fireEmbers.length - 1; i >= 0; i--) {
+      const s = this._fireEmbers[i];
+      s.vel.y += 6 * dt; // embers rise
+      s.vel.multiplyScalar(1 - dt * 3.5); // drag
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.rotation.z += s.spin * dt;
+      s.life -= dt;
+      const t = Math.max(0, s.life / 0.35);
+      s.mesh.material.opacity = t;
+      s.mesh.scale.setScalar(0.5 + t * 0.6); // shrink as they fade
+      if (s.life <= 0) {
+        this.scene.remove(s.mesh);
+        s.mesh.geometry.dispose();
+        s.mesh.material.dispose();
+        this._fireEmbers.splice(i, 1);
       }
     }
   }
@@ -819,6 +872,9 @@ export class WeaponSystem {
     this._flash();
     // Kawaii skins: spawn pink sparkle hearts at the muzzle
     if (CUTE_SOUNDS.has(skinSound)) this._spawnAnimeSparkles();
+    // Fire skins with fireEmbers flag: spawn orange ember burst
+    const activeSkinDef = this._activeSkinFor?.(this.currentDef?.id);
+    if (activeSkinDef?.fireEmbers) this._spawnFireEmbers();
 
     this.kickPos.z += def.recoil * 2.2;
     this.kickPos.y += def.recoil * 0.4;
@@ -988,6 +1044,7 @@ export class WeaponSystem {
     this._updateExplosions(dt);
     this._updateShells(dt);
     this._updateAnimeSparkles(dt);
+    this._updateFireEmbers(dt);
 
     // skin animations (only on the currently visible weapon)
     this.animTime += dt;
