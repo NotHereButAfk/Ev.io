@@ -479,6 +479,8 @@ export class World {
     this._buildGreenery();
     this._buildObstacles();
     this._buildBoundary();
+    this._buildOrbitalRing();
+    this._buildArenaCore();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -1011,24 +1013,38 @@ export class World {
   }
 
   _streetLight(x, z) {
+    // Plasma lamp — replaces old street light
     const group = new THREE.Group();
-    const metal = this._mats.poleMetal;
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x080e18, roughness: 0.28, metalness: 0.92 });
+    const color    = this._randNeon();
+    const nm       = this._neonMat(color);
 
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 6, 8), metal);
-    pole.position.y = 3;
-    pole.castShadow = true;
-    group.add(pole);
+    // Tapered shaft
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.10, 7.2, 8), metalMat);
+    shaft.position.y = 3.6;
+    shaft.castShadow = true;
+    group.add(shaft);
 
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.12, 0.12), metal);
-    arm.position.set(0.6, 5.9, 0);
-    group.add(arm);
+    // Collar rings
+    for (const ry of [1.6, 3.8]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.03, 6, 16), nm);
+      ring.position.y = ry;
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+    }
 
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 0.35), this._mats.streetLamp);
-    lamp.position.set(1.25, 5.82, 0);
-    group.add(lamp);
+    // Plasma orb on top
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), nm);
+    orb.position.y = 7.5;
+    group.add(orb);
 
-    const light = new THREE.PointLight(0xffb86b, 9, 16, 2);
-    light.position.set(1.25, 5.7, 0);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.40, 0.04, 6, 16), nm);
+    halo.position.y = 7.5;
+    halo.rotation.x = Math.PI / 2;
+    group.add(halo);
+
+    const light = new THREE.PointLight(color, 7, 20, 2);
+    light.position.y = 7.4;
     group.add(light);
 
     group.position.set(x, 0, z);
@@ -1078,7 +1094,7 @@ export class World {
   }
 
   _buildStreetProps() {
-    // streetlights down the two central avenues
+    // Plasma lamps lining both central avenues
     const lampPos = [-72, -50, -34, -18, 18, 34, 50, 72];
     for (const z of lampPos) {
       this._streetLight(-8, z);
@@ -1088,27 +1104,7 @@ export class World {
       this._streetLight(x, -8);
       this._streetLight(x, 8);
     }
-
-    // parked + abandoned cars along the avenues and side streets (also
-    // cover) — weathered, rusted, grimy tones; only a couple of faded
-    // yellow cabs remain as a relic of busier days
-    const carColors = [
-      0x6b5a3a, 0x3a3f33, 0x5a2a22, 0x4a4d4f, 0x2f3a2a,
-      0x705840, 0x33363a, TAXI_YELLOW, 0x5c4a36, 0x26301f,
-      0x614b3f, 0x3c372e, 0x4a4438, TAXI_YELLOW, 0x575048, 0x2a2e26
-    ];
-    const cars = [
-      // main north-south avenue, both kerbs
-      [-7.2, -46, 0], [-7.2, -28, 0], [-7.2, 12, 0], [-7.2, 30, 0], [-7.2, 48, 0], [-7.2, 64, 0],
-      [7.2, -40, Math.PI], [7.2, -16, Math.PI], [7.2, 22, Math.PI], [7.2, 44, Math.PI], [7.2, -64, Math.PI],
-      // main east-west avenue, both kerbs
-      [-46, 7.2, Math.PI / 2], [-24, 7.2, Math.PI / 2], [18, 7.2, Math.PI / 2], [40, 7.2, Math.PI / 2], [62, 7.2, Math.PI / 2],
-      [-38, -7.2, -Math.PI / 2], [-14, -7.2, -Math.PI / 2], [26, -7.2, -Math.PI / 2], [-62, -7.2, -Math.PI / 2],
-      // side streets between blocks
-      [27, 27, 0], [-27, -27, Math.PI], [27, -45, 0], [-45, 27, Math.PI / 2],
-      [63, 63, 0], [-63, -63, Math.PI], [63, -63, Math.PI / 2]
-    ];
-    cars.forEach((c, i) => this._buildCar(c[0], c[1], c[2], carColors[i % carColors.length]));
+    // No ground vehicles — this is a Forerunner arena, not a city street
   }
 
   // Ladder-style zebra crossing. `axis` 'x' paints bars spanning the X road
@@ -1116,10 +1112,11 @@ export class World {
   _crosswalk(cx, cz, axis) {
     if (!this._crosswalkMat) {
       this._crosswalkMat = new THREE.MeshStandardMaterial({
-        color: 0xe4e7ec,
-        emissive: 0x3a3d42,
-        emissiveIntensity: 0.4,
-        roughness: 0.8
+        color: 0x00c8e8,
+        emissive: 0x00c8e8,
+        emissiveIntensity: 1.6,
+        roughness: 0.4,
+        metalness: 0.2
       });
     }
     const mat = this._crosswalkMat;
@@ -1158,88 +1155,100 @@ export class World {
   }
 
   _buildTree(x, z) {
-    const group = new THREE.Group();
+    // Energy crystal spire — replaces organic tree
+    const group      = new THREE.Group();
+    const color      = this._randNeon();
+    const nm         = this._neonMat(color);
+    const metalMat   = new THREE.MeshStandardMaterial({ color: 0x07101a, roughness: 0.30, metalness: 0.88 });
 
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 2.2, 8), this._mats.treeTrunk);
-    trunk.position.y = 1.1;
-    trunk.castShadow = true;
-    group.add(trunk);
+    // Hex base pad
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 0.28, 6), metalMat);
+    base.position.y = 0.14;
+    group.add(base);
 
-    // layered canopy from a few overlapping spheres
-    const blobs = [
-      [0, 2.6, 0, 1.05],
-      [0.5, 2.3, 0.3, 0.75],
-      [-0.5, 2.4, -0.2, 0.7],
-      [0.2, 3.1, -0.3, 0.7]
-    ];
-    for (const [bx, by, bz, r] of blobs) {
-      const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), this._mats.treeLeaf);
-      leaf.position.set(bx, by, bz);
-      leaf.castShadow = true;
-      group.add(leaf);
-    }
+    // Lower shaft (thicker)
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 2.8, 6), metalMat);
+    shaft.position.y = 1.54;
+    shaft.castShadow = true;
+    group.add(shaft);
 
-    group.position.set(x, 0.25, z);
+    // Crystal upper section (tapers to point)
+    const crystal = new THREE.Mesh(new THREE.CylinderGeometry(0, 0.11, 2.2, 6), nm);
+    crystal.position.y = 4.0;
+    group.add(crystal);
+
+    // Orbital rings at different heights + rotations
+    [[1.4, 0.0], [2.4, Math.PI / 3], [3.2, Math.PI * 0.7]].forEach(([ry, rot]) => {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.026, 6, 20), nm);
+      ring.position.y = ry;
+      ring.rotation.y  = rot;
+      group.add(ring);
+    });
+
+    const light = new THREE.PointLight(color, 3.5, 14, 2);
+    light.position.y = 3.5;
+    group.add(light);
+
+    group.position.set(x, 0, z);
     group.updateMatrixWorld(true);
     this.scene.add(group);
 
-    // slim trunk collider
     const box = new THREE.Box3(
-      new THREE.Vector3(x - 0.35, 0, z - 0.35),
-      new THREE.Vector3(x + 0.35, 2.5, z + 0.35)
+      new THREE.Vector3(x - 0.55, 0, z - 0.55),
+      new THREE.Vector3(x + 0.55, 5.2, z + 0.55)
     );
-    this.colliders.push({ box, mesh: trunk });
+    this.colliders.push({ box, mesh: base });
   }
 
   _buildPlanter(x, z) {
-    const group = new THREE.Group();
+    // Holographic data terminal — replaces organic planter
+    const group   = new THREE.Group();
+    const color   = this._randNeon();
+    const nm      = this._neonMat(color);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x080f18, roughness: 0.38, metalness: 0.82 });
 
-    const planter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.9), this._mats.planterBox);
-    planter.position.y = 0.25;
-    planter.castShadow = true;
-    planter.receiveShadow = true;
-    group.add(planter);
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.75, 0.72), bodyMat);
+    chassis.position.y = 0.375;
+    chassis.castShadow = true;
+    chassis.receiveShadow = true;
+    group.add(chassis);
 
-    const soil = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 0.7), this._mats.soil);
-    soil.position.y = 0.5;
-    group.add(soil);
+    // Glowing screen panel
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.44, 0.04), nm);
+    screen.position.set(0, 0.60, 0.38);
+    group.add(screen);
 
-    // leafy clumps
-    for (let i = 0; i < 3; i++) {
-      const bush = new THREE.Mesh(this._geo.bush, this._mats.bush);
-      bush.position.set(-0.7 + i * 0.7, 0.62, 0);
-      bush.scale.set(1, 0.8, 1);
-      group.add(bush);
-    }
+    // Edge trim strips
+    [-0.98, 0.98].forEach(ex => {
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.78, 0.04), nm);
+      trim.position.set(ex, 0.375, 0);
+      group.add(trim);
+    });
 
     group.position.set(x, 0.25, z);
     group.updateMatrixWorld(true);
     this.scene.add(group);
-
-    // bright flowers dotted through the greenery (absolute coords)
-    for (let i = 0; i < 8; i++) {
-      this._flower(x - 0.9 + Math.random() * 1.8, 0.25 + 0.7 + Math.random() * 0.1, z - 0.25 + Math.random() * 0.5);
-    }
 
     const box = new THREE.Box3().setFromObject(group);
     this.colliders.push({ box, mesh: group });
   }
 
   _buildFlowerBed(x, z) {
-    // a low ground bed of grass dotted with flowers — no collider, walkable edge
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 1.4), this._mats.grass);
-    bed.position.set(x, 0.31, z);
-    bed.receiveShadow = true;
-    this.scene.add(bed);
-
-    for (let i = 0; i < 12; i++) {
-      const fx = x - 1.3 + Math.random() * 2.6;
-      const fz = z - 0.55 + Math.random() * 1.1;
-      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 4), this._mats.stem);
-      stem.position.set(fx, 0.45, fz);
-      this.scene.add(stem);
-      this._flower(fx, 0.55, fz, 0.85);
-    }
+    // Glowing hex ground pad — replaces organic flower bed
+    const color = this._randNeon();
+    const nm = this._neonMat(color);
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x06101a, roughness: 0.35, metalness: 0.85 });
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.7, 0.12, 6), metalMat);
+    pad.position.set(x, 0.06, z);
+    pad.receiveShadow = true;
+    this.scene.add(pad);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.06, 6, 18), nm);
+    ring.position.set(x, 0.14, z);
+    ring.rotation.x = Math.PI / 2;
+    this.scene.add(ring);
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 6), nm);
+    dot.position.set(x, 0.13, z);
+    this.scene.add(dot);
   }
 
   _buildGreenery() {
@@ -1263,8 +1272,7 @@ export class World {
       this._buildPlanterRot(px, pz, rot ? Math.PI / 2 : 0);
     }
 
-    // ground flower beds dotted around the plaza
-    this._buildFlowerBed(0, 0);
+    // glowing hex pads dotted around the plaza (center reserved for arena core)
     this._buildFlowerBed(13, 13);
     this._buildFlowerBed(-13, 13);
     this._buildFlowerBed(13, -13);
@@ -1659,66 +1667,201 @@ export class World {
   // nothing clips into a building footprint. Glowing energy checkpoints seal
   // each avenue's far end.
   _buildObstacles() {
-    this._buildHotDogCart(3, 16, 0);
-    this._buildHotDogCart(-3, -16, Math.PI);
-    this._buildHotDogCart(-3, 44, 0.4);
-    this._buildHotDogCart(3, -44, -0.4);
+    // Mid-avenue energy barriers — staggered pairs give cover without blocking LOS
+    this._buildEnergyBarrier( 3, -22, 0, 3.4);
+    this._buildEnergyBarrier(-3,  38, 0, 3.4);
+    this._buildEnergyBarrier( 3,  22, 0, 3.4);
+    this._buildEnergyBarrier(-3, -38, 0, 3.4);
+    this._buildEnergyBarrier( 22, -3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier(-22,  3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier( 22,  3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier(-22, -3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier( 3,  50, 0, 3.4);
+    this._buildEnergyBarrier(-3, -50, 0, 3.4);
+    this._buildEnergyBarrier( 50, -3, Math.PI / 2, 3.4);
+    this._buildEnergyBarrier(-50,  3, Math.PI / 2, 3.4);
 
-    this._buildNewsstand(-3, 22, Math.PI / 2);
-    this._buildNewsstand(3, -28, -Math.PI / 2);
-
-    this._buildScaffold(-3.2, -38, Math.PI / 2, 6);
-    this._buildScaffold(3.2, 58, -Math.PI / 2, 6);
-
-    this._buildDumpster(3, -58, 0);
-    this._buildDumpster(-3, 28, 0.5);
-
-    this._buildMailbox(58, 3, Math.PI / 2);
-    this._buildMailbox(-58, -3, -Math.PI / 2);
-
-    // sci-fi energy barriers give mid-avenue cover (replacing concrete barriers)
-    this._buildEnergyBarrier(3, -22, 0, 3.4);
-    this._buildEnergyBarrier(-3, 38, 0, 3.4);
-    this._buildEnergyBarrier(22, -3, Math.PI / 2, 3.4);
-    this._buildEnergyBarrier(-22, 3, Math.PI / 2, 3.4);
-
-    this._buildTktsSteps(0, -66);
-    this._buildSubwayEntrance(0, 66, 0);
-
-    // glowing energy checkpoints seal each avenue's far end (no more army trucks)
-    this._buildEnergyBarrier(0, 76, 0, 6);
+    // Glowing energy checkpoints seal each avenue's far end
+    this._buildEnergyBarrier(0,  76, 0, 6);
     this._buildEnergyBarrier(0, -76, 0, 6);
-    this._buildEnergyBarrier(76, 0, Math.PI / 2, 6);
+    this._buildEnergyBarrier( 76, 0, Math.PI / 2, 6);
     this._buildEnergyBarrier(-76, 0, Math.PI / 2, 6);
 
-    // sci-fi supply crates for closer-range cover
-    this._buildSciCrate(4, 4, 0.2);
-    this._buildSciCrate(-4, -4, 0.2 + Math.PI);
-    this._buildSciCrate(-4, 54, -0.3);
-    this._buildSciCrate(4, -52, -0.3 + Math.PI);
-    this._buildSciCrate(54, -4, Math.PI / 2);
-    this._buildSciCrate(-54, 4, -Math.PI / 2);
+    // Sci-fi supply crates — primary low-profile cover in and around the plaza
+    this._buildSciCrate( 4,   4, 0.2);
+    this._buildSciCrate(-4,  -4, 0.2 + Math.PI);
+    this._buildSciCrate(-4,  54, -0.3);
+    this._buildSciCrate( 4, -52, -0.3 + Math.PI);
+    this._buildSciCrate( 54, -4, Math.PI / 2);
+    this._buildSciCrate(-54,  4, -Math.PI / 2);
+    this._buildSciCrate( 30,  5, 0.8);
+    this._buildSciCrate(-30, -5, 0.8 + Math.PI);
+    this._buildSciCrate(  5, -30, -0.5);
+    this._buildSciCrate( -5,  30, -0.5 + Math.PI);
+    this._buildSciCrate( 42,  42, 1.2);
+    this._buildSciCrate(-42, -42, 1.2 + Math.PI);
+    this._buildSciCrate( 42, -42, 0.6);
+    this._buildSciCrate(-42,  42, 0.6 + Math.PI);
   }
 
   _buildBoundary() {
-    // low jersey-barrier walls ring the playable area so you can't leave the city
-    const mat = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9 });
-    const h = 2.2;
-    const t = 1;
+    // Force-field boundary: translucent glowing panels anchored by neon pylons
     const half = ARENA_HALF;
-    const specs = [
-      { w: half * 2, d: t, x: 0, z: -half },
-      { w: half * 2, d: t, x: 0, z: half },
-      { w: t, d: half * 2, x: -half, z: 0 },
-      { w: t, d: half * 2, x: half, z: 0 }
+    const fieldColor = 0x00e5ff;
+    const h = 5.0;
+    const fieldMat = new THREE.MeshStandardMaterial({
+      color: fieldColor, emissive: fieldColor, emissiveIntensity: 0.8,
+      transparent: true, opacity: 0.15, roughness: 0.2, metalness: 0.1,
+      side: THREE.DoubleSide
+    });
+    const pylonNm  = this._neonMat(fieldColor);
+    const pylonMetal = new THREE.MeshStandardMaterial({ color: 0x060d16, roughness: 0.25, metalness: 0.95 });
+
+    // Four thin force-field panels (collidable)
+    const wallSpecs = [
+      { w: half * 2, d: 0.2, x: 0, z: -half },
+      { w: half * 2, d: 0.2, x: 0, z:  half },
+      { w: 0.2, d: half * 2, x: -half, z: 0 },
+      { w: 0.2, d: half * 2, x:  half, z: 0 }
     ];
-    for (const s of specs) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, h, s.d), mat);
+    for (const s of wallSpecs) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, h, s.d), fieldMat);
       mesh.position.set(s.x, h / 2, s.z);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
       this._addCollider(mesh);
     }
+
+    // Anchor pylons along each wall edge
+    const pylonH = h + 1.0;
+    const offsets = [-80, -60, -40, -20, 0, 20, 40, 60, 80];
+    for (const off of offsets) {
+      for (const side of [-1, 1]) {
+        // North / South boundary
+        const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, pylonH, 8), pylonMetal);
+        p1.position.set(off, pylonH / 2, side * half);
+        this.scene.add(p1);
+        const c1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), pylonNm);
+        c1.position.set(off, pylonH, side * half);
+        this.scene.add(c1);
+
+        // East / West boundary
+        const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, pylonH, 8), pylonMetal);
+        p2.position.set(side * half, pylonH / 2, off);
+        this.scene.add(p2);
+        const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), pylonNm);
+        c2.position.set(side * half, pylonH, off);
+        this.scene.add(c2);
+      }
+    }
+  }
+
+  _buildOrbitalRing() {
+    // Massive Forerunner ring structure floating overhead — the signature landmark
+    const ringColor = 0x00e5ff;
+    const nm        = this._neonMat(ringColor);
+    const accentNm  = this._neonMat(0xff2db4);
+    const metalMat  = new THREE.MeshStandardMaterial({ color: 0x060d18, roughness: 0.22, metalness: 0.92 });
+
+    // Main structural torus — slightly tilted for visual dynamism
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(95, 2.4, 10, 80), metalMat);
+    ring.position.y = 120;
+    ring.rotation.x = Math.PI / 2 + 0.08;
+    ring.rotation.y = 0.3;
+    this.scene.add(ring);
+
+    // Inner cyan glow band
+    const glow = new THREE.Mesh(new THREE.TorusGeometry(94, 0.55, 8, 80), nm);
+    glow.position.y = 120;
+    glow.rotation.x = Math.PI / 2 + 0.08;
+    glow.rotation.y = 0.3;
+    this.scene.add(glow);
+
+    // Outer accent ring (magenta)
+    const accent = new THREE.Mesh(new THREE.TorusGeometry(97.5, 0.35, 6, 80), accentNm);
+    accent.position.y = 120;
+    accent.rotation.x = Math.PI / 2 + 0.08;
+    accent.rotation.y = 0.3;
+    this.scene.add(accent);
+
+    // Eight structural nodules evenly spaced around the ring
+    const nodeR = 95;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const nx = Math.cos(angle) * nodeR;
+      const nz = Math.sin(angle) * nodeR;
+      const node = new THREE.Mesh(new THREE.SphereGeometry(1.8, 10, 10), metalMat);
+      node.position.set(nx, 120, nz);
+      this.scene.add(node);
+      const nodeTip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 8), nm);
+      nodeTip.position.set(nx, 122.4, nz);
+      this.scene.add(nodeTip);
+    }
+  }
+
+  _buildArenaCore() {
+    // Central Forerunner energy spire — dominant landmark visible from everywhere
+    const color    = 0x00e5ff;
+    const nm       = this._neonMat(color);
+    const accentNm = this._neonMat(0xb24bff);
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x040c14, roughness: 0.20, metalness: 0.95 });
+
+    // Base platform (collidable)
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5.2, 0.6, 8), metalMat);
+    base.position.y = 0.3;
+    base.receiveShadow = true;
+    this._addCollider(base);
+
+    const baseRing = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.14, 8, 32), nm);
+    baseRing.position.y = 0.65;
+    baseRing.rotation.x = Math.PI / 2;
+    this.scene.add(baseRing);
+
+    // Lower shaft (collidable — blocks movement)
+    const shaft1 = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 2.2, 6, 8), metalMat);
+    shaft1.position.y = 3.6;
+    shaft1.castShadow = true;
+    this._addCollider(shaft1);
+
+    // Mid shaft
+    const shaft2 = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.2, 8, 8), metalMat);
+    shaft2.position.y = 10.0;
+    shaft2.castShadow = true;
+    this.scene.add(shaft2);
+
+    // Upper shaft
+    const shaft3 = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.7, 10, 8), metalMat);
+    shaft3.position.y = 19.0;
+    this.scene.add(shaft3);
+
+    // Crystal tip
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0, 0.35, 8, 8), nm);
+    tip.position.y = 28.0;
+    this.scene.add(tip);
+
+    // Energy rings at intervals along the spire
+    [[3.0, 3.0, color], [7.0, 2.2, 0xff2db4], [12.0, 1.6, color], [18.5, 1.2, 0xb24bff], [24.0, 0.8, color]].forEach(([y, r, c]) => {
+      const energyRing = new THREE.Mesh(new THREE.TorusGeometry(r, 0.12, 8, 32), this._neonMat(c));
+      energyRing.position.y = y;
+      energyRing.rotation.x = Math.PI / 2;
+      this.scene.add(energyRing);
+    });
+
+    // Apex light — illuminates the surrounding plaza
+    const light = new THREE.PointLight(color, 12, 45, 2);
+    light.position.y = 28;
+    this.scene.add(light);
+
+    // Orbiting satellite rings (tilted for dynamism)
+    const orb1 = new THREE.Mesh(new THREE.TorusGeometry(6.5, 0.18, 8, 40), nm);
+    orb1.position.y = 8;
+    orb1.rotation.x = Math.PI * 0.35;
+    orb1.rotation.y = Math.PI * 0.2;
+    this.scene.add(orb1);
+
+    const orb2 = new THREE.Mesh(new THREE.TorusGeometry(5.5, 0.14, 8, 40), accentNm);
+    orb2.position.y = 8;
+    orb2.rotation.x = -Math.PI * 0.25;
+    orb2.rotation.z =  Math.PI * 0.15;
+    this.scene.add(orb2);
   }
 
   _buildSpawnPoints() {
