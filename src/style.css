@@ -2787,7 +2787,22 @@ html, body {
   color: rgba(255,255,255,0.55);
 }
 
-/* Hide on true pointer devices (desktops/laptops with mouse) */
-@media (hover: hover) and (pointer: fine) {
-  #mobile-controls { display: none !important; }
+/* Swap weapon button — amber accent so it stands out */
+[data-role="swap"] {
+  border-color: rgba(255, 180, 0, 0.6);
+  color: #ffb400;
+  box-shadow: 0 0 10px rgba(255, 180, 0, 0.2);
+}
+[data-role="swap"]:active {
+  background: rgba(255, 180, 0, 0.2);
+  box-shadow: 0 0 20px rgba(255, 180, 0, 0.5);
+}
+
+/* Controls visibility is managed entirely by JS (MobileControls.show/hide).
+   The CSS media-query guard is intentionally removed — some Chrome/Android
+   builds report hover:hover for stylus/trackpad and would hide controls. */
+
+/* On touch devices hide the keyboard-centric weapon-slot hotbar */
+@media (pointer: coarse) {
+  #weapon-slots { display: none !important; }
 }

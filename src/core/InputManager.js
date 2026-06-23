@@ -10,8 +10,11 @@ export class InputManager {
     this.pointerLocked = false;
     this.justPressed = new Set();
 
-    // Mobile detection + virtual key state (set by MobileControls)
-    this.isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    // Treat any coarse-pointer / touch device as mobile.
+    // Use three independent signals so one false negative doesn't break it.
+    this.isMobile = ('ontouchstart' in window)
+      || (navigator.maxTouchPoints > 0)
+      || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
     this._virtualKeys = new Set();
 
     this._onKeyDown = (e) => {

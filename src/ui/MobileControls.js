@@ -38,10 +38,11 @@ export class MobileControls {
 
       <!-- Action buttons — right side -->
       <div id="m-top-btns">
-        <button class="mbtn mbtn-sm" data-role="ability">Q</button>
-        <button class="mbtn mbtn-sm" data-role="reload">R</button>
-        <button class="mbtn mbtn-sm" data-role="grenade">G</button>
         <button class="mbtn mbtn-sm mbtn-menu" data-role="menu">≡</button>
+        <button class="mbtn mbtn-sm" data-role="swap">⇄</button>
+        <button class="mbtn mbtn-sm" data-role="reload">R</button>
+        <button class="mbtn mbtn-sm" data-role="ability">Q</button>
+        <button class="mbtn mbtn-sm" data-role="grenade">G</button>
       </div>
       <div id="m-bot-btns">
         <button class="mbtn mbtn-jump" data-role="jump">↑</button>
@@ -132,6 +133,9 @@ export class MobileControls {
         break;
       case 'jump':
         inp.justPressed.add('Space');
+        break;
+      case 'swap':
+        inp.wheelDelta += 1; // WeaponSystem cycles to next slot on wheelDelta != 0
         break;
       case 'reload':
         inp.justPressed.add('KeyR');
