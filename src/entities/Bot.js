@@ -10,9 +10,12 @@ const RADIUS = 0.5;
 let nextId = 1;
 
 const BOT_TYPES = [
-  { primary: 0x0a1a2a, secondary: 0x040810, trim: 0x0e2a3e, visor: 0x00e5ff }, // Sentinel Mk-VII
-  { primary: 0x1e0a2a, secondary: 0x0a0418, trim: 0x2e0a42, visor: 0xaa44ff }, // Vex Construct
-  { primary: 0x0a1a0a, secondary: 0x030803, trim: 0x102e10, visor: 0x39ff9e }, // Null Enforcer
+  { primary: 0x2a0a0a, secondary: 0x0f0303, trim: 0x3d1515, visor: 0xff3333 }, // Crimson
+  { primary: 0x0a0e1e, secondary: 0x030610, trim: 0x12184a, visor: 0x4488ff }, // Cobalt
+  { primary: 0x160a20, secondary: 0x07030f, trim: 0x220f33, visor: 0xaa44ff }, // Violet
+  { primary: 0x061a0a, secondary: 0x020a03, trim: 0x0d2c13, visor: 0x00e87a }, // Emerald
+  { primary: 0x1a1c22, secondary: 0x0a0c12, trim: 0x262a36, visor: 0x88ccff }, // Arctic
+  { primary: 0x1e1004, secondary: 0x0c0602, trim: 0x2e1808, visor: 0xff8800 }, // Amber
 ];
 let _botTypeIdx = 0; // round-robin so each new bot picks the next type
 
@@ -32,7 +35,6 @@ function buildBotMesh() {
 
   function B(w,h,d,m)  { return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m); }
   function Cap(r,h,m)  { return new THREE.Mesh(new THREE.CapsuleGeometry(r,h,6,10), m); }
-  function Sph(r,m)    { return new THREE.Mesh(new THREE.SphereGeometry(r,10,8), m); }
   function add(mesh,x,y,z){ mesh.position.set(x,y,z); group.add(mesh); return mesh; }
 
   // ── Boots ─────────────────────────────────────────────────────────────────
@@ -85,35 +87,31 @@ function buildBotMesh() {
     add(B(0.18,0.14,0.16,suitMat),  ax, 0.85, 0);   // bare hand / glove
   });
 
-  // ── Android head unit ─────────────────────────────────────────────────────
-  // Neck connector (mechanical joints)
-  add(B(0.22,0.10,0.20,trimMat),    0, 1.91,  0.00);
-  add(B(0.14,0.08,0.14,suitMat),    0, 1.83,  0.00);
+  // ── Tactical helmet — same aesthetic as the player character ─────────────
+  // Neck collar
+  add(B(0.20,0.10,0.18,trimMat),    0, 1.91,  0.00);
+  add(B(0.12,0.08,0.12,suitMat),    0, 1.83,  0.00);
 
-  // Main head chassis — angular, box-like
-  const headBox = add(B(0.40,0.32,0.38,armorMat), 0, 2.13, 0.00);
+  // Main helmet hull — proportional box (matches player assault helm shape)
+  const headBox = add(B(0.38,0.42,0.40,armorMat), 0, 2.12, 0.00);
 
-  // Brow plate (angled edge)
-  add(B(0.42,0.055,0.14,trimMat),   0, 2.30, -0.06);
-  // Chin module
-  add(B(0.34,0.07,0.32,trimMat),    0, 1.96,  0.00);
+  // Face visor — transparent band at eye level
+  add(B(0.28,0.13,0.05,visorMat),   0, 2.12, -0.21);
 
-  // Full-width sensor visor strip
-  add(B(0.38,0.10,0.03,visorMat),   0, 2.13, -0.19);
+  // Visor brow trim (upper visor frame)
+  add(B(0.34,0.04,0.08,trimMat),    0, 2.20, -0.20);
 
-  // Side sensor nodes
-  [-0.20,0.20].forEach(sx => add(Sph(0.028,visorMat), sx, 2.13, -0.18));
+  // Chin guard (lower visor frame)
+  add(B(0.26,0.05,0.07,trimMat),    0, 2.04, -0.20);
 
-  // Side panel detail
-  [-1,1].forEach(s => {
-    add(B(0.04,0.26,0.36,trimMat),  s*0.21, 2.13,  0.00);
-    add(B(0.035,0.055,0.08,visorMat), s*0.21, 2.20, -0.06);
-  });
+  // Crown ridge along top of helmet
+  add(B(0.13,0.03,0.36,trimMat),    0, 2.335, 0.00);
 
-  // Top sensor/antenna array
-  add(B(0.10,0.04,0.10,trimMat),    0, 2.30,  0.06);
-  add(B(0.025,0.14,0.025,visorMat), 0, 2.39,  0.06);
-  add(B(0.06,0.035,0.06,trimMat),   0, 2.47,  0.06);
+  // Cheek rail strips (left + right sides)
+  [-1,1].forEach(s => add(B(0.04,0.22,0.36,trimMat), s*0.195, 2.12, 0.00));
+
+  // Rear neck guard
+  add(B(0.30,0.08,0.06,armorMat),   0, 2.02,  0.20);
 
   // ── Shadow + light casting on all meshes ──────────────────────────────────
   group.traverse((obj) => {
