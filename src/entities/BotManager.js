@@ -75,9 +75,9 @@ export class BotManager {
     return this.bots.length > 0 && this.bots.every((b) => !b.alive);
   }
 
-  update(dt, player, camera, onPlayerDamaged) {
+  update(dt, player, camera, onPlayerDamaged, world) {
     for (const bot of this.bots) {
-      bot.update(dt, player, camera, onPlayerDamaged);
+      bot.update(dt, player, camera, onPlayerDamaged, world);
     }
   }
 

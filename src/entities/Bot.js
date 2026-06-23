@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 import { buildPreviewCharacter } from '../player/PreviewCharacter.js';
 
+const BOT_GUNS = [
+  { damage: 22, fireRate: 0.13, range: 18, spread: 0.07 },  // AR
+  { damage: 12, fireRate: 0.09, range: 12, spread: 0.12 },  // SMG
+  { damage: 51, fireRate: 0.60, range: 16, spread: 0.05 },  // Pistol
+  { damage: 30, fireRate: 0.40, range: 22, spread: 0.04 },  // DMR
+  { damage: 38, fireRate: 0.32, range: 18, spread: 0.045 }, // Magnum
+  { damage: 24, fireRate: 0.14, range: 20, spread: 0.06 },  // Rifle
+];
+
 const DETECT_RADIUS = 15;
 const ATTACK_RADIUS = 1.9;
 const ATTACK_DAMAGE = 9;
@@ -62,6 +71,9 @@ export class Bot {
     this.wanderCooldown = 0;
     this.speed = 2.6 + Math.random() * 1.2;
     this.lungeTimer = 0;
+    this._botGun      = BOT_GUNS[Math.floor(Math.random() * BOT_GUNS.length)];
+    this._gunTimer    = Math.random() * 0.8;  // stagger initial shots across bots
+    this._accuracy    = 0.55 + Math.random() * 0.35; // 55–90% base accuracy
 
     this.position = spawnPoint.clone();
 
@@ -121,7 +133,26 @@ export class Bot {
     this.mesh.visible = true;
   }
 
-  update(dt, player, camera, onAttack) {
+  _shootAt(player, onAttack, world) {
+    const from = new THREE.Vector3(this.position.x, this.position.y + 1.5, this.position.z);
+    const target = new THREE.Vector3(player.position.x, player.position.y + 1.0, player.position.z);
+    const dist = from.distanceTo(target);
+    if (dist < 0.5) return;
+    const dir = target.clone().sub(from).normalize();
+
+    // Line-of-sight check against world geometry
+    if (world?.colliders?.length) {
+      const ray = new THREE.Raycaster(from, dir, 0.2, dist - 0.5);
+      const wMeshes = world.colliders.map(c => c.mesh).filter(Boolean);
+      if (ray.intersectObjects(wMeshes, true).length) return; // blocked by wall
+    }
+
+    // Hit probability falls off with distance
+    const hitP = this._accuracy * Math.max(0.1, 1 - dist / (this._botGun.range * 1.5));
+    if (Math.random() < hitP) onAttack(this._botGun.damage);
+  }
+
+  update(dt, player, camera, onAttack, world) {
     // ── death animation ──────────────────────────────────────────────────────
     if (this._dying) {
       this._deathT += dt;
@@ -186,6 +217,14 @@ export class Bot {
       this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
+        // Ranged shooting while closing in or when in range
+        if (distToPlayer < this._botGun.range) {
+          this._gunTimer -= dt;
+          if (this._gunTimer <= 0) {
+            this._gunTimer = this._botGun.fireRate * (0.7 + Math.random() * 0.6);
+            this._shootAt(player, onAttack, world);
+          }
+        }
       } else if (this.attackCooldown <= 0) {
         this.attackCooldown = ATTACK_COOLDOWN;
         this.lungeTimer = 0.2;

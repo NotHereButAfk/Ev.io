@@ -37,6 +37,7 @@ import { ServerSim } from './ServerSim.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel } from '../player/PreviewCharacter.js';
 import { preloadWeaponModels } from '../weapons/WeaponModels.js';
+import { PickupSystem } from '../world/PickupSystem.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
 
@@ -106,6 +107,7 @@ export class Game {
     this._hudCrosshair  = document.getElementById('crosshair');
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
     this.grenadeSystem  = new GrenadeSystem(this.world.scene);
+    this.pickupSystem = null; // created on first play, cleared on restart
     this.menu           = new MenuUI();
     this.authUI       = new AuthUI();
 
@@ -443,6 +445,9 @@ export class Game {
       this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
       this.serverSim.start(false, 1);
       this.hud.showServerPop(true);
+      // (re)create pickup system for fresh match
+      this.pickupSystem?.dispose();
+      this.pickupSystem = new PickupSystem(this.world.scene);
       this.hud.showDMTimer('8:00');
     } else if (this._isSurvival) {
       this._activeManager = this.zombieManager;
@@ -467,6 +472,9 @@ export class Game {
         this._mode.waves ? 3 : this._mode.botCount,
         this._mode.noRespawn, 1
       );
+      // (re)create pickup system for fresh match
+      this.pickupSystem?.dispose();
+      this.pickupSystem = new PickupSystem(this.world.scene);
       this._refreshModeHUD();
     }
 
@@ -645,6 +653,8 @@ export class Game {
     this.input.exitPointerLock();
     this.botManager.clear();
     this.zombieManager.clear();
+    this.pickupSystem?.dispose();
+    this.pickupSystem = null;
     this._playerDowned = false;
     this.menu.showMain();
   }
@@ -793,7 +803,8 @@ export class Game {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
-    this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg));
+    this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg), this.world);
+    this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // grenade input  F = frag  E = smoke (ignored while the menu is open)
     if (!menuOpen && this.input.consumeJustPressed('KeyF')) {

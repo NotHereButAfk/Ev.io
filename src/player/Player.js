@@ -19,6 +19,11 @@ const STAMINA_REGEN_DELAY = 1.2;
 const SHIELD_REGEN      = 6;    // per second
 const SHIELD_REGEN_DELAY = 3.0; // seconds before regen kicks in
 
+const CROUCH_HEIGHT   = 0.85;
+const SLIDE_DURATION  = 0.72;
+const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~15.7 u/s burst
+const COYOTE_TIME     = 0.14;
+
 export class Player {
   constructor(aspect) {
     this.camera = new THREE.PerspectiveCamera(78, aspect, 0.05, 300);
@@ -64,6 +69,13 @@ export class Player {
     this._wasOnGround = true;
     this._stepPhase = 0;
     this._lastBobSign = 1;
+
+    this.isCrouching   = false;
+    this.isSliding     = false;
+    this._slideTimer   = 0;
+    this._slideVel     = new THREE.Vector3();
+    this._coyoteTimer  = 0;
+    this._eyeHeight    = EYE_HEIGHT;  // current (lerped) eye height
   }
 
   get isDead() {
@@ -118,15 +130,15 @@ export class Player {
     // --- movement input ---
     let moveX = 0;
     let moveZ = 0;
-    if (input.isDown('KeyW')) moveZ += 1;   // forward
-    if (input.isDown('KeyS')) moveZ -= 1;   // backward
+    if (input.isDown('KeyW')) moveZ += 1;
+    if (input.isDown('KeyS')) moveZ -= 1;
     if (input.isDown('KeyA')) moveX -= 1;
     if (input.isDown('KeyD')) moveX += 1;
 
     const moving = moveX !== 0 || moveZ !== 0;
     // On mobile the joystick sets ShiftLeft virtually; also auto-sprint any forward motion
     const wantSprint = input.isDown('ShiftLeft') || (input.isMobile && moveZ > 0);
-    this.isSprinting = moving && wantSprint && moveZ > 0 && this.stamina > 2;
+    this.isSprinting = moving && wantSprint && moveZ > 0 && this.stamina > 2 && !this.isSliding && !this.isCrouching;
 
     // smooth sprint blend for camera roll
     this._sprintT += ((this.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
@@ -152,22 +164,55 @@ export class Player {
     }
 
     const len = Math.hypot(moveX, moveZ);
-    if (len > 0) {
-      moveX /= len;
-      moveZ /= len;
-    }
+    if (len > 0) { moveX /= len; moveZ /= len; }
 
-    const speed = WALK_SPEED * (this.isSprinting ? SPRINT_MULT : 1);
+    const speed = WALK_SPEED * (this.isSprinting ? SPRINT_MULT : (this.isCrouching ? 0.55 : 1));
     const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-    const right = new THREE.Vector3(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
+    const right   = new THREE.Vector3(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
 
     const desired = new THREE.Vector3();
     desired.addScaledVector(forward, -moveZ);
-    desired.addScaledVector(right, moveX);
+    desired.addScaledVector(right,    moveX);
     desired.multiplyScalar(speed);
 
-    this.velocity.x = desired.x;
-    this.velocity.z = desired.z;
+    // --- crouch / slide ---
+    const wantCrouch   = input.isDown('ControlLeft') || input.isDown('KeyC');
+    const justCrouch   = input.consumeJustPressed('ControlLeft') || input.consumeJustPressed('KeyC');
+
+    if (justCrouch && this.isSprinting && this.onGround && !this.isSliding) {
+      // Initiate slide
+      this.isSliding   = true;
+      this._slideTimer = SLIDE_DURATION;
+      const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      this._slideVel.copy(fwd).multiplyScalar(SLIDE_BOOST);
+      this.isSprinting = false;
+    }
+
+    if (this.isSliding) {
+      this._slideTimer -= dt;
+      const t = Math.max(0, this._slideTimer / SLIDE_DURATION);   // 1→0 over duration
+      const boost = t * t;  // eased deceleration
+      this.velocity.x = this._slideVel.x * boost;
+      this.velocity.z = this._slideVel.z * boost;
+      if (this._slideTimer <= 0) {
+        this.isSliding   = false;
+        this.isCrouching = wantCrouch;
+      }
+    } else if (this.onGround) {
+      // Normal ground movement
+      this.velocity.x = desired.x;
+      this.velocity.z = desired.z;
+      this.isCrouching = wantCrouch && !this.isSprinting;
+    } else {
+      // Air strafing — soft control, preserves jump momentum
+      const blend = dt * 3.5;
+      this.velocity.x += (desired.x - this.velocity.x) * Math.min(1, blend);
+      this.velocity.z += (desired.z - this.velocity.z) * Math.min(1, blend);
+    }
+
+    // smooth eye height between stand / crouch / slide
+    const targetEye = (this.isSliding || this.isCrouching) ? CROUCH_HEIGHT : EYE_HEIGHT;
+    this._eyeHeight += (targetEye - this._eyeHeight) * Math.min(1, dt * 16);
 
     // --- teleport blink (Q key) ---
     if (this.teleportCooldown > 0) this.teleportCooldown = Math.max(0, this.teleportCooldown - dt);
@@ -200,10 +245,22 @@ export class Player {
       this.onTeleport?.(fromPos, this.position.clone());
     }
 
-    // --- jump / gravity ---
-    if (input.consumeJustPressed('Space') && this.onGround) {
-      this.velocity.y = JUMP_SPEED;
-      this.onGround = false;
+    // --- coyote time (forgives jumps just after walking off a ledge) ---
+    if (this.onGround) {
+      this._coyoteTimer = COYOTE_TIME;
+    } else {
+      this._coyoteTimer = Math.max(0, this._coyoteTimer - dt);
+    }
+
+    // --- jump ---
+    const canJump = this.onGround || this._coyoteTimer > 0;
+    if (input.consumeJustPressed('Space') && canJump && !this.isSliding) {
+      const jumpBoost = this.isCrouching ? JUMP_SPEED * 1.1 : JUMP_SPEED; // slight boost out of crouch
+      this.velocity.y = jumpBoost;
+      this.onGround    = false;
+      this.isCrouching = false;
+      this.isSliding   = false;
+      this._coyoteTimer = 0;
       if (this.audio) this.audio.playJump();
     }
     this.velocity.y += GRAVITY * dt;
@@ -227,9 +284,9 @@ export class Player {
 
     // --- head bob + footstep sounds ---
     if (moving && this.onGround) {
-      this.bobTime += dt * (this.isSprinting ? 11 : 8);
+      this.bobTime += dt * (this.isSprinting ? 11 : (this.isCrouching ? 6 : 8));
       // Footstep on each downward bob (sine crossing zero from positive)
-      const bobSin = Math.sin(this.bobTime);
+      const bobSin  = Math.sin(this.bobTime);
       const bobSign = bobSin >= 0 ? 1 : -1;
       if (bobSign !== this._lastBobSign && bobSign < 0 && this.audio) {
         this.audio.playFootstep(this.isSprinting);
@@ -244,12 +301,9 @@ export class Player {
 
     // --- apply to camera ---
     if (this._camDist > 0) {
-      // Third-person: orbit camera behind and above the player.
-      // "behind" in our coord system = +sin(yaw) X, +cos(yaw) Z (opposite of camera forward).
-      const d   = this._camDist;
+      const d    = this._camDist;
       const sinY = Math.sin(this.yaw);
       const cosY = Math.cos(this.yaw);
-      // Slight vertical arc based on pitch so looking up lifts the camera.
       const pitchBlend = Math.sin(Math.max(0, this.pitch) * 0.5);
       this.camera.position.set(
         this.position.x + sinY * d * (1 - pitchBlend * 0.4),
@@ -260,7 +314,7 @@ export class Player {
       this.camera.lookAt(this._tpsTarget);
     } else {
       // First-person: camera sits at eye height with head-bob.
-      this.camera.position.set(this.position.x, this.position.y + EYE_HEIGHT + bobOffset, this.position.z);
+      this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
       this.camera.rotation.order = 'YXZ';
       this.camera.rotation.y = this.yaw;
       this.camera.rotation.x = this.pitch + this.recoilPitch;
