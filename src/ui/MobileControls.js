@@ -2,8 +2,9 @@
 const TOUCH_SENS  = 4.0;
 const JOY_RADIUS  = 62;  // max nub travel in px
 const JOY_DEAD    = 8;   // deadzone
-const JOY_CENTER_X = 90; // fixed joystick center from left edge
-const JOY_CENTER_Y_FROM_BOTTOM = 110; // from bottom edge
+// Fallback constants matching CSS: left:28 + width:144/2=100, bottom:48 + height:144/2=120
+const JOY_CENTER_X = 100;
+const JOY_CENTER_Y_FROM_BOTTOM = 120;
 
 export class MobileControls {
   constructor(input, callbacks = {}) {
@@ -55,10 +56,13 @@ export class MobileControls {
   }
 
   _updateJoyCenter() {
-    this._joyCenter = {
-      x: JOY_CENTER_X,
-      y: window.innerHeight - JOY_CENTER_Y_FROM_BOTTOM,
-    };
+    const outer = document.getElementById('joy-outer');
+    if (outer) {
+      const r = outer.getBoundingClientRect();
+      this._joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    } else {
+      this._joyCenter = { x: JOY_CENTER_X, y: window.innerHeight - JOY_CENTER_Y_FROM_BOTTOM };
+    }
   }
 
   // ── Events ─────────────────────────────────────────────────────────────────
@@ -77,7 +81,10 @@ export class MobileControls {
       const btn = el.closest('[data-role]');
       if (btn) return btn.dataset.role;
     }
-    // Generous joystick zone: left 44% of screen width
+    const { x, y } = this._joyCenter;
+    const dx = touch.clientX - x;
+    const dy = touch.clientY - y;
+    if (Math.sqrt(dx * dx + dy * dy) <= JOY_RADIUS + 24) return 'joy';
     if (touch.clientX < window.innerWidth * 0.44) return 'joy';
     return 'look';
   }
@@ -182,8 +189,8 @@ export class MobileControls {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   show() {
-    this._updateJoyCenter();
     this._el.classList.remove('hidden');
+    this._updateJoyCenter();
   }
 
   hide() {
