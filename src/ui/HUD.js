@@ -219,6 +219,51 @@ export class HUD {
     this.serverPop?.classList.toggle('hidden', !show);
   }
 
+  // Post-match leaderboard (outside #hud, so hud.hide() won't touch it).
+  showLeaderboard(rows, playerName) {
+    const overlay = document.getElementById('leaderboard-overlay');
+    const tbody   = document.getElementById('lb-rows');
+    if (!overlay || !tbody) return;
+    tbody.innerHTML = '';
+    rows.forEach((row, i) => {
+      const rank   = i + 1;
+      const rankCls = rank <= 3 ? `lb-rank lb-rank-${rank}` : 'lb-rank';
+      const tr = document.createElement('tr');
+      tr.className = row.isYou ? 'lb-row-you' : '';
+      const nameTd = document.createElement('td');
+      nameTd.textContent = row.name;
+      if (row.isYou) {
+        const badge = document.createElement('span');
+        badge.className = 'lb-you-badge';
+        badge.textContent = 'YOU';
+        nameTd.appendChild(badge);
+      }
+      tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
+      tr.appendChild(nameTd);
+      const killsTd = document.createElement('td');
+      killsTd.className = 'lb-kills';
+      killsTd.textContent = row.kills;
+      tr.appendChild(killsTd);
+      const scoreTd = document.createElement('td');
+      scoreTd.className = 'lb-score-cell';
+      scoreTd.textContent = row.score.toLocaleString();
+      tr.appendChild(scoreTd);
+      tbody.appendChild(tr);
+    });
+    overlay.classList.remove('hidden');
+  }
+
+  hideLeaderboard() {
+    document.getElementById('leaderboard-overlay')?.classList.add('hidden');
+  }
+
+  updateLeaderboardCountdown(secsLeft, total) {
+    const el = document.getElementById('lb-countdown');
+    if (el) el.textContent = secsLeft;
+    const bar = document.getElementById('lb-bar');
+    if (bar) bar.style.width = `${Math.max(0, (secsLeft / total) * 100)}%`;
+  }
+
   addKillFeed(text) {
     const el = document.createElement('div');
     el.className = 'kill-entry';

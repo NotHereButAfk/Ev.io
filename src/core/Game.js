@@ -144,6 +144,7 @@ export class Game {
     this._lives     = Infinity;
     this._wave      = 1;
     this._modeTimer = 0;    // countdown (time-attack)
+    this._lbTimer   = 0;    // post-match leaderboard countdown
 
     this.timer = new THREE.Timer();
     this.timer.connect(document);
@@ -548,6 +549,56 @@ export class Game {
     }
   }
 
+  // ── Post-match leaderboard ───────────────────────────────────────────────────
+
+  _showLeaderboard() {
+    this.serverSim?.stop();
+    this._saveStats();
+    this._menuOpen = false;
+    if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
+    if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
+
+    // Build leaderboard: player + all current bots with generated kill stats.
+    const rows = [{
+      name:  this.player.name,
+      kills: this.kills,
+      score: this.score,
+      isYou: true,
+    }];
+    for (const bot of this.botManager.bots) {
+      const k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
+      rows.push({ name: bot.displayName, kills: k, score: k * 100, isYou: false });
+    }
+    rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
+
+    this.state    = 'leaderboard';
+    this._lbTimer = 10;
+    this.input.exitPointerLock();
+    this.mobileControls?.hide();
+    this.hud.hide();         // hide crosshair / ammo / health
+    this.hud.hideDMTimer();
+    this.hud.hideLeaderboard(); // reset in case it was shown before
+    this.hud.showLeaderboard(rows, this.player.name);
+    this.hud.updateLeaderboardCountdown(10, 10);
+  }
+
+  _updateLeaderboard(dt) {
+    // Bots and cinematic camera keep running during the scoreboard
+    this._activeManager.update(dt, this.player, this.player.camera, () => {});
+    this.deathEffects.update(dt);
+    this._updateMenuScene(dt);
+
+    this._lbTimer -= dt;
+    const secsLeft = Math.max(0, Math.ceil(this._lbTimer));
+    this.hud.updateLeaderboardCountdown(secsLeft, 10);
+
+    if (this._lbTimer <= 0) {
+      this._lbTimer = Infinity; // guard against multiple triggers
+      this.hud.hideLeaderboard();
+      this._restart();
+    }
+  }
+
   _saveStats() {
     if (this._statsSaved) return;
     this._statsSaved = true;
@@ -572,7 +623,9 @@ export class Game {
   }
 
   _quitToMenu() {
-    if (this.state === 'playing') this._saveStats();
+    if (this.state === 'playing' || this.state === 'leaderboard') this._saveStats();
+    this._lbTimer = Infinity; // cancel any pending auto-restart
+    this.hud.hideLeaderboard();
     this.audio.stopAmbientCity();
     this.serverSim?.stop();
     this.hud.showServerPop(false);
@@ -598,6 +651,7 @@ export class Game {
 
   _restart() {
     this._saveStats();
+    this.hud.hideLeaderboard();
     this.menu.hideGameOver();
     this._startGame(
       this.player.name,
@@ -803,7 +857,7 @@ export class Game {
       const secs = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${mins}:${String(secs).padStart(2, '0')}`, this._modeTimer <= 30);
       if (this._modeTimer <= 0) {
-        this._endGame('MATCH OVER', `${this.kills} KILLS`);
+        this._showLeaderboard();
       }
       return;
     }
@@ -892,6 +946,8 @@ export class Game {
 
     if (this.state === 'playing') {
       this._updatePlaying(dt);
+    } else if (this.state === 'leaderboard') {
+      this._updateLeaderboard(dt);
     } else {
       // Cinematic camera runs for every non-playing state (connecting, auth, menu, paused, gameover)
       this._updateMenuScene(dt);

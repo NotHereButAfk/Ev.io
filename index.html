@@ -526,6 +526,28 @@
         </div>
       </div>
     </div>
+
+    <!-- ===================== POST-MATCH LEADERBOARD ===================== -->
+    <!-- Sits outside #hud so hud.hide() doesn't bury it -->
+    <div id="leaderboard-overlay" class="hidden">
+      <div class="lb-panel">
+        <div class="lb-match-over">MATCH OVER</div>
+        <div class="lb-match-over-sub">FREE FOR ALL &bull; FORERUNNER DISTRICT</div>
+        <table class="lb-table">
+          <thead><tr>
+            <th class="lb-th-rank">#</th>
+            <th>SPARTAN</th>
+            <th>KILLS</th>
+            <th>SCORE</th>
+          </tr></thead>
+          <tbody id="lb-rows"></tbody>
+        </table>
+        <div class="lb-footer">
+          <div class="lb-new-match">NEW MATCH STARTING IN <span id="lb-countdown">10</span>s</div>
+          <div class="lb-bar-wrap"><div id="lb-bar"></div></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>
