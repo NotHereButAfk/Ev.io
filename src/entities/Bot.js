@@ -1,14 +1,10 @@
 import * as THREE from 'three';
 import { buildPreviewCharacter } from '../player/PreviewCharacter.js';
+import { buildWeaponModel } from '../weapons/WeaponModels.js';
+import { getWeapon } from '../weapons/weaponDefs.js';
 
-const BOT_GUNS = [
-  { damage: 22, fireRate: 0.13, range: 18, spread: 0.07 },  // AR
-  { damage: 12, fireRate: 0.09, range: 12, spread: 0.12 },  // SMG
-  { damage: 51, fireRate: 0.60, range: 16, spread: 0.05 },  // Pistol
-  { damage: 30, fireRate: 0.40, range: 22, spread: 0.04 },  // DMR
-  { damage: 38, fireRate: 0.32, range: 18, spread: 0.045 }, // Magnum
-  { damage: 24, fireRate: 0.14, range: 20, spread: 0.06 },  // Rifle
-];
+// AR-type ranged stats — sword bots skip shooting entirely
+const AR_GUN = { damage: 22, fireRate: 0.13, range: 18, spread: 0.07 };
 
 const DETECT_RADIUS = 15;
 const ATTACK_RADIUS = 1.9;
@@ -71,9 +67,11 @@ export class Bot {
     this.wanderCooldown = 0;
     this.speed = 2.6 + Math.random() * 1.2;
     this.lungeTimer = 0;
-    this._botGun      = BOT_GUNS[Math.floor(Math.random() * BOT_GUNS.length)];
-    this._gunTimer    = Math.random() * 0.8;  // stagger initial shots across bots
-    this._accuracy    = 0.55 + Math.random() * 0.35; // 55–90% base accuracy
+    // 40% of bots carry swords (melee only); 60% carry ARs (ranged)
+    this._isSwordBot  = Math.random() < 0.40;
+    this._botGun      = this._isSwordBot ? null : AR_GUN;
+    this._gunTimer    = Math.random() * 0.8;
+    this._accuracy    = 0.55 + Math.random() * 0.35;
 
     this.position = spawnPoint.clone();
 
@@ -95,6 +93,27 @@ export class Bot {
     this.healthBarGroup = hpGroup;
 
     this.mesh.position.copy(this.position);
+
+    // Attach visible weapon to the right hand.
+    // The inner armor clone has rotation.y = π, so the character's right side
+    // is at -X in the group's local space. Bot +Z faces its look-at target.
+    // Weapon models have their muzzle/tip at -Z, so rotating Y by π aims them forward.
+    const weaponId  = this._isSwordBot ? 'sword' : 'm4';
+    const weaponDef = getWeapon(weaponId);
+    if (weaponDef) {
+      const { group: wm } = buildWeaponModel(weaponDef);
+      wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
+      if (this._isSwordBot) {
+        // Sword: raised at shoulder, angled diagonally forward-up
+        wm.position.set(-0.42, 1.05, 0.05);
+        wm.rotation.set(-0.55, Math.PI, 0.25);
+      } else {
+        // AR: held forward at hip/chest level, parallel to ground
+        wm.position.set(-0.40, 0.88, 0.05);
+        wm.rotation.set(-0.12, Math.PI, 0.18);
+      }
+      this.mesh.add(wm);
+    }
   }
 
   takeDamage(amount) {
@@ -217,8 +236,8 @@ export class Bot {
       this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
-        // Ranged shooting while closing in or when in range
-        if (distToPlayer < this._botGun.range) {
+        // AR bots shoot while closing in; sword bots only melee
+        if (this._botGun && distToPlayer < this._botGun.range) {
           this._gunTimer -= dt;
           if (this._gunTimer <= 0) {
             this._gunTimer = this._botGun.fireRate * (0.7 + Math.random() * 0.6);
