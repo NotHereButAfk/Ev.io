@@ -85,21 +85,22 @@ export class ServerSim {
 
   // A remote player connects → kick a bot to free its slot, add the player.
   _playerJoins() {
-    const removed = this.botManager.removeOne(false); // remove a bot slot
-    const player  = this.botManager.addBot(this._noRespawn, this._healthMult, true);
+    this.botManager.removeOne(false); // remove a bot slot
+    const player = this.botManager.addBot(this._noRespawn, this._healthMult, true);
     if (this.hud && player) {
-      this.hud.addKillFeed(`▶ ${player.displayName} joined the server${removed ? ' — a bot left to make room' : ''}`);
+      this.hud.showJoinNotification?.(`▶  ${player.displayName}  joined the match`);
+      this.hud.addKillFeed(`▶ ${player.displayName} joined`);
     }
   }
 
   // A remote player disconnects → backfill the empty slot with a bot.
   _playerLeaves() {
     const left = this.botManager.removeOne(true);     // remove a human slot
-    const bot  = this.botManager.addBot(this._noRespawn, this._healthMult, false);
+    this.botManager.addBot(this._noRespawn, this._healthMult, false);
     if (this.hud && left) {
-      this.hud.addKillFeed(`◀ ${left.displayName} left — a bot filled the slot`);
+      this.hud.showJoinNotification?.(`◀  ${left.displayName}  left the match`, true);
+      this.hud.addKillFeed(`◀ ${left.displayName} left`);
     }
-    void bot;
   }
 
   _pushCount() {

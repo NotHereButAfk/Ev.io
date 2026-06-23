@@ -29,13 +29,16 @@ export class HUD {
     this.downedBar      = document.getElementById('downed-bar');
     this.downedCountdown = document.getElementById('downed-countdown');
     this.waveBanner     = document.getElementById('wave-banner');
-    this._teleportFlash = document.getElementById('teleport-flash');
-    this._abilityQ      = document.getElementById('ability-q');
+    this._teleportFlash    = document.getElementById('teleport-flash');
+    this._abilityQ         = document.getElementById('ability-q');
+    this._joinNotification = document.getElementById('join-notification');
     this._hitmarkerTimeout    = null;
     this._damageTimeout       = null;
     this._waveBannerTimer     = null;
     this._streakTimeout       = null;
     this._teleportFlashTimeout = null;
+    this._joinNotifTimer      = null;
+    this._joinFadeTimer       = null;
   }
 
   show() { this.root?.classList.remove('hidden'); }
@@ -184,6 +187,26 @@ export class HUD {
     this.damageFlash.classList.add('show');
     clearTimeout(this._damageTimeout);
     this._damageTimeout = setTimeout(() => this.damageFlash.classList.remove('show'), 600);
+  }
+
+  // Mid-match player join/leave toast — slides in from left, fades after 3s.
+  showJoinNotification(text, isLeave = false) {
+    const el = this._joinNotification;
+    if (!el) return;
+    clearTimeout(this._joinNotifTimer);
+    clearTimeout(this._joinFadeTimer);
+    el.textContent = text;
+    el.classList.remove('hidden', 'fade-out', 'leave');
+    if (isLeave) el.classList.add('leave');
+    // Force reflow to restart animation
+    void el.offsetWidth;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+    this._joinNotifTimer = setTimeout(() => {
+      el.classList.add('fade-out');
+      this._joinFadeTimer = setTimeout(() => el.classList.add('hidden'), 420);
+    }, 3000);
   }
 
   // Live server population indicator (you + remote players, out of capacity).

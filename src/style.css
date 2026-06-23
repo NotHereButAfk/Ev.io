@@ -2534,6 +2534,48 @@ html, body {
   text-transform: uppercase;
 }
 
+/* ===================== Mid-Match Join/Leave Notification ===================== */
+
+@keyframes joinSlideIn {
+  from { transform: translateX(-110%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes joinFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; transform: translateX(-30%); }
+}
+
+#join-notification {
+  position: absolute;
+  bottom: 38%;
+  left: 0;
+  padding: 10px 20px 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: 0 8px 8px 0;
+  border-left: 3px solid #00e5ff;
+  background: rgba(0, 229, 255, 0.10);
+  backdrop-filter: blur(6px);
+  color: #e8edf2;
+  z-index: 54;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: joinSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.18);
+}
+#join-notification.leave {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.10);
+  box-shadow: 0 0 18px rgba(255, 107, 107, 0.18);
+  color: #ffb3b3;
+}
+#join-notification.fade-out {
+  animation: joinFadeOut 0.4s ease forwards;
+}
+#join-notification.hidden { display: none; }
+
 /* ===================== Scope Overlay ===================== */
 
 #scope-overlay {
