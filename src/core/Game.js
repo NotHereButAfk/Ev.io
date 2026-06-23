@@ -33,11 +33,16 @@ import { KILL_MULT_BONUS, GUN_PERKS, ARMOR_PERKS } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
+import { ServerSim } from './ServerSim.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel } from '../player/PreviewCharacter.js';
 import { preloadWeaponModels } from '../weapons/WeaponModels.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
+
+// The arena is an always-on server with a fixed capacity. You take one slot;
+// the rest are filled with bots and simulated remote players (see ServerSim).
+const MAX_PLAYERS = 8;
 
 export class Game {
   constructor(canvas) {
@@ -85,6 +90,7 @@ export class Game {
     preloadZombieModel();   // start fetching zombie.glb during the 60s grace period
     this.survivalManager = new SurvivalManager();
     this.dmManager       = new DeathmatchManager();
+    this.serverSim       = null; // built once the HUD exists (see below)
     this._activeManager  = this.botManager;  // switches between botManager / zombieManager
     this._isSurvival     = false;
     this._isDM           = false;
@@ -95,6 +101,7 @@ export class Game {
       ? new MobileControls(this.input, { onMenu: () => this._openMenu() })
       : null;
     this.hud            = new HUD();
+    this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
@@ -430,7 +437,11 @@ export class Game {
       this.zombieManager.clear();
       this.dmManager.reset();
       this._modeTimer = 480; // 8 minutes
-      this.botManager.spawnAll(7, false, 1);
+      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. The server sim
+      // then swaps bots for simulated remote players as they come and go.
+      this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
+      this.serverSim.start(false, 1);
+      this.hud.showServerPop(true);
       this.hud.showDMTimer('8:00');
     } else if (this._isSurvival) {
       this._activeManager = this.zombieManager;
@@ -438,12 +449,16 @@ export class Game {
       this.zombieManager.clear();
       this.survivalManager.reset();
       this._modeTimer = 0;
+      this.serverSim.stop();
+      this.hud.showServerPop(false);
       this._wireSurvivalCallbacks();
       this.hud.setModeHUD('GRACE PERIOD', '1:00 REMAINING');
     } else {
       // Legacy modes (kept for compatibility)
       this._activeManager = this.botManager;
       this.zombieManager.clear();
+      this.serverSim.stop();
+      this.hud.showServerPop(false);
       this._modeTimer = this._mode.timeLimit || 0;
       this._lives     = this._mode.lives === Infinity ? Infinity : this._mode.lives;
       this._wave      = 1;
@@ -559,6 +574,8 @@ export class Game {
   _quitToMenu() {
     if (this.state === 'playing') this._saveStats();
     this.audio.stopAmbientCity();
+    this.serverSim?.stop();
+    this.hud.showServerPop(false);
     this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
@@ -780,6 +797,7 @@ export class Game {
     // ─── DEATHMATCH ─────────────────────────────────────────────────────────────
     if (this._isDM) {
       this.dmManager.update(dt);
+      this.serverSim.update(dt); // simulate the live 24/7 server roster
       this._modeTimer = Math.max(0, this._modeTimer - dt);
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);

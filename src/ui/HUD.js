@@ -15,6 +15,9 @@ export class HUD {
     this.reloadText  = document.getElementById('reload-text');
     this.killCount   = document.getElementById('kill-count');
     this.scoreCount  = document.getElementById('score-count');
+    this.serverPop      = document.getElementById('server-pop');
+    this.serverPopCount = document.getElementById('server-pop-count');
+    this.serverPopMax   = document.getElementById('server-pop-max');
     this.weaponSlots = document.getElementById('weapon-slots');
     this.hitmarker   = document.getElementById('hitmarker');
     this.damageFlash = document.getElementById('damage-flash');
@@ -181,6 +184,16 @@ export class HUD {
     this.damageFlash.classList.add('show');
     clearTimeout(this._damageTimeout);
     this._damageTimeout = setTimeout(() => this.damageFlash.classList.remove('show'), 600);
+  }
+
+  // Live server population indicator (you + remote players, out of capacity).
+  setServerPop(count, max) {
+    if (this.serverPopCount) this.serverPopCount.textContent = count;
+    if (this.serverPopMax)   this.serverPopMax.textContent   = max;
+  }
+
+  showServerPop(show) {
+    this.serverPop?.classList.toggle('hidden', !show);
   }
 
   addKillFeed(text) {

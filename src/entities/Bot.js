@@ -150,6 +150,10 @@ export class Bot {
     this.maxHealth = 100;
     this.health = this.maxHealth;
     this.alive = true;
+    // Server-roster metadata: every combatant fills one of the 8 server slots.
+    // A "human slot" is a simulated remote player; otherwise it's a bot.
+    this.displayName = `Bot-${this.id}`;
+    this.isHumanSlot = false;
     this.respawnTimer = 0;
     this.attackCooldown = 0;
     this.flashTimer = 0;
