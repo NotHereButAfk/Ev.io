@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>KYX.IO — The Halo of Web3</title>
   <link rel="stylesheet" href="/src/style.css" />
+  <!--
+    Google AdSense — replace data-ad-client with your publisher ID (ca-pub-XXXXXXXXXXXXXXXX)
+    and each data-ad-slot with your per-unit slot IDs before going live.
+  -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+          crossorigin="anonymous"></script>
 </head>
 <body>
   <div id="app">
@@ -23,6 +29,16 @@
           <div id="connect-bar" class="connect-bar"></div>
         </div>
         <div class="connect-server-info">SERVER: us-east-1 &bull; 24/7 &bull; <span id="connect-pop">8/8</span> &bull; PING: <span id="connect-ping">--</span>ms</div>
+      </div>
+      <!-- Ad: loading screen banner — shown while assets stream in -->
+      <div class="ad-slot ad-slot-connect">
+        <ins class="adsbygoogle"
+             style="display:block;width:100%;height:100%"
+             data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+             data-ad-slot="1111111111"
+             data-ad-format="horizontal"
+             data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
       </div>
     </div>
 
@@ -422,6 +438,15 @@
       <div class="menu-panel small">
         <h2 id="gameover-title">YOU DIED</h2>
         <div class="stats" id="gameover-stats"></div>
+        <!-- Ad: death screen 300×250 — captive audience between stats and respawn -->
+        <div class="ad-slot ad-slot-gameover">
+          <ins class="adsbygoogle"
+               style="display:block;width:300px;height:250px"
+               data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+               data-ad-slot="2222222222"
+               data-ad-format="rectangle"></ins>
+          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+        </div>
         <button id="restart-btn" class="play-btn">RESPAWN</button>
         <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
       </div>
@@ -542,6 +567,16 @@
           </tr></thead>
           <tbody id="lb-rows"></tbody>
         </table>
+        <!-- Ad: post-match banner — 10-second countdown = captive audience -->
+        <div class="ad-slot ad-slot-leaderboard">
+          <ins class="adsbygoogle"
+               style="display:block;width:100%;height:100%"
+               data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+               data-ad-slot="3333333333"
+               data-ad-format="horizontal"
+               data-full-width-responsive="true"></ins>
+          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+        </div>
         <div class="lb-footer">
           <div class="lb-new-match">NEW MATCH STARTING IN <span id="lb-countdown">10</span>s</div>
           <div class="lb-bar-wrap"><div id="lb-bar"></div></div>

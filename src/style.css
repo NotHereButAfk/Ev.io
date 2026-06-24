@@ -2991,3 +2991,66 @@ html, body {
 @media (pointer: coarse) {
   #weapon-slots { display: none !important; }
 }
+
+/* ===================== Ad Slots ===================== */
+
+.ad-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* Label shown while the real ad loads / for fallback */
+.ad-slot::before {
+  content: 'ADVERTISEMENT';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.22);
+  text-align: center;
+  pointer-events: none;
+  line-height: 14px;
+}
+
+/* Game over — 300×250 rectangle below the stats */
+.ad-slot-gameover {
+  position: relative;
+  width: 300px;
+  height: 250px;
+  margin: 14px auto 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(0, 229, 255, 0.10);
+}
+
+/* Leaderboard — responsive banner above the footer countdown */
+.ad-slot-leaderboard {
+  position: relative;
+  width: 100%;
+  max-width: 468px;
+  height: 60px;
+  margin: 0 auto 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(0, 229, 255, 0.10);
+}
+
+/* Connect / loading screen — horizontal banner below the panel */
+.ad-slot-connect {
+  position: relative;
+  width: min(468px, 92vw);
+  height: 60px;
+  margin: 18px auto 0;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+@media (pointer: coarse) {
+  /* On mobile show a smaller 320×50 strip instead */
+  .ad-slot-gameover   { width: min(300px, 92vw); height: 250px; }
+  .ad-slot-leaderboard { height: 50px; max-width: 320px; }
+  .ad-slot-connect    { height: 50px; max-width: 320px; }
+}
