@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildPreviewCharacter } from '../player/PreviewCharacter.js';
+import { buildPreviewCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 
@@ -75,6 +75,8 @@ export class Bot {
     this._weaponT     = Math.random() * Math.PI * 2; // phase offset for variety
     this._alertBlend  = 0;   // 0 = low-ready, 1 = high-ready/aiming
     this._weaponMesh  = null;
+    this._rig         = null;
+    this._walkT       = Math.random() * Math.PI * 2; // random phase so bots aren't in sync
 
     this.position = spawnPoint.clone();
 
@@ -96,6 +98,9 @@ export class Bot {
     this.healthBarGroup = hpGroup;
 
     this.mesh.position.copy(this.position);
+
+    // Rig limb pivots for the walk cycle — may return null for procedural meshes
+    this._rig = rigCharacterLimbs(this.mesh);
 
     // Attach visible weapon to the right hand.
     // Inner armor clone has rotation.y = π so character's right side = -X in group space.
@@ -334,6 +339,36 @@ export class Bot {
           Math.PI,
           0.22 + sway * 0.5
         );
+      }
+    }
+
+    // ── Limb rig walk cycle ───────────────────────────────────────────────────
+    if (this._rig) {
+      const { armL, armR, legL, legR } = this._rig;
+      const isMoving = !!moveTarget;
+
+      // Advance walk timer proportional to movement speed (mirrors player bobTime)
+      this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
+
+      const swing   = isMoving ? Math.sin(this._walkT) * 0.55 : 0;
+      const breathe = Math.sin(this._walkT * (isMoving ? 0.22 : 0.28)) * 0.04;
+
+      if (isMoving) {
+        // Natural gait: legs stride opposite each other; arms counter-swing
+        legL.rotation.x += ( swing - legL.rotation.x) * Math.min(1, dt * 14);
+        legR.rotation.x += (-swing - legR.rotation.x) * Math.min(1, dt * 14);
+        // AR bots grip the rifle so the weapon arm (armL = anatomical right)
+        // swings less; sword bots swing both arms freely
+        const swL = this._isSwordBot ? -swing * 0.65 : -swing * 0.30;
+        const swR = this._isSwordBot ?  swing * 0.65 :  swing * 0.62;
+        armL.rotation.x += (swL - armL.rotation.x) * Math.min(1, dt * 12);
+        armR.rotation.x += (swR - armR.rotation.x) * Math.min(1, dt * 12);
+      } else {
+        // Idle: gentle breathing sway on arms, legs settle back to neutral
+        armL.rotation.x += (breathe - armL.rotation.x) * Math.min(1, dt * 4);
+        armR.rotation.x += (breathe - armR.rotation.x) * Math.min(1, dt * 4);
+        legL.rotation.x += (0       - legL.rotation.x) * Math.min(1, dt * 6);
+        legR.rotation.x += (0       - legR.rotation.x) * Math.min(1, dt * 6);
       }
     }
   }
