@@ -72,6 +72,9 @@ export class Bot {
     this._botGun      = this._isSwordBot ? null : AR_GUN;
     this._gunTimer    = Math.random() * 0.8;
     this._accuracy    = 0.55 + Math.random() * 0.35;
+    this._weaponT     = Math.random() * Math.PI * 2; // phase offset for variety
+    this._alertBlend  = 0;   // 0 = low-ready, 1 = high-ready/aiming
+    this._weaponMesh  = null;
 
     this.position = spawnPoint.clone();
 
@@ -95,24 +98,24 @@ export class Bot {
     this.mesh.position.copy(this.position);
 
     // Attach visible weapon to the right hand.
-    // The inner armor clone has rotation.y = π, so the character's right side
-    // is at -X in the group's local space. Bot +Z faces its look-at target.
-    // Weapon models have their muzzle/tip at -Z, so rotating Y by π aims them forward.
+    // Inner armor clone has rotation.y = π so character's right side = -X in group space.
+    // Bot +Z faces its look-at target; weapon -Z → +Z via rotation.y = π to aim forward.
     const weaponId  = this._isSwordBot ? 'sword' : 'm4';
     const weaponDef = getWeapon(weaponId);
     if (weaponDef) {
       const { group: wm } = buildWeaponModel(weaponDef);
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
       if (this._isSwordBot) {
-        // Sword: raised at shoulder, angled diagonally forward-up
-        wm.position.set(-0.42, 1.05, 0.05);
-        wm.rotation.set(-0.55, Math.PI, 0.25);
+        // Sword low guard: right hand at mid-chest, blade angled ~40° forward-up
+        wm.position.set(-0.38, 1.00, 0.02);
+        wm.rotation.set(-0.70, Math.PI, 0.22);
       } else {
-        // AR: held forward at hip/chest level, parallel to ground
-        wm.position.set(-0.40, 0.88, 0.05);
-        wm.rotation.set(-0.12, Math.PI, 0.18);
+        // AR low-ready: two-handed chest carry, barrel angled ~20° down
+        wm.position.set(-0.40, 0.92, 0.02);
+        wm.rotation.set(-0.35, Math.PI, 0.14);
       }
       this.mesh.add(wm);
+      this._weaponMesh = wm;
     }
   }
 
@@ -273,6 +276,65 @@ export class Bot {
     if (this.healthBarGroup) {
       const localQuat = this.mesh.quaternion.clone().invert().multiply(camera.quaternion);
       this.healthBarGroup.quaternion.copy(localQuat);
+    }
+
+    // ── Weapon animation ──────────────────────────────────────────────────────
+    if (this._weaponMesh) {
+      const isAlert   = !player.isDead && distToPlayer < DETECT_RADIUS;
+      const isMoving  = !!moveTarget;
+      const isLunging = this.lungeTimer > 0;
+
+      // Blend alert level: raise weapon when bot spots player
+      this._alertBlend += ((isAlert ? 1 : 0) - this._alertBlend) * Math.min(1, dt * 5);
+
+      // Advance animation timer — faster tick while walking
+      this._weaponT += dt * (isMoving ? 7 : 2.2);
+
+      const breathe = Math.sin(this._weaponT * (isMoving ? 1.0 : 0.28)) * 0.018;
+      const sway    = Math.cos(this._weaponT * (isMoving ? 0.5 : 0.14)) * 0.010;
+      const bob     = isMoving ? Math.abs(Math.sin(this._weaponT * 0.5)) * 0.022 : 0;
+
+      const wm = this._weaponMesh;
+
+      if (!this._isSwordBot) {
+        // AR rifle animation
+        // Low-ready base:  pos(-0.40, 0.92, 0.02)  rot(-0.35, π, 0.14)
+        // High-ready alert: raise +0.10 Y, pitch up by 0.28 (barrel levels to horizon)
+        const alertY   = this._alertBlend * 0.10;
+        const alertPX  = this._alertBlend * -0.28; // negative = barrel pitches up
+        const lungeZ   = isLunging ? 0.06 : 0;    // thrust forward on melee lunge
+
+        wm.position.set(
+          -0.40 + sway * 0.4,
+          0.92  + breathe + alertY - bob,
+          0.02  + lungeZ
+        );
+        wm.rotation.set(
+          -0.35 + alertPX,
+          Math.PI,
+          0.14 + sway
+        );
+      } else {
+        // Sword animation
+        // Low guard base:  pos(-0.38, 1.00, 0.02)  rot(-0.70, π, 0.22)
+        // High guard alert: raise +0.08 Y, rotate wrist to bring blade more forward (−0.20 X)
+        const alertY   = this._alertBlend * 0.08;
+        const alertPX  = this._alertBlend * -0.20;
+        // Lunge: extend arm forward and lower tip toward target
+        const lungeZ   = isLunging ? 0.14 : 0;
+        const lungePX  = isLunging ? 0.30 : 0; // tip dips on thrust
+
+        wm.position.set(
+          -0.38 + sway * 0.3,
+          1.00  + breathe * 1.3 + alertY - bob * 0.8,
+          0.02  + lungeZ
+        );
+        wm.rotation.set(
+          -0.70 + alertPX + lungePX,
+          Math.PI,
+          0.22 + sway * 0.5
+        );
+      }
     }
   }
 }
