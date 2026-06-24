@@ -78,6 +78,14 @@ export class Bot {
     this._rig         = null;
     this._walkT       = Math.random() * Math.PI * 2; // random phase so bots aren't in sync
 
+    // Pre-allocated scratch vectors — avoids per-frame GC pressure
+    this._toPlayer    = new THREE.Vector3();
+    this._wanderDir   = new THREE.Vector3();
+    this._shootFrom   = new THREE.Vector3();
+    this._shootTarget = new THREE.Vector3();
+    this._shootDir    = new THREE.Vector3();
+    this._raycaster   = new THREE.Raycaster();
+
     this.position = spawnPoint.clone();
 
     const armorTypeId = ARMOR_TYPES[_armorIdx++ % ARMOR_TYPES.length];
@@ -161,17 +169,19 @@ export class Bot {
   }
 
   _shootAt(player, onAttack, world) {
-    const from = new THREE.Vector3(this.position.x, this.position.y + 1.5, this.position.z);
-    const target = new THREE.Vector3(player.position.x, player.position.y + 1.0, player.position.z);
-    const dist = from.distanceTo(target);
+    this._shootFrom.set(this.position.x, this.position.y + 1.5, this.position.z);
+    this._shootTarget.set(player.position.x, player.position.y + 1.0, player.position.z);
+    const dist = this._shootFrom.distanceTo(this._shootTarget);
     if (dist < 0.5) return;
-    const dir = target.clone().sub(from).normalize();
+    this._shootDir.subVectors(this._shootTarget, this._shootFrom).normalize();
 
     // Line-of-sight check against world geometry
     if (world?.colliders?.length) {
-      const ray = new THREE.Raycaster(from, dir, 0.2, dist - 0.5);
+      this._raycaster.near = 0.2;
+      this._raycaster.far  = dist - 0.5;
+      this._raycaster.set(this._shootFrom, this._shootDir);
       const wMeshes = world.colliders.map(c => c.mesh).filter(Boolean);
-      if (ray.intersectObjects(wMeshes, true).length) return; // blocked by wall
+      if (this._raycaster.intersectObjects(wMeshes, true).length) return; // blocked by wall
     }
 
     // Hit probability falls off with distance
@@ -234,7 +244,8 @@ export class Bot {
       this.mesh.scale.setScalar(1);
     }
 
-    const toPlayer = new THREE.Vector3(player.position.x - this.position.x, 0, player.position.z - this.position.z);
+    this._toPlayer.set(player.position.x - this.position.x, 0, player.position.z - this.position.z);
+    const toPlayer = this._toPlayer;
     const distToPlayer = toPlayer.length();
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
@@ -264,9 +275,9 @@ export class Bot {
         this.wanderTarget.set((Math.random() * 2 - 1) * r, 0, (Math.random() * 2 - 1) * r);
         this.wanderCooldown = 3 + Math.random() * 3;
       }
-      const dir = new THREE.Vector3().subVectors(this.wanderTarget, this.position);
-      if (dir.lengthSq() > 0.04) {
-        moveTarget = dir.normalize();
+      this._wanderDir.subVectors(this.wanderTarget, this.position);
+      if (this._wanderDir.lengthSq() > 0.04) {
+        moveTarget = this._wanderDir.normalize();
         this.mesh.lookAt(this.wanderTarget.x, this.position.y + 1.08, this.wanderTarget.z);
       }
     }

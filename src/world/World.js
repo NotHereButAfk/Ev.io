@@ -495,6 +495,16 @@ export class World {
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
+
+    // Lock world matrix on every static mesh built above so Three.js skips
+    // recomputing it on every frame. Dynamic objects (bots, player, pickups)
+    // are added later by Game.js and are not affected.
+    this.scene.traverse((obj) => {
+      if (obj.isMesh && obj.matrixAutoUpdate) {
+        obj.matrixAutoUpdate = false;
+        obj.updateMatrix();
+      }
+    });
   }
 
   _buildLighting() {
@@ -506,7 +516,7 @@ export class World {
     const star = new THREE.DirectionalLight(0xb8d4ff, 0.72);
     star.position.set(-50, 70, 40);
     star.castShadow = true;
-    star.shadow.mapSize.set(2048, 2048);
+    star.shadow.mapSize.set(1024, 1024);
     star.shadow.camera.left   = -95;
     star.shadow.camera.right  =  95;
     star.shadow.camera.top    =  95;
@@ -544,6 +554,8 @@ export class World {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
+    ground.matrixAutoUpdate = false;
+    ground.updateMatrix();
     this.scene.add(ground);
   }
 
@@ -558,12 +570,16 @@ export class World {
         depthWrite: false,
       })
     );
+    sky.matrixAutoUpdate = false;
+    sky.updateMatrix();
     this.scene.add(sky);
 
     // moon disc — bright enough to bloom
     const moonMat = new THREE.MeshBasicMaterial({ color: 0xf4f8ff, fog: false });
     const moon = new THREE.Mesh(new THREE.SphereGeometry(9, 32, 32), moonMat);
     moon.position.set(-130, 95, -170);
+    moon.matrixAutoUpdate = false;
+    moon.updateMatrix();
     this.scene.add(moon);
     // Layered halo glow (blooms into a soft moon corona)
     [[14, 0x9fb4d8, 0.22], [22, 0x6a86c8, 0.12], [34, 0x4a5fa8, 0.06]].forEach(([r, c, o]) => {
@@ -605,6 +621,8 @@ export class World {
   }
 
   _addCollider(mesh) {
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
     this.scene.add(mesh);
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);

@@ -655,6 +655,12 @@ export class Zombie {
     this.healthBarGroup = hpGroup;
     this.mesh.add(hpGroup);
     this.mesh.position.copy(this.position);
+
+    // Pre-allocated scratch vectors — avoids per-frame GC pressure
+    this._toPlayer  = new THREE.Vector3();
+    this._strafeVec = new THREE.Vector3();
+    this._wanderDir = new THREE.Vector3();
+    this._strafeT   = Math.random() * Math.PI * 2; // smooth strafe oscillator
   }
 
   // ─── Animation ──────────────────────────────────────────────────────────────
@@ -848,11 +854,12 @@ export class Zombie {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     if (this.shootCooldown  > 0) this.shootCooldown  -= dt;
 
-    const toPlayer = new THREE.Vector3(
+    this._toPlayer.set(
       player.position.x - this.position.x,
       0,
       player.position.z - this.position.z
     );
+    const toPlayer = this._toPlayer;
     const dist = toPlayer.length();
     let moveDir  = null;
     let isMoving = false;
@@ -877,9 +884,10 @@ export class Zombie {
             this._fireAt(player, onAttack);
           }
           // Slight strafe
-          const strafe = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
-          const strafeSign = Math.sin(Date.now() * 0.0007 + this.id) > 0 ? 1 : -1;
-          moveDir  = strafe.multiplyScalar(strafeSign * 0.35);
+          this._strafeT += dt * 0.7;
+          this._strafeVec.set(-toPlayer.z, 0, toPlayer.x).normalize();
+          const strafeSign = Math.sin(this._strafeT + this.id * 0.01) > 0 ? 1 : -1;
+          moveDir  = this._strafeVec.multiplyScalar(strafeSign * 0.35);
           isMoving = true;
         } else {
           // Chase
@@ -910,9 +918,9 @@ export class Zombie {
         );
         this.wanderCooldown = 2 + Math.random() * 2;
       }
-      const dir = new THREE.Vector3().subVectors(this.wanderTarget, this.position);
-      if (dir.lengthSq() > 0.04) {
-        moveDir  = dir.normalize();
+      this._wanderDir.subVectors(this.wanderTarget, this.position);
+      if (this._wanderDir.lengthSq() > 0.04) {
+        moveDir  = this._wanderDir.normalize();
         isMoving = true;
         this.mesh.lookAt(this.wanderTarget.x, this.position.y + 1.08, this.wanderTarget.z);
       }

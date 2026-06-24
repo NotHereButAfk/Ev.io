@@ -75,7 +75,8 @@ export class PickupSystem {
       const mesh   = this._buildMesh(def);
       mesh.position.set(px, 0.7, pz);
       this.scene.add(mesh);
-      this._pickups.push({ type, def, mesh, active: true, respawnTimer: 0, baseY: 0.7 });
+      // Stagger _animT so every pickup floats at a different phase from the start
+      this._pickups.push({ type, def, mesh, active: true, respawnTimer: 0, baseY: 0.7, _animT: this._pickups.length * 1.37 });
     }
   }
 
@@ -127,8 +128,9 @@ export class PickupSystem {
         continue;
       }
 
-      // Float + spin animation
-      p.mesh.position.y  = p.baseY + Math.sin(Date.now() * 0.002 + p.mesh.position.x) * 0.12;
+      // Float + spin animation — use frame time instead of Date.now() (avoids 20 syscalls/frame)
+      p._animT += dt * 2.0;
+      p.mesh.position.y  = p.baseY + Math.sin(p._animT) * 0.12;
       p.mesh.rotation.y += dt * 1.4;
 
       // Proximity collect

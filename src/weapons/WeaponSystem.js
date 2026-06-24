@@ -82,6 +82,21 @@ export class WeaponSystem {
       this._flashMeshes.push(mesh);
     }
 
+    // Pre-allocated scratch vectors — avoids GC spikes from per-shot allocations
+    this._camPos      = new THREE.Vector3();
+    this._camDir      = new THREE.Vector3();
+    this._rightVec    = new THREE.Vector3();
+    this._upVec       = new THREE.Vector3();
+    this._fwdVec      = new THREE.Vector3();
+    this._muzzleWorld = new THREE.Vector3();
+    this._pelletDir   = new THREE.Vector3();
+    this._farVec      = new THREE.Vector3();
+    this._raycaster   = new THREE.Raycaster();
+
+    // Shared shell casing geo/mat — created once, reused by every ejected casing
+    this._shellGeo = new THREE.CylinderGeometry(0.0048, 0.0035, 0.02, 6);
+    this._shellMat = new THREE.MeshStandardMaterial({ color: 0xd4a520, roughness: 0.28, metalness: 0.9 });
+
     this._buildViewmodels();
     this._lastSpawnedTracerHolder = scene;
 
@@ -395,9 +410,9 @@ export class WeaponSystem {
     const flashHex    = animeActive ? 0xff9de0 : fireActive ? 0xff6600 : 0xfff0a0;
     this.flashLight.color.setHex(flashColor);
     this.flashLight.intensity = animeActive ? 12 : fireActive ? 14 : 8;
-    const muzzleWorld = new THREE.Vector3();
-    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
-    this.camera.worldToLocal(muzzleWorld);
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(this._muzzleWorld);
+    this.camera.worldToLocal(this._muzzleWorld);
+    const muzzleWorld = this._muzzleWorld;
     this.flashLight.position.copy(muzzleWorld);
     this._flashTimer = FLASH_LIFE;
 
@@ -412,17 +427,16 @@ export class WeaponSystem {
   }
 
   _spawnShell() {
-    const mat = new THREE.MeshStandardMaterial({ color: 0xd4a520, roughness: 0.28, metalness: 0.9 });
-    const geo = new THREE.CylinderGeometry(0.0048, 0.0035, 0.02, 6);
-    const mesh = new THREE.Mesh(geo, mat);
-    const muzzleWorld = new THREE.Vector3();
-    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
-    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
-    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
-    mesh.position.copy(muzzleWorld).addScaledVector(right, 0.12).addScaledVector(up, -0.05);
+    const mesh = new THREE.Mesh(this._shellGeo, this._shellMat);
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(this._muzzleWorld);
+    this._rightVec.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this._upVec.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    mesh.position.copy(this._muzzleWorld)
+      .addScaledVector(this._rightVec, 0.12)
+      .addScaledVector(this._upVec, -0.05);
     this.scene.add(mesh);
-    const vel = right.clone().multiplyScalar(2.8 + Math.random() * 1.4);
-    vel.addScaledVector(up, 1.8 + Math.random() * 1.0);
+    const vel = this._rightVec.clone().multiplyScalar(2.8 + Math.random() * 1.4);
+    vel.addScaledVector(this._upVec, 1.8 + Math.random() * 1.0);
     vel.x += (Math.random() - 0.5) * 0.8;
     vel.z += (Math.random() - 0.5) * 0.8;
     this.shells.push({ mesh, vel, life: 0.55 });
@@ -431,10 +445,11 @@ export class WeaponSystem {
   _spawnAnimeSparkles() {
     if (!this._animeSparkles) this._animeSparkles = [];
     const colors = [0xff69b4, 0xff1493, 0xffa0d0, 0xffd700, 0xffffff];
-    const muzzleWorld = new THREE.Vector3();
-    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
-    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
-    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(this._muzzleWorld);
+    const muzzleWorld = this._muzzleWorld;
+    this._upVec.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this._rightVec.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const up = this._upVec, right = this._rightVec;
     for (let i = 0; i < 8; i++) {
       const geo = new THREE.SphereGeometry(0.015 + Math.random() * 0.02, 4, 3);
       const mat = new THREE.MeshBasicMaterial({
@@ -476,11 +491,12 @@ export class WeaponSystem {
   _spawnFireEmbers() {
     if (!this._fireEmbers) this._fireEmbers = [];
     const colors = [0xff2200, 0xff6600, 0xff9900, 0xffcc00, 0xff4400];
-    const muzzleWorld = new THREE.Vector3();
-    this.models.get(this.currentDef.id).muzzle.getWorldPosition(muzzleWorld);
-    const fwd   = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 2).negate();
-    const up    = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
-    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this.models.get(this.currentDef.id).muzzle.getWorldPosition(this._muzzleWorld);
+    const muzzleWorld = this._muzzleWorld;
+    this._fwdVec.setFromMatrixColumn(this.camera.matrixWorld, 2).negate();
+    this._upVec.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this._rightVec.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const fwd = this._fwdVec, up = this._upVec, right = this._rightVec;
     for (let i = 0; i < 12; i++) {
       const size = 0.012 + Math.random() * 0.022;
       const geo = new THREE.SphereGeometry(size, 4, 3);
@@ -540,20 +556,13 @@ export class WeaponSystem {
   _doHitscanShot(world, botMeshes) {
     const def = this.currentDef;
     const st = this.currentState;
-    const camPos = new THREE.Vector3();
-    this.camera.getWorldPosition(camPos);
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
-    const right = new THREE.Vector3();
-    right.setFromMatrixColumn(this.camera.matrixWorld, 0);
-    const up = new THREE.Vector3();
-    up.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this.camera.getWorldPosition(this._camPos);
+    this.camera.getWorldDirection(this._camDir);
+    this._rightVec.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    this._upVec.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this.models.get(def.id).muzzle.getWorldPosition(this._muzzleWorld);
 
-    const muzzleWorld = new THREE.Vector3();
-    this.models.get(def.id).muzzle.getWorldPosition(muzzleWorld);
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.far = def.range;
+    this._raycaster.far = def.range;
     const targets = [...botMeshes, ...world.colliders.map((c) => c.mesh)];
 
     const pelletCount = def.pellets || 1;
@@ -561,14 +570,14 @@ export class WeaponSystem {
     let lastImpact = null;
 
     for (let i = 0; i < pelletCount; i++) {
-      const dir = camDir.clone();
+      this._pelletDir.copy(this._camDir);
       if (def.spread > 0) {
         const jx = (Math.random() - 0.5) * def.spread;
         const jy = (Math.random() - 0.5) * def.spread;
-        dir.addScaledVector(right, jx).addScaledVector(up, jy).normalize();
+        this._pelletDir.addScaledVector(this._rightVec, jx).addScaledVector(this._upVec, jy).normalize();
       }
-      raycaster.set(camPos, dir);
-      const hits = raycaster.intersectObjects(targets, true);
+      this._raycaster.set(this._camPos, this._pelletDir);
+      const hits = this._raycaster.intersectObjects(targets, true);
       const hit = hits.find((h) => !h.object.userData.noHit);
       if (hit) {
         lastImpact = hit.point;
@@ -581,10 +590,10 @@ export class WeaponSystem {
         } else if (this.onHitWorld) {
           this.onHitWorld(hit.point);
         }
-        this._spawnTracer(muzzleWorld, hit.point);
+        this._spawnTracer(this._muzzleWorld, hit.point);
       } else {
-        const far = camPos.clone().addScaledVector(dir, def.range);
-        this._spawnTracer(muzzleWorld, far);
+        this._farVec.copy(this._camPos).addScaledVector(this._pelletDir, def.range);
+        this._spawnTracer(this._muzzleWorld, this._farVec);
       }
     }
 

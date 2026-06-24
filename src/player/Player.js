@@ -76,6 +76,12 @@ export class Player {
     this._slideVel     = new THREE.Vector3();
     this._coyoteTimer  = 0;
     this._eyeHeight    = EYE_HEIGHT;  // current (lerped) eye height
+
+    // Pre-allocated scratch vectors — avoids per-frame GC pressure
+    this._fwdVec     = new THREE.Vector3();
+    this._rightVec   = new THREE.Vector3();
+    this._desiredVec = new THREE.Vector3();
+    this._slideFwd   = new THREE.Vector3();
   }
 
   get isDead() {
@@ -167,12 +173,12 @@ export class Player {
     if (len > 0) { moveX /= len; moveZ /= len; }
 
     const speed = WALK_SPEED * (this.isSprinting ? SPRINT_MULT : (this.isCrouching ? 0.55 : 1));
-    const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-    const right   = new THREE.Vector3(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
+    this._fwdVec.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    this._rightVec.set(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
 
-    const desired = new THREE.Vector3();
-    desired.addScaledVector(forward, -moveZ);
-    desired.addScaledVector(right,    moveX);
+    const desired = this._desiredVec.set(0, 0, 0);
+    desired.addScaledVector(this._fwdVec, -moveZ);
+    desired.addScaledVector(this._rightVec, moveX);
     desired.multiplyScalar(speed);
 
     // --- crouch / slide ---
@@ -183,8 +189,8 @@ export class Player {
       // Initiate slide
       this.isSliding   = true;
       this._slideTimer = SLIDE_DURATION;
-      const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-      this._slideVel.copy(fwd).multiplyScalar(SLIDE_BOOST);
+      this._slideFwd.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      this._slideVel.copy(this._slideFwd).multiplyScalar(SLIDE_BOOST);
       this.isSprinting = false;
     }
 
