@@ -90,7 +90,7 @@ export class Bot {
 
     const armorTypeId = ARMOR_TYPES[_armorIdx++ % ARMOR_TYPES.length];
     const skin = BOT_SKINS[_skinIdx++ % BOT_SKINS.length];
-    this.mesh = buildPreviewCharacter(skin, armorTypeId);
+    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: false });
     this.bodyMat = this.mesh.userData.primaryMat;
 
     this.mesh.userData.bot = this;

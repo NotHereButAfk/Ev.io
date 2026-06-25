@@ -67,16 +67,25 @@ export class ArmorPreviewRenderer {
     const g = buildPreviewCharacter(playerSkin, armorTypeId, armorSkin);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
 
-    // center horizontally, sit feet on the disc, frame the whole body
-    const box = new THREE.Box3().setFromObject(g);
-    const c   = box.getCenter(new THREE.Vector3());
-    const sz  = box.getSize(new THREE.Vector3());
-    g.position.x -= c.x;
-    g.position.z -= c.z;
-    g.position.y -= box.min.y; // feet on disc
-
+    // center horizontally, sit feet on the disc, frame the whole body.
     const targetH = 2.3;
-    const s = sz.y > 0 ? targetH / sz.y : 1;
+    let cx, cz, feetY, height;
+    if (g.userData?.isHuman) {
+      // Re-measuring the posed SkinnedMesh here collapses to a degenerate box;
+      // use the metrics cached at build time instead.
+      cx = g.userData.centerX; cz = g.userData.centerZ;
+      feetY = g.userData.feetY; height = g.userData.standHeight;
+    } else {
+      g.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(g);
+      const c   = box.getCenter(new THREE.Vector3());
+      const sz  = box.getSize(new THREE.Vector3());
+      cx = c.x; cz = c.z; feetY = box.min.y; height = sz.y;
+    }
+    g.position.x -= cx;
+    g.position.z -= cz;
+    g.position.y -= feetY; // feet on disc
+    const s = height > 0 ? targetH / height : 1;
     g.scale.setScalar(s);
 
     this._group = g;
@@ -94,7 +103,12 @@ export class ArmorPreviewRenderer {
     const loop = () => {
       this._raf = requestAnimationFrame(loop);
       this._t += 0.016;
-      if (this._group) this._group.rotation.y = this._t * 0.6;
+      if (this._group) {
+        this._group.rotation.y = this._t * 0.6;
+        // Drive the rigged human soldier's idle animation on the turntable.
+        const ud = this._group.userData;
+        if (ud?.isHuman) { ud.setMotion('idle'); ud.mixer.update(0.016); }
+      }
       this._renderer.render(this._scene, this._camera);
     };
     loop();

@@ -1,5 +1,6 @@
 export const SKINS = [
-  // Default: standard US Army OCP gear (coyote plate carrier + OCP uniform)
+  // Default: Master Chief / Spartan green armour
+  { id: 'spartan', name: 'Spartan', primary: 0x5a7d35, secondary: 0x33421d },
   { id: 'ocp',     name: 'OCP',     primary: 0x7a6040, secondary: 0xb09870 },
   { id: 'crimson', name: 'Crimson', primary: 0xd1372b, secondary: 0x2b1414 },
   { id: 'azure', name: 'Azure', primary: 0x2b8fd1, secondary: 0x142233 },

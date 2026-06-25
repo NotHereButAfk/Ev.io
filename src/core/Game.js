@@ -36,6 +36,7 @@ import { DeathmatchManager } from './DeathmatchManager.js';
 import { ServerSim } from './ServerSim.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel } from '../player/PreviewCharacter.js';
+import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
@@ -58,13 +59,16 @@ export class Game {
 
     GameSettings.load();
 
-    // Kick off Blender GLB fetches immediately so models are ready before first use
-    preloadPlayerModel(() => {
-      // GLB finished loading after the initial preview was built — swap in the real model
+    // Kick off model fetches immediately so they're ready before first use.
+    // The real rigged human soldier is preferred; both callbacks swap the
+    // preview to the best available model once it finishes loading.
+    const swapPreview = () => {
       const wasVisible = this.previewCharacter?.visible ?? false;
       this._rebuildPreviewCharacter();
       this.previewCharacter.visible = wasVisible;
-    });
+    };
+    preloadHumanSoldier(swapPreview);
+    preloadPlayerModel(swapPreview);
     preloadWeaponModels();
 
     this.world        = new World();
@@ -131,7 +135,7 @@ export class Game {
     this._camSegTime = 0;
     this._CAM_SEG_DUR = 7.0; // seconds per transition
 
-    this.selectedSkin      = getSkin('ocp');
+    this.selectedSkin      = getSkin('spartan');
     this.selectedArmorType = loadArmorType();
     this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
     this.previewCharacter  = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin);
@@ -495,7 +499,9 @@ export class Game {
     this._playerBody = buildPreviewCharacter(
       this.selectedSkin, armorTypeId || this.selectedArmorType || 'assault', this.selectedArmorSkin
     );
-    rigCharacterLimbs(this._playerBody);
+    // The human soldier animates via its own skeleton; only the procedural
+    // block character needs the limb-pivot rig.
+    if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
     this._playerBody.visible = false;
     this.world.scene.add(this._playerBody);
 
@@ -840,10 +846,22 @@ export class Game {
   // Drive the third-person body's walk cycle: swing the rigged arm/leg pivots
   // when moving, gentle breathing sway when standing still.
   _animatePlayerBody(dt) {
-    const rig = this._playerBody?.userData?.rig;
-    if (!rig) return;
     const p = this.player;
     const speed = Math.hypot(p.velocity.x, p.velocity.z);
+
+    // Real human soldier: drive its skeletal Idle/Walk/Run clips.
+    const ud = this._playerBody?.userData;
+    if (ud?.isHuman) {
+      const grounded = p.onGround;
+      let motion = 'idle';
+      if (grounded && speed > 0.6) motion = (p.isSprinting || speed > 6.5) ? 'run' : 'walk';
+      ud.setMotion(motion);
+      ud.mixer.update(dt);
+      return;
+    }
+
+    const rig = ud?.rig;
+    if (!rig) return;
     const moving = speed > 0.6 && p.onGround;
     if (moving) {
       const swing = Math.sin(p.bobTime) * (p.isSprinting ? 0.85 : 0.55);
@@ -938,6 +956,9 @@ export class Game {
     if (this.previewCharacter.visible) {
       this.previewCharacter.rotation.y += dt * 0.6;
     }
+    // Tick the human soldier's idle animation whenever it's on screen.
+    const pud = this.previewCharacter?.userData;
+    if (pud?.isHuman) { pud.setMotion('idle'); pud.mixer.update(dt); }
 
     // Cinematic spectator fly-through
     this._camSegTime += dt;

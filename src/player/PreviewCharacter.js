@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
 
 // ── Blender GLB player model loader ─────────────────────────────────────────
 let _playerTemplate = null, _playerLoading = false;
@@ -308,8 +309,16 @@ const BUILDERS = {
   stealth: buildStealth,
 };
 
-export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null) {
-  // Prefer Blender GLB when loaded
+export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null, opts = {}) {
+  // Prefer the real rigged human soldier (the player). Bots opt out with
+  // allowHuman:false — they rely on the procedural model's limb-pivot rig,
+  // per-part headshot zones, and weapon-hand attachment.
+  if (opts.allowHuman !== false && isHumanSoldierReady()) {
+    const human = buildHumanSoldier(skin);
+    if (human) { human.userData.armorTypeId = armorTypeId; return human; }
+  }
+
+  // Then the blocky Blender GLB
   const glbResult = _buildFromGLB(skin, armorTypeId, armorSkin);
   if (glbResult) return glbResult;
 
@@ -348,7 +357,11 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin =
 }
 
 export function applySkinToCharacter(group, skin, armorSkin = null) {
+  // Human soldier: tint the body texture instead of recoloring armor plates.
+  if (group.userData?.isHuman) { tintHumanSoldier(group, skin, armorSkin); return; }
+
   const { primaryMat, secondaryMat } = group.userData;
+  if (!primaryMat || !secondaryMat) return;
   primaryMat.color.setHex(armorSkin ? armorSkin.primary   : skin.primary);
   secondaryMat.color.setHex(armorSkin ? armorSkin.secondary : skin.secondary);
   if (armorSkin) {
