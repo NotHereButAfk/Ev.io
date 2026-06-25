@@ -315,15 +315,15 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin =
 
   const P = new THREE.MeshStandardMaterial({
     color:             primaryColor,
-    roughness:         src.roughness         ?? 0.42,
-    metalness:         src.metalness         ?? 0.52,
+    roughness:         src.roughness         ?? 0.82,
+    metalness:         src.metalness         ?? 0.06,
     emissive:          new THREE.Color(src.emissive ?? 0x000000),
     emissiveIntensity: src.emissiveIntensity ?? 0,
   });
   const S = new THREE.MeshStandardMaterial({
     color:     secondaryColor,
-    roughness: (src.roughness ?? 0.72) * 1.3,
-    metalness: (src.metalness ?? 0.18) * 0.35,
+    roughness: (src.roughness ?? 0.82) * 1.1,
+    metalness: (src.metalness ?? 0.06) * 0.2,
   });
 
   const builder = BUILDERS[armorTypeId] || buildAssault;

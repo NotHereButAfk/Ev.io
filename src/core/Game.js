@@ -126,7 +126,7 @@ export class Game {
     this._camSegTime = 0;
     this._CAM_SEG_DUR = 7.0; // seconds per transition
 
-    this.selectedSkin      = getSkin('crimson');
+    this.selectedSkin      = getSkin('ocp');
     this.selectedArmorType = loadArmorType();
     this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
     this.previewCharacter  = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin);
