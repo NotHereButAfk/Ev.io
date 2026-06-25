@@ -3,12 +3,19 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // ── Blender GLB player model loader ─────────────────────────────────────────
 let _playerTemplate = null, _playerLoading = false;
+const _loadCallbacks = [];
 
-export function preloadPlayerModel() {
-  if (_playerTemplate || _playerLoading) return;
+export function preloadPlayerModel(onLoad) {
+  if (onLoad) _loadCallbacks.push(onLoad);
+  if (_playerTemplate) { onLoad?.(); return; }
+  if (_playerLoading) return;
   _playerLoading = true;
   new GLTFLoader().load('/player.glb',
-    (gltf) => { _playerTemplate = gltf.scene; _playerLoading = false; },
+    (gltf) => {
+      _playerTemplate = gltf.scene;
+      _playerLoading  = false;
+      _loadCallbacks.splice(0).forEach(cb => cb());
+    },
     undefined,
     (err) => { console.warn('[PlayerGLB] load failed:', err.message); _playerLoading = false; }
   );
@@ -26,16 +33,16 @@ function _buildFromGLB(skin, armorTypeId, armorSkin) {
   const src = armorSkin || {};
   const P = new THREE.MeshStandardMaterial({
     color:             armorSkin ? armorSkin.primary   : skin.primary,
-    roughness:         src.roughness         ?? 0.42,
-    metalness:         src.metalness         ?? 0.52,
+    roughness:         src.roughness         ?? 0.82,
+    metalness:         src.metalness         ?? 0.06,
     emissive:          new THREE.Color(src.emissive ?? 0x000000),
     emissiveIntensity: src.emissiveIntensity ?? 0,
-    envMapIntensity:   1.15,
+    envMapIntensity:   1.0,
   });
   const S = new THREE.MeshStandardMaterial({
     color:     armorSkin ? armorSkin.secondary : skin.secondary,
-    roughness: (src.roughness ?? 0.72) * 1.3,
-    metalness: (src.metalness ?? 0.18) * 0.35,
+    roughness: (src.roughness ?? 0.82) * 1.1,
+    metalness: (src.metalness ?? 0.06) * 0.2,
     envMapIntensity: 0.8,
   });
 

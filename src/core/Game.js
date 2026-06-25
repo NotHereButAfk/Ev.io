@@ -59,7 +59,12 @@ export class Game {
     GameSettings.load();
 
     // Kick off Blender GLB fetches immediately so models are ready before first use
-    preloadPlayerModel();
+    preloadPlayerModel(() => {
+      // GLB finished loading after the initial preview was built — swap in the real model
+      const wasVisible = this.previewCharacter?.visible ?? false;
+      this._rebuildPreviewCharacter();
+      this.previewCharacter.visible = wasVisible;
+    });
     preloadWeaponModels();
 
     this.world        = new World();
