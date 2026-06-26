@@ -67,19 +67,24 @@ function makeTechFloorEmissiveTexture() {
 // (removed — replaced by tech floor)
 function makeWetRoughnessTexture() { return null; }
 
-// Vertical gradient skydome — deep indigo zenith fading to a warm neon-haze
-// horizon, so the city sits under a moody, colorful night sky instead of flat black.
+// Vertical gradient skydome — deep space zenith bleeding into a vivid
+// purple/cyan city-glow horizon. The neon mega-city light-pollutes the sky.
 function makeSkyGradientTexture() {
-  const w = 16, h = 256;
+  const w = 16, h = 512;
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0.0,  '#010208');
-  grad.addColorStop(0.35, '#01050f');
-  grad.addColorStop(0.65, '#020814');
-  grad.addColorStop(0.85, '#040b1e');
-  grad.addColorStop(1.0,  '#070e28');
+  grad.addColorStop(0.00, '#000008'); // deep space zenith
+  grad.addColorStop(0.18, '#01020e');
+  grad.addColorStop(0.38, '#010614');
+  grad.addColorStop(0.55, '#04081e');
+  grad.addColorStop(0.68, '#080420'); // purple tint begins
+  grad.addColorStop(0.78, '#12063a'); // deep violet haze
+  grad.addColorStop(0.86, '#1a0a3e'); // rich purple
+  grad.addColorStop(0.92, '#200838'); // neon city glow
+  grad.addColorStop(0.96, '#18062a'); // deep magenta shadow
+  grad.addColorStop(1.00, '#0c0418'); // dark at base
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -483,6 +488,9 @@ export class World {
     this._buildGround();
     this._buildSky();
     this._buildCity();
+    this._buildBackgroundSkyline();
+    this._buildSkyways();
+    this._buildHologramPillars();
     this._buildCrosswalks();
     this._buildStreetProps();
     this._buildGreenery();
@@ -674,10 +682,7 @@ export class World {
   _buildCity() {
     // City blocks sit in a grid; the central row (z=0) and column (x=0) are
     // left clear so two wide avenues cross at the plaza, giving long sightlines
-    // and somewhere to spawn. Buildings only fill the four quadrants. The
-    // outer ring (ring 4) gets simplified detail and the inner two rings
-    // (the "Times Square" core) get jumbotron billboards, keeping the bigger
-    // map's prop count under control.
+    // and somewhere to spawn. Buildings only fill the four quadrants.
     const cell = 18; // centre-to-centre spacing
     const range = 4; // cells out from centre
 
@@ -685,29 +690,40 @@ export class World {
       for (let iz = -range; iz <= range; iz++) {
         if (ix === 0 || iz === 0) continue; // keep the cross avenues open
 
-        // Randomized sci-fi skyline: ~18% of lots are left as empty plazas so
-        // the city no longer reads as a perfect grid, and every tower is jittered
-        // off its cell centre (clamped so it never spills into an avenue).
+        // ~18% of lots left as empty plazas for breathing room + sightlines.
         if (Math.random() < 0.18) continue;
         const jx = (Math.random() - 0.5) * 4.2;
         const jz = (Math.random() - 0.5) * 4.2;
         const cx = ix * cell + jx;
         const cz = iz * cell + jz;
+        const ring = Math.max(Math.abs(ix), Math.abs(iz));
 
-        // footprint, leaving room for sidewalks + streets
         const fw = 8 + Math.random() * 4;
         const fd = 8 + Math.random() * 4;
 
-        // Mostly sleek glass arcologies; a few squat brick relics for contrast.
-        // Heights vary hard — from low blocks to the odd mega-spire.
-        const brick = false;
+        // Three sci-fi archetypes: glass slab, cylinder tower, stepped spire.
+        const roll = Math.random();
         let height;
-        if (brick)                       height = 9  + Math.random() * 9;
-        else if (Math.random() < 0.16)   height = 56 + Math.random() * 28; // mega-tower
-        else                             height = 20 + Math.random() * 28;
-        const ring = Math.max(Math.abs(ix), Math.abs(iz));
-
-        this._buildBuilding(cx, cz, fw, fd, height, brick ? 'brick' : 'glass', ring);
+        if (roll < 0.22) {
+          // Cylindrical glass tower
+          const radius = 3.0 + Math.random() * 2.5;
+          height = Math.random() < 0.18
+            ? 52 + Math.random() * 32
+            : 22 + Math.random() * 28;
+          this._buildCylinderTower(cx, cz, radius, height, ring);
+        } else if (roll < 0.46) {
+          // Stepped / tiered Art-Deco-in-space spire
+          height = Math.random() < 0.15
+            ? 50 + Math.random() * 32
+            : 22 + Math.random() * 28;
+          this._buildSteppedTower(cx, cz, fw, fd, height, ring);
+        } else {
+          // Standard glass curtain-wall tower
+          height = Math.random() < 0.16
+            ? 56 + Math.random() * 28
+            : 20 + Math.random() * 28;
+          this._buildBuilding(cx, cz, fw, fd, height, 'glass', ring);
+        }
       }
     }
   }
@@ -1134,6 +1150,429 @@ export class World {
       this._streetLight(x, 8);
     }
     // No ground vehicles — this is a Forerunner arena, not a city street
+  }
+
+  // ── Cylindrical glass tower ─────────────────────────────────────────────────
+  _buildCylinderTower(cx, cz, radius, height, ring = 1) {
+    const base = 0.25;
+    const neon  = this._randNeon();
+    const nm    = this._neonMat(neon);
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x0c1824, roughness: 0.22, metalness: 0.76,
+      emissive: 0x000c18, emissiveIntensity: 0.28, envMapIntensity: 1.4,
+    });
+
+    // Circular sidewalk slab
+    const sidewalk = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius + 1.9, radius + 2.2, base, 20),
+      new THREE.MeshStandardMaterial({ color: 0xb0b4bc, roughness: 0.9, metalness: 0.05 })
+    );
+    sidewalk.position.set(cx, base / 2, cz);
+    sidewalk.receiveShadow = true;
+    this.scene.add(sidewalk);
+
+    // Stone plinth ring
+    const plinth = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius + 0.3, radius + 0.5, 1.0, 20), this._mats.glassPlinth
+    );
+    plinth.position.set(cx, base + 0.5, cz);
+    this.scene.add(plinth);
+
+    // Main tower
+    const tower = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.93, radius, height, 20), metalMat
+    );
+    tower.position.set(cx, height / 2 + base, cz);
+    tower.castShadow = true;
+    tower.receiveShadow = true;
+    this._addCollider(tower);
+
+    // Neon horizontal ring bands
+    const numBands = Math.max(2, Math.floor(height / 11));
+    for (let i = 1; i <= numBands; i++) {
+      const t  = i / (numBands + 1);
+      const by = base + height * t;
+      const br = radius * (1.0 - t * 0.07);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(br + 0.2, 0.065, 8, 32), nm);
+      band.position.set(cx, by, cz);
+      band.rotation.x = Math.PI / 2;
+      this.scene.add(band);
+    }
+
+    // Glowing rooftop cap
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius + 0.28, radius * 0.93, 0.38, 20), nm
+    );
+    cap.position.set(cx, base + height + 0.19, cz);
+    this.scene.add(cap);
+
+    // Antenna spire on taller towers
+    if (height > 22) {
+      const spireH = 2.5 + Math.random() * 5;
+      const spire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.12, spireH, 6), this._mats.poleMetal
+      );
+      spire.position.set(cx, base + height + spireH / 2 + 0.38, cz);
+      this.scene.add(spire);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), nm);
+      tip.position.set(cx, base + height + spireH + 0.38, cz);
+      this.scene.add(tip);
+    }
+
+    // Billboard panel on inner-ring towers
+    if (ring <= 2 && Math.random() < 0.55) {
+      const panelAngle = Math.random() * Math.PI * 2;
+      const panelX = cx + Math.cos(panelAngle) * (radius + 0.2);
+      const panelZ = cz + Math.sin(panelAngle) * (radius + 0.2);
+      const panelH = Math.min(height * 0.30, 9);
+      const panelW = panelH * 0.62;
+      const tex = this._billboardTex[Math.floor(Math.random() * this._billboardTex.length)];
+      const panelMat = new THREE.MeshStandardMaterial({
+        map: tex, emissiveMap: tex, emissive: 0xffffff,
+        emissiveIntensity: 2.0, color: 0x101010, roughness: 0.4,
+      });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, panelH, 0.12), panelMat);
+      panel.position.set(panelX, base + height * 0.36, panelZ);
+      panel.rotation.y = -panelAngle;
+      this.scene.add(panel);
+      const glowCols = [0xff1d68, 0x18e0ff, 0x39ff9e, 0xc46bff, 0xffcc00];
+      const gc = glowCols[Math.floor(Math.random() * glowCols.length)];
+      const glow = new THREE.PointLight(gc, 2.0, 18, 2);
+      glow.position.set(
+        panelX + Math.cos(panelAngle) * 2.5, base + height * 0.36,
+        panelZ + Math.sin(panelAngle) * 2.5
+      );
+      this.scene.add(glow);
+    }
+  }
+
+  // ── Stepped / tiered Art-Deco-in-space tower ────────────────────────────────
+  _buildSteppedTower(cx, cz, fw, fd, height, ring = 1) {
+    const base = 0.25;
+    const neon  = this._randNeon();
+    const nm    = this._neonMat(neon);
+
+    // Sidewalk slab
+    const swTex = this._sidewalkTex.clone();
+    swTex.needsUpdate = true;
+    swTex.repeat.set(Math.round(fw / 2), Math.round(fd / 2));
+    const sidewalk = new THREE.Mesh(
+      new THREE.BoxGeometry(fw + 3, base, fd + 3),
+      new THREE.MeshStandardMaterial({ map: swTex, roughness: 0.9, metalness: 0.05, color: 0xb8bcc4 })
+    );
+    sidewalk.position.set(cx, base / 2, cz);
+    sidewalk.receiveShadow = true;
+    this.scene.add(sidewalk);
+
+    const plinth = new THREE.Mesh(
+      new THREE.BoxGeometry(fw + 0.32, 1.2, fd + 0.32), this._mats.glassPlinth
+    );
+    plinth.position.set(cx, base + 0.6, cz);
+    this.scene.add(plinth);
+
+    // Three setback tiers
+    const h1 = height * 0.54;                          // base block
+    const h2 = height * 0.26;                          // mid setback
+    const h3 = height * 0.20;                          // top spire block
+    this._addGlassBlock(cx, cz, fw,        fd,        h1, base,           nm, true);
+    this._addGlassBlock(cx, cz, fw * 0.72, fd * 0.72, h2, base + h1,     nm, false);
+    this._addGlassBlock(cx, cz, fw * 0.46, fd * 0.46, h3, base + h1 + h2, nm, false);
+
+    // Antenna
+    const spireH = 2 + Math.random() * 5;
+    const spire = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.13, spireH, 6), this._mats.poleMetal
+    );
+    spire.position.set(cx, base + h1 + h2 + h3 + spireH / 2, cz);
+    this.scene.add(spire);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), nm);
+    tip.position.set(cx, base + h1 + h2 + h3 + spireH, cz);
+    this.scene.add(tip);
+
+    // Inner-core billboard
+    if (ring <= 2 && Math.random() < 0.5) {
+      const front = this._frontFace(cx, cz);
+      this._buildBillboard(cx, cz, fw, fd, front, height, base, false);
+    }
+  }
+
+  // Shared glass block used by stepped tower — one facade-textured box with
+  // neon roof band + corner strips. isCollider=true registers it in the collider list.
+  _addGlassBlock(cx, cz, fw, fd, height, yBase, nm, isCollider) {
+    const tex = this._facadeTex[Math.floor(Math.random() * this._facadeTex.length)].clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(Math.max(1, Math.round(fw / 4)), Math.max(2, Math.round(height / 8)));
+    const facadeMat = new THREE.MeshStandardMaterial({
+      map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 1.6,
+      color: 0x161a20, roughness: 0.35, metalness: 0.6, envMapIntensity: 1.2,
+    });
+    const block = new THREE.Mesh(new THREE.BoxGeometry(fw, height, fd), facadeMat);
+    block.position.set(cx, yBase + height / 2, cz);
+    block.castShadow = true;
+    block.receiveShadow = true;
+    if (isCollider) {
+      this._addCollider(block);
+    } else {
+      block.matrixAutoUpdate = false;
+      block.updateMatrix();
+      this.scene.add(block);
+    }
+    // Neon roof band
+    const roofBand = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.5, 0.14, fd + 0.5), nm);
+    roofBand.position.set(cx, yBase + height + 0.07, cz);
+    this.scene.add(roofBand);
+    // Vertical neon corner strips
+    const hx = fw / 2, hz = fd / 2;
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.1, height * 0.92, 0.1), nm);
+        strip.position.set(cx + sx * hx, yBase + height / 2, cz + sz * hz);
+        this.scene.add(strip);
+      }
+    }
+  }
+
+  // ── Elevated glass skyway bridges ───────────────────────────────────────────
+  _buildSkyways() {
+    // Pedestrian bridges spanning the cross-avenues at height, connecting
+    // inner-ring building clusters. Positions chosen so bridges clear the
+    // 16-unit-wide avenue floor and don't clip into building mass.
+    const specs = [
+      // [x1, z1, x2, z2, bridgeHeight]
+      [  9, -20,   9,  20, 13],
+      [ -9, -20,  -9,  20, 13],
+      [-20,   9,  20,   9, 13],
+      [-20,  -9,  20,  -9, 13],
+      [  9,  27,   9,  46, 10],
+      [ -9, -27,  -9, -46, 10],
+      [ 27,   9,  46,   9, 10],
+      [-27,  -9, -46,  -9, 10],
+      [ 10, -38,  32, -38, 16],
+      [-10,  38, -32,  38, 16],
+    ];
+    for (const [x1, z1, x2, z2, h] of specs) {
+      this._buildSkyway(x1, z1, x2, z2, h);
+    }
+  }
+
+  _buildSkyway(x1, z1, x2, z2, height) {
+    const dx = x2 - x1, dz = z2 - z1;
+    const length = Math.sqrt(dx * dx + dz * dz);
+    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+    const angle = Math.atan2(dz, dx);
+
+    const neon = this._randNeon();
+    const nm   = this._neonMat(neon);
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x1a3550, transparent: true, opacity: 0.52,
+      roughness: 0.08, metalness: 0.65, side: THREE.DoubleSide,
+    });
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0x080e18, roughness: 0.28, metalness: 0.90,
+    });
+
+    const group = new THREE.Group();
+
+    // Floor slab
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(length, 0.22, 2.4), frameMat);
+    floor.position.y = -0.68;
+    group.add(floor);
+
+    // Glass side walls
+    for (const sz of [-1.18, 1.18]) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(length, 2.2, 0.07), glassMat);
+      panel.position.set(0, 0.42, sz);
+      group.add(panel);
+    }
+
+    // Ceiling
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(length, 0.15, 2.44), frameMat);
+    ceiling.position.y = 1.42;
+    group.add(ceiling);
+
+    // Neon underside strip
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(length - 0.5, 0.05, 2.08), nm);
+    strip.position.y = -0.54;
+    group.add(strip);
+
+    // Structural ribs at intervals
+    const ribCount = Math.max(2, Math.round(length / 7));
+    for (let i = 0; i <= ribCount; i++) {
+      const lx = -length / 2 + (i / ribCount) * length;
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.6, 2.46), frameMat);
+      rib.position.set(lx, 0.32, 0);
+      group.add(rib);
+    }
+
+    // Diagonal tension cables
+    for (const s of [-1, 1]) {
+      const cable = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 2.6, 4), this._mats.poleMetal
+      );
+      cable.position.set(s * length * 0.28, 0.44, 0);
+      cable.rotation.z = s * 0.28;
+      group.add(cable);
+    }
+
+    group.position.set(cx, height, cz);
+    group.rotation.y = -angle;
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+
+    const box = new THREE.Box3().setFromObject(group);
+    this.colliders.push({ box, mesh: group });
+  }
+
+  // ── Holographic projection pillars ──────────────────────────────────────────
+  _buildHologramPillars() {
+    const positions = [
+      // staggered pairs down each avenue arm so they don't block the centreline
+      [  5, -28], [-5,  28], [-28,  5], [ 28, -5],
+      [  5, -55], [-5,  55], [-55,  5], [ 55, -5],
+    ];
+    for (const [x, z] of positions) this._buildHologramPillar(x, z);
+  }
+
+  _buildHologramPillar(x, z) {
+    const group   = new THREE.Group();
+    const color   = this._randNeon();
+    const nm      = this._neonMat(color);
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x06101e, roughness: 0.26, metalness: 0.92,
+    });
+
+    // Hex base pad
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 0.18, 6), bodyMat);
+    pad.position.y = 0.09;
+    pad.receiveShadow = true;
+    group.add(pad);
+
+    // Tapered column
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 2.8, 8), bodyMat);
+    pillar.position.y = 1.49;
+    pillar.castShadow = true;
+    group.add(pillar);
+
+    // Neon collar rings
+    for (const py of [0.72, 1.52, 2.6]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.042, 6, 18), nm);
+      ring.position.y = py;
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+    }
+
+    // Floating hologram panel
+    const holoMat = new THREE.MeshStandardMaterial({
+      color: color, emissive: color, emissiveIntensity: 1.0,
+      transparent: true, opacity: 0.28, side: THREE.DoubleSide,
+      roughness: 0.2, metalness: 0.1,
+    });
+    const holo = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.7, 0.04), holoMat);
+    holo.position.set(0, 4.25, 0);
+    group.add(holo);
+
+    // Frame edges
+    for (const ex of [-1.02, 1.02]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.74, 0.06), nm);
+      edge.position.set(ex, 4.25, 0);
+      group.add(edge);
+    }
+    for (const ey of [2.875, 5.625]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.05, 0.06), nm);
+      edge.position.set(0, ey, 0);
+      group.add(edge);
+    }
+
+    // Stalk connecting column top to hologram base
+    const stalk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 1.0, 6), this._mats.poleMetal
+    );
+    stalk.position.set(0, 3.25, 0);
+    group.add(stalk);
+
+    const light = new THREE.PointLight(color, 2.8, 15, 2);
+    light.position.y = 4.5;
+    group.add(light);
+
+    group.position.set(x, 0, z);
+    group.updateMatrixWorld(true);
+    this.scene.add(group);
+  }
+
+  // ── Background city silhouette ───────────────────────────────────────────────
+  // Simplified buildings ringing the arena far beyond the boundary — makes the
+  // sci-fi city feel limitless rather than stopping at the force field.
+  _buildBackgroundSkyline() {
+    const beaconMat = new THREE.MeshStandardMaterial({
+      color: 0xff1a00, emissive: 0xff1a00, emissiveIntensity: 3.0,
+    });
+    const winColors = [0x1840c0, 0xd01060, 0x00a0d8, 0xff5010, 0x5018d0, 0x00e5ff, 0xff2080];
+
+    for (let i = 0; i < 64; i++) {
+      const angle  = (i / 64) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
+      const dist   = 108 + Math.random() * 38;
+      const bx     = Math.cos(angle) * dist;
+      const bz     = Math.sin(angle) * dist;
+      const height = 10 + Math.random() * 75;
+      const width  = 3.5 + Math.random() * 9;
+      const depth  = 3.5 + Math.random() * 9;
+
+      // Dark silhouette body — barely picks up ambient
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: 0x03060d, roughness: 0.95, metalness: 0.08,
+        emissive: 0x010308, emissiveIntensity: 0.18,
+      });
+      const bld = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMat);
+      bld.position.set(bx, height / 2, bz);
+      this.scene.add(bld);
+
+      // Lit window band partway up
+      if (Math.random() < 0.68) {
+        const wc = winColors[Math.floor(Math.random() * winColors.length)];
+        const winMat = new THREE.MeshStandardMaterial({
+          color: 0x040710, emissive: wc,
+          emissiveIntensity: 0.35 + Math.random() * 0.55,
+        });
+        const wh = 0.6 + Math.random() * 2.0;
+        const win = new THREE.Mesh(
+          new THREE.BoxGeometry(width - 0.4, wh, depth - 0.4), winMat
+        );
+        win.position.set(bx, height * (0.28 + Math.random() * 0.44), bz);
+        this.scene.add(win);
+      }
+
+      // Second lit band for taller buildings
+      if (height > 40 && Math.random() < 0.5) {
+        const wc2 = winColors[Math.floor(Math.random() * winColors.length)];
+        const winMat2 = new THREE.MeshStandardMaterial({
+          color: 0x040710, emissive: wc2,
+          emissiveIntensity: 0.3 + Math.random() * 0.45,
+        });
+        const wh2 = 0.5 + Math.random() * 1.4;
+        const win2 = new THREE.Mesh(
+          new THREE.BoxGeometry(width - 0.6, wh2, depth - 0.6), winMat2
+        );
+        win2.position.set(bx, height * (0.55 + Math.random() * 0.25), bz);
+        this.scene.add(win2);
+      }
+
+      // Rooftop beacon on tall towers
+      if (height > 50) {
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.38, 6, 6), beaconMat);
+        beacon.position.set(bx, height + 0.4, bz);
+        this.scene.add(beacon);
+      }
+
+      // Neon rooftop band on some buildings
+      if (Math.random() < 0.42) {
+        const neon = this._randNeon();
+        const band = new THREE.Mesh(
+          new THREE.BoxGeometry(width + 0.3, 0.22, depth + 0.3), this._neonMat(neon)
+        );
+        band.position.set(bx, height + 0.11, bz);
+        this.scene.add(band);
+      }
+    }
   }
 
   // Ladder-style zebra crossing. `axis` 'x' paints bars spanning the X road
