@@ -250,6 +250,7 @@ export class Game {
 
   _applySettings() {
     this.player.sensitivityMult = GameSettings.get('sensitivity');
+    this.player.invertY         = GameSettings.get('invertY');
     this.player.baseFov         = GameSettings.get('fov');
     this.player.camera.fov      = this.player.baseFov;
     this.player.camera.updateProjectionMatrix();
@@ -377,6 +378,7 @@ export class Game {
     };
     this.menu.onSettingsSaved = (s) => {
       this.player.sensitivityMult = s.sensitivity;
+      this.player.invertY         = s.invertY;
       this.player.baseFov         = s.fov;
       if (this.state !== 'playing') {
         this.player.camera.fov = s.fov;

@@ -33,6 +33,7 @@ export class Player {
     this.velocity = new THREE.Vector3();
     this.yaw = Math.PI;
     this.pitch = 0;
+    this.invertY = false; // when true, vertical look is inverted (mouse + touch)
     this.onGround = true;
 
     this.maxHealth = 100;
@@ -124,8 +125,11 @@ export class Player {
     }
 
     // --- look ---
+    // Standard (non-inverted) is mouse/finger up → look up. invertY flips the
+    // vertical axis for players who prefer inverted aim (applies to touch too).
+    const pitchSign = this.invertY ? 1 : -1;
     this.yaw -= input.mouseDX * MOUSE_SENSITIVITY * this.sensitivityMult;
-    this.pitch -= input.mouseDY * MOUSE_SENSITIVITY * this.sensitivityMult;
+    this.pitch += pitchSign * input.mouseDY * MOUSE_SENSITIVITY * this.sensitivityMult;
     this.pitch = THREE.MathUtils.clamp(this.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
 
     // recoil recovery (spring back to 0)

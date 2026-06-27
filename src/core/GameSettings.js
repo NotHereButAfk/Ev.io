@@ -5,6 +5,7 @@ export const DEFAULTS = {
   volume:      0.5,   // master audio gain  0–1
   fov:         78,    // player camera field-of-view in degrees
   quality:     'medium', // 'low' | 'medium' | 'high'
+  invertY:     false, // invert vertical look (mouse + touch)
 };
 
 export const GameSettings = {

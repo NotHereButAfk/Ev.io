@@ -503,9 +503,18 @@ export class MenuUI {
     update(fov,  'set-fov-val',  (v) => `${v}°`);
     update(vol,  'set-vol-val',  (v) => `${Math.round(v)}%`);
 
-    document.querySelectorAll('.quality-btn').forEach((btn) => {
+    // Render-quality buttons (mutually exclusive within their own group).
+    document.querySelectorAll('#quality-btns .quality-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.quality-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('#quality-btns .quality-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Invert-look toggle (its own NORMAL/INVERTED pair).
+    document.querySelectorAll('#invert-btns .invert-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#invert-btns .invert-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
       });
     });
@@ -515,12 +524,14 @@ export class MenuUI {
         sensitivity: parseFloat(sens.value) / 100,
         fov:         parseInt(fov.value),
         volume:      parseFloat(vol.value) / 100,
-        quality:     document.querySelector('.quality-btn.active')?.dataset.q || 'medium',
+        quality:     document.querySelector('#quality-btns .quality-btn.active')?.dataset.q || 'medium',
+        invertY:     document.querySelector('#invert-btns .invert-btn.active')?.dataset.inv === 'on',
       };
       GameSettings.set('sensitivity', s.sensitivity);
       GameSettings.set('fov',         s.fov);
       GameSettings.set('volume',      s.volume);
       GameSettings.set('quality',     s.quality);
+      GameSettings.set('invertY',     s.invertY);
       this.onSettingsSaved?.(s);
       const btn = document.getElementById('settings-save-btn');
       btn.textContent = 'SAVED ✓';
@@ -540,7 +551,9 @@ export class MenuUI {
     fov.dispatchEvent(new Event('input'));
     vol.dispatchEvent(new Event('input'));
     const q = GameSettings.get('quality');
-    document.querySelectorAll('.quality-btn').forEach((b) => b.classList.toggle('active', b.dataset.q === q));
+    document.querySelectorAll('#quality-btns .quality-btn').forEach((b) => b.classList.toggle('active', b.dataset.q === q));
+    const inv = GameSettings.get('invertY') ? 'on' : 'off';
+    document.querySelectorAll('#invert-btns .invert-btn').forEach((b) => b.classList.toggle('active', b.dataset.inv === inv));
   }
 
   // ── Profile ────────────────────────────────────────────────────────────────
