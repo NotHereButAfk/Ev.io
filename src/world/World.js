@@ -487,7 +487,14 @@ export class World {
     // Animated props ticked by update(dt): flying vehicles + pulsing energy.
     this._airVehicles = [];
     this._pulseMats   = [];
+    this._spinRings   = []; // grav-lift / teleporter rings spun in update(dt)
     this._clock       = 0;
+
+    // ev.io-style arena structures: walkable surfaces (platforms + ramps you can
+    // stand on), grav-lift launch columns, and teleporter pairs.
+    this.platforms   = []; // { minX,maxX,minZ,maxZ, y0,y1, axis } walkable tops
+    this.gravLifts   = []; // { x,z, r, topY, power }
+    this.teleporters = []; // { x,z, r, dest:Vector3 }
 
     this._buildLighting();
     this._buildGround();
@@ -506,6 +513,7 @@ export class World {
     this._buildArenaCore();
     this._buildLandingPads();
     this._buildGroundChannels();
+    this._buildArenaStructures();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -519,6 +527,9 @@ export class World {
         obj.updateMatrix();
       }
     });
+    // Re-enable matrix updates on meshes we animate every frame (the lock above
+    // would otherwise freeze their spin).
+    for (const r of this._spinRings) r.mesh.matrixAutoUpdate = true;
   }
 
   _buildLighting() {
@@ -2509,7 +2520,7 @@ export class World {
   _buildSpawnPoints() {
     // spawn out on the streets, never inside a block
     const coords = [
-      [0, 0], [0, 20], [0, -20], [20, 0], [-20, 0],
+      [0, 22], [0, -22], [22, 0], [-22, 0], [14, 14], [-14, -14],
       [7.5, 42], [-7.5, -42], [42, 7.5], [-42, -7.5], [7.5, -50], [-7.5, 50],
       [0, 60], [0, -60], [60, 0], [-60, 0]
     ];
@@ -2545,6 +2556,261 @@ export class World {
         }
       }
     }
+    // Spin grav-lift / teleporter rings for a live, energised look.
+    for (const r of this._spinRings) {
+      r.mesh.rotation.z = this._clock * r.speed;
+    }
+  }
+
+  // ── ev.io-style arena structures ────────────────────────────────────────────
+  // Walkable raised platforms + ramps (strong verticality), grav-lift launch
+  // columns, and teleporter pads — the structural language that defines ev.io
+  // arenas: a high-ground control centre, connecting catwalks, fast vertical
+  // travel, and cross-map teleports.
+  _buildArenaStructures() {
+    const deckMat = new THREE.MeshStandardMaterial({
+      color: 0x2a3340, roughness: 0.55, metalness: 0.55, envMapIntensity: 0.9,
+    });
+    const trimColor = 0x00e5ff;
+
+    // 1) Central command deck around the spire (the high-ground power position).
+    const DECK = 8, DECK_Y = 4.5;
+    this._platformBox(0, 0, DECK * 2, DECK * 2, DECK_Y, deckMat, trimColor);
+
+    // 4 ramps from the avenues up onto the deck.
+    // +X / -X (axis 'x'), +Z / -Z (axis 'z'); each 5 wide, rising to the deck.
+    this._rampBox( 8, 18, -2.5, 2.5, DECK_Y, 0, 'x', deckMat, trimColor); // east, high at minX
+    this._rampBox(-18, -8, -2.5, 2.5, 0, DECK_Y, 'x', deckMat, trimColor); // west, high at maxX
+    this._rampBox(-2.5, 2.5,  8, 18, DECK_Y, 0, 'z', deckMat, trimColor); // north
+    this._rampBox(-2.5, 2.5, -18, -8, 0, DECK_Y, 'z', deckMat, trimColor); // south
+
+    // 2) Four wing platforms on the avenue arms, each fed by its own grav-lift
+    //    (lofts you up onto the deck) and topped with a power-weapon marker.
+    const WING_Y = 6.5;
+    const wings = [
+      { x:  34, z:   0, axis: 'x', inX: -3, inZ:  0, outX:  3, outZ:  0 },
+      { x: -34, z:   0, axis: 'x', inX:  3, inZ:  0, outX: -3, outZ:  0 },
+      { x:   0, z:  34, axis: 'z', inX:  0, inZ: -3, outX:  0, outZ:  3 },
+      { x:   0, z: -34, axis: 'z', inX:  0, inZ:  3, outX:  0, outZ: -3 },
+    ];
+    for (const w of wings) {
+      const ww = w.axis === 'x' ? 11 : 9;
+      const wd = w.axis === 'x' ? 9  : 11;
+      this._platformBox(w.x, w.z, ww, wd, WING_Y, deckMat, trimColor);
+      // Grav-lift sits under the wing's inner half and lifts you onto the deck.
+      this._gravLift(w.x + w.inX, w.z + w.inZ, WING_Y - 0.5, 14);
+      // Power-weapon spawn marker on the wing's outer half.
+      this._spawnPadMarker(w.x + w.outX, w.z + w.outZ, WING_Y, 0xffc400);
+    }
+
+    // 3) Teleporter pairs near the diagonal corners — cross-map jumps.
+    this._teleporterPair( 60,  60, -60, -60, 0xb24bff);
+    this._teleporterPair(-60,  60,  60, -60, 0x39ff9e);
+  }
+
+  // Solid walkable platform: a deck box with a glowing neon edge band. Registers
+  // a flat walkable surface in this.platforms (stand-on-top, not a wall).
+  _platformBox(cx, cz, w, d, y, mat, trimColor) {
+    const thick = 0.5;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(w, thick, d), mat);
+    deck.position.set(cx, y - thick / 2, cz);
+    deck.castShadow = true;
+    deck.receiveShadow = true;
+    this.scene.add(deck);
+    // glowing edge trim
+    const nm = this._neonMat(trimColor);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.08, d + 0.3), nm);
+    band.position.set(cx, y + 0.02, cz);
+    this.scene.add(band);
+    // support pillar(s) down to the ground for a grounded look
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0c1420, roughness: 0.4, metalness: 0.8 });
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, y, 8), pillarMat);
+    pillar.position.set(cx, y / 2, cz);
+    this.scene.add(pillar);
+    this.platforms.push({
+      minX: cx - w / 2, maxX: cx + w / 2,
+      minZ: cz - d / 2, maxZ: cz + d / 2,
+      y0: y, y1: y, axis: 'x',
+    });
+  }
+
+  // Sloped walkable ramp from y0 (at the min end of `axis`) to y1 (at the max end).
+  _rampBox(minX, maxX, minZ, maxZ, y0, y1, axis, mat, trimColor) {
+    const w = maxX - minX, d = maxZ - minZ;
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    const run = axis === 'x' ? w : d;
+    const rise = y1 - y0;
+    const len = Math.hypot(run, rise);
+    const thick = 0.4;
+    const geo = axis === 'x'
+      ? new THREE.BoxGeometry(len, thick, d)
+      : new THREE.BoxGeometry(w, thick, len);
+    const ramp = new THREE.Mesh(geo, mat);
+    ramp.position.set(cx, (y0 + y1) / 2, cz);
+    const angle = Math.atan2(rise, run);
+    if (axis === 'x') ramp.rotation.z = -angle;
+    else              ramp.rotation.x = angle;
+    ramp.castShadow = true;
+    ramp.receiveShadow = true;
+    this.scene.add(ramp);
+    // neon side rails
+    const nm = this._neonMat(trimColor);
+    for (const s of [-1, 1]) {
+      const railGeo = axis === 'x'
+        ? new THREE.BoxGeometry(len, 0.07, 0.12)
+        : new THREE.BoxGeometry(0.12, 0.07, len);
+      const rail = new THREE.Mesh(railGeo, nm);
+      const off = (axis === 'x' ? d : w) / 2;
+      rail.position.set(
+        cx + (axis === 'x' ? 0 : s * off),
+        (y0 + y1) / 2 + 0.24,
+        cz + (axis === 'x' ? s * off : 0)
+      );
+      if (axis === 'x') rail.rotation.z = -angle;
+      else              rail.rotation.x = angle;
+      this.scene.add(rail);
+    }
+    this.platforms.push({ minX, maxX, minZ, maxZ, y0, y1, axis });
+  }
+
+  // A glowing weapon/power-up spawn marker resting on a platform.
+  _spawnPadMarker(x, z, y, color) {
+    const nm = this._neonMat(color);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.07, 8, 24), nm);
+    ring.position.set(x, y + 0.1, z);
+    ring.rotation.x = Math.PI / 2;
+    this.scene.add(ring);
+    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.4), nm);
+    core.position.set(x, y + 0.8, z);
+    this.scene.add(core);
+    this._spinRings.push({ mesh: core, speed: 1.4 });
+  }
+
+  // Grav-lift: a translucent energy column that launches the player upward.
+  _gravLift(x, z, topY, power) {
+    const color = 0x00e5ff;
+    const nm = this._neonMat(color);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x07101c, roughness: 0.3, metalness: 0.85 });
+
+    // base ring pad
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.4, 0.18, 20), metal);
+    pad.position.set(x, 0.09, z);
+    pad.receiveShadow = true;
+    this.scene.add(pad);
+    const baseRing = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.1, 8, 28), nm);
+    baseRing.position.set(x, 0.2, z);
+    baseRing.rotation.x = Math.PI / 2;
+    this.scene.add(baseRing);
+
+    // translucent updraft column
+    const colMat = new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 0.8,
+      transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.9, topY, 20, 1, true), colMat);
+    col.position.set(x, topY / 2, z);
+    this.scene.add(col);
+
+    // floating accelerator rings up the column (spin for energy feel)
+    for (let i = 1; i <= 4; i++) {
+      const ry = (topY / 5) * i;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.06, 6, 24), nm);
+      ring.position.set(x, ry, z);
+      ring.rotation.x = Math.PI / 2;
+      this.scene.add(ring);
+      this._spinRings.push({ mesh: ring, speed: 0.8 + i * 0.3 });
+    }
+    const light = new THREE.PointLight(color, 3, 16, 2);
+    light.position.set(x, 2.5, z);
+    this.scene.add(light);
+
+    this.gravLifts.push({ x, z, r: 1.9, topY, power });
+  }
+
+  // A linked pair of teleporter pads (A↔B): stepping on one drops you at the other.
+  _teleporterPair(ax, az, bx, bz, color) {
+    this._teleporter(ax, az, bx, bz, color);
+    this._teleporter(bx, bz, ax, az, color);
+  }
+
+  _teleporter(x, z, destX, destZ, color) {
+    const nm = this._neonMat(color);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x09121e, roughness: 0.3, metalness: 0.85 });
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.2, 0.16, 20), metal);
+    pad.position.set(x, 0.08, z);
+    pad.receiveShadow = true;
+    this.scene.add(pad);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.12, 8, 28), nm);
+    ring.position.set(x, 0.18, z);
+    ring.rotation.x = Math.PI / 2;
+    this.scene.add(ring);
+    // vertical portal hoop
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.14, 10, 32), nm);
+    hoop.position.set(x, 1.7, z);
+    this.scene.add(hoop);
+    this._spinRings.push({ mesh: hoop, speed: 1.0 });
+    const portalMat = new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 1.2,
+      transparent: true, opacity: 0.3, side: THREE.DoubleSide,
+    });
+    const portal = new THREE.Mesh(new THREE.CircleGeometry(1.45, 28), portalMat);
+    portal.position.set(x, 1.7, z);
+    this.scene.add(portal);
+    const light = new THREE.PointLight(color, 2.5, 14, 2);
+    light.position.set(x, 1.7, z);
+    this.scene.add(light);
+    // Arrive ~3m toward centre from the destination pad so the player lands just
+    // OFF the partner's trigger ring — prevents instant teleport ping-pong.
+    const dest = new THREE.Vector3(destX, 0, destZ);
+    const inward = new THREE.Vector3(-destX, 0, -destZ);
+    if (inward.lengthSq() > 0) dest.addScaledVector(inward.normalize(), 3.2);
+    this.teleporters.push({ x, z, r: 1.6, dest });
+  }
+
+  // ── Player-physics queries ──────────────────────────────────────────────────
+
+  // Highest walkable surface under (x,z) that the player (moving prevY→newY this
+  // frame) should stand on. Uses a swept test (no fast-fall tunnelling) plus a
+  // small step-up so ramps and low ledges are climbable. Returns 0 for the base
+  // ground floor.
+  groundHeightAt(x, z, prevY, newY) {
+    const STEP_UP = 0.55, GRACE = 0.06;
+    let support = 0;
+    for (const p of this.platforms) {
+      if (x < p.minX || x > p.maxX || z < p.minZ || z > p.maxZ) continue;
+      let top;
+      if (p.y0 === p.y1) {
+        top = p.y0;
+      } else {
+        const t = p.axis === 'x'
+          ? (x - p.minX) / (p.maxX - p.minX)
+          : (z - p.minZ) / (p.maxZ - p.minZ);
+        top = p.y0 + (p.y1 - p.y0) * t;
+      }
+      const crossed = prevY >= top - GRACE && newY <= top + GRACE;        // fell onto/through top
+      const stepping = newY <= top + STEP_UP && newY >= top - 0.8;        // walking up onto it
+      if ((crossed || stepping) && top > support) support = top;
+    }
+    return support;
+  }
+
+  // If (x,z) is inside a grav-lift column below its top, return the launch
+  // velocity to apply this frame, else 0.
+  queryGravLift(x, z, y) {
+    for (const L of this.gravLifts) {
+      const dx = x - L.x, dz = z - L.z;
+      if (dx * dx + dz * dz < L.r * L.r && y < L.topY) return L.power;
+    }
+    return 0;
+  }
+
+  // If (x,z) is on a teleporter pad, return its destination (foot position), else null.
+  queryTeleport(x, z) {
+    for (const T of this.teleporters) {
+      const dx = x - T.x, dz = z - T.z;
+      if (dx * dx + dz * dz < T.r * T.r) return T.dest;
+    }
+    return null;
   }
 
   randomSpawnPoint() {

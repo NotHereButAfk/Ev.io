@@ -273,24 +273,59 @@ export class Player {
       this._coyoteTimer = 0;
       if (this.audio) this.audio.playJump();
     }
+    // --- grav-lifts: launch upward while standing in an energy column ---
+    if (world.queryGravLift) {
+      const lift = world.queryGravLift(this.position.x, this.position.z, this.position.y);
+      if (lift > 0) {
+        this.velocity.y = lift;
+        this.onGround = false;
+        this._coyoteTimer = 0;
+      }
+    }
+
     this.velocity.y += GRAVITY * dt;
 
+    const prevY = this.position.y;
     this.position.x += this.velocity.x * dt;
     this.position.z += this.velocity.z * dt;
     this.position.y += this.velocity.y * dt;
 
+    // Land on the highest walkable surface under us (platforms/ramps, or base
+    // ground at y=0). Swept test prevents falling through thin platforms.
     const landingVel = this.velocity.y;
-    if (this.position.y <= 0) {
-      this.position.y = 0;
+    const groundY = world.groundHeightAt
+      ? world.groundHeightAt(this.position.x, this.position.z, prevY, this.position.y)
+      : 0;
+    if (this.position.y <= groundY + 0.05 && this.velocity.y <= 0.001) {
+      this.position.y = groundY;
       this.velocity.y = 0;
       if (!this._wasOnGround && this.audio) {
         this.audio.playLand(landingVel < -12);
       }
       this.onGround = true;
+    } else {
+      this.onGround = false;
     }
     this._wasOnGround = this.onGround;
 
     world.resolveCollisions(this.position, RADIUS);
+
+    // --- teleporter pads: step on one, drop out of its linked partner ---
+    if (world.queryTeleport) {
+      this._padTeleCD = Math.max(0, (this._padTeleCD || 0) - dt);
+      if (this._padTeleCD <= 0) {
+        const dest = world.queryTeleport(this.position.x, this.position.z);
+        if (dest) {
+          const from = this.position.clone();
+          this.position.set(dest.x, 0, dest.z);
+          this.velocity.set(0, 0, 0);
+          this.onGround = true;
+          this._padTeleCD = 1.0;
+          if (this.audio) this.audio.playTeleport();
+          this.onTeleport?.(from, this.position.clone());
+        }
+      }
+    }
 
     // --- head bob + footstep sounds ---
     if (moving && this.onGround) {

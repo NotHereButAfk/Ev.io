@@ -55,7 +55,7 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.95;
 
     GameSettings.load();
 
@@ -755,12 +755,14 @@ export class Game {
     this.renderPass = new RenderPass(this.world.scene, this.menuCamera);
     this.composer.addPass(this.renderPass);
 
-    // Selective-ish glow: threshold keeps only bright/emissive pixels blooming.
+    // Selective glow: a higher threshold + lower strength keeps the arena clean
+    // and readable (ev.io-style) — only the brightest neon blooms, instead of
+    // the whole scene washing out to white.
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(w, h),
-      0.85,   // strength
-      0.55,   // radius
-      0.72    // threshold — only pixels brighter than this bloom
+      0.55,   // strength
+      0.5,    // radius
+      0.85    // threshold — only pixels brighter than this bloom
     );
     this.composer.addPass(this.bloomPass);
 
