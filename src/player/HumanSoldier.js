@@ -40,20 +40,52 @@ export function isHumanSoldierReady() { return !!_template; }
 // character pedestal / capsule assumes ~1.8m standing at y=0. Tune to taste.
 const MODEL_SCALE = 1.0;
 
+// ── Per-armor-type Spartan variants ─────────────────────────────────────────
+// Each loadout armor type renders a visibly distinct futuristic super-soldier:
+// its own armour colour, glowing visor/accent hue, surface finish, and build
+// scale. This is what makes the loadout's armor cards each preview a different
+// "model" instead of the same green Chief four times.
+export const ARMOR_LOOKS = {
+  assault: { // Master Chief green — the iconic default
+    body: 0x5a7d35, visor: 0xffb02a,
+    roughness: 0.55, metalness: 0.35, scale: 1.00,
+  },
+  recon: {   // sleek light-blue scout exo
+    body: 0x2f6fae, visor: 0x36f0ff,
+    roughness: 0.42, metalness: 0.48, scale: 0.97,
+  },
+  heavy: {   // bulky burnt-orange juggernaut plate
+    body: 0x9a4a1f, visor: 0xff7a1a,
+    roughness: 0.62, metalness: 0.30, scale: 1.09,
+  },
+  stealth: { // dark infiltrator plate with violet glow (kept light enough to read)
+    body: 0x2c3042, visor: 0xb24bff,
+    roughness: 0.30, metalness: 0.62, scale: 0.95,
+  },
+};
+const DEFAULT_LOOK = ARMOR_LOOKS.assault;
+
+function _lookFor(armorTypeId) {
+  return ARMOR_LOOKS[armorTypeId] || DEFAULT_LOOK;
+}
+
 /**
  * Build an independent, animated human-soldier instance.
  * Returns a THREE.Group whose userData carries { mixer, actions, setMotion, isHuman }.
  * Call `group.userData.mixer.update(dt)` every frame and
  * `group.userData.setMotion('idle'|'walk'|'run')` to switch clips.
+ * `armorTypeId` selects one of the ARMOR_LOOKS variants so each loadout armor
+ * type previews as a distinct super-soldier.
  */
-export function buildHumanSoldier(skin = null) {
+export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   if (!_template) return null;
 
+  const look = _lookFor(armorTypeId);
   const root = cloneSkeleton(_template.scene);
-  root.scale.setScalar(MODEL_SCALE);
+  root.scale.setScalar(MODEL_SCALE * look.scale);
 
   // Give this instance its own materials, and split body vs visor so we can
-  // paint a Master-Chief-style Spartan: green armour + glowing gold visor.
+  // paint each armour variant: coloured plate + glowing visor.
   const bodyMats = [];
   const visorMats = [];
   root.traverse((o) => {
@@ -64,7 +96,7 @@ export function buildHumanSoldier(skin = null) {
       else                  bodyMats.push(o.material);
     }
   });
-  _applySpartanLook(bodyMats, visorMats);
+  _applyArmorLook(bodyMats, visorMats, look);
 
   const group = new THREE.Group();
   group.add(root);
@@ -112,7 +144,8 @@ export function buildHumanSoldier(skin = null) {
     setMotion,
     bodyMats,
     visorMats,
-    armorTypeId: 'human',
+    armorTypeId,
+    baseBodyColor: look.body, // the variant's plate colour, used as tint anchor
     // Cached framing metrics (see measurement above).
     standHeight: _size.y || 1.8,
     feetY:       _box.min.y,
@@ -128,39 +161,35 @@ export function buildHumanSoldier(skin = null) {
   return group;
 }
 
-// Master Chief / Spartan default: deep green armour plates + a reflective,
-// self-lit gold visor. Used whenever no cosmetic skin overrides the colours.
-const SPARTAN_GREEN = 0x5a7d35;
-const VISOR_GOLD    = 0xffb02a;
-
-function _applySpartanLook(bodyMats, visorMats) {
+function _applyArmorLook(bodyMats, visorMats, look) {
   for (const m of bodyMats) {
-    m.color.setHex(SPARTAN_GREEN);
-    m.roughness = 0.55;
-    m.metalness = 0.35;
+    m.color.setHex(look.body);
+    m.roughness = look.roughness;
+    m.metalness = look.metalness;
     if (m.map) m.map = m.map; // keep the texture detail if present (real GLB)
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
-    m.color.setHex(VISOR_GOLD);
-    m.emissive?.setHex?.(VISOR_GOLD);
-    m.emissiveIntensity = 0.9;
+    m.color.setHex(look.visor);
+    m.emissive?.setHex?.(look.visor);
+    m.emissiveIntensity = 1.0;
     m.metalness = 0.95;
-    m.roughness = 0.18;
+    m.roughness = 0.16;
     m.needsUpdate = true;
   }
 }
 
-// Cosmetic skin tint: recolours the Spartan armour while keeping the gold
-// visor. Blends toward the base green so equipped skins read as armour shades
-// rather than flat solid blobs.
+// Cosmetic skin tint: recolours the armour plates toward the equipped skin
+// while keeping the variant's glowing visor. Blends toward the variant base
+// colour so equipped skins read as armour shades rather than flat solid blobs.
 export function tintHumanSoldier(group, skin, armorSkin = null) {
   const mats = group.userData?.bodyMats;
   if (!mats || !mats.length) return;
   const hex = armorSkin ? armorSkin.primary : skin?.primary;
   if (hex == null) return;
+  const anchor = new THREE.Color(group.userData?.baseBodyColor ?? 0x5a7d35);
   for (const m of mats) {
-    m.color.setHex(hex).lerp(new THREE.Color(SPARTAN_GREEN), 0.35);
+    m.color.setHex(hex).lerp(anchor, 0.35);
     m.needsUpdate = true;
   }
 }

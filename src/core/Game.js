@@ -797,6 +797,9 @@ export class Game {
     }
     this.player.camera.updateMatrixWorld(true);
 
+    // Animate the living sci-fi city (flying traffic, pulsing energy).
+    this.world.update(dt);
+
     // Sync third-person body mesh and hide/show viewmodel
     const inTPS = this.player._camDist > 0;
     if (this._playerBody) {
@@ -959,6 +962,9 @@ export class Game {
     // Tick the human soldier's idle animation whenever it's on screen.
     const pud = this.previewCharacter?.userData;
     if (pud?.isHuman) { pud.setMotion('idle'); pud.mixer.update(dt); }
+
+    // Keep the city alive behind the menu fly-through (flying traffic, pulse).
+    this.world.update(dt);
 
     // Cinematic spectator fly-through
     this._camSegTime += dt;

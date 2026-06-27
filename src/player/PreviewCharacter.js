@@ -314,8 +314,8 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin =
   // allowHuman:false — they rely on the procedural model's limb-pivot rig,
   // per-part headshot zones, and weapon-hand attachment.
   if (opts.allowHuman !== false && isHumanSoldierReady()) {
-    const human = buildHumanSoldier(skin);
-    if (human) { human.userData.armorTypeId = armorTypeId; return human; }
+    const human = buildHumanSoldier(skin, armorTypeId);
+    if (human) return human;
   }
 
   // Then the blocky Blender GLB

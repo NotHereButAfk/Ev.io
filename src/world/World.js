@@ -484,6 +484,11 @@ export class World {
     this._neonColors = [0x00e5ff, 0xff2db4, 0xb24bff, 0x39ff9e, 0xffc400, 0x2a6bff];
     this._neonMats = new Map();
 
+    // Animated props ticked by update(dt): flying vehicles + pulsing energy.
+    this._airVehicles = [];
+    this._pulseMats   = [];
+    this._clock       = 0;
+
     this._buildLighting();
     this._buildGround();
     this._buildSky();
@@ -491,6 +496,7 @@ export class World {
     this._buildBackgroundSkyline();
     this._buildSkyways();
     this._buildHologramPillars();
+    this._buildAirTraffic();
     this._buildCrosswalks();
     this._buildStreetProps();
     this._buildGreenery();
@@ -1499,6 +1505,76 @@ export class World {
     this.scene.add(group);
   }
 
+  // ── Flying traffic ──────────────────────────────────────────────────────────
+  // Hover-vehicles and dropships drifting on looping paths high over the city —
+  // the single biggest "this is the future" cue. Built as Groups (which keep
+  // matrixAutoUpdate on) so update(dt) can reposition them every frame.
+  _buildAirTraffic() {
+    const colors = [0x00e5ff, 0xff2db4, 0x39ff9e, 0xffc400, 0xb24bff];
+    // Circling hover-cars at varied altitude/radius/speed/direction.
+    for (let i = 0; i < 9; i++) {
+      const color  = colors[i % colors.length];
+      const veh    = this._buildHoverVehicle(color, 0.8 + Math.random() * 0.7);
+      const radius = 50 + Math.random() * 70;
+      const y      = 26 + Math.random() * 60;
+      const speed  = (0.06 + Math.random() * 0.10) * (Math.random() < 0.5 ? 1 : -1);
+      const phase  = Math.random() * Math.PI * 2;
+      veh.matrixAutoUpdate = true;
+      this.scene.add(veh);
+      this._airVehicles.push({ group: veh, kind: 'orbit', radius, y, speed, phase, bob: Math.random() * Math.PI * 2 });
+    }
+    // A couple of big slow dropships on straight cross-city passes.
+    for (let i = 0; i < 3; i++) {
+      const color = 0x9fe8ff;
+      const ship  = this._buildHoverVehicle(color, 2.0 + Math.random() * 0.8);
+      const y     = 70 + Math.random() * 30;
+      const axis  = i % 2 === 0 ? 'x' : 'z';
+      const off   = (Math.random() - 0.5) * 80;
+      const speed = (6 + Math.random() * 5) * (Math.random() < 0.5 ? 1 : -1);
+      ship.matrixAutoUpdate = true;
+      this.scene.add(ship);
+      this._airVehicles.push({ group: ship, kind: 'cross', axis, off, y, speed, pos: (Math.random() - 0.5) * 360 });
+    }
+  }
+
+  _buildHoverVehicle(color, scale = 1) {
+    const group = new THREE.Group();
+    const nm    = this._neonMat(color);
+    const hull  = new THREE.MeshStandardMaterial({ color: 0x0a121e, roughness: 0.3, metalness: 0.85 });
+
+    // Sleek elongated body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 3.6), hull);
+    group.add(body);
+    // Cockpit canopy
+    const canopy = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 0.4, 1.4),
+      new THREE.MeshStandardMaterial({ color: 0x0a1c2a, roughness: 0.1, metalness: 0.6,
+        emissive: color, emissiveIntensity: 0.3 })
+    );
+    canopy.position.set(0, 0.38, 0.5);
+    group.add(canopy);
+    // Glowing engine pods at the rear
+    for (const sx of [-0.62, 0.62]) {
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.5, 10), nm);
+      pod.rotation.x = Math.PI / 2;
+      pod.position.set(sx, -0.02, -1.85);
+      group.add(pod);
+    }
+    // Underglow strip
+    const under = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 3.0), nm);
+    under.position.y = -0.28;
+    group.add(under);
+    // Wingtip nav lights
+    for (const sx of [-0.95, 0.95]) {
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), nm);
+      tip.position.set(sx, 0, 0.2);
+      group.add(tip);
+    }
+
+    group.scale.setScalar(scale);
+    return group;
+  }
+
   // ── Background city silhouette ───────────────────────────────────────────────
   // Simplified buildings ringing the arena far beyond the boundary — makes the
   // sci-fi city feel limitless rather than stopping at the force field.
@@ -2439,6 +2515,35 @@ export class World {
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));
+    }
+  }
+
+  // Animate the living city: drive flying traffic along its looping paths.
+  // Called every frame by Game.js (both gameplay and the menu fly-through).
+  update(dt) {
+    this._clock += dt;
+    for (const v of this._airVehicles) {
+      const g = v.group;
+      if (v.kind === 'orbit') {
+        v.phase += v.speed * dt;
+        const x = Math.cos(v.phase) * v.radius;
+        const z = Math.sin(v.phase) * v.radius;
+        const y = v.y + Math.sin(this._clock * 0.6 + v.bob) * 1.2; // gentle bob
+        g.position.set(x, y, z);
+        // Face along the tangent of travel.
+        g.rotation.y = -v.phase + (v.speed > 0 ? -Math.PI / 2 : Math.PI / 2);
+      } else { // cross
+        v.pos += v.speed * dt;
+        if (v.pos >  220) v.pos = -220;
+        if (v.pos < -220) v.pos =  220;
+        if (v.axis === 'x') {
+          g.position.set(v.pos, v.y, v.off);
+          g.rotation.y = v.speed > 0 ? Math.PI / 2 : -Math.PI / 2;
+        } else {
+          g.position.set(v.off, v.y, v.pos);
+          g.rotation.y = v.speed > 0 ? 0 : Math.PI;
+        }
+      }
     }
   }
 
