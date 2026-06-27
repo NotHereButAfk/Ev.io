@@ -11,7 +11,69 @@ export class AudioManager {
     this.ctx = new Ctx();
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.5;
-    this.master.connect(this.ctx.destination);
+    // Master limiter — keeps overlapping full-auto gunfire from clipping into
+    // harsh digital distortion; gives the mix a tight, "produced" punch instead.
+    this._limiter = this.ctx.createDynamicsCompressor();
+    this._limiter.threshold.value = -7;
+    this._limiter.knee.value = 8;
+    this._limiter.ratio.value = 14;
+    this._limiter.attack.value = 0.002;
+    this._limiter.release.value = 0.16;
+    this.master.connect(this._limiter).connect(this.ctx.destination);
+    this._initGunBus();
+  }
+
+  // Shared convolution reverb for gunfire — a synthesized arena impulse response
+  // (exponential noise decay + discrete early reflections) gives every shot a
+  // real environmental "report" tail bouncing off the map, the single biggest
+  // realism upgrade over a dry synthetic blip.
+  _initGunBus() {
+    const ctx = this.ctx;
+    this._gunVerb = ctx.createConvolver();
+    this._gunVerb.buffer = this._makeImpulseResponse(1.7, 3.4);
+    const verbOut = ctx.createGain();
+    verbOut.gain.value = 0.9;
+    this._gunVerb.connect(verbOut).connect(this.master);
+    this._gunVerbIn = ctx.createGain();   // shared reverb-send input
+    this._gunVerbIn.gain.value = 1.0;
+    this._gunVerbIn.connect(this._gunVerb);
+  }
+
+  _makeImpulseResponse(duration, decay) {
+    const ctx = this.ctx;
+    const rate = ctx.sampleRate;
+    const len = Math.floor(rate * duration);
+    const ir = ctx.createBuffer(2, len, rate);
+    // Discrete early reflections (slapback echoes off arena surfaces): [time s, gain]
+    const early = [[0.011, 0.62], [0.023, -0.44], [0.041, 0.33], [0.069, -0.25], [0.097, 0.18], [0.131, -0.12]];
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay);
+      }
+      // Slightly offset L/R reflection times for natural stereo width.
+      for (const [tr, gr] of early) {
+        const idx = Math.floor(tr * rate * (ch ? 1.06 : 1));
+        if (idx < len) d[idx] += gr;
+      }
+    }
+    return ir;
+  }
+
+  // Soft-saturation waveshaper curve (cached) — gives the muzzle transient grit
+  // and "crack" that pure oscillators + white noise can't produce on their own.
+  _distortionCurve(amount) {
+    if (this._distCache && this._distCache.a === amount) return this._distCache.c;
+    const n = 1024;
+    const curve = new Float32Array(n);
+    const k = amount;
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = (1 + k) * x / (1 + k * Math.abs(x));
+    }
+    this._distCache = { a: amount, c: curve };
+    return curve;
   }
 
   resume() {
@@ -42,65 +104,98 @@ export class AudioManager {
 
   playShot(kind = 'rifle') {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    // Per-weapon profile: punch (body tone), crack (filtered noise burst), tail (reverb decay).
-    // Values tuned to match each weapon's real acoustic signature.
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const R = (a, b) => a + Math.random() * (b - a);
+    // Per-shot pitch + level jitter so sustained automatic fire never sounds
+    // like one looped sample — real gunfire varies shot to shot.
+    const jit = R(0.95, 1.05);
+    const lvl = R(0.9, 1.0);
+
+    // Per-weapon acoustic profile.
+    //  body: muzzle-blast fundamental Hz · crackHz: supersonic snap band ·
+    //  sub: chest-thump Hz · dist: transient saturation · reverb: send to arena IR
     const P = {
-      // Pistols — tight crack, medium body, short tail
-      sidearm:  { dur: 0.14, body: 310, crackHz: 3400, tail: 0.10, gain: 0.88 },
-      // SMGs — high rate, bright crack, little body
-      smg:      { dur: 0.09, body: 240, crackHz: 3800, tail: 0.06, gain: 0.82 },
-      // Shotgun — low frequency boom, wide crack, long reverb
-      shotgun:  { dur: 0.28, body: 110, crackHz: 1600, tail: 0.26, gain: 1.0  },
-      // Assault rifles — punchy mid body, sharp crack
-      rifle:    { dur: 0.13, body: 230, crackHz: 4500, tail: 0.12, gain: 0.94 },
-      // LMG — heavy sustained body, rumbling tail
-      lmg:      { dur: 0.18, body: 160, crackHz: 2800, tail: 0.16, gain: 1.0  },
-      // Sniper — ultra-low body boom, piercing supersonic crack, very long tail
-      sniper:   { dur: 0.40, body:  85, crackHz: 6000, tail: 0.38, gain: 1.0  },
-      // RPG — deep sub-bass thump (explosion handled by playExplosion separately)
-      rpg:      { dur: 0.42, body:  70, crackHz: 1200, tail: 0.36, gain: 1.0  },
-    }[kind] || { dur: 0.13, body: 220, crackHz: 4000, tail: 0.12, gain: 0.95 };
+      // Pistols — tight crack, medium body, short report
+      sidearm:  { dur: 0.13, body: 320, crackHz: 3600, sub: 92, dist: 6,  reverb: 0.34, gain: 0.9  },
+      // SMGs — fast, bright, little body
+      smg:      { dur: 0.085, body: 250, crackHz: 3900, sub: 80, dist: 5,  reverb: 0.22, gain: 0.84 },
+      // Shotgun — low boom, wide crack, long roar
+      shotgun:  { dur: 0.30, body: 120, crackHz: 1700, sub: 55, dist: 9,  reverb: 0.62, gain: 1.0  },
+      // Assault rifles — punchy mid body, sharp supersonic crack
+      rifle:    { dur: 0.135, body: 240, crackHz: 4600, sub: 76, dist: 7,  reverb: 0.42, gain: 0.96 },
+      // LMG — heavy sustained body, rumbling report
+      lmg:      { dur: 0.18, body: 168, crackHz: 2900, sub: 60, dist: 8,  reverb: 0.5,  gain: 1.0  },
+      // Sniper — deep boom, piercing crack, very long tail
+      sniper:   { dur: 0.42, body:  90, crackHz: 6200, sub: 46, dist: 10, reverb: 0.92, gain: 1.0  },
+      // RPG launch thump (the blast itself is playExplosion)
+      rpg:      { dur: 0.44, body:  72, crackHz: 1200, sub: 38, dist: 9,  reverb: 0.8,  gain: 1.0  },
+    }[kind] || { dur: 0.135, body: 230, crackHz: 4200, sub: 72, dist: 7, reverb: 0.42, gain: 0.95 };
 
-    // 1) Transient crack — short bright noise burst (the "snap").
-    const crack = this.ctx.createBufferSource();
-    crack.buffer = this._noiseBuffer(0.05);
-    const crackHP = this.ctx.createBiquadFilter();
-    crackHP.type = 'highpass';
-    crackHP.frequency.value = 1200;
-    const crackBP = this.ctx.createBiquadFilter();
+    const g = P.gain * lvl;
+
+    // Per-shot bus: a dry path to the master and a send to the shared arena reverb.
+    const dry = ctx.createGain(); dry.gain.value = 1; dry.connect(this.master);
+    const send = ctx.createGain(); send.gain.value = P.reverb; send.connect(this._gunVerbIn);
+    const out = (node) => { node.connect(dry); if (P.reverb > 0) node.connect(send); };
+
+    // 1) Muzzle transient — the initial pressure spike: an ultra-sharp, saturated
+    //    noise click. Sub-millisecond attack + waveshaper grit = the "snap".
+    const click = ctx.createBufferSource();
+    click.buffer = this._noiseBuffer(0.03);
+    const clickHP = ctx.createBiquadFilter();
+    clickHP.type = 'highpass'; clickHP.frequency.value = 1700;
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = this._distortionCurve(P.dist);
+    const clickGain = this._envGain(0.85 * g, 0.0004, 0.022, t);
+    click.connect(clickHP).connect(shaper).connect(clickGain); out(clickGain);
+
+    // 2) Supersonic crack — bright bandpass noise sweeping down (the bullet snap).
+    const crack = ctx.createBufferSource();
+    crack.buffer = this._noiseBuffer(0.06);
+    const crackBP = ctx.createBiquadFilter();
     crackBP.type = 'bandpass';
-    crackBP.frequency.setValueAtTime(P.crackHz, t);
-    crackBP.frequency.exponentialRampToValueAtTime(P.crackHz * 0.4, t + 0.05);
-    crackBP.Q.value = 0.8;
-    const crackGain = this._envGain(0.55 * P.gain, 0.001, 0.05, t);
-    crack.connect(crackHP).connect(crackBP).connect(crackGain).connect(this.master);
+    crackBP.frequency.setValueAtTime(P.crackHz * jit, t);
+    crackBP.frequency.exponentialRampToValueAtTime(P.crackHz * 0.38, t + 0.055);
+    crackBP.Q.value = 0.7;
+    const crackGain = this._envGain(0.5 * g, 0.0008, 0.055, t);
+    crack.connect(crackBP).connect(crackGain); out(crackGain);
 
-    // 2) Body punch — pitch-dropping tone for weight.
-    const body = this.ctx.createOscillator();
-    body.type = 'square';
-    body.frequency.setValueAtTime(P.body, t);
-    body.frequency.exponentialRampToValueAtTime(P.body * 0.35, t + P.dur);
-    const bodyGain = this._envGain(0.6 * P.gain, 0.001, P.dur, t);
-    const bodyShape = this.ctx.createBiquadFilter();
-    bodyShape.type = 'lowpass';
-    bodyShape.frequency.value = P.body * 8;
-    body.connect(bodyShape).connect(bodyGain).connect(this.master);
+    // 3) Body punch — detuned square+saw pair dropping in pitch, lowpassed: the
+    //    gunpowder "boom" with weight and harmonic richness.
+    const bodyLP = ctx.createBiquadFilter();
+    bodyLP.type = 'lowpass'; bodyLP.frequency.value = P.body * 9;
+    const bodyGain = this._envGain(0.62 * g, 0.0009, P.dur, t);
+    bodyLP.connect(bodyGain); out(bodyGain);
+    for (const [type, det] of [['square', 1.0], ['sawtooth', 0.5]]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(P.body * jit * det, t);
+      o.frequency.exponentialRampToValueAtTime(P.body * 0.32 * det, t + P.dur);
+      const og = ctx.createGain(); og.gain.value = det === 1 ? 1 : 0.5;
+      o.connect(og).connect(bodyLP);
+      o.start(t); o.stop(t + P.dur + 0.03);
+    }
 
-    // 3) Tail — lower-passed noise that decays, the report bouncing off the map.
-    const tail = this.ctx.createBufferSource();
-    tail.buffer = this._noiseBuffer(P.tail);
-    const tailLP = this.ctx.createBiquadFilter();
-    tailLP.type = 'lowpass';
-    tailLP.frequency.setValueAtTime(P.crackHz * 0.5, t);
-    tailLP.frequency.exponentialRampToValueAtTime(220, t + P.tail);
-    const tailGain = this._envGain(0.5 * P.gain, 0.004, P.tail, t + 0.01);
-    tail.connect(tailLP).connect(tailGain).connect(this.master);
+    // 4) Sub thump — a low sine you feel in the chest more than hear.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(P.sub * jit, t);
+    sub.frequency.exponentialRampToValueAtTime(P.sub * 0.5, t + P.dur * 1.4);
+    const subGain = this._envGain(0.5 * g, 0.001, P.dur * 1.4, t);
+    sub.connect(subGain).connect(dry); // sub stays dry (reverb would muddy it)
 
-    crack.start(t); body.start(t); tail.start(t + 0.005);
-    crack.stop(t + 0.06);
-    body.stop(t + P.dur + 0.02);
-    tail.stop(t + P.tail + 0.04);
+    // 5) Mechanical action — a short metallic tick (slide/bolt) just after firing.
+    const mech = ctx.createBufferSource();
+    mech.buffer = this._noiseBuffer(0.03);
+    const mechBP = ctx.createBiquadFilter();
+    mechBP.type = 'bandpass'; mechBP.frequency.value = 2600; mechBP.Q.value = 2.2;
+    const mechGain = this._envGain(0.12 * g, 0.0006, 0.03, t + 0.012);
+    mech.connect(mechBP).connect(mechGain).connect(dry);
+
+    click.start(t); crack.start(t); sub.start(t); mech.start(t + 0.012);
+    click.stop(t + 0.04); crack.stop(t + 0.07);
+    sub.stop(t + P.dur * 1.4 + 0.04); mech.stop(t + 0.05);
   }
 
   // Kawaii anime "pew~!" — a cute vocal-ish chirp with vibrato + sparkle.
