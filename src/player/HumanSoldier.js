@@ -270,12 +270,28 @@ function _buildArmorPieces(root, armorTypeId, look) {
     color: new THREE.Color(look.body).multiplyScalar(0.4), roughness: 0.92, metalness: 0.05,
     side: THREE.DoubleSide,
   });
+  // Clean armoured helmet shell — slightly lighter than the plate so the head
+  // reads as a helmet, not a bare scalp.
+  const helmetMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.25),
+    roughness: 0.45, metalness: 0.55,
+  });
 
   const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-  const sph = (r) => new THREE.SphereGeometry(r, 12, 10);
+  const sph = (r) => new THREE.SphereGeometry(r, 16, 12);
   const oct = (r) => new THREE.OctahedronGeometry(r);
   const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 8);
   const tiltBack = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, 0));
+
+  // Helmet worn by EVERY variant — covers the bald untextured head and gives the
+  // soldier a face: an armoured shell + brow, a glowing visor, and a jaw guard.
+  const helmet = [
+    { bone: 'Head', geo: sph(0.135), mat: helmetMat, x: 0, y: 1.605, z: 0.045 },         // shell
+    { bone: 'Head', geo: box(0.20, 0.05, 0.16), mat: helmetMat, x: 0, y: 1.635, z: 0.0 }, // brow ridge
+    { bone: 'Head', geo: box(0.13, 0.075, 0.12), mat: helmetMat, x: 0, y: 1.50, z: -0.015 }, // jaw guard
+    { bone: 'Head', geo: box(0.185, 0.055, 0.05), mat: accent, x: 0, y: 1.585, z: -0.085,
+      anim: { type: 'pulse', freq: 1.1, min: 0.7, max: 1.15 } },                          // glowing visor (the "face")
+  ];
 
   // spec: { bone, geo, mat, x, y, z, quat?, anim? }
   //   anim: { type:'pulse'|'thruster'|'blink'|'sway', freq, ... }
@@ -345,6 +361,8 @@ function _buildArmorPieces(root, armorTypeId, look) {
       { bone: 'Spine2', geo: box(0.22, 0.26, 0.13), mat: dark, x: 0, y: 1.38, z: 0.14 },     // pack
     ];
   }
+
+  specs = [...helmet, ...specs]; // every soldier wears the helmet
 
   const animated = [];
   for (const sp of specs) {

@@ -497,25 +497,22 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
+    // A focused ev.io ARENA — not a city. The old city builders (building grid,
+    // skyline, holograms, flying traffic, crosswalks, street lamps, greenery) are
+    // intentionally gone; what remains is the arena: enclosing walls, a central
+    // landmark, multi-level platforms/ramps, pillars, grav-lifts, teleporters,
+    // and cover.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildCity();
-    this._buildBackgroundSkyline();
-    this._buildSkyways();
-    this._buildHologramPillars();
-    this._buildAirTraffic();
-    this._buildCrosswalks();
-    this._buildStreetProps();
-    this._buildGreenery();
-    this._buildObstacles();
-    this._buildBoundary();
-    this._buildOrbitalRing();
-    this._buildArenaCore();
-    this._buildLandingPads();
-    this._buildGroundChannels();
-    this._buildArenaStructures();
-    this._buildArenaPillars();
+    this._buildArenaWalls();      // solid perimeter walls (replaces the force-field boundary)
+    this._buildObstacles();       // mid-field cover (energy barriers + crates)
+    this._buildOrbitalRing();     // overhead sci-fi landmark
+    this._buildArenaCore();       // central spire landmark
+    this._buildLandingPads();     // accent pads
+    this._buildGroundChannels();  // glowing floor lane markings
+    this._buildArenaStructures(); // central deck, ramps, wing platforms, grav-lifts, teleporters
+    this._buildArenaPillars();    // tall pillars (cover + verticality)
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -2192,52 +2189,50 @@ export class World {
     this._buildSciCrate(-42,  42, 0.6 + Math.PI);
   }
 
-  _buildBoundary() {
-    // Force-field boundary: translucent glowing panels anchored by neon pylons
+  // Solid perimeter walls that enclose the arena (replaces the old force-field).
+  // Clean light panels with glowing blue trim + corner towers — the ev.io
+  // "you're inside a built arena" feel, and the backdrop now that the city is gone.
+  _buildArenaWalls() {
     const half = ARENA_HALF;
-    const fieldColor = 0x37c4d4;
-    const h = 5.0;
-    const fieldMat = new THREE.MeshStandardMaterial({
-      color: fieldColor, emissive: fieldColor, emissiveIntensity: 0.8,
-      transparent: true, opacity: 0.15, roughness: 0.2, metalness: 0.1,
-      side: THREE.DoubleSide
-    });
-    const pylonNm  = this._neonMat(fieldColor);
-    const pylonMetal = new THREE.MeshStandardMaterial({ color: 0x060d16, roughness: 0.25, metalness: 0.95 });
+    const H = 24, T = 2.5;
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xc2cace, roughness: 0.72, metalness: 0.12 });
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0x9aa6ae, roughness: 0.6, metalness: 0.2 });
+    const trimMat = this._neonMat(0x33a8ec);
 
-    // Four thin force-field panels (collidable)
-    const wallSpecs = [
-      { w: half * 2, d: 0.2, x: 0, z: -half },
-      { w: half * 2, d: 0.2, x: 0, z:  half },
-      { w: 0.2, d: half * 2, x: -half, z: 0 },
-      { w: 0.2, d: half * 2, x:  half, z: 0 }
+    const specs = [
+      { w: half * 2 + T * 2, d: T, x: 0, z: -half },
+      { w: half * 2 + T * 2, d: T, x: 0, z:  half },
+      { w: T, d: half * 2 + T * 2, x: -half, z: 0 },
+      { w: T, d: half * 2 + T * 2, x:  half, z: 0 },
     ];
-    for (const s of wallSpecs) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, h, s.d), fieldMat);
-      mesh.position.set(s.x, h / 2, s.z);
-      this._addCollider(mesh);
+    for (const s of specs) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(s.w, H, s.d), wallMat);
+      wall.position.set(s.x, H / 2, s.z);
+      wall.receiveShadow = true;
+      this._addCollider(wall);
+      // inset panel stripe for paneling detail
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.98, H * 0.5, s.d + 0.2), panelMat);
+      panel.position.set(s.x, H * 0.5, s.z);
+      this.scene.add(panel);
+      // glowing blue trim bands near the top and base
+      for (const ty of [H - 3.0, 1.0]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.15, 0.4, s.d + 0.15), trimMat);
+        band.position.set(s.x, ty, s.z);
+        this.scene.add(band);
+      }
     }
 
-    // Anchor pylons along each wall edge
-    const pylonH = h + 1.0;
-    const offsets = [-80, -60, -40, -20, 0, 20, 40, 60, 80];
-    for (const off of offsets) {
-      for (const side of [-1, 1]) {
-        // North / South boundary
-        const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, pylonH, 8), pylonMetal);
-        p1.position.set(off, pylonH / 2, side * half);
-        this.scene.add(p1);
-        const c1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), pylonNm);
-        c1.position.set(off, pylonH, side * half);
-        this.scene.add(c1);
-
-        // East / West boundary
-        const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, pylonH, 8), pylonMetal);
-        p2.position.set(side * half, pylonH / 2, off);
-        this.scene.add(p2);
-        const c2 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), pylonNm);
-        c2.position.set(side * half, pylonH, off);
-        this.scene.add(c2);
+    // Corner towers tie the walls together.
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, H + 5, 14), wallMat);
+        tower.position.set(sx * half, (H + 5) / 2, sz * half);
+        tower.receiveShadow = true;
+        this._addCollider(tower);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.18, 8, 26), trimMat);
+        ring.position.set(sx * half, H + 1.5, sz * half);
+        ring.rotation.x = Math.PI / 2;
+        this.scene.add(ring);
       }
     }
   }

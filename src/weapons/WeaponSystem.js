@@ -584,7 +584,11 @@ export class WeaponSystem {
         const bot = hit.object.userData.bot;
         if (bot) {
           anyHitBot = true;
-          const isHead = !!hit.object.userData.isHead;
+          // Procedural bots tag head meshes; the human model is one skinned mesh,
+          // so resolve its headshots from the hit height (~1.5m+ above the feet).
+          const isHead = bot.mesh?.userData?.isHuman
+            ? (hit.point.y - bot.position.y) > 1.5
+            : !!hit.object.userData.isHead;
           const mult   = isHead && def.headshotMultiplier ? def.headshotMultiplier : 1;
           if (this.onHitBot) this.onHitBot(bot, def.damage * mult, hit.point, { headshot: isHead });
         } else if (this.onHitWorld) {

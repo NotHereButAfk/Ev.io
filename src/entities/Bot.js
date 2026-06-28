@@ -3,29 +3,34 @@ import { buildPreviewCharacter, rigCharacterLimbs } from '../player/PreviewChara
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 
-// AR-type ranged stats — sword bots skip shooting entirely
-const AR_GUN = { damage: 22, fireRate: 0.13, range: 18, spread: 0.07 };
+// AR-type ranged stats — sword bots skip shooting entirely.
+// Slower fire + short range: bots are not meant to be a real threat.
+const AR_GUN = { damage: 14, fireRate: 0.30, range: 14, spread: 0.07 };
 
 const DETECT_RADIUS = 15;
 const ATTACK_RADIUS = 1.9;
-const ATTACK_DAMAGE = 9;
-const ATTACK_COOLDOWN = 1.1;
+const ATTACK_DAMAGE = 7;
+const ATTACK_COOLDOWN = 1.5;
 const RESPAWN_DELAY = 4;
 const RADIUS = 0.5;
+// Bots are passive: they ignore the player until shot, then retaliate for a
+// short window (and even then they aim badly).
+const PROVOKE_DURATION = 7;
 
 let nextId = 1;
 
 const ARMOR_TYPES = ['assault', 'recon', 'heavy', 'stealth'];
 let _armorIdx = 0;
 
-// Each bot picks the next skin in sequence so the lobby always looks varied
+// Each bot picks the next skin in sequence so the lobby always looks varied.
+// Bright, distinct hues so enemy soldiers read clearly at a distance.
 const BOT_SKINS = [
-  { primary: 0x2a0a0a, secondary: 0x0f0303 }, // Crimson
-  { primary: 0x0a0e1e, secondary: 0x030610 }, // Cobalt
-  { primary: 0x160a20, secondary: 0x07030f }, // Violet
-  { primary: 0x061a0a, secondary: 0x020a03 }, // Emerald
-  { primary: 0x1a1c22, secondary: 0x0a0c12 }, // Arctic
-  { primary: 0x1e1004, secondary: 0x0c0602 }, // Amber
+  { primary: 0xd1372b, secondary: 0x2b1414 }, // Crimson
+  { primary: 0x2b6fd1, secondary: 0x14223a }, // Cobalt
+  { primary: 0x9050d1, secondary: 0x241433 }, // Violet
+  { primary: 0x2fae5a, secondary: 0x0c2a16 }, // Emerald
+  { primary: 0xc9d2d8, secondary: 0x2a3238 }, // Arctic
+  { primary: 0xe0902c, secondary: 0x33240c }, // Amber
 ];
 let _skinIdx = 0;
 
@@ -71,12 +76,16 @@ export class Bot {
     this._isSwordBot  = Math.random() < 0.40;
     this._botGun      = this._isSwordBot ? null : AR_GUN;
     this._gunTimer    = Math.random() * 0.8;
-    this._accuracy    = 0.55 + Math.random() * 0.35;
+    // Deliberately poor aim — bots rarely actually land a shot.
+    this._accuracy    = 0.10 + Math.random() * 0.14;
     this._weaponT     = Math.random() * Math.PI * 2; // phase offset for variety
     this._alertBlend  = 0;   // 0 = low-ready, 1 = high-ready/aiming
     this._weaponMesh  = null;
     this._rig         = null;
     this._walkT       = Math.random() * Math.PI * 2; // random phase so bots aren't in sync
+    // Passive AI: only fights back after being attacked.
+    this._provoked     = false;
+    this._provokeTimer = 0;
 
     // Pre-allocated scratch vectors — avoids per-frame GC pressure
     this._toPlayer    = new THREE.Vector3();
@@ -90,14 +99,18 @@ export class Bot {
 
     const armorTypeId = ARMOR_TYPES[_armorIdx++ % ARMOR_TYPES.length];
     const skin = BOT_SKINS[_skinIdx++ % BOT_SKINS.length];
-    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: false });
+    // Bots use the SAME rigged human model as the player (falls back to the
+    // procedural body only if the GLB hasn't loaded yet).
+    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: true });
+    this._isHuman = !!this.mesh.userData?.isHuman;
     this.bodyMat = this.mesh.userData.primaryMat;
 
     this.mesh.userData.bot = this;
     this.mesh.traverse((obj) => {
       obj.userData.bot = this;
-      // Tag head-zone parts for headshot detection (y >= 1.90 = neck and above)
-      if (obj.isMesh && obj.position.y >= 1.90) obj.userData.isHead = true;
+      // Procedural model: tag head-zone parts for headshots (human headshots are
+      // resolved by hit-point height in WeaponSystem instead).
+      if (!this._isHuman && obj.isMesh && obj.position.y >= 1.90) obj.userData.isHead = true;
     });
 
     const { group: hpGroup, fg } = buildHealthBar();
@@ -107,14 +120,14 @@ export class Bot {
 
     this.mesh.position.copy(this.position);
 
-    // Rig limb pivots for the walk cycle — may return null for procedural meshes
-    this._rig = rigCharacterLimbs(this.mesh);
+    // Rig limb pivots for the walk cycle (procedural model only; the human model
+    // animates via its own skeletal mixer).
+    this._rig = this._isHuman ? null : rigCharacterLimbs(this.mesh);
 
-    // Attach visible weapon to the right hand.
-    // Inner armor clone has rotation.y = π so character's right side = -X in group space.
-    // Bot +Z faces its look-at target; weapon -Z → +Z via rotation.y = π to aim forward.
+    // The human model matches the third-person player, which carries no visible
+    // weapon mesh — so human bots skip the weapon attachment entirely.
     const weaponId  = this._isSwordBot ? 'sword' : 'm4';
-    const weaponDef = getWeapon(weaponId);
+    const weaponDef = !this._isHuman && getWeapon(weaponId);
     if (weaponDef) {
       const { group: wm } = buildWeaponModel(weaponDef);
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
@@ -134,6 +147,9 @@ export class Bot {
 
   takeDamage(amount) {
     if (!this.alive) return false;
+    // Being hit is the only thing that makes a bot fight back.
+    this._provoked = true;
+    this._provokeTimer = PROVOKE_DURATION;
     this.health = Math.max(0, this.health - amount);
     this.flashTimer = 0.12;
     this.healthBarFg.scale.x = Math.max(0.001, this.health / this.maxHealth);
@@ -250,8 +266,16 @@ export class Bot {
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
+    // Passive AI: a bot only engages while provoked (recently shot). Otherwise it
+    // wanders and ignores the player entirely.
+    if (this._provokeTimer > 0) {
+      this._provokeTimer -= dt;
+      if (this._provokeTimer <= 0) this._provoked = false;
+    }
+    const engaged = this._provoked && !player.isDead && distToPlayer < DETECT_RADIUS;
+
     let moveTarget = null;
-    if (!player.isDead && distToPlayer < DETECT_RADIUS) {
+    if (engaged) {
       this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
@@ -294,9 +318,18 @@ export class Bot {
       this.healthBarGroup.quaternion.copy(localQuat);
     }
 
-    // ── Weapon animation ──────────────────────────────────────────────────────
+    // ── Human soldier: drive its skeletal idle/walk/run animation ──────────────
+    if (this._isHuman) {
+      const ud = this.mesh.userData;
+      const moving = !!moveTarget;
+      ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
+      ud.mixer.update(dt);
+      ud.armorTick?.(dt);
+    }
+
+    // ── Weapon animation (procedural model only) ───────────────────────────────
     if (this._weaponMesh) {
-      const isAlert   = !player.isDead && distToPlayer < DETECT_RADIUS;
+      const isAlert   = engaged;
       const isMoving  = !!moveTarget;
       const isLunging = this.lungeTimer > 0;
 
