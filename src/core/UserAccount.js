@@ -36,7 +36,7 @@ export const UserAccount = {
       displayName: u,
       password,
       created: Date.now(),
-      stats: { kills: 0, score: 0, games: 0 },
+      stats: { kills: 0, deaths: 0, score: 0, games: 0 },
     };
     _save(db);
     sessionStorage.setItem(_SES, u.toLowerCase());
@@ -53,15 +53,16 @@ export const UserAccount = {
 
   getStats(username) {
     const { accounts } = _load();
-    return accounts[username]?.stats || { kills: 0, score: 0, games: 0 };
+    return accounts[username]?.stats || { kills: 0, deaths: 0, score: 0, games: 0 };
   },
 
-  addGameStats(username, kills, score) {
+  addGameStats(username, kills, score, deaths = 0) {
     if (!username || username === '__guest__') return;
     const db = _load();
     const acc = db.accounts[username];
     if (!acc) return;
     acc.stats.kills  = (acc.stats.kills  || 0) + kills;
+    acc.stats.deaths = (acc.stats.deaths || 0) + deaths;
     acc.stats.score  = (acc.stats.score  || 0) + score;
     acc.stats.games  = (acc.stats.games  || 0) + 1;
     _save(db);

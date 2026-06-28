@@ -1,5 +1,5 @@
 import { SKINS, getSkin } from '../player/skins.js';
-import { ARMOR_TYPES, loadArmorType, saveArmorType } from '../player/ArmorTypes.js';
+import { ARMOR_TYPES, getArmorType, loadArmorType, saveArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
@@ -26,6 +26,33 @@ function _rank(k) {
   return 'RECRUIT';
 }
 function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}s`; }
+
+// ── ev.io-style inventory: tabs + weapon categorisation + card visuals ───────
+const INV_TABS = [
+  { id: 'character', label: 'Character' },
+  { id: 'auto',      label: 'Auto Rifle' },
+  { id: 'hand',      label: 'Hand Cannon' },
+  { id: 'burst',     label: 'Burst Rifle' },
+  { id: 'sweeper',   label: 'Sweeper' },
+  { id: 'laser',     label: 'Laser Rifle' },
+  { id: 'sword',     label: 'Sword' },
+];
+const WEP_CATEGORY = {
+  uzi: 'auto', m4: 'auto', m16: 'auto', lmg: 'auto', needler: 'auto', plasmarifle: 'auto',
+  sidearm: 'hand', magnum: 'hand',
+  battlerifle: 'burst', dmr: 'burst',
+  levershotgun: 'sweeper', energyshotgun: 'sweeper',
+  rifle: 'laser', boltsniper: 'laser', rpg: 'laser', fuelrod: 'laser', concussion: 'laser',
+  knife: 'sword', sword: 'sword', ghammer: 'sword',
+};
+const ICON_GUN   = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M3 8h13l3 3v2h-4l-2 3H8l-1-3H3z"/><path d="M7 13v3"/></svg>';
+const ICON_SWORD = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M4 20l9-9 3-7 1 1-7 3-9 9z"/><path d="M6 18l-2 2"/><path d="M14 6l4 4"/></svg>';
+const ICON_CHAR  = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0114 0v1"/></svg>';
+function _grad(a, b) { return `linear-gradient(150deg, #${_hex(a >>> 0)}, #${_hex(b >>> 0)})`; }
+function _darken(hex, f) {
+  const r = Math.floor((hex >> 16 & 255) * f), g = Math.floor((hex >> 8 & 255) * f), b = Math.floor((hex & 255) * f);
+  return (r << 16 | g << 8 | b) >>> 0;
+}
 
 export class MenuUI {
   constructor() {
@@ -77,10 +104,7 @@ export class MenuUI {
     this.onSettingsSaved      = null;
     this.onArmorSkinEquipped  = null; // (skinId) => void
 
-    warmThumbnails(); // kick off async thumbnail generation immediately
-    this._buildSkinGrid();
-    this._buildArmorGrid();
-    this._buildLoadoutPickers();
+    this._buildInventory();   // ev.io-style loadout (tabs + cards)
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -163,7 +187,7 @@ export class MenuUI {
     document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
 
     if (id === 'loadout') {
-      this._initArmory();
+      this._refreshInventory();
       this._startArmorPreview();
       this.onLoadoutOpen?.();
     }
@@ -175,9 +199,11 @@ export class MenuUI {
 
   _closeAllPanels() {
     if (this._activePanel === 'loadout') {
-      this._stopPreview();
       this._armorPreview?.stop();
       this.onLoadoutClose?.();
+    }
+    if (this._activePanel === 'profile') {
+      this._profilePreview?.stop();
     }
     this._activePanel = null;
     document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
@@ -276,6 +302,159 @@ export class MenuUI {
     const playerSkin = getSkin(this.selectedSkinId);
     const armorSkin  = getArmorSkin(Shop.getEquipped());
     this._armorPreview.loadArmor(playerSkin, this.selectedArmorId, armorSkin);
+  }
+
+  // ── ev.io-style inventory (tabs + cards) ─────────────────────────────────────
+
+  _buildInventory() {
+    this._invCat = 'character';
+    const tabsEl = document.getElementById('inv-tabs');
+    if (!tabsEl) return;
+    tabsEl.innerHTML = '';
+    for (const t of INV_TABS) {
+      const b = document.createElement('button');
+      b.className = 'inv-tab' + (t.id === this._invCat ? ' active' : '');
+      b.textContent = t.label;
+      b.addEventListener('click', () => {
+        this._invCat = t.id;
+        tabsEl.querySelectorAll('.inv-tab').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        this._renderInvGrid();
+      });
+      tabsEl.appendChild(b);
+    }
+    // Cosmetic header buttons.
+    document.getElementById('inv-wallet-btn')?.addEventListener('click', () => {
+      const el = document.getElementById('inv-wallet-btn'); el.textContent = '✓ Wallet Linked';
+    });
+    document.getElementById('inv-account-btn')?.addEventListener('click', () => this._togglePanel('profile'));
+    this._renderEquipped();
+    this._renderInvGrid();
+    this._refreshInvMeta();
+  }
+
+  // Re-sync the inventory each time the panel opens (balance, name, equipped).
+  _refreshInventory() {
+    const nameI = document.getElementById('player-name');
+    if (nameI && this._currentUser && this._currentUser !== '__guest__') {
+      nameI.value = UserAccount.getDisplayName(this._currentUser);
+    }
+    this._renderEquipped();
+    this._renderInvGrid();
+    this._refreshInvMeta();
+  }
+
+  _refreshInvMeta() {
+    const bal = document.getElementById('inv-balance');
+    if (bal) bal.textContent = Shop.getCoins().toLocaleString();
+    const nw = document.getElementById('inv-networth');
+    if (nw) nw.textContent = '0';
+  }
+
+  _makeCard({ bg, icon, name, equipped, onClick }) {
+    const card = document.createElement('div');
+    card.className = 'inv-card' + (equipped ? ' equipped' : '');
+    const thumb = document.createElement('div');
+    thumb.className = 'inv-card-thumb';
+    thumb.style.background = bg;
+    card.appendChild(thumb);
+    if (icon) {
+      const ic = document.createElement('div');
+      ic.className = 'inv-card-icon';
+      ic.innerHTML = icon;
+      card.appendChild(ic);
+    }
+    if (equipped) {
+      const badge = document.createElement('div');
+      badge.className = 'inv-card-badge';
+      badge.textContent = 'EQUIPPED';
+      card.appendChild(badge);
+    }
+    const nm = document.createElement('div');
+    nm.className = 'inv-card-name';
+    nm.textContent = name;
+    card.appendChild(nm);
+    if (onClick) card.addEventListener('click', onClick);
+    return card;
+  }
+
+  _renderEquipped() {
+    const el = document.getElementById('inv-equipped');
+    if (!el) return;
+    el.innerHTML = '';
+    const skin  = getSkin(this.selectedSkinId);
+    const armor = getArmorType(this.selectedArmorId);
+    el.appendChild(this._makeCard({
+      bg: _grad(skin.primary, skin.secondary), icon: ICON_CHAR,
+      name: armor.name, equipped: true,
+    }));
+    const gun = WEAPONS.find((w) => w.id === Loadout.getGun());
+    if (gun) el.appendChild(this._makeCard({
+      bg: _grad(gun.color || 0x223040, _darken(gun.color || 0x223040, 0.4)),
+      icon: ICON_GUN, name: gun.name, equipped: true,
+    }));
+    const melee = WEAPONS.find((w) => w.id === Loadout.getMelee());
+    if (melee) el.appendChild(this._makeCard({
+      bg: _grad(melee.color || 0x2a2030, _darken(melee.color || 0x2a2030, 0.4)),
+      icon: ICON_SWORD, name: melee.name, equipped: true,
+    }));
+  }
+
+  _renderInvGrid() {
+    const grid = document.getElementById('inv-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    if (this._invCat === 'character') {
+      // Armour-type builds first, then colour skins — all "characters".
+      for (const a of ARMOR_TYPES) {
+        const equipped = a.id === this.selectedArmorId;
+        const c = ARMOR_SKINS?.[0]; void c;
+        grid.appendChild(this._makeCard({
+          bg: _grad(0x33506e, 0x0c1622), icon: ICON_CHAR, name: a.name, equipped,
+          onClick: () => {
+            this.selectedArmorId = a.id;
+            saveArmorType(a.id);
+            this.onArmorChanged?.(a.id);
+            this._updateArmorPreview();
+            this._renderEquipped();
+            this._renderInvGrid();
+          },
+        }));
+      }
+      for (const s of SKINS) {
+        const equipped = s.id === this.selectedSkinId;
+        grid.appendChild(this._makeCard({
+          bg: _grad(s.primary, s.secondary), name: s.name, equipped,
+          onClick: () => {
+            this.selectedSkinId = s.id;
+            this._updateArmorPreview();
+            this._renderEquipped();
+            this._renderInvGrid();
+          },
+        }));
+      }
+      return;
+    }
+
+    // Weapon category tabs.
+    const equippedGun   = Loadout.getGun();
+    const equippedMelee = Loadout.getMelee();
+    const list = WEAPONS.filter((w) => WEP_CATEGORY[w.id] === this._invCat);
+    for (const w of list) {
+      const isMelee    = w.kind === 'melee';
+      const equippable = isMelee ? (w.id === 'sword') : true;
+      const equipped   = isMelee ? (w.id === equippedMelee) : (w.id === equippedGun);
+      grid.appendChild(this._makeCard({
+        bg: _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4)),
+        icon: isMelee ? ICON_SWORD : ICON_GUN, name: w.name, equipped,
+        onClick: equippable ? () => {
+          if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
+          this._renderEquipped();
+          this._renderInvGrid();
+        } : null,
+      }));
+    }
   }
 
   // ── Loadout pickers (1 gun + 1 melee) ────────────────────────────────────────
@@ -574,32 +753,42 @@ export class MenuUI {
   _renderProfile() {
     const u       = this._currentUser;
     const isGuest = !u || u === '__guest__';
-    document.getElementById('profile-username').textContent = isGuest ? 'GUEST' : UserAccount.getDisplayName(u).toUpperCase();
-    const stats = isGuest ? { kills: 0, score: 0, games: 0 } : UserAccount.getStats(u);
-    document.getElementById('profile-badge').textContent  = isGuest ? 'GUEST MODE' : _rank(stats.kills);
-    document.getElementById('stat-kills').textContent     = isGuest ? '—' : stats.kills;
-    document.getElementById('stat-score').textContent     = isGuest ? '—' : stats.score;
-    document.getElementById('stat-games').textContent     = isGuest ? '—' : stats.games;
+    const name    = isGuest ? 'GUEST' : UserAccount.getDisplayName(u);
+    const stats   = isGuest ? { kills: 0, deaths: 0, score: 0, games: 0 } : UserAccount.getStats(u);
+    const kills   = stats.kills  || 0;
+    const deaths  = stats.deaths || 0;
+    const score   = stats.score  || 0;
+    const games   = stats.games  || 0;
+    const kd      = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
 
-    const firstGunSkinId = Armory.getSkinId(WEAPONS.find((w) => w.kind !== 'melee')?.id || WEAPONS[0].id, false);
-    const ws = WEAPON_SKINS.find((s) => s.id === firstGunSkinId) || WEAPON_SKINS[0];
-    document.getElementById('profile-avatar').style.background =
-      `linear-gradient(135deg, #${_hex(ws.body)}, #${_hex(ws.metal)})`;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('profile-username', name);
+    set('ps-kills', kills);
+    set('ps-deaths', deaths);
+    set('ps-kd', kd);
+    set('ps-rating', Math.max(1, Math.floor(kills / 10) + 1));
+    set('ps-scoreweek', 0);
+    set('ps-score', score.toLocaleString());
+    set('ps-games', games);
+    set('ps-survival', '00:00:00');
+    set('ps-rank', _rank(kills));
+    set('ps-balance', Shop.getCoins().toLocaleString() + 'e');
 
-    const gunWep   = WEAPONS.find((w) => w.kind !== 'melee');
-    const swordWep = WEAPONS.find((w) => w.kind === 'melee');
-    const gsId     = gunWep   ? Armory.getSkinId(gunWep.id,   false) : null;
-    const ssId     = swordWep ? Armory.getSkinId(swordWep.id, true)  : null;
-    const gs = WEAPON_SKINS.find((s) => s.id === gsId)  || WEAPON_SKINS[0];
-    const ss = SWORD_SKINS.find((s) => s.id === ssId)   || SWORD_SKINS[0];
+    const logout = document.getElementById('profile-logout-btn');
+    if (logout) logout.style.display = isGuest ? 'none' : 'block';
 
-    document.getElementById('profile-weapon-skin').style.background =
-      `linear-gradient(145deg, #${_hex(gs.body)}, #${_hex(gs.accent)})`;
-    document.getElementById('profile-weapon-skin-name').textContent = gs.name;
-    document.getElementById('profile-sword-skin').style.background =
-      `linear-gradient(145deg, #${_hex(ss.blade)}, #${_hex(ss.guard)})`;
-    document.getElementById('profile-sword-skin-name').textContent = ss.name;
-    document.getElementById('profile-logout-btn').style.display = isGuest ? 'none' : 'block';
+    this._startProfilePreview();
+  }
+
+  // Dedicated full-body character render on the profile (the equipped soldier).
+  _startProfilePreview() {
+    const canvas = document.getElementById('profile-char-canvas');
+    if (!canvas) return;
+    if (!this._profilePreview) this._profilePreview = new ArmorPreviewRenderer(canvas);
+    const playerSkin = getSkin(this.selectedSkinId);
+    const armorSkin  = getArmorSkin(Shop.getEquipped());
+    this._profilePreview.loadArmor(playerSkin, this.selectedArmorId, armorSkin);
+    this._profilePreview.start();
   }
 
   // ── Visibility helpers ─────────────────────────────────────────────────────

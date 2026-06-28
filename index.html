@@ -146,65 +146,25 @@
     <!-- ===================== PANEL: LOADOUT ===================== -->
     <div id="panel-loadout" class="nav-panel nav-panel-wide hidden">
 
-      <div class="panel-top-row">
-        <div class="panel-section">
-          <div class="panel-label">CALLSIGN</div>
-          <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" value="Recruit" />
-          <div class="panel-label" style="margin-top:14px">PLAYER SKIN</div>
-          <div id="skin-grid" class="skin-grid"></div>
+      <div class="inv-header">
+        <div class="inv-avatar"><canvas id="armor-preview-canvas" width="200" height="240"></canvas></div>
+        <div class="inv-id">
+          <input id="player-name" class="inv-name-input" maxlength="16" value="Recruit" />
+          <div class="inv-meta">Balance: <span class="inv-coin">&#9678;</span> <span id="inv-balance">500</span></div>
+          <div class="inv-meta inv-meta-dim">Networth: <span id="inv-networth">0</span></div>
         </div>
-        <div class="panel-section panel-section-grow">
-          <div class="panel-label">ARMOR TYPE</div>
-          <div id="armor-type-grid" class="armor-type-grid"></div>
-        </div>
-        <div class="panel-section armor-preview-section">
-          <div class="panel-label">LIVE PREVIEW</div>
-          <div class="armor-preview-wrap">
-            <canvas id="armor-preview-canvas" width="240" height="320"></canvas>
-          </div>
+        <div class="inv-actions">
+          <button class="inv-btn" id="inv-wallet-btn">&#9783; Connect Wallet</button>
+          <button class="inv-btn inv-btn-ghost" id="inv-account-btn">Account &#8599;</button>
         </div>
       </div>
 
-      <div class="panel-divider"></div>
-      <div class="panel-label" style="margin-bottom:10px">EQUIP LOADOUT &mdash; 1 GUN + ARC BLADE</div>
-      <div class="loadout-equip">
-        <div class="loadout-equip-col loadout-equip-col-wide">
-          <div class="armory-section-label">PRIMARY WEAPON</div>
-          <div id="loadout-gun-grid" class="loadout-pick-grid"></div>
-        </div>
-        <div class="loadout-equip-col loadout-equip-col-fixed">
-          <div class="armory-section-label">MELEE</div>
-          <div class="loadout-melee-fixed">
-            <span class="loadout-melee-fixed-name">Arc Blade</span>
-            <span class="loadout-melee-fixed-badge">EQUIPPED</span>
-          </div>
-        </div>
-      </div>
+      <div class="inv-section-label">EQUIPPED</div>
+      <div id="inv-equipped" class="inv-card-row"></div>
 
-      <div class="panel-divider"></div>
-      <div class="panel-label" style="margin-bottom:10px">WEAPON FINISHES</div>
-
-      <div class="armory-layout">
-        <div class="armory-weapon-list">
-          <div class="armory-section-label">WEAPONS</div>
-          <div id="armory-weapon-list"></div>
-        </div>
-        <div class="armory-skin-panel">
-          <div class="armory-preview-wrap">
-            <canvas id="skin-preview-canvas" width="360" height="202"></canvas>
-            <div class="armory-preview-info">
-              <div id="preview-skin-name" class="preview-skin-name">Select a skin</div>
-              <div id="preview-skin-tags" class="preview-skin-tags"></div>
-            </div>
-          </div>
-          <div class="armory-skin-header">
-            <span class="armory-section-label">FINISHES</span>
-            <span id="armory-equipped-chip" class="equipped-chip">— none equipped —</span>
-          </div>
-          <div id="armory-skin-grid" class="armory-skin-grid"></div>
-          <button id="armory-equip-btn" class="play-btn armory-equip-btn" disabled>EQUIP FINISH</button>
-        </div>
-      </div>
+      <div class="inv-section-label">INVENTORY</div>
+      <div id="inv-tabs" class="inv-tabs"></div>
+      <div id="inv-grid" class="inv-card-grid"></div>
 
     </div>
 
@@ -331,49 +291,30 @@
     </div>
 
     <!-- ===================== PANEL: PROFILE ===================== -->
-    <div id="panel-profile" class="nav-panel hidden">
-      <div class="profile-header">
-        <div id="profile-avatar" class="profile-avatar"></div>
-        <div class="profile-info">
-          <div id="profile-username" class="profile-name">RECRUIT</div>
-          <div id="profile-badge" class="profile-badge">RECRUIT</div>
+    <div id="panel-profile" class="nav-panel nav-panel-wide hidden">
+      <div id="profile-username" class="prof-username">RECRUIT</div>
+      <div class="prof-tabs">
+        <button class="prof-tab active">VIEW</button>
+        <button class="prof-tab prof-tab-dim">EDIT</button>
+      </div>
+      <div class="prof-body">
+        <div class="prof-char">
+          <canvas id="profile-char-canvas" width="320" height="480"></canvas>
+        </div>
+        <div class="prof-stats">
+          <div class="prof-stat"><div class="prof-stat-label">KILLS</div><div class="prof-stat-val" id="ps-kills">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">DEATHS</div><div class="prof-stat-val" id="ps-deaths">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">K/D</div><div class="prof-stat-val" id="ps-kd">0.00</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">RATING</div><div class="prof-stat-val" id="ps-rating">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">SCORE THIS WEEK</div><div class="prof-stat-val" id="ps-scoreweek">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">ALL TIME SCORE</div><div class="prof-stat-val" id="ps-score">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">TOTAL GAMES</div><div class="prof-stat-val" id="ps-games">0</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">BEST SURVIVAL</div><div class="prof-stat-val" id="ps-survival">00:00:00</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">RANK</div><div class="prof-stat-val" id="ps-rank">RECRUIT</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">BALANCE</div><div class="prof-stat-val" id="ps-balance">0e</div></div>
         </div>
       </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="stat-kills">0</div>
-          <div class="stat-label">KILLS</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="stat-score">0</div>
-          <div class="stat-label">SCORE</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="stat-games">0</div>
-          <div class="stat-label">GAMES</div>
-        </div>
-      </div>
-
-      <label class="field-label">equipped finishes</label>
-      <div class="equipped-skins">
-        <div class="equipped-slot">
-          <div id="profile-weapon-skin" class="equipped-preview"></div>
-          <div class="equipped-text">
-            <div id="profile-weapon-skin-name" class="equipped-name">Midnight Black</div>
-            <div class="equipped-type">GUN SKIN</div>
-          </div>
-        </div>
-        <div class="equipped-slot">
-          <div id="profile-sword-skin" class="equipped-preview"></div>
-          <div class="equipped-text">
-            <div id="profile-sword-skin-name" class="equipped-name">Iron</div>
-            <div class="equipped-type">SWORD SKIN</div>
-          </div>
-        </div>
-      </div>
-
-      <button id="profile-logout-btn" class="ghost-btn" style="margin-top:20px;display:none">LOGOUT</button>
+      <button id="profile-logout-btn" class="ghost-btn" style="margin-top:16px;display:none">LOGOUT</button>
     </div>
 
     <!-- ===================== PANEL: SHOP ===================== -->
