@@ -176,7 +176,7 @@ export class GrenadeSystem {
 
     const light = new THREE.PointLight(0xff8a3a, 12, FRAG_RADIUS * 3.5, 2);
     light.position.copy(point);
-    this.scene.add(light);
+    // (sky-only lighting) explosion light not added to scene
     this.explosions.push({ mesh: fireball, light, t: 0, life: 0.5 });
 
     if (this.onExplode) this.onExplode(point, FRAG_RADIUS, FRAG_DMG);

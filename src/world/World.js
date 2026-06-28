@@ -480,9 +480,9 @@ export class World {
     // the glow. Shadows and prop counts also scale with quality.
     const q = GameSettings.get('quality');
     this._quality = q;
-    this._maxAccentLights = q === 'high' ? 26 : q === 'medium' ? 9 : 0;
+    this._maxAccentLights = 0;  // sky-only lighting: NO point lights at any quality
     this._accentLights = 0;
-    this._shadows = q !== 'low';
+    this._shadows = false;      // no directional light -> no shadows anywhere
     this._lod = q === 'high' ? 1 : q === 'medium' ? 0.7 : 0.4; // scales prop counts
 
     // Animated props ticked by update(dt): flying vehicles + pulsing energy.
@@ -535,30 +535,12 @@ export class World {
   }
 
   _buildLighting() {
-    // Bright, even daylight — clean arena, not a moody night scene.
-    const hemi = new THREE.HemisphereLight(0xdce8ee, 0x809098, 0.66);
+    // SKY LIGHT ONLY. Per request, the scene has no other lights anywhere — no
+    // directional key/fill, no point lights, no shadows. Surfaces are lit by this
+    // single hemisphere (sky) light plus the scene's environment map (IBL) and
+    // emissive accents, which is the cheapest possible lighting to render.
+    const hemi = new THREE.HemisphereLight(0xeef5f9, 0x8a96a0, 1.7);
     this.scene.add(hemi);
-
-    // Primary key light — bright neutral white, casts shadows (quality-gated).
-    const star = new THREE.DirectionalLight(0xffffff, 0.92);
-    star.position.set(-45, 85, 55);
-    star.castShadow = this._shadows;
-    const shadowRes = this._quality === 'high' ? 2048 : 1024;
-    star.shadow.mapSize.set(shadowRes, shadowRes);
-    star.shadow.camera.left   = -95;
-    star.shadow.camera.right  =  95;
-    star.shadow.camera.top    =  95;
-    star.shadow.camera.bottom = -95;
-    star.shadow.camera.near   =  1;
-    star.shadow.camera.far    = 260;
-    star.shadow.bias        = -0.0012;
-    star.shadow.normalBias  =  0.02;
-    this.scene.add(star);
-
-    // Soft cool fill from the opposite side so shadows stay light, not black.
-    const fill = new THREE.DirectionalLight(0xc4dce6, 0.45);
-    fill.position.set(35, 25, -30);
-    this.scene.add(fill);
   }
 
   _buildGround() {
@@ -607,7 +589,8 @@ export class World {
   // otherwise the emissive material + bloom still carry the glow for free.
   // `important` lights (e.g. the central arena core) bypass the cap.
   _accentLight(parent, color, intensity, distance, x, y, z, important = false) {
-    if (!important && this._accentLights >= this._maxAccentLights) return null;
+    // Sky-only lighting: never add a point light (budget is 0 for all qualities).
+    if (this._accentLights >= this._maxAccentLights) return null;
     this._accentLights++;
     const light = new THREE.PointLight(color, intensity, distance, 2);
     light.position.set(x, y, z);

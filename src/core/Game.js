@@ -58,7 +58,7 @@ export class Game {
       antialias: _q === 'high',
       powerPreference: 'high-performance',
     });
-    this.renderer.shadowMap.enabled = _q !== 'low';
+    this.renderer.shadowMap.enabled = false; // sky-only lighting: no shadow casters
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setPixelRatio(_q === 'high' ? Math.min(window.devicePixelRatio, 2) : _q === 'low' ? 0.6 : 1);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -398,7 +398,7 @@ export class Game {
       // (bloom + shadows). The decorative light budget is baked at world build,
       // so the lighting part of the change takes full effect on the next reload.
       this._bloomEnabled = s.quality !== 'low';
-      this.renderer.shadowMap.enabled = s.quality !== 'low';
+      // shadows stay off — sky-only lighting has no shadow casters.
     };
     this.menu.onLogout = () => {
       UserAccount.logout();

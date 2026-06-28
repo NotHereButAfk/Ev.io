@@ -70,7 +70,7 @@ function buildZombieRigFromGLB(mat) {
   // Eye glow light attached to the glowing eye mesh
   const eyeGlowMesh = glbScene.getObjectByName('ZEyeGlow');
   const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
-  (eyeGlowMesh || headGroup).add(eyeGlow);
+  // (sky-only lighting) eyeGlow not added to scene
 
   const get = (name) => glbScene.getObjectByName(name) || spineGroup;
 
@@ -385,7 +385,7 @@ function buildZombieRig() {
 
   // Eye glow PointLight
   const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
-  eyeGlow.position.set(0, 0.264, -0.26); headGroup.add(eyeGlow);
+  eyeGlow.position.set(0, 0.264, -0.26); /* (sky-only) not added */
 
   // Temple hollows (sunken areas)
   [[-0.188, 0.24, 0.02], [0.188, 0.24, 0.02]].forEach(([tx,ty,tz]) => {
@@ -547,7 +547,7 @@ function buildGunMesh(type) {
   // Muzzle flash light (off by default)
   const flash = new THREE.PointLight(0xff8822, 0, 4, 2);
   flash.position.copy(muzzleOffset);
-  group.add(flash);
+  // (sky-only lighting) zombie muzzle flash light not added to scene
 
   group.traverse(obj => { if (obj.isMesh) obj.castShadow = false; });
 

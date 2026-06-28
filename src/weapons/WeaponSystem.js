@@ -68,7 +68,7 @@ export class WeaponSystem {
     this.swordSkin = null;
     this.animTime = 0;
     this.flashLight = new THREE.PointLight(0xffcc66, 0, 8, 1.8);
-    this.camera.add(this.flashLight);
+    // (sky-only lighting) flashLight not added to scene
 
     // Visible muzzle flash sprite — two crossed quads for a star shape
     const flashMat = new THREE.MeshBasicMaterial({
@@ -117,11 +117,11 @@ export class WeaponSystem {
     // that rakes across the gun so its metal/clearcoat highlights always read.
     this.vmLight = new THREE.PointLight(0xffffff, 4.5, 1.8, 2);
     this.vmLight.position.set(0.5, 0.35, 0.0);
-    this.camera.add(this.vmLight);
+    // (sky-only lighting) vmLight not added to scene
     // Cool fill from the other side to shape the form.
     this.vmFill = new THREE.PointLight(0x88aaff, 1.6, 1.8, 2);
     this.vmFill.position.set(-0.5, -0.1, -0.2);
-    this.camera.add(this.vmFill);
+    // (sky-only lighting) vmFill not added to scene
 
     this.swayGroup = new THREE.Object3D();
     this.weaponMount.add(this.swayGroup);
@@ -803,7 +803,7 @@ export class WeaponSystem {
     this.scene.add(fireball);
     const light = new THREE.PointLight(0xff8a3a, 10, (def.splashRadius || 5) * 3.5, 2);
     light.position.copy(point);
-    this.scene.add(light);
+    // (sky-only lighting) explosion light not added to scene
     this.explosions.push({ mesh: fireball, light, t: 0, life: 0.45, radius: def.splashRadius || 5 });
 
     const radius = def.splashRadius || 5;
