@@ -104,7 +104,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // Bolt on this loadout's distinct armour set (bone-parented so plates ride the
   // skeleton during the animation). Each armor type gets its own silhouette.
   group.updateMatrixWorld(true);
-  _buildArmorPieces(root, armorTypeId, look);
+  const armor = _buildArmorPieces(root, armorTypeId, look);
 
   // Measure the standing figure now, while its matrices resolve cleanly, and
   // stash the result. Re-measuring a posed SkinnedMesh elsewhere (e.g. the
@@ -142,11 +142,44 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   };
   setMotion('idle');
 
+  // ── Per-armor motion: animation speed + additive stance + animated armour ──
+  const motion = ARMOR_MOTION[armorTypeId] || ARMOR_MOTION.assault;
+  mixer.timeScale = motion.speed;
+
+  const poseOffsets = [];
+  const spineBone = root.getObjectByName('mixamorig:Spine1');
+  const headBone  = root.getObjectByName('mixamorig:Head');
+  if (spineBone && motion.spineLean)
+    poseOffsets.push({ bone: spineBone, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.spineLean) });
+  if (headBone && motion.headPitch)
+    poseOffsets.push({ bone: headBone, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.headPitch) });
+
+  let armorT = 0;
+  const armorTick = (dt) => {
+    armorT += dt;
+    const t = armorT;
+    for (const a of armor.animated) {
+      const an = a.anim;
+      if (an.type === 'pulse' || an.type === 'thruster') {
+        a.mat.emissiveIntensity = an.min + (an.max - an.min) * (0.5 + 0.5 * Math.sin(t * an.freq + (an.phase || 0)));
+      } else if (an.type === 'blink') {
+        a.mat.emissiveIntensity = Math.sin(t * an.freq + (an.phase || 0)) > 0.3 ? an.on : an.off;
+      } else if (an.type === 'sway') {
+        const ang = an.amp * Math.sin(t * an.freq + (an.phase || 0));
+        a.mesh.quaternion.copy(a.baseQuat);
+        if (an.axis === 'z') a.mesh.rotateZ(ang); else a.mesh.rotateX(ang);
+      }
+    }
+    // Stance offsets are re-applied each frame after mixer.update overwrites the pose.
+    for (const p of poseOffsets) p.bone.quaternion.multiply(p.q);
+  };
+
   group.userData = {
     isHuman: true,
     mixer,
     actions,
     setMotion,
+    armorTick,
     bodyMats,
     visorMats,
     armorTypeId,
@@ -208,11 +241,23 @@ function _attachAtWorld(bone, mesh, wx, wy, wz, worldScale, quat) {
   mesh.receiveShadow = true;
 }
 
+// Per-armor motion character: animation playback speed + a small additive
+// stance (spine lean / head pitch) applied on top of the base clip so each
+// type MOVES differently, not just looks different.
+const ARMOR_MOTION = {
+  assault: { speed: 1.00, spineLean:  0.00, headPitch:  0.00 },
+  recon:   { speed: 1.16, spineLean: -0.04, headPitch: -0.06 }, // upright, alert
+  heavy:   { speed: 0.82, spineLean:  0.11, headPitch:  0.05 }, // lumbering hunch
+  stealth: { speed: 0.92, spineLean:  0.13, headPitch:  0.09 }, // low, prowling
+};
+const _AX_X = new THREE.Vector3(1, 0, 0);
+
+// Returns { animated: [...] } — armour meshes that pulse / blink / sway every
+// frame via the group's armorTick(dt).
 function _buildArmorPieces(root, armorTypeId, look) {
   const bone = (n) => root.getObjectByName('mixamorig:' + n);
   const s = look.scale || 1;
 
-  // Materials: a plate (armour-coloured), dark metal, and a glowing accent.
   const plate = new THREE.MeshStandardMaterial({
     color: new THREE.Color(look.body).multiplyScalar(0.78),
     roughness: look.roughness ?? 0.5, metalness: 0.62,
@@ -221,68 +266,98 @@ function _buildArmorPieces(root, armorTypeId, look) {
   const accent = new THREE.MeshStandardMaterial({
     color: look.visor, emissive: look.visor, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.6,
   });
+  const cape = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(look.body).multiplyScalar(0.4), roughness: 0.92, metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
 
   const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   const sph = (r) => new THREE.SphereGeometry(r, 12, 10);
   const oct = (r) => new THREE.OctahedronGeometry(r);
   const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 8);
-
-  // spec: [boneName, geometry, material, wx, wy, wz, (quat)]
-  let specs = [];
   const tiltBack = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, 0));
 
+  // spec: { bone, geo, mat, x, y, z, quat?, anim? }
+  //   anim: { type:'pulse'|'thruster'|'blink'|'sway', freq, ... }
+  let specs = [];
+
   if (armorTypeId === 'recon') {
-    // Light scout: slim chest, one pad, head scope + antenna.
     specs = [
-      ['Spine2', box(0.24, 0.26, 0.06), plate, 0, 1.40, -0.075],
-      ['LeftShoulder', box(0.11, 0.09, 0.13), plate, -0.16, 1.52, 0.04],
-      ['Head', box(0.06, 0.05, 0.09), dark, 0.085, 1.585, -0.01],
-      ['Head', cyl(0.008, 0.20), accent, 0.085, 1.72, 0.05],
-      ['Spine2', box(0.05, 0.05, 0.10), accent, 0, 1.30, 0.12], // small back beacon
+      { bone: 'Spine2', geo: box(0.24, 0.26, 0.06), mat: plate, x: 0, y: 1.40, z: -0.075 },
+      { bone: 'LeftShoulder', geo: box(0.11, 0.09, 0.13), mat: plate, x: -0.16, y: 1.52, z: 0.04 },
+      { bone: 'Head', geo: box(0.06, 0.05, 0.09), mat: dark, x: 0.085, y: 1.585, z: -0.01 },
+      { bone: 'Head', geo: box(0.11, 0.015, 0.015), mat: accent, x: 0.10, y: 1.585, z: -0.055,
+        anim: { type: 'pulse', freq: 6, min: 0.4, max: 1.9 } },           // visor scanner line
+      { bone: 'Head', geo: cyl(0.008, 0.20), mat: dark, x: 0.085, y: 1.72, z: 0.05 },
+      { bone: 'Head', geo: sph(0.013), mat: accent, x: 0.085, y: 1.82, z: 0.05,
+        anim: { type: 'blink', freq: 5, on: 2.4, off: 0.1 } },            // antenna tip blink
+      { bone: 'Spine2', geo: box(0.05, 0.05, 0.10), mat: accent, x: 0, y: 1.30, z: 0.12,
+        anim: { type: 'pulse', freq: 4, min: 0.3, max: 1.6 } },           // back beacon
     ];
   } else if (armorTypeId === 'heavy') {
-    // Juggernaut: big pauldrons, thick chest + abs, back power unit, collar, thighs.
     specs = [
-      ['Spine2', box(0.40, 0.42, 0.18), plate, 0, 1.40, -0.05],
-      ['Spine1', box(0.34, 0.18, 0.14), plate, 0, 1.21, -0.05],
-      ['LeftShoulder', sph(0.135), plate, -0.205, 1.52, 0.03],
-      ['RightShoulder', sph(0.135), plate, 0.205, 1.52, 0.03],
-      ['LeftShoulder', box(0.10, 0.05, 0.10), accent, -0.205, 1.61, 0.03],
-      ['RightShoulder', box(0.10, 0.05, 0.10), accent, 0.205, 1.61, 0.03],
-      ['Spine2', box(0.32, 0.36, 0.20), dark, 0, 1.40, 0.17], // back power pack
-      ['Spine2', box(0.07, 0.30, 0.06), accent, 0, 1.40, 0.28],
-      ['Neck', box(0.28, 0.11, 0.24), plate, 0, 1.52, 0.04],   // collar guard
-      ['LeftUpLeg', box(0.15, 0.24, 0.17), plate, -0.115, 0.92, -0.02],
-      ['RightUpLeg', box(0.15, 0.24, 0.17), plate, 0.115, 0.92, -0.02],
+      { bone: 'Spine2', geo: box(0.40, 0.42, 0.18), mat: plate, x: 0, y: 1.40, z: -0.05 },
+      { bone: 'Spine1', geo: box(0.34, 0.18, 0.14), mat: plate, x: 0, y: 1.21, z: -0.05 },
+      { bone: 'LeftShoulder', geo: sph(0.135), mat: plate, x: -0.205, y: 1.52, z: 0.03 },
+      { bone: 'RightShoulder', geo: sph(0.135), mat: plate, x: 0.205, y: 1.52, z: 0.03 },
+      { bone: 'LeftShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: -0.205, y: 1.61, z: 0.03,
+        anim: { type: 'thruster', freq: 2.2, min: 0.6, max: 2.6 } },      // shoulder vents
+      { bone: 'RightShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: 0.205, y: 1.61, z: 0.03,
+        anim: { type: 'thruster', freq: 2.2, min: 0.6, max: 2.6, phase: 1.0 } },
+      { bone: 'Spine2', geo: box(0.32, 0.36, 0.20), mat: dark, x: 0, y: 1.40, z: 0.17 },
+      { bone: 'Spine2', geo: box(0.07, 0.30, 0.06), mat: accent, x: 0, y: 1.40, z: 0.28,
+        anim: { type: 'pulse', freq: 1.6, min: 0.5, max: 2.4 } },         // power core
+      { bone: 'Neck', geo: box(0.28, 0.11, 0.24), mat: plate, x: 0, y: 1.52, z: 0.04 },
+      { bone: 'LeftUpLeg', geo: box(0.15, 0.24, 0.17), mat: plate, x: -0.115, y: 0.92, z: -0.02 },
+      { bone: 'RightUpLeg', geo: box(0.15, 0.24, 0.17), mat: plate, x: 0.115, y: 0.92, z: -0.02 },
+      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: -0.10, y: 1.27, z: 0.30,
+        anim: { type: 'thruster', freq: 3, min: 0.4, max: 2.2 } },        // exhaust nozzles
+      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: 0.10, y: 1.27, z: 0.30,
+        anim: { type: 'thruster', freq: 3, min: 0.4, max: 2.2, phase: 1.6 } },
     ];
   } else if (armorTypeId === 'stealth') {
-    // Infiltrator: sleek angular plates, head cowl, back sheath.
     specs = [
-      ['Spine2', box(0.25, 0.30, 0.05), plate, 0, 1.40, -0.075],
-      ['LeftShoulder', oct(0.085), dark, -0.17, 1.52, 0.04],
-      ['RightShoulder', oct(0.085), dark, 0.17, 1.52, 0.04],
-      ['Head', box(0.20, 0.16, 0.20), dark, 0, 1.65, 0.10, tiltBack], // cowl/hood
-      ['Spine2', box(0.05, 0.42, 0.10), dark, 0.07, 1.40, 0.14],      // back sheath
-      ['Spine2', box(0.03, 0.30, 0.03), accent, 0, 1.40, -0.10],      // chest light strip
+      { bone: 'Spine2', geo: box(0.25, 0.30, 0.05), mat: plate, x: 0, y: 1.40, z: -0.075 },
+      { bone: 'LeftShoulder', geo: oct(0.085), mat: dark, x: -0.17, y: 1.52, z: 0.04 },
+      { bone: 'RightShoulder', geo: oct(0.085), mat: dark, x: 0.17, y: 1.52, z: 0.04 },
+      { bone: 'Head', geo: box(0.20, 0.16, 0.20), mat: dark, x: 0, y: 1.65, z: 0.10, quat: tiltBack }, // cowl
+      { bone: 'Head', geo: box(0.16, 0.03, 0.16), mat: accent, x: 0, y: 1.60, z: 0.10,
+        anim: { type: 'pulse', freq: 1.5, min: 0.12, max: 0.7 } },        // cowl rim glow
+      { bone: 'Spine2', geo: box(0.05, 0.42, 0.10), mat: dark, x: 0.07, y: 1.40, z: 0.14,
+        anim: { type: 'sway', axis: 'x', amp: 0.06, freq: 1.6 } },        // back sheath
+      { bone: 'Spine2', geo: box(0.03, 0.30, 0.03), mat: accent, x: 0, y: 1.40, z: -0.10,
+        anim: { type: 'pulse', freq: 2.0, min: 0.15, max: 0.95 } },       // chest light strip
+      { bone: 'Spine2', geo: box(0.32, 0.55, 0.02), mat: cape, x: 0, y: 1.12, z: 0.135,
+        anim: { type: 'sway', axis: 'x', amp: 0.10, freq: 1.25 } },       // flowing cape
     ];
   } else {
-    // Assault (default): balanced tactical plate, two pads, belt, small pack.
     specs = [
-      ['Spine2', box(0.31, 0.35, 0.12), plate, 0, 1.40, -0.055],
-      ['Spine2', box(0.05, 0.22, 0.04), accent, 0, 1.40, -0.115], // chest emitter
-      ['LeftShoulder', box(0.15, 0.13, 0.17), plate, -0.18, 1.51, 0.04],
-      ['RightShoulder', box(0.15, 0.13, 0.17), plate, 0.18, 1.51, 0.04],
-      ['Spine', box(0.32, 0.09, 0.22), dark, 0, 1.13, -0.01],     // utility belt
-      ['Spine2', box(0.22, 0.26, 0.13), dark, 0, 1.38, 0.14],     // small backpack
+      { bone: 'Spine2', geo: box(0.31, 0.35, 0.12), mat: plate, x: 0, y: 1.40, z: -0.055 },
+      { bone: 'Spine2', geo: box(0.05, 0.22, 0.04), mat: accent, x: 0, y: 1.40, z: -0.115,
+        anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },         // chest emitter heartbeat
+      { bone: 'LeftShoulder', geo: box(0.15, 0.13, 0.17), mat: plate, x: -0.18, y: 1.51, z: 0.04 },
+      { bone: 'RightShoulder', geo: box(0.15, 0.13, 0.17), mat: plate, x: 0.18, y: 1.51, z: 0.04 },
+      { bone: 'LeftShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: -0.18, y: 1.59, z: 0.04,
+        anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
+      { bone: 'RightShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: 0.18, y: 1.59, z: 0.04,
+        anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2, phase: Math.PI } },
+      { bone: 'Spine', geo: box(0.32, 0.09, 0.22), mat: dark, x: 0, y: 1.13, z: -0.01 },     // belt
+      { bone: 'Spine2', geo: box(0.22, 0.26, 0.13), mat: dark, x: 0, y: 1.38, z: 0.14 },     // pack
     ];
   }
 
-  for (const [bn, geo, mat, wx, wy, wz, quat] of specs) {
-    const b = bone(bn);
+  const animated = [];
+  for (const sp of specs) {
+    const b = bone(sp.bone);
     if (!b) continue;
-    const mesh = new THREE.Mesh(geo, mat);
-    _attachAtWorld(b, mesh, wx * s, wy * s, wz * s, s, quat);
+    const mat = sp.anim ? sp.mat.clone() : sp.mat; // independent animation per piece
+    const mesh = new THREE.Mesh(sp.geo, mat);
+    _attachAtWorld(b, mesh, sp.x * s, sp.y * s, sp.z * s, s, sp.quat);
+    if (sp.anim) {
+      animated.push({ mesh, mat, anim: sp.anim, baseQuat: mesh.quaternion.clone() });
+    }
   }
+  return { animated };
 }
 
 // Cosmetic skin tint: recolours the armour plates toward the equipped skin

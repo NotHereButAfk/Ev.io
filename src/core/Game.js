@@ -864,6 +864,7 @@ export class Game {
       if (grounded && speed > 0.6) motion = (p.isSprinting || speed > 6.5) ? 'run' : 'walk';
       ud.setMotion(motion);
       ud.mixer.update(dt);
+      ud.armorTick?.(dt);
       return;
     }
 
@@ -965,7 +966,7 @@ export class Game {
     }
     // Tick the human soldier's idle animation whenever it's on screen.
     const pud = this.previewCharacter?.userData;
-    if (pud?.isHuman) { pud.setMotion('idle'); pud.mixer.update(dt); }
+    if (pud?.isHuman) { pud.setMotion('idle'); pud.mixer.update(dt); pud.armorTick?.(dt); }
 
     // Keep the city alive behind the menu fly-through (flying traffic, pulse).
     this.world.update(dt);
