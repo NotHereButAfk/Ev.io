@@ -469,8 +469,8 @@ export class World {
     this._carMats = new Map();
     // Sci-fi neon accent palette + cached emissive materials (bloom does the glow,
     // so these are cheap unlit-looking emissives, no extra point lights).
-    // Clean ev.io accent palette: teals + orange (no hot magenta/violet neon).
-    this._neonColors = [0x33b8c8, 0xff8a2c, 0x4aa8b8, 0xffa850, 0x2f9fb0, 0xff7a1e];
+    // Iconic ev.io accent palette: glowing blue first, with orange + teal.
+    this._neonColors = [0x33a8ec, 0xff8a2c, 0x37c4d4, 0x6cc4f0, 0xffa850, 0x2f9fb0];
     this._neonMats = new Map();
 
     // ── Performance budget (the big lever for low-end laptops) ────────────────
@@ -515,6 +515,7 @@ export class World {
     this._buildLandingPads();
     this._buildGroundChannels();
     this._buildArenaStructures();
+    this._buildArenaPillars();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -2507,16 +2508,84 @@ export class World {
     }
   }
 
+  // ── Arena pillars ────────────────────────────────────────────────────────────
+  // Tall clean columns with glowing blue rings — the single most iconic ev.io
+  // arena element: cover, sightline breaks, and verticality anchors. Symmetric
+  // placement keeps the map balanced for TDM/CTF.
+  _buildArenaPillars() {
+    const pillarMat = new THREE.MeshStandardMaterial({
+      color: 0xdfe5e8, roughness: 0.55, metalness: 0.14, envMapIntensity: 0.5,
+    });
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0xb6c0c6, roughness: 0.6, metalness: 0.2,
+    });
+    const ringMat = this._neonMat(0x33a8ec); // glowing blue ring
+
+    // Symmetric ring of pillars around the central courtyard + outer pairs,
+    // placed in open lanes so they read as cover, not clutter.
+    const spots = [
+      [16, 16], [-16, 16], [16, -16], [-16, -16],
+      [27, 0], [-27, 0], [0, 27], [0, -27],
+      [50, 50], [-50, 50], [50, -50], [-50, -50],
+    ];
+    for (const [x, z] of spots) {
+      const h = 11 + ((Math.abs(x) + Math.abs(z)) % 5);
+      const group = new THREE.Group();
+
+      // base plinth
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.45, 0.5, 16), capMat);
+      base.position.y = 0.25;
+      base.receiveShadow = true;
+      group.add(base);
+
+      // tapered shaft
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.05, h, 16), pillarMat);
+      shaft.position.y = h / 2 + 0.5;
+      shaft.castShadow = true;
+      shaft.receiveShadow = true;
+      group.add(shaft);
+
+      // top cap
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.95, 0.6, 16), capMat);
+      cap.position.y = h + 0.8;
+      cap.castShadow = true;
+      group.add(cap);
+
+      // glowing blue rings near the base and top
+      for (const ry of [1.6, h - 1.0]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 8, 28), ringMat);
+        ring.position.y = ry;
+        ring.rotation.x = Math.PI / 2;
+        group.add(ring);
+      }
+      // a vertical accent groove up one face
+      const groove = new THREE.Mesh(new THREE.BoxGeometry(0.1, h - 2.4, 0.1), ringMat);
+      groove.position.set(0, h / 2 + 0.5, 1.0);
+      group.add(groove);
+
+      group.position.set(x, 0, z);
+      group.updateMatrixWorld(true);
+      this.scene.add(group);
+      // collide against the shaft (solid cover)
+      const box = new THREE.Box3(
+        new THREE.Vector3(x - 1.05, 0, z - 1.05),
+        new THREE.Vector3(x + 1.05, h + 1.4, z + 1.05)
+      );
+      this.colliders.push({ box, mesh: shaft });
+    }
+  }
+
   // ── ev.io-style arena structures ────────────────────────────────────────────
   // Walkable raised platforms + ramps (strong verticality), grav-lift launch
   // columns, and teleporter pads — the structural language that defines ev.io
   // arenas: a high-ground control centre, connecting catwalks, fast vertical
   // travel, and cross-map teleports.
   _buildArenaStructures() {
+    // Iconic ev.io look: clean near-white platforms with glowing blue edges.
     const deckMat = new THREE.MeshStandardMaterial({
-      color: 0x9aa6ae, roughness: 0.7, metalness: 0.15, envMapIntensity: 0.5,
+      color: 0xd6dde1, roughness: 0.62, metalness: 0.12, envMapIntensity: 0.5,
     });
-    const trimColor = 0xff8a2c;
+    const trimColor = 0x33a8ec; // glowing blue edge
 
     // 1) Central command deck around the spire (the high-ground power position).
     const DECK = 8, DECK_Y = 4.5;
