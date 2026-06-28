@@ -3181,6 +3181,7 @@ html, body {
 /* ---- per-gun tab + weapon detail view ---- */
 .inv-tab-eq { box-shadow: inset 0 -3px 0 #2fae5a; }
 .inv-detail {
+  grid-column: 1 / -1;            /* span the whole inventory grid, not one cell */
   display: flex; gap: 26px; align-items: center;
   background: rgba(10,15,22,0.6); border: 1px solid rgba(70,110,140,0.25);
   border-radius: 12px; padding: 24px;
@@ -3210,5 +3211,30 @@ html, body {
 
 /* Wider panel for the per-gun inventory (many tabs + a detail view). */
 .nav-panel-inv { width: min(97vw, 1000px); }
-.nav-panel-inv .inv-tabs { gap: 5px; }
-.nav-panel-inv .inv-tab { padding: 9px 14px; font-size: 13px; }
+
+/* Transparent, floating panels (loadout + profile) over the blurred scene. */
+.nav-panel-inv, #panel-profile {
+  background: rgba(8, 11, 18, 0.18);
+  border-color: rgba(120, 200, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+}
+/* Keep loose text legible over the transparent background. */
+.nav-panel-inv .inv-section-label, .nav-panel-inv .inv-meta,
+.nav-panel-inv .inv-name-input, #panel-profile .prof-username,
+#panel-profile .prof-stat-label, #panel-profile .prof-stat-val {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
+}
+
+/* Tidy, evenly-aligned tab grid instead of a ragged wrap. */
+.nav-panel-inv .inv-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+  gap: 6px;
+}
+.nav-panel-inv .inv-tab {
+  padding: 9px 10px; font-size: 12.5px; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv-detail-name { white-space: nowrap; }
