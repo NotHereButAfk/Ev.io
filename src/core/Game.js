@@ -63,7 +63,7 @@ export class Game {
     this.renderer.setPixelRatio(_q === 'high' ? Math.min(window.devicePixelRatio, 2) : _q === 'low' ? 0.6 : 1);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.toneMappingExposure = 0.85;
 
     // Kick off model fetches immediately so they're ready before first use.
     // The real rigged human soldier is preferred; both callbacks swap the
@@ -771,9 +771,9 @@ export class Game {
     // the whole scene washing out to white.
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(w, h),
-      0.55,   // strength
-      0.5,    // radius
-      0.85    // threshold — only pixels brighter than this bloom
+      0.14,   // strength — subtle; clean arena, not a neon glow-fest
+      0.4,    // radius
+      1.05    // threshold — only emissive accents bloom, not lit surfaces
     );
     this.composer.addPass(this.bloomPass);
 

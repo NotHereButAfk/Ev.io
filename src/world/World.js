@@ -13,27 +13,28 @@ function makeTechFloorTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#04070d';
+  // Clean light-grey arena floor with subtle panel seams (ev.io style).
+  ctx.fillStyle = '#97a3aa';
   ctx.fillRect(0, 0, size, size);
-  // minor grid
-  ctx.strokeStyle = 'rgba(0,130,190,0.11)';
+  // minor panel grid — faint grey
+  ctx.strokeStyle = 'rgba(120,140,150,0.16)';
   ctx.lineWidth = 0.7;
   for (let i = 0; i < size; i += 16) {
     ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
   }
-  // major grid
-  ctx.strokeStyle = 'rgba(0,200,255,0.42)';
+  // major seams — soft teal-grey
+  ctx.strokeStyle = 'rgba(70,140,155,0.32)';
   ctx.lineWidth = 1.4;
   for (let i = 0; i < size; i += 64) {
     ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
   }
-  // intersection dots
-  ctx.fillStyle = 'rgba(0,230,255,0.72)';
+  // intersection bolts — subtle orange accents
+  ctx.fillStyle = 'rgba(230,130,50,0.5)';
   for (let x = 0; x < size; x += 64)
     for (let y = 0; y < size; y += 64) {
-      ctx.beginPath(); ctx.arc(x,y,2.4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,2.0,0,Math.PI*2); ctx.fill();
     }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -76,16 +77,11 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0.00, '#000008'); // deep space zenith
-  grad.addColorStop(0.18, '#01020e');
-  grad.addColorStop(0.38, '#010614');
-  grad.addColorStop(0.55, '#04081e');
-  grad.addColorStop(0.68, '#080420'); // purple tint begins
-  grad.addColorStop(0.78, '#12063a'); // deep violet haze
-  grad.addColorStop(0.86, '#1a0a3e'); // rich purple
-  grad.addColorStop(0.92, '#200838'); // neon city glow
-  grad.addColorStop(0.96, '#18062a'); // deep magenta shadow
-  grad.addColorStop(1.00, '#0c0418'); // dark at base
+  grad.addColorStop(0.00, '#6f9cb2'); // muted blue zenith
+  grad.addColorStop(0.35, '#86aabc');
+  grad.addColorStop(0.62, '#9fc0cc');
+  grad.addColorStop(0.82, '#b6d2da');
+  grad.addColorStop(1.00, '#c8dde2'); // soft horizon (not white)
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -132,7 +128,9 @@ function makeFacadeTexture(seed) {
   canvas.height = h;
   const ctx = canvas.getContext('2d');
 
-  const baseShades = ['#0e1116', '#12151b', '#171a1f', '#0c0f14'];
+  // Clean light panelled facades (ev.io style) — pale grey/teal walls with
+  // teal-tinted glass and the odd orange accent pane. No glowing night windows.
+  const baseShades = ['#a4afb6', '#aeb9bf', '#98a4ab', '#b2bcc2'];
   ctx.fillStyle = baseShades[seed % baseShades.length];
   ctx.fillRect(0, 0, w, h);
 
@@ -145,32 +143,21 @@ function makeFacadeTexture(seed) {
   const winW = cellW * 0.62;
   const winH = cellH * 0.6;
 
-  const litWarm = ['#ffd9a0', '#ffe7bd', '#ffcf86', '#fff0cf', '#ffb84d'];
-  const litCool = ['#bcd4ff', '#d4e4ff', '#a9c4f5'];
-  const litNeon = ['#ff3d8a', '#33e0ff', '#39ff9e', '#c46bff', '#ffcc00']; // occasional vivid office/sign
+  const glass  = ['#7fa6b2', '#8cb2bd', '#9ac0c8', '#6f99a5', '#86acb6'];
+  const accent = ['#ff9c42', '#ffab5a', '#ff8c2e']; // occasional orange pane
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = padX + c * cellW + (cellW - winW) / 2;
       const y = padY + r * cellH + (cellH - winH) / 2;
-      // A living city at night — a healthy fraction of windows glow, with the
-      // occasional vivid neon office to catch the eye (and the bloom pass).
-      const lit = Math.random() < 0.16;
-      if (lit) {
-        const roll = Math.random();
-        const pal = roll < 0.12 ? litNeon : (roll < 0.38 ? litCool : litWarm);
-        ctx.fillStyle = pal[Math.floor(Math.random() * pal.length)];
-        ctx.globalAlpha = 0.6 + Math.random() * 0.4;
-      } else {
-        ctx.fillStyle = '#05070a';
-        ctx.globalAlpha = 1;
-      }
+      const isAccent = Math.random() < 0.08;
+      const pal = isAccent ? accent : glass;
+      ctx.fillStyle = pal[Math.floor(Math.random() * pal.length)];
       ctx.fillRect(x, y, winW, winH);
-      ctx.globalAlpha = 1;
     }
   }
-  // rooftop band
-  ctx.fillStyle = '#05070a';
+  // rooftop trim band
+  ctx.fillStyle = '#9aa4aa';
   ctx.fillRect(0, 0, w, padY);
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -280,13 +267,13 @@ function makeBillboardTexture(seed) {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
-  // Each billboard is a dominant neon hue over near-black.
+  // Clean signage: teal / orange / white over a light panel (no neon night ads).
   const neon = [
-    ['#ff1d68', '#ff7ab0', '#3a0018'],  // hot pink
-    ['#18e0ff', '#9bf3ff', '#001a26'],  // cyan
-    ['#39ff9e', '#bfffd9', '#002616'],  // green
-    ['#c46bff', '#e7c2ff', '#1a0030'],  // violet
-    ['#ffcc00', '#fff0a0', '#241a00'],  // amber
+    ['#ff8a2c', '#ffc08a', '#e8eef0'],  // orange on light
+    ['#37c4d4', '#9fe0e8', '#eef4f5'],  // teal on light
+    ['#2f9fb0', '#bfe6ec', '#f0f5f6'],  // deep teal
+    ['#ffa850', '#ffd6a8', '#eceff0'],  // amber
+    ['#4a7d8a', '#a9ccd4', '#f2f6f7'],  // slate-teal
   ];
   const pal = neon[seed % neon.length];
   ctx.fillStyle = pal[2];
@@ -402,10 +389,10 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x020308);
-    // Deep cyber-indigo haze; pushed back so the neon skyline reads, with a soft
-    // near-field so distant holograms and signage glow through the atmosphere.
-    this.scene.fog = new THREE.Fog(0x040a18, 30, 160);
+    // Clean, bright ev.io-style arena: a light cool-grey sky and a soft, far
+    // haze (not a dark moody fog) so distant structure fades cleanly to white.
+    this.scene.background = new THREE.Color(0x9cbcc8);
+    this.scene.fog = new THREE.Fog(0xa8c4cc, 180, 470);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -482,7 +469,8 @@ export class World {
     this._carMats = new Map();
     // Sci-fi neon accent palette + cached emissive materials (bloom does the glow,
     // so these are cheap unlit-looking emissives, no extra point lights).
-    this._neonColors = [0x00e5ff, 0xff2db4, 0xb24bff, 0x39ff9e, 0xffc400, 0x2a6bff];
+    // Clean ev.io accent palette: teals + orange (no hot magenta/violet neon).
+    this._neonColors = [0x33b8c8, 0xff8a2c, 0x4aa8b8, 0xffa850, 0x2f9fb0, 0xff7a1e];
     this._neonMats = new Map();
 
     // ── Performance budget (the big lever for low-end laptops) ────────────────
@@ -546,13 +534,13 @@ export class World {
   }
 
   _buildLighting() {
-    // Cold star-field ambient — deep space tech bounce
-    const hemi = new THREE.HemisphereLight(0x1a2a4a, 0x030806, 0.40);
+    // Bright, even daylight — clean arena, not a moody night scene.
+    const hemi = new THREE.HemisphereLight(0xdce8ee, 0x809098, 0.66);
     this.scene.add(hemi);
 
-    // Primary star light — cold white-blue key, casts shadows (quality-gated).
-    const star = new THREE.DirectionalLight(0xb8d4ff, 0.72);
-    star.position.set(-50, 70, 40);
+    // Primary key light — bright neutral white, casts shadows (quality-gated).
+    const star = new THREE.DirectionalLight(0xffffff, 0.92);
+    star.position.set(-45, 85, 55);
     star.castShadow = this._shadows;
     const shadowRes = this._quality === 'high' ? 2048 : 1024;
     star.shadow.mapSize.set(shadowRes, shadowRes);
@@ -566,29 +554,19 @@ export class World {
     star.shadow.normalBias  =  0.02;
     this.scene.add(star);
 
-    // Deep-violet fill from the opposite side — energy field bounce
-    const fill = new THREE.DirectionalLight(0x4428cc, 0.18);
-    fill.position.set(20, 8, -30);
+    // Soft cool fill from the opposite side so shadows stay light, not black.
+    const fill = new THREE.DirectionalLight(0xc4dce6, 0.45);
+    fill.position.set(35, 25, -30);
     this.scene.add(fill);
-
-    // Cyan rim — sculpts silhouettes against the dark background
-    const rim = new THREE.DirectionalLight(0x00e5ff, 0.30);
-    rim.position.set(60, 18, 50);
-    this.scene.add(rim);
   }
 
   _buildGround() {
     const floorTex  = makeTechFloorTexture();
-    const emitTex   = makeTechFloorEmissiveTexture();
     const roadMat = new THREE.MeshStandardMaterial({
       map:          floorTex,
-      emissiveMap:  emitTex,
-      emissive:     new THREE.Color(0x003448),
-      emissiveIntensity: 0.14,
-      roughness:    0.85,
-      metalness:    0.22,
-      color:        0x07111a,
-      envMapIntensity: 0.7,
+      roughness:    0.9,
+      metalness:    0.05,
+      color:        0xffffff, // let the light texture define the tone
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;
@@ -599,7 +577,8 @@ export class World {
   }
 
   _buildSky() {
-    // Gradient skydome — a huge inward-facing sphere with a vertical gradient.
+    // Clean bright skydome — light blue zenith fading to near-white horizon.
+    // No stars / moon: this is a daylit arena, not a neon night city.
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(420, 32, 16),
       new THREE.MeshBasicMaterial({
@@ -612,51 +591,6 @@ export class World {
     sky.matrixAutoUpdate = false;
     sky.updateMatrix();
     this.scene.add(sky);
-
-    // moon disc — bright enough to bloom
-    const moonMat = new THREE.MeshBasicMaterial({ color: 0xf4f8ff, fog: false });
-    const moon = new THREE.Mesh(new THREE.SphereGeometry(9, 32, 32), moonMat);
-    moon.position.set(-130, 95, -170);
-    moon.matrixAutoUpdate = false;
-    moon.updateMatrix();
-    this.scene.add(moon);
-    // Layered halo glow (blooms into a soft moon corona)
-    [[14, 0x9fb4d8, 0.22], [22, 0x6a86c8, 0.12], [34, 0x4a5fa8, 0.06]].forEach(([r, c, o]) => {
-      const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(r, 24, 24),
-        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, fog: false, depthWrite: false })
-      );
-      halo.position.copy(moon.position);
-      this.scene.add(halo);
-    });
-
-    // scattered stars — more of them, with size + brightness variation
-    const count = 1400;
-    const pos = new Float32Array(count * 3);
-    const col = new Float32Array(count * 3);
-    const starColors = [
-      [0.81, 0.85, 1.0], [1.0, 0.95, 0.85], [0.85, 0.92, 1.0],
-      [1.0, 0.82, 0.78], [0.92, 0.88, 1.0],
-    ];
-    for (let i = 0; i < count; i++) {
-      const r = 300;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI * 0.48 + 0.02;
-      pos[i * 3] = Math.cos(theta) * Math.sin(phi) * r;
-      pos[i * 3 + 1] = Math.cos(phi) * r + 40;
-      pos[i * 3 + 2] = Math.sin(theta) * Math.sin(phi) * r;
-      const sc = starColors[Math.floor(Math.random() * starColors.length)];
-      const b = 0.5 + Math.random() * 0.9;
-      col[i * 3] = sc[0] * b; col[i * 3 + 1] = sc[1] * b; col[i * 3 + 2] = sc[2] * b;
-    }
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const stars = new THREE.Points(
-      starGeo,
-      new THREE.PointsMaterial({ size: 1.1, sizeAttenuation: true, fog: false, vertexColors: true })
-    );
-    this.scene.add(stars);
   }
 
   _addCollider(mesh) {
@@ -702,7 +636,7 @@ export class World {
     let m = this._neonMats.get(c);
     if (!m) {
       m = new THREE.MeshStandardMaterial({
-        color: c, emissive: c, emissiveIntensity: 2.4, roughness: 0.4, metalness: 0.3
+        color: c, emissive: c, emissiveIntensity: 0.85, roughness: 0.5, metalness: 0.2
       });
       this._neonMats.set(c, m);
     }
@@ -810,13 +744,10 @@ export class World {
       tex.repeat.set(Math.max(1, Math.round(fw / 4)), Math.max(2, Math.round(height / 8)));
       facadeMat = new THREE.MeshStandardMaterial({
         map: tex,
-        emissiveMap: tex,
-        emissive: 0xffffff,
-        emissiveIntensity: 1.6,
-        color: 0x161a20,
-        roughness: 0.35,
-        metalness: 0.6,
-        envMapIntensity: 1.2
+        color: 0xffffff,   // clean light panels, lit by scene light (no self-glow)
+        roughness: 0.55,
+        metalness: 0.15,
+        envMapIntensity: 0.5,
       });
     }
 
@@ -923,7 +854,7 @@ export class World {
       map: tex,
       emissiveMap: tex,
       emissive: 0xffffff,
-      emissiveIntensity: special ? 2.4 : 2.0,
+      emissiveIntensity: special ? 0.7 : 0.5,
       color: 0x101010,
       roughness: 0.4,
       metalness: 0.1
@@ -935,7 +866,7 @@ export class World {
 
     // Every billboard casts a colored glow onto the street below — a pool of
     // neon light that reflects off the wet asphalt.
-    const glowColors = [0xff1d68, 0x18e0ff, 0x39ff9e, 0xc46bff, 0xffcc00];
+    const glowColors = [0xff8a2c, 0x37c4d4, 0x37c4d4, 0xff8a2c, 0xffcc00];
     const gc = special ? 0xff3a4a : glowColors[Math.floor(Math.random() * glowColors.length)];
     this._accentLight(this.scene, gc, special ? 3.0 : 2.2, 22,
       cx + ox * (half + 2.5), y, cz + oz * (half + 2.5));
@@ -1269,13 +1200,13 @@ export class World {
       const tex = this._billboardTex[Math.floor(Math.random() * this._billboardTex.length)];
       const panelMat = new THREE.MeshStandardMaterial({
         map: tex, emissiveMap: tex, emissive: 0xffffff,
-        emissiveIntensity: 2.0, color: 0x101010, roughness: 0.4,
+        emissiveIntensity: 0.5, color: 0x303030, roughness: 0.5,
       });
       const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, panelH, 0.12), panelMat);
       panel.position.set(panelX, base + height * 0.36, panelZ);
       panel.rotation.y = -panelAngle;
       this.scene.add(panel);
-      const glowCols = [0xff1d68, 0x18e0ff, 0x39ff9e, 0xc46bff, 0xffcc00];
+      const glowCols = [0xff8a2c, 0x37c4d4, 0x37c4d4, 0xff8a2c, 0xffcc00];
       const gc = glowCols[Math.floor(Math.random() * glowCols.length)];
       this._accentLight(this.scene, gc, 2.0, 18,
         panelX + Math.cos(panelAngle) * 2.5, base + height * 0.36,
@@ -1539,7 +1470,7 @@ export class World {
   // the single biggest "this is the future" cue. Built as Groups (which keep
   // matrixAutoUpdate on) so update(dt) can reposition them every frame.
   _buildAirTraffic() {
-    const colors = [0x00e5ff, 0xff2db4, 0x39ff9e, 0xffc400, 0xb24bff];
+    const colors = [0x37c4d4, 0xff8a2c, 0x37c4d4, 0xffc400, 0x3aa0b0];
     // Circling hover-cars at varied altitude/radius/speed/direction.
     const orbitCount = Math.max(2, Math.round(9 * this._lod));
     for (let i = 0; i < orbitCount; i++) {
@@ -1612,7 +1543,7 @@ export class World {
     const beaconMat = new THREE.MeshStandardMaterial({
       color: 0xff1a00, emissive: 0xff1a00, emissiveIntensity: 3.0,
     });
-    const winColors = [0x1840c0, 0xd01060, 0x00a0d8, 0xff5010, 0x5018d0, 0x00e5ff, 0xff2080];
+    const winColors = [0x1840c0, 0xd01060, 0x00a0d8, 0xff5010, 0x5018d0, 0x37c4d4, 0xff2080];
 
     const bgCount = Math.max(20, Math.round(64 * this._lod));
     for (let i = 0; i < bgCount; i++) {
@@ -2280,7 +2211,7 @@ export class World {
   _buildBoundary() {
     // Force-field boundary: translucent glowing panels anchored by neon pylons
     const half = ARENA_HALF;
-    const fieldColor = 0x00e5ff;
+    const fieldColor = 0x37c4d4;
     const h = 5.0;
     const fieldMat = new THREE.MeshStandardMaterial({
       color: fieldColor, emissive: fieldColor, emissiveIntensity: 0.8,
@@ -2329,9 +2260,9 @@ export class World {
 
   _buildOrbitalRing() {
     // Massive Forerunner ring structure floating overhead — the signature landmark
-    const ringColor = 0x00e5ff;
+    const ringColor = 0x37c4d4;
     const nm        = this._neonMat(ringColor);
-    const accentNm  = this._neonMat(0xff2db4);
+    const accentNm  = this._neonMat(0xff8a2c);
     const metalMat  = new THREE.MeshStandardMaterial({ color: 0x060d18, roughness: 0.22, metalness: 0.92 });
 
     // Main structural torus — slightly tilted for visual dynamism
@@ -2372,9 +2303,9 @@ export class World {
 
   _buildArenaCore() {
     // Central Forerunner energy spire — dominant landmark visible from everywhere
-    const color    = 0x00e5ff;
+    const color    = 0x37c4d4;
     const nm       = this._neonMat(color);
-    const accentNm = this._neonMat(0xb24bff);
+    const accentNm = this._neonMat(0x3aa0b0);
     const metalMat = new THREE.MeshStandardMaterial({ color: 0x040c14, roughness: 0.20, metalness: 0.95 });
 
     // Base platform (collidable)
@@ -2411,7 +2342,7 @@ export class World {
     this.scene.add(tip);
 
     // Energy rings at intervals along the spire
-    [[3.0, 3.0, color], [7.0, 2.2, 0xff2db4], [12.0, 1.6, color], [18.5, 1.2, 0xb24bff], [24.0, 0.8, color]].forEach(([y, r, c]) => {
+    [[3.0, 3.0, color], [7.0, 2.2, 0xff8a2c], [12.0, 1.6, color], [18.5, 1.2, 0x3aa0b0], [24.0, 0.8, color]].forEach(([y, r, c]) => {
       const energyRing = new THREE.Mesh(new THREE.TorusGeometry(r, 0.12, 8, 32), this._neonMat(c));
       energyRing.position.y = y;
       energyRing.rotation.x = Math.PI / 2;
@@ -2483,14 +2414,14 @@ export class World {
   }
 
   _buildLandingPads() {
-    this._buildLandingPad( 36,   0, 5.5, 0x00e5ff);
-    this._buildLandingPad(-36,   0, 5.5, 0x00e5ff);
-    this._buildLandingPad(  0,  36, 5.5, 0xff2db4);
-    this._buildLandingPad(  0, -36, 5.5, 0xff2db4);
-    this._buildLandingPad( 60,  60, 4.5, 0xb24bff);
-    this._buildLandingPad(-60, -60, 4.5, 0xb24bff);
-    this._buildLandingPad( 60, -60, 4.5, 0x39ff9e);
-    this._buildLandingPad(-60,  60, 4.5, 0x39ff9e);
+    this._buildLandingPad( 36,   0, 5.5, 0x37c4d4);
+    this._buildLandingPad(-36,   0, 5.5, 0x37c4d4);
+    this._buildLandingPad(  0,  36, 5.5, 0xff8a2c);
+    this._buildLandingPad(  0, -36, 5.5, 0xff8a2c);
+    this._buildLandingPad( 60,  60, 4.5, 0x3aa0b0);
+    this._buildLandingPad(-60, -60, 4.5, 0x3aa0b0);
+    this._buildLandingPad( 60, -60, 4.5, 0x37c4d4);
+    this._buildLandingPad(-60,  60, 4.5, 0x37c4d4);
   }
 
   // Glowing energy channels running down both main avenues, like runway strips
@@ -2499,7 +2430,7 @@ export class World {
       color: c, emissive: c, emissiveIntensity: 2.0, roughness: 0.3, metalness: 0.1
     });
     const cyan   = channelMat(0x00b4d8);
-    const violet = channelMat(0x8844ff);
+    const violet = channelMat(0x3aa0b0);
 
     // N-S avenue channel strips (parallel to Z axis, offset ±1.5 from centre)
     for (const xOff of [-1.5, 1.5]) {
@@ -2583,9 +2514,9 @@ export class World {
   // travel, and cross-map teleports.
   _buildArenaStructures() {
     const deckMat = new THREE.MeshStandardMaterial({
-      color: 0x2a3340, roughness: 0.55, metalness: 0.55, envMapIntensity: 0.9,
+      color: 0x9aa6ae, roughness: 0.7, metalness: 0.15, envMapIntensity: 0.5,
     });
-    const trimColor = 0x00e5ff;
+    const trimColor = 0xff8a2c;
 
     // 1) Central command deck around the spire (the high-ground power position).
     const DECK = 8, DECK_Y = 4.5;
@@ -2618,8 +2549,8 @@ export class World {
     }
 
     // 3) Teleporter pairs near the diagonal corners — cross-map jumps.
-    this._teleporterPair( 60,  60, -60, -60, 0xb24bff);
-    this._teleporterPair(-60,  60,  60, -60, 0x39ff9e);
+    this._teleporterPair( 60,  60, -60, -60, 0x3aa0b0);
+    this._teleporterPair(-60,  60,  60, -60, 0x37c4d4);
   }
 
   // Solid walkable platform: a deck box with a glowing neon edge band. Registers
@@ -2702,7 +2633,7 @@ export class World {
 
   // Grav-lift: a translucent energy column that launches the player upward.
   _gravLift(x, z, topY, power) {
-    const color = 0x00e5ff;
+    const color = 0x37c4d4;
     const nm = this._neonMat(color);
     const metal = new THREE.MeshStandardMaterial({ color: 0x07101c, roughness: 0.3, metalness: 0.85 });
 
