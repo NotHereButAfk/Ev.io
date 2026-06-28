@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GameSettings } from '../core/GameSettings.js';
 
 const ARENA_HALF = 85;
 const TAXI_YELLOW = 0xffcf3d;
@@ -484,6 +485,18 @@ export class World {
     this._neonColors = [0x00e5ff, 0xff2db4, 0xb24bff, 0x39ff9e, 0xffc400, 0x2a6bff];
     this._neonMats = new Map();
 
+    // ── Performance budget (the big lever for low-end laptops) ────────────────
+    // A forward renderer pays for every dynamic light on every lit pixel, so the
+    // ~100 decorative point-lights this map used to spawn were the #1 cost. We
+    // now cap them hard by quality and let the emissive materials + bloom carry
+    // the glow. Shadows and prop counts also scale with quality.
+    const q = GameSettings.get('quality');
+    this._quality = q;
+    this._maxAccentLights = q === 'high' ? 26 : q === 'medium' ? 9 : 0;
+    this._accentLights = 0;
+    this._shadows = q !== 'low';
+    this._lod = q === 'high' ? 1 : q === 'medium' ? 0.7 : 0.4; // scales prop counts
+
     // Animated props ticked by update(dt): flying vehicles + pulsing energy.
     this._airVehicles = [];
     this._pulseMats   = [];
@@ -537,11 +550,12 @@ export class World {
     const hemi = new THREE.HemisphereLight(0x1a2a4a, 0x030806, 0.40);
     this.scene.add(hemi);
 
-    // Primary star light — cold white-blue key, casts shadows
+    // Primary star light — cold white-blue key, casts shadows (quality-gated).
     const star = new THREE.DirectionalLight(0xb8d4ff, 0.72);
     star.position.set(-50, 70, 40);
-    star.castShadow = true;
-    star.shadow.mapSize.set(1024, 1024);
+    star.castShadow = this._shadows;
+    const shadowRes = this._quality === 'high' ? 2048 : 1024;
+    star.shadow.mapSize.set(shadowRes, shadowRes);
     star.shadow.camera.left   = -95;
     star.shadow.camera.right  =  95;
     star.shadow.camera.top    =  95;
@@ -652,6 +666,18 @@ export class World {
     mesh.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(mesh);
     this.colliders.push({ box, mesh });
+  }
+
+  // Add a decorative point light only if we're under the per-quality budget;
+  // otherwise the emissive material + bloom still carry the glow for free.
+  // `important` lights (e.g. the central arena core) bypass the cap.
+  _accentLight(parent, color, intensity, distance, x, y, z, important = false) {
+    if (!important && this._accentLights >= this._maxAccentLights) return null;
+    this._accentLights++;
+    const light = new THREE.PointLight(color, intensity, distance, 2);
+    light.position.set(x, y, z);
+    parent.add(light);
+    return light;
   }
 
   _flowerMat(c) {
@@ -911,9 +937,8 @@ export class World {
     // neon light that reflects off the wet asphalt.
     const glowColors = [0xff1d68, 0x18e0ff, 0x39ff9e, 0xc46bff, 0xffcc00];
     const gc = special ? 0xff3a4a : glowColors[Math.floor(Math.random() * glowColors.length)];
-    const light = new THREE.PointLight(gc, special ? 3.0 : 2.2, 22, 2);
-    light.position.set(cx + ox * (half + 2.5), y, cz + oz * (half + 2.5));
-    this.scene.add(light);
+    this._accentLight(this.scene, gc, special ? 3.0 : 2.2, 22,
+      cx + ox * (half + 2.5), y, cz + oz * (half + 2.5));
   }
 
   // Which face looks onto the nearest avenue. Returns the outward normal.
@@ -1105,9 +1130,7 @@ export class World {
     halo.rotation.x = Math.PI / 2;
     group.add(halo);
 
-    const light = new THREE.PointLight(color, 7, 20, 2);
-    light.position.y = 7.4;
-    group.add(light);
+    this._accentLight(group, color, 7, 20, 0, 7.4, 0);
 
     group.position.set(x, 0, z);
     this.scene.add(group);
@@ -1254,12 +1277,9 @@ export class World {
       this.scene.add(panel);
       const glowCols = [0xff1d68, 0x18e0ff, 0x39ff9e, 0xc46bff, 0xffcc00];
       const gc = glowCols[Math.floor(Math.random() * glowCols.length)];
-      const glow = new THREE.PointLight(gc, 2.0, 18, 2);
-      glow.position.set(
+      this._accentLight(this.scene, gc, 2.0, 18,
         panelX + Math.cos(panelAngle) * 2.5, base + height * 0.36,
-        panelZ + Math.sin(panelAngle) * 2.5
-      );
-      this.scene.add(glow);
+        panelZ + Math.sin(panelAngle) * 2.5);
     }
   }
 
@@ -1507,9 +1527,7 @@ export class World {
     stalk.position.set(0, 3.25, 0);
     group.add(stalk);
 
-    const light = new THREE.PointLight(color, 2.8, 15, 2);
-    light.position.y = 4.5;
-    group.add(light);
+    this._accentLight(group, color, 2.8, 15, 0, 4.5, 0);
 
     group.position.set(x, 0, z);
     group.updateMatrixWorld(true);
@@ -1523,7 +1541,8 @@ export class World {
   _buildAirTraffic() {
     const colors = [0x00e5ff, 0xff2db4, 0x39ff9e, 0xffc400, 0xb24bff];
     // Circling hover-cars at varied altitude/radius/speed/direction.
-    for (let i = 0; i < 9; i++) {
+    const orbitCount = Math.max(2, Math.round(9 * this._lod));
+    for (let i = 0; i < orbitCount; i++) {
       const color  = colors[i % colors.length];
       const veh    = this._buildHoverVehicle(color, 0.8 + Math.random() * 0.7);
       const radius = 50 + Math.random() * 70;
@@ -1595,8 +1614,9 @@ export class World {
     });
     const winColors = [0x1840c0, 0xd01060, 0x00a0d8, 0xff5010, 0x5018d0, 0x00e5ff, 0xff2080];
 
-    for (let i = 0; i < 64; i++) {
-      const angle  = (i / 64) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
+    const bgCount = Math.max(20, Math.round(64 * this._lod));
+    for (let i = 0; i < bgCount; i++) {
+      const angle  = (i / bgCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
       const dist   = 108 + Math.random() * 38;
       const bx     = Math.cos(angle) * dist;
       const bz     = Math.sin(angle) * dist;
@@ -1740,9 +1760,7 @@ export class World {
       group.add(ring);
     });
 
-    const light = new THREE.PointLight(color, 3.5, 14, 2);
-    light.position.y = 3.5;
-    group.add(light);
+    this._accentLight(group, color, 3.5, 14, 0, 3.5, 0);
 
     group.position.set(x, 0, z);
     group.updateMatrixWorld(true);
@@ -2400,10 +2418,8 @@ export class World {
       this.scene.add(energyRing);
     });
 
-    // Apex light — illuminates the surrounding plaza
-    const light = new THREE.PointLight(color, 12, 45, 2);
-    light.position.y = 28;
-    this.scene.add(light);
+    // Apex light — illuminates the surrounding plaza (central landmark; always on)
+    this._accentLight(this.scene, color, 12, 45, 0, 28, 0, true);
 
     // Orbiting satellite rings (tilted for dynamism)
     const orb1 = new THREE.Mesh(new THREE.TorusGeometry(6.5, 0.18, 8, 40), nm);
@@ -2463,9 +2479,7 @@ export class World {
     }
 
     // Ambient pad light
-    const light = new THREE.PointLight(c, 3, 18, 2);
-    light.position.set(x, 1.2, z);
-    this.scene.add(light);
+    this._accentLight(this.scene, c, 3, 18, x, 1.2, z);
   }
 
   _buildLandingPads() {
@@ -2720,9 +2734,7 @@ export class World {
       this.scene.add(ring);
       this._spinRings.push({ mesh: ring, speed: 0.8 + i * 0.3 });
     }
-    const light = new THREE.PointLight(color, 3, 16, 2);
-    light.position.set(x, 2.5, z);
-    this.scene.add(light);
+    this._accentLight(this.scene, color, 3, 16, x, 2.5, z);
 
     this.gravLifts.push({ x, z, r: 1.9, topY, power });
   }
@@ -2756,9 +2768,7 @@ export class World {
     const portal = new THREE.Mesh(new THREE.CircleGeometry(1.45, 28), portalMat);
     portal.position.set(x, 1.7, z);
     this.scene.add(portal);
-    const light = new THREE.PointLight(color, 2.5, 14, 2);
-    light.position.set(x, 1.7, z);
-    this.scene.add(light);
+    this._accentLight(this.scene, color, 2.5, 14, x, 1.7, z);
     // Arrive ~3m toward centre from the destination pad so the player lands just
     // OFF the partner's trigger ring — prevents instant teleport ping-pong.
     const dest = new THREE.Vector3(destX, 0, destZ);

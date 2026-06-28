@@ -49,15 +49,21 @@ const MAX_PLAYERS = 8;
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.shadowMap.enabled = true;
+    GameSettings.load();
+    const _q = GameSettings.get('quality');
+    // Quality-aware renderer: MSAA + full pixel ratio + shadows only on 'high',
+    // and request the discrete GPU (helps a lot on dual-GPU laptops).
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: _q === 'high',
+      powerPreference: 'high-performance',
+    });
+    this.renderer.shadowMap.enabled = _q !== 'low';
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(_q === 'high' ? Math.min(window.devicePixelRatio, 2) : _q === 'low' ? 0.6 : 1);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
-
-    GameSettings.load();
 
     // Kick off model fetches immediately so they're ready before first use.
     // The real rigged human soldier is preferred; both callbacks swap the
@@ -388,6 +394,11 @@ export class Game {
       const pr = s.quality === 'high' ? Math.min(window.devicePixelRatio, 2)
                : s.quality === 'low'  ? 0.6 : 1;
       this.renderer.setPixelRatio(pr);
+      // Apply the heavy toggles live so a quality drop gives immediate relief
+      // (bloom + shadows). The decorative light budget is baked at world build,
+      // so the lighting part of the change takes full effect on the next reload.
+      this._bloomEnabled = s.quality !== 'low';
+      this.renderer.shadowMap.enabled = s.quality !== 'low';
     };
     this.menu.onLogout = () => {
       UserAccount.logout();
