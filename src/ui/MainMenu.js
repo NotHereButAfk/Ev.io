@@ -29,21 +29,29 @@ function _rank(k) {
 function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}s`; }
 
 // ── ev.io-style inventory: tabs + weapon categorisation + card visuals ───────
+// Categories that actually match OUR arsenal (not ev.io's tab names).
 const INV_TABS = [
   { id: 'character', label: 'Character' },
-  { id: 'auto',      label: 'Auto Rifle' },
-  { id: 'hand',      label: 'Hand Cannon' },
-  { id: 'burst',     label: 'Burst Rifle' },
-  { id: 'sweeper',   label: 'Sweeper' },
-  { id: 'laser',     label: 'Laser Rifle' },
+  { id: 'rifle',     label: 'Rifle' },
+  { id: 'pistol',    label: 'Pistol' },
+  { id: 'shotgun',   label: 'Shotgun' },
+  { id: 'sniper',    label: 'Sniper' },
+  { id: 'heavy',     label: 'Heavy' },
   { id: 'sword',     label: 'Sword' },
 ];
 const WEP_CATEGORY = {
-  uzi: 'auto', m4: 'auto', m16: 'auto', lmg: 'auto', needler: 'auto', plasmarifle: 'auto',
-  sidearm: 'hand', magnum: 'hand',
-  battlerifle: 'burst', dmr: 'burst',
-  levershotgun: 'sweeper', energyshotgun: 'sweeper',
-  rifle: 'laser', boltsniper: 'laser', rpg: 'laser', fuelrod: 'laser', concussion: 'laser',
+  // Rifles (assault / SMG / marksman / energy rifles)
+  uzi: 'rifle', m4: 'rifle', m16: 'rifle', rifle: 'rifle',
+  battlerifle: 'rifle', needler: 'rifle', plasmarifle: 'rifle', dmr: 'rifle',
+  // Pistols
+  sidearm: 'pistol', magnum: 'pistol',
+  // Shotguns
+  levershotgun: 'shotgun', energyshotgun: 'shotgun',
+  // Sniper
+  boltsniper: 'sniper',
+  // Heavy (LMG + launchers/explosive)
+  lmg: 'heavy', rpg: 'heavy', fuelrod: 'heavy', concussion: 'heavy',
+  // Melee
   knife: 'sword', sword: 'sword', ghammer: 'sword',
 };
 const ICON_GUN   = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M3 8h13l3 3v2h-4l-2 3H8l-1-3H3z"/><path d="M7 13v3"/></svg>';
