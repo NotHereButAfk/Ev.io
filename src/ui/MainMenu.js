@@ -29,31 +29,11 @@ function _rank(k) {
 function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}s`; }
 
 // ── ev.io-style inventory: tabs + weapon categorisation + card visuals ───────
-// Categories that actually match OUR arsenal (not ev.io's tab names).
+// One tab per gun (labelled with the gun name) + a Character tab.
 const INV_TABS = [
   { id: 'character', label: 'Character' },
-  { id: 'rifle',     label: 'Rifle' },
-  { id: 'pistol',    label: 'Pistol' },
-  { id: 'shotgun',   label: 'Shotgun' },
-  { id: 'sniper',    label: 'Sniper' },
-  { id: 'heavy',     label: 'Heavy' },
-  { id: 'sword',     label: 'Sword' },
+  ...WEAPONS.map((w) => ({ id: w.id, label: w.name })),
 ];
-const WEP_CATEGORY = {
-  // Rifles (assault / SMG / marksman / energy rifles)
-  uzi: 'rifle', m4: 'rifle', m16: 'rifle', rifle: 'rifle',
-  battlerifle: 'rifle', needler: 'rifle', plasmarifle: 'rifle', dmr: 'rifle',
-  // Pistols
-  sidearm: 'pistol', magnum: 'pistol',
-  // Shotguns
-  levershotgun: 'shotgun', energyshotgun: 'shotgun',
-  // Sniper
-  boltsniper: 'sniper',
-  // Heavy (LMG + launchers/explosive)
-  lmg: 'heavy', rpg: 'heavy', fuelrod: 'heavy', concussion: 'heavy',
-  // Melee
-  knife: 'sword', sword: 'sword', ghammer: 'sword',
-};
 const ICON_GUN   = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M3 8h13l3 3v2h-4l-2 3H8l-1-3H3z"/><path d="M7 13v3"/></svg>';
 const ICON_SWORD = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M4 20l9-9 3-7 1 1-7 3-9 9z"/><path d="M6 18l-2 2"/><path d="M14 6l4 4"/></svg>';
 const ICON_CHAR  = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0114 0v1"/></svg>';
@@ -326,6 +306,7 @@ export class MenuUI {
     for (const t of INV_TABS) {
       const b = document.createElement('button');
       b.className = 'inv-tab' + (t.id === this._invCat ? ' active' : '');
+      b.dataset.wid = t.id;
       b.textContent = t.label;
       b.addEventListener('click', () => {
         this._invCat = t.id;
@@ -335,6 +316,7 @@ export class MenuUI {
       });
       tabsEl.appendChild(b);
     }
+    this._refreshTabHighlights();
     // Cosmetic header buttons.
     document.getElementById('inv-wallet-btn')?.addEventListener('click', () => {
       const el = document.getElementById('inv-wallet-btn'); el.textContent = '✓ Wallet Linked';
@@ -354,6 +336,7 @@ export class MenuUI {
     this._renderEquipped();
     this._renderInvGrid();
     this._refreshInvMeta();
+    this._refreshTabHighlights();
   }
 
   _refreshInvMeta() {
@@ -455,25 +438,77 @@ export class MenuUI {
       return;
     }
 
-    // Weapon category tabs.
-    const equippedGun   = Loadout.getGun();
-    const equippedMelee = Loadout.getMelee();
-    const list = WEAPONS.filter((w) => WEP_CATEGORY[w.id] === this._invCat);
-    for (const w of list) {
-      const isMelee    = w.kind === 'melee';
-      const equippable = isMelee ? (w.id === 'sword') : true;
-      const equipped   = isMelee ? (w.id === equippedMelee) : (w.id === equippedGun);
-      grid.appendChild(this._makeCard({
-        bg: _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4)),
-        icon: isMelee ? ICON_SWORD : ICON_GUN, thumbSrc: getWeaponThumb(w.id),
-        name: w.name, equipped,
-        onClick: equippable ? () => {
-          if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
-          this._renderEquipped();
-          this._renderInvGrid();
-        } : null,
-      }));
+    // A single gun's tab is selected — show its detail (model + stats + equip).
+    const w = WEAPONS.find((x) => x.id === this._invCat);
+    if (w) {
+      const detail = this._weaponDetail(w);
+      grid.appendChild(detail);
+      detail.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
+  }
+
+  _weaponDetail(w) {
+    const isMelee    = w.kind === 'melee';
+    const equippable = isMelee ? (w.id === 'sword') : true;
+    const equipped   = isMelee ? (Loadout.getMelee() === w.id) : (Loadout.getGun() === w.id);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'inv-detail';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'inv-detail-thumb';
+    const src = getWeaponThumb(w.id);
+    thumb.style.background = _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4));
+    if (src) thumb.style.backgroundImage = `url(${src}), ${_grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4))}`;
+    wrap.appendChild(thumb);
+
+    const info = document.createElement('div');
+    info.className = 'inv-detail-info';
+    const nm = document.createElement('div');
+    nm.className = 'inv-detail-name';
+    nm.textContent = w.name;
+    info.appendChild(nm);
+
+    const stats = document.createElement('div');
+    stats.className = 'inv-detail-stats';
+    const rpm = w.fireRate ? Math.round(60 / w.fireRate) : null;
+    const rows = [
+      ['DAMAGE', w.damage ?? '—'],
+      ['FIRE RATE', rpm ? `${rpm} RPM` : (isMelee ? 'MELEE' : '—')],
+      ['MAGAZINE', w.magSize ?? (isMelee ? '—' : '—')],
+      ['RANGE', w.range ?? '—'],
+    ];
+    for (const [k, v] of rows) {
+      const s = document.createElement('div');
+      s.className = 'inv-detail-stat';
+      s.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>`;
+      stats.appendChild(s);
+    }
+    info.appendChild(stats);
+
+    const btn = document.createElement('button');
+    btn.className = 'inv-equip-btn' + (equipped ? ' equipped' : '') + (equippable ? '' : ' disabled');
+    btn.textContent = equipped ? 'EQUIPPED' : (equippable ? 'EQUIP' : 'NOT AVAILABLE');
+    if (equippable && !equipped) {
+      btn.addEventListener('click', () => {
+        if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
+        this._renderEquipped();
+        this._renderInvGrid();
+        this._refreshTabHighlights();
+      });
+    }
+    info.appendChild(btn);
+    wrap.appendChild(info);
+    return wrap;
+  }
+
+  // Mark the tabs of the currently-equipped gun + melee.
+  _refreshTabHighlights() {
+    const g = Loadout.getGun();
+    const m = Loadout.getMelee();
+    document.querySelectorAll('#inv-tabs .inv-tab').forEach((b) => {
+      b.classList.toggle('inv-tab-eq', b.dataset.wid === g || b.dataset.wid === m);
+    });
   }
 
   // ── Loadout pickers (1 gun + 1 melee) ────────────────────────────────────────
