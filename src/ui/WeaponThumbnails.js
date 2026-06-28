@@ -10,12 +10,63 @@
 import * as THREE from 'three';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { buildWeaponModel, preloadWeaponModels } from '../weapons/WeaponModels.js';
+import { applyWeaponSkin } from '../weapons/WeaponSkins.js';
+import { applySwordSkin } from '../weapons/SwordSkins.js';
 
 const _cache = new Map();
 let _warmed = false;
 let _onReady = null;
 
 export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
+
+// Render a one-off larger thumbnail of a weapon wearing a specific skin (or raw
+// if skin is null). Returns a data-URL, or null if the weapon GLB isn't ready.
+let _live = null;
+function _ensureLive() {
+  if (_live) return _live;
+  const SIZE = 256;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setSize(SIZE, SIZE);
+  renderer.setPixelRatio(1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.25;
+  const scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(2.5, 3, 4); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.5); fill.position.set(-3, 1, 2); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffe0b0, 0.4); rim.position.set(0, -2, -3); scene.add(rim);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
+  _live = { renderer, scene, camera };
+  return _live;
+}
+
+export function renderWeaponSkinned(weaponDef, skin) {
+  let built;
+  try { built = buildWeaponModel(weaponDef); } catch { built = null; }
+  if (!built) return null;
+  const { renderer, scene, camera } = _ensureLive();
+  const g = built.group;
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  if (skin) {
+    if (weaponDef.kind === 'melee') applySwordSkin(g, skin);
+    else                            applyWeaponSkin(g, skin);
+  }
+  scene.add(g);
+  const box = new THREE.Box3().setFromObject(g);
+  const c = box.getCenter(new THREE.Vector3());
+  const sz = box.getSize(new THREE.Vector3());
+  g.position.sub(c);
+  const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
+  g.scale.setScalar(0.95 / maxDim);
+  g.rotation.set(0.12, -0.5, 0.04);
+  camera.position.set(0.55, 0.28, 0.9);
+  camera.lookAt(0, 0, 0);
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/png');
+  scene.remove(g);
+  g.traverse((o) => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
+  return url;
+}
 
 export function warmWeaponThumbs(onReady) {
   _onReady = onReady;

@@ -15,7 +15,7 @@ import { GAME_MODES } from '../core/GameModes.js';
 import { WeaponPreviewRenderer } from './WeaponPreviewRenderer.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { warmThumbnails, getThumbnail } from './SkinThumbnails.js';
-import { warmWeaponThumbs, getWeaponThumb } from './WeaponThumbnails.js';
+import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponThumbnails.js';
 
 function _hex(n) { return n.toString(16).padStart(6, '0'); }
 function _rank(k) {
@@ -192,6 +192,7 @@ export class MenuUI {
   _closeAllPanels() {
     if (this._activePanel === 'loadout') {
       this._armorPreview?.stop();
+      this._weaponPreview?.stop();
       this.onLoadoutClose?.();
     }
     if (this._activePanel === 'profile') {
@@ -405,6 +406,7 @@ export class MenuUI {
     const grid = document.getElementById('inv-grid');
     if (!grid) return;
     grid.innerHTML = '';
+    if (this._invCat === 'character') this._weaponPreview?.stop();
 
     if (this._invCat === 'character') {
       // Armour-type builds first, then colour skins — all "characters".
@@ -455,12 +457,25 @@ export class MenuUI {
     const wrap = document.createElement('div');
     wrap.className = 'inv-detail';
 
-    const thumb = document.createElement('div');
-    thumb.className = 'inv-detail-thumb';
-    const src = getWeaponThumb(w.id);
-    thumb.style.background = _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4));
-    if (src) thumb.style.backgroundImage = `url(${src}), ${_grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4))}`;
-    wrap.appendChild(thumb);
+    // ── View of the gun, wearing its equipped skin (default look if none). ──
+    // Only show a skin if the player actually has one equipped; otherwise the
+    // raw gun. Skinned renders on demand; the raw look uses the cached thumb.
+    const hasSkin = Armory.hasSkin(w.id);
+    const skinId  = Armory.getSkinId(w.id, isMelee);
+    const skin    = hasSkin
+      ? (isMelee ? SWORD_SKINS.find((s) => s.id === skinId) : WEAPON_SKINS.find((s) => s.id === skinId))
+      : null;
+
+    const stage = document.createElement('div');
+    stage.className = 'inv-detail-stage';
+    const src = skin ? renderWeaponSkinned(w, skin) : getWeaponThumb(w.id);
+    if (src) {
+      stage.style.backgroundImage = `url(${src})`;
+      stage.style.backgroundSize = 'contain';
+      stage.style.backgroundRepeat = 'no-repeat';
+      stage.style.backgroundPosition = 'center';
+    }
+    wrap.appendChild(stage);
 
     const info = document.createElement('div');
     info.className = 'inv-detail-info';
@@ -469,31 +484,22 @@ export class MenuUI {
     nm.textContent = w.name;
     info.appendChild(nm);
 
-    const stats = document.createElement('div');
-    stats.className = 'inv-detail-stats';
-    const rpm = w.fireRate ? Math.round(60 / w.fireRate) : null;
-    const rows = [
-      ['DAMAGE', w.damage ?? '—'],
-      ['FIRE RATE', rpm ? `${rpm} RPM` : (isMelee ? 'MELEE' : '—')],
-      ['MAGAZINE', w.magSize ?? (isMelee ? '—' : '—')],
-      ['RANGE', w.range ?? '—'],
-    ];
-    for (const [k, v] of rows) {
-      const s = document.createElement('div');
-      s.className = 'inv-detail-stat';
-      s.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div>`;
-      stats.appendChild(s);
-    }
-    info.appendChild(stats);
+    const skinLabel = document.createElement('div');
+    skinLabel.className = 'inv-detail-skin';
+    skinLabel.textContent = skin ? `Skin: ${skin.name}` : 'Default look (no skin)';
+    info.appendChild(skinLabel);
 
     const btn = document.createElement('button');
     btn.className = 'inv-equip-btn' + (equipped ? ' equipped' : '') + (equippable ? '' : ' disabled');
     btn.textContent = equipped ? 'EQUIPPED' : (equippable ? 'EQUIP' : 'NOT AVAILABLE');
     if (equippable && !equipped) {
+      // Update in place (don't rebuild the grid) so the live preview keeps running.
       btn.addEventListener('click', () => {
         if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
+        btn.textContent = 'EQUIPPED';
+        btn.classList.add('equipped');
+        btn.onclick = null;
         this._renderEquipped();
-        this._renderInvGrid();
         this._refreshTabHighlights();
       });
     }

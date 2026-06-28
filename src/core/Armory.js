@@ -17,6 +17,12 @@ export const Armory = {
     return _load()[weaponId] || (isSword ? SWORD_SKINS[0].id : WEAPON_SKINS[0].id);
   },
 
+  // True only if the player has explicitly equipped a skin for this weapon
+  // (vs. the implicit default) — used to decide whether to show it skinned.
+  hasSkin(weaponId) {
+    return !!_load()[weaponId];
+  },
+
   equipSkin(weaponId, skinId) {
     const d = _load();
     d[weaponId] = skinId;

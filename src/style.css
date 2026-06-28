@@ -3238,3 +3238,13 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .inv-detail-name { white-space: nowrap; }
+
+/* Live gun view in the weapon detail (replaces the stat block). */
+.inv-detail-stage {
+  width: 480px; height: 320px; flex: 0 0 auto;
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(80,110,135,0.3);
+  background: #0c1018;
+}
+.inv-detail-stage canvas { width: 100%; height: 100%; display: block; }
+.inv-detail-skin { color: #7fa8c4; font-size: 15px; font-weight: 600; margin-bottom: 20px; }
