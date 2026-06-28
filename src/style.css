@@ -3130,6 +3130,11 @@ html, body {
   opacity: 0.85;
 }
 .inv-card-icon svg { width: 56%; height: 56%; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+.inv-card-render {
+  position: absolute; inset: 6px 6px 22px;
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.6));
+}
 .inv-card-name {
   position: absolute; left: 0; right: 0; bottom: 0;
   background: linear-gradient(180deg, rgba(6,10,16,0), rgba(6,10,16,0.92));

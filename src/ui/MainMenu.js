@@ -15,6 +15,7 @@ import { GAME_MODES } from '../core/GameModes.js';
 import { WeaponPreviewRenderer } from './WeaponPreviewRenderer.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { warmThumbnails, getThumbnail } from './SkinThumbnails.js';
+import { warmWeaponThumbs, getWeaponThumb } from './WeaponThumbnails.js';
 
 function _hex(n) { return n.toString(16).padStart(6, '0'); }
 function _rank(k) {
@@ -105,6 +106,9 @@ export class MenuUI {
     this.onArmorSkinEquipped  = null; // (skinId) => void
 
     this._buildInventory();   // ev.io-style loadout (tabs + cards)
+    // Render real weapon-model thumbnails for the inventory cards; refresh the
+    // grid once they're ready so the cards show our actual guns.
+    warmWeaponThumbs(() => { if (this._activePanel === 'loadout') this._refreshInventory(); });
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -351,14 +355,20 @@ export class MenuUI {
     if (nw) nw.textContent = '0';
   }
 
-  _makeCard({ bg, icon, name, equipped, onClick }) {
+  _makeCard({ bg, icon, thumbSrc, name, equipped, onClick }) {
     const card = document.createElement('div');
     card.className = 'inv-card' + (equipped ? ' equipped' : '');
     const thumb = document.createElement('div');
     thumb.className = 'inv-card-thumb';
     thumb.style.background = bg;
     card.appendChild(thumb);
-    if (icon) {
+    if (thumbSrc) {
+      // Real rendered weapon model on top of the coloured backdrop.
+      const img = document.createElement('div');
+      img.className = 'inv-card-render';
+      img.style.backgroundImage = `url(${thumbSrc})`;
+      card.appendChild(img);
+    } else if (icon) {
       const ic = document.createElement('div');
       ic.className = 'inv-card-icon';
       ic.innerHTML = icon;
@@ -391,12 +401,12 @@ export class MenuUI {
     const gun = WEAPONS.find((w) => w.id === Loadout.getGun());
     if (gun) el.appendChild(this._makeCard({
       bg: _grad(gun.color || 0x223040, _darken(gun.color || 0x223040, 0.4)),
-      icon: ICON_GUN, name: gun.name, equipped: true,
+      icon: ICON_GUN, thumbSrc: getWeaponThumb(gun.id), name: gun.name, equipped: true,
     }));
     const melee = WEAPONS.find((w) => w.id === Loadout.getMelee());
     if (melee) el.appendChild(this._makeCard({
       bg: _grad(melee.color || 0x2a2030, _darken(melee.color || 0x2a2030, 0.4)),
-      icon: ICON_SWORD, name: melee.name, equipped: true,
+      icon: ICON_SWORD, thumbSrc: getWeaponThumb(melee.id), name: melee.name, equipped: true,
     }));
   }
 
@@ -447,7 +457,8 @@ export class MenuUI {
       const equipped   = isMelee ? (w.id === equippedMelee) : (w.id === equippedGun);
       grid.appendChild(this._makeCard({
         bg: _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4)),
-        icon: isMelee ? ICON_SWORD : ICON_GUN, name: w.name, equipped,
+        icon: isMelee ? ICON_SWORD : ICON_GUN, thumbSrc: getWeaponThumb(w.id),
+        name: w.name, equipped,
         onClick: equippable ? () => {
           if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
           this._renderEquipped();
