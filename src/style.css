@@ -3244,7 +3244,48 @@ html, body {
   width: 480px; height: 320px; flex: 0 0 auto;
   border-radius: 10px; overflow: hidden;
   border: 1px solid rgba(80,110,135,0.3);
-  background: #0c1018;
+  /* light-centred backdrop so dark/black guns stay visible */
+  background: radial-gradient(circle at 50% 42%, #5b7a88, #243240 55%, #0e151e);
+  background-color: #243240;
 }
 .inv-detail-stage canvas { width: 100%; height: 100%; display: block; }
-.inv-detail-skin { color: #7fa8c4; font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+.inv-detail-skin { color: #7fa8c4; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin: 4px 0 12px; }
+
+/* ---- weapon detail: head row + skins grid ---- */
+.inv-detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.inv-detail-head .inv-detail-name { margin-bottom: 0; }
+.inv-detail-eq {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+  color: #9fb0bc; border: 1px solid rgba(120,150,170,0.3);
+  padding: 5px 11px; border-radius: 20px;
+}
+.inv-detail-eq.on { color: #9be8b4; border-color: #2fae5a; background: rgba(20,44,30,0.6); }
+
+.inv-skins-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.inv-skin-tile {
+  position: relative; aspect-ratio: 1 / 1; border-radius: 8px; cursor: pointer;
+  border: 2px solid rgba(80,110,135,0.35); overflow: hidden;
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.inv-skin-tile:hover { transform: translateY(-2px); border-color: rgba(140,200,240,0.8); }
+.inv-skin-tile.sel { border-color: #4db6ff; box-shadow: 0 0 0 1px #4db6ff, 0 0 14px rgba(77,182,255,0.5); }
+.inv-skin-name {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(180deg, rgba(6,10,16,0), rgba(6,10,16,0.92));
+  color: #fff; font-size: 11px; font-weight: 600; text-align: center;
+  padding: 14px 4px 6px;
+}
+
+/* ---- map weapons (locked, collect-on-map only) ---- */
+.inv-map-label { color: #8a96a0; margin-top: 26px; font-size: 13px; }
+.inv-card-locked { cursor: default; opacity: 0.78; filter: grayscale(0.35); }
+.inv-card-locked:hover { transform: none; border-color: rgba(80,110,135,0.3); }
+.inv-card-maptag {
+  position: absolute; top: 6px; left: 6px;
+  background: rgba(12,18,26,0.9); border: 1px solid rgba(120,150,170,0.4);
+  color: #cdd6dc; font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  padding: 3px 7px; border-radius: 4px;
+}

@@ -7,6 +7,7 @@ import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout, GUNS, MELEE } from '../core/Loadout.js';
+import { MainWeapons } from '../core/MainWeapons.js';
 import { Shop } from '../core/Shop.js';
 import { describePerk } from '../core/RarityPerks.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
@@ -29,11 +30,16 @@ function _rank(k) {
 function _fmt(s) { return s > 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${s}s`; }
 
 // ── ev.io-style inventory: tabs + weapon categorisation + card visuals ───────
-// One tab per gun (labelled with the gun name) + a Character tab.
-const INV_TABS = [
-  { id: 'character', label: 'Character' },
-  ...WEAPONS.map((w) => ({ id: w.id, label: w.name })),
-];
+// Tabs: Character + one per EQUIPPABLE main weapon (the random 5 guns + sword).
+function _invTabs() {
+  return [
+    { id: 'character', label: 'Character' },
+    ...MainWeapons.getAllIds().map((id) => {
+      const w = WEAPONS.find((x) => x.id === id);
+      return { id, label: w ? w.name : id };
+    }),
+  ];
+}
 const ICON_GUN   = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M3 8h13l3 3v2h-4l-2 3H8l-1-3H3z"/><path d="M7 13v3"/></svg>';
 const ICON_SWORD = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M4 20l9-9 3-7 1 1-7 3-9 9z"/><path d="M6 18l-2 2"/><path d="M14 6l4 4"/></svg>';
 const ICON_CHAR  = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0114 0v1"/></svg>';
@@ -304,7 +310,7 @@ export class MenuUI {
     const tabsEl = document.getElementById('inv-tabs');
     if (!tabsEl) return;
     tabsEl.innerHTML = '';
-    for (const t of INV_TABS) {
+    for (const t of _invTabs()) {
       const b = document.createElement('button');
       b.className = 'inv-tab' + (t.id === this._invCat ? ' active' : '');
       b.dataset.wid = t.id;
@@ -325,6 +331,7 @@ export class MenuUI {
     document.getElementById('inv-account-btn')?.addEventListener('click', () => this._togglePanel('profile'));
     this._renderEquipped();
     this._renderInvGrid();
+    this._renderMapWeapons();
     this._refreshInvMeta();
   }
 
@@ -336,8 +343,30 @@ export class MenuUI {
     }
     this._renderEquipped();
     this._renderInvGrid();
+    this._renderMapWeapons();
     this._refreshInvMeta();
     this._refreshTabHighlights();
+  }
+
+  // Section 2: the non-main guns — display only; they spawn on the map in-match.
+  _renderMapWeapons() {
+    const grid = document.getElementById('inv-map-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (const id of MainWeapons.getMapGunIds()) {
+      const w = WEAPONS.find((x) => x.id === id);
+      if (!w) continue;
+      const card = this._makeCard({
+        bg: _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4)),
+        icon: ICON_GUN, thumbSrc: getWeaponThumb(w.id), name: w.name,
+      });
+      card.classList.add('inv-card-locked');
+      const tag = document.createElement('div');
+      tag.className = 'inv-card-maptag';
+      tag.textContent = 'MAP';
+      card.appendChild(tag);
+      grid.appendChild(card);
+    }
   }
 
   _refreshInvMeta() {
@@ -450,62 +479,95 @@ export class MenuUI {
   }
 
   _weaponDetail(w) {
-    const isMelee    = w.kind === 'melee';
-    const equippable = isMelee ? (w.id === 'sword') : true;
-    const equipped   = isMelee ? (Loadout.getMelee() === w.id) : (Loadout.getGun() === w.id);
+    const isMelee = w.kind === 'melee';
+    const skins   = isMelee ? SWORD_SKINS : WEAPON_SKINS;
+    const equippedMain = isMelee ? (Loadout.getMelee() === w.id) : (Loadout.getGun() === w.id);
 
     const wrap = document.createElement('div');
     wrap.className = 'inv-detail';
 
-    // ── View of the gun, wearing its equipped skin (default look if none). ──
-    // Only show a skin if the player actually has one equipped; otherwise the
-    // raw gun. Skinned renders on demand; the raw look uses the cached thumb.
-    const hasSkin = Armory.hasSkin(w.id);
-    const skinId  = Armory.getSkinId(w.id, isMelee);
-    const skin    = hasSkin
-      ? (isMelee ? SWORD_SKINS.find((s) => s.id === skinId) : WEAPON_SKINS.find((s) => s.id === skinId))
-      : null;
+    const curSkinId = Armory.hasSkin(w.id) ? Armory.getSkinId(w.id, isMelee) : null;
+    const curSkin   = curSkinId ? skins.find((s) => s.id === curSkinId) : null;
 
+    // ── gun render, wearing the selected skin (or raw default) ──
     const stage = document.createElement('div');
     stage.className = 'inv-detail-stage';
-    const src = skin ? renderWeaponSkinned(w, skin) : getWeaponThumb(w.id);
-    if (src) {
-      stage.style.backgroundImage = `url(${src})`;
-      stage.style.backgroundSize = 'contain';
-      stage.style.backgroundRepeat = 'no-repeat';
-      stage.style.backgroundPosition = 'center';
-    }
+    const GRAD = 'radial-gradient(circle at 50% 42%, #5b7a88, #243240 55%, #0e151e)';
+    const setStage = (skin) => {
+      const src = skin ? renderWeaponSkinned(w, skin) : getWeaponThumb(w.id);
+      // Gun image rides on top of the light-centred backdrop so dark guns show.
+      stage.style.backgroundImage = src ? `url(${src}), ${GRAD}` : GRAD;
+      stage.style.backgroundSize = 'contain, cover';
+      stage.style.backgroundRepeat = 'no-repeat, no-repeat';
+      stage.style.backgroundPosition = 'center, center';
+    };
+    setStage(curSkin);
     wrap.appendChild(stage);
 
     const info = document.createElement('div');
     info.className = 'inv-detail-info';
-    const nm = document.createElement('div');
-    nm.className = 'inv-detail-name';
-    nm.textContent = w.name;
-    info.appendChild(nm);
+    const head = document.createElement('div');
+    head.className = 'inv-detail-head';
+    const nm = document.createElement('div'); nm.className = 'inv-detail-name'; nm.textContent = w.name;
+    head.appendChild(nm);
+    const eq = document.createElement('span');
+    eq.className = 'inv-detail-eq' + (equippedMain ? ' on' : '');
+    eq.textContent = equippedMain ? 'EQUIPPED' : 'Pick a skin to equip';
+    head.appendChild(eq);
+    info.appendChild(head);
 
-    const skinLabel = document.createElement('div');
-    skinLabel.className = 'inv-detail-skin';
-    skinLabel.textContent = skin ? `Skin: ${skin.name}` : 'Default look (no skin)';
-    info.appendChild(skinLabel);
+    const lbl = document.createElement('div');
+    lbl.className = 'inv-detail-skin';
+    lbl.textContent = 'SKINS';
+    info.appendChild(lbl);
 
-    const btn = document.createElement('button');
-    btn.className = 'inv-equip-btn' + (equipped ? ' equipped' : '') + (equippable ? '' : ' disabled');
-    btn.textContent = equipped ? 'EQUIPPED' : (equippable ? 'EQUIP' : 'NOT AVAILABLE');
-    if (equippable && !equipped) {
-      // Update in place (don't rebuild the grid) so the live preview keeps running.
-      btn.addEventListener('click', () => {
-        if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
-        btn.textContent = 'EQUIPPED';
-        btn.classList.add('equipped');
-        btn.onclick = null;
-        this._renderEquipped();
-        this._refreshTabHighlights();
-      });
+    const skinsGrid = document.createElement('div');
+    skinsGrid.className = 'inv-skins-grid';
+    info.appendChild(skinsGrid);
+
+    const tiles = [];
+    // Selecting a skin equips THIS gun (single main — picking it unselects any
+    // other main gun automatically, since the loadout holds exactly one).
+    const select = (id) => {
+      if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
+      if (id) Armory.equipSkin(w.id, id); else Armory.clearSkin(w.id);
+      setStage(id ? skins.find((s) => s.id === id) : null);
+      eq.textContent = 'EQUIPPED'; eq.classList.add('on');
+      tiles.forEach((t) => t.el.classList.toggle('sel', t.id === (id || '__def__')));
+      this._renderEquipped();
+      this._refreshTabHighlights();
+    };
+
+    const defTile = this._skinTile('Default', _grad(w.color || 0x223040, _darken(w.color || 0x223040, 0.4)), null, () => select(null));
+    if (!curSkinId) defTile.classList.add('sel');
+    skinsGrid.appendChild(defTile);
+    tiles.push({ id: '__def__', el: defTile });
+
+    for (const s of skins) {
+      const bg = isMelee
+        ? _grad(s.blade ?? 0x8090a0, s.guard ?? 0x303840)
+        : _grad(s.body ?? 0x556070, s.accent ?? 0x202830);
+      const tile = this._skinTile(s.name, bg, RARITY_COLORS?.[s.rarity], () => select(s.id));
+      if (s.id === curSkinId) tile.classList.add('sel');
+      skinsGrid.appendChild(tile);
+      tiles.push({ id: s.id, el: tile });
     }
-    info.appendChild(btn);
+
     wrap.appendChild(info);
     return wrap;
+  }
+
+  _skinTile(name, bg, rarityColor, onClick) {
+    const el = document.createElement('div');
+    el.className = 'inv-skin-tile';
+    el.style.background = bg;
+    if (rarityColor != null) el.style.borderColor = `#${_hex(rarityColor)}`;
+    const lbl = document.createElement('div');
+    lbl.className = 'inv-skin-name';
+    lbl.textContent = name;
+    el.appendChild(lbl);
+    el.addEventListener('click', onClick);
+    return el;
   }
 
   // Mark the tabs of the currently-equipped gun + melee.

@@ -29,6 +29,13 @@ export const Armory = {
     _save(d);
   },
 
+  // Remove a weapon's skin so it shows its default (raw) look.
+  clearSkin(weaponId) {
+    const d = _load();
+    delete d[weaponId];
+    _save(d);
+  },
+
   // Returns Map<weaponId, { skin, isSword }>  for all weapons in loadout
   buildSkinMap(weapons) {
     const d = _load();

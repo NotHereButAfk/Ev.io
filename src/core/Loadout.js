@@ -1,6 +1,7 @@
 // Player loadout selection: you bring exactly ONE gun and ONE melee into a
 // match. Backed by localStorage so the choice persists between sessions.
 import { WEAPONS } from '../weapons/weaponDefs.js';
+import { MainWeapons } from './MainWeapons.js';
 
 const _KEY = 'sio_loadout';
 
@@ -16,7 +17,11 @@ function _load() {
 }
 function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 
-function _validGun(id)   { return GUNS.some((w) => w.id === id) ? id : DEFAULTS.gun; }
+// Only a "main" gun (one of the random 5) may be equipped from the loadout.
+function _validGun(id) {
+  const mains = MainWeapons.getGunIds();
+  return mains.includes(id) ? id : mains[0];
+}
 function _validMelee(id) { return MELEE.some((w) => w.id === id) ? id : DEFAULTS.melee; }
 
 export const Loadout = {

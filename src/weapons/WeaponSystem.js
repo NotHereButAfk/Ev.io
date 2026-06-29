@@ -293,6 +293,23 @@ export class WeaponSystem {
     this._setActiveModel(0);
   }
 
+  // Swap the primary gun to a map-collected weapon, keeping the current melee,
+  // refill it to full, and switch to holding it. Returns the weapon def (or null).
+  equipMapGun(gunId) {
+    const def = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee');
+    if (!def) return null;
+    const melee = this.loadout.find((w) => w.kind === 'melee');
+    this.setLoadout(gunId, melee?.id);
+    const st = this.state.get(gunId);
+    if (st) {
+      st.magAmmo = def.magSize;
+      st.reserveAmmo = def.reserveMax;
+      st.isReloading = false;
+      st.reloadTimer = 0;
+    }
+    return def;
+  }
+
   _setActiveModel(index) {
     // Hide every model, then show the active loadout slot.
     for (const w of this.allWeapons) {
