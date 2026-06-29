@@ -5,6 +5,7 @@ import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
+import { Achievements } from '../core/Achievements.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout, GUNS, MELEE } from '../core/Loadout.js';
 import { MainWeapons } from '../core/MainWeapons.js';
@@ -43,6 +44,13 @@ function _invTabs() {
 const ICON_GUN   = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M3 8h13l3 3v2h-4l-2 3H8l-1-3H3z"/><path d="M7 13v3"/></svg>';
 const ICON_SWORD = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><path d="M4 20l9-9 3-7 1 1-7 3-9 9z"/><path d="M6 18l-2 2"/><path d="M14 6l4 4"/></svg>';
 const ICON_CHAR  = '<svg viewBox="0 0 24 24" fill="none" stroke="#eaf2f8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0114 0v1"/></svg>';
+// Achievement category icons (cyan stroke)
+const ICON_ACH = {
+  kills: '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>',
+  games: '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 12h3M8.5 10.5v3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18.5" cy="13.5" r="1"/></svg>',
+  score: '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16.9 5.9 19.4 7.4 12.9l-5-4.3 6.6-.6z"/></svg>',
+  kd:    '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><path d="M12 2l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V5z"/><path d="M9 12l2 2 4-4"/></svg>',
+};
 function _grad(a, b) { return `linear-gradient(150deg, #${_hex(a >>> 0)}, #${_hex(b >>> 0)})`; }
 function _darken(hex, f) {
   const r = Math.floor((hex >> 16 & 255) * f), g = Math.floor((hex >> 8 & 255) * f), b = Math.floor((hex & 255) * f);
@@ -220,6 +228,7 @@ export class MenuUI {
       this.onLoadoutOpen?.();
     }
     if (id === 'profile')     this._renderProfile();
+    if (id === 'achievements') this._renderAchievements();
     if (id === 'settings')    this._loadSettings();
     if (id === 'shop')        this._renderShop();
     if (id === 'battlepass')  this._renderBattlePass();
@@ -931,6 +940,67 @@ export class MenuUI {
     if (logout) logout.style.display = isGuest ? 'none' : 'block';
 
     this._startProfilePreview();
+  }
+
+  // ── Achievements (ev.io-style tiered challenges) ────────────────────────────
+  _renderAchievements() {
+    const grid = document.getElementById('ach-grid');
+    if (!grid) return;
+    const list = Achievements.list(this._currentUser);
+    const done = list.filter((a) => a.complete).length;
+    const setT = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    setT('ach-done', done);
+    setT('ach-total', list.length);
+
+    grid.innerHTML = '';
+    for (const a of list) {
+      const card = document.createElement('div');
+      card.className = 'ach-card'
+        + (a.claimed ? ' ach-claimed' : a.complete ? ' ach-complete' : '');
+
+      const icon = document.createElement('div');
+      icon.className = 'ach-icon';
+      icon.innerHTML = ICON_ACH[a.icon] || ICON_ACH.kills;
+      card.appendChild(icon);
+
+      const body = document.createElement('div');
+      body.className = 'ach-body';
+      const curLabel = a.isRatio ? a.current.toFixed(1) : Math.floor(a.current).toLocaleString();
+      const goalLabel = a.isRatio ? a.goal.toFixed(1) : a.goal.toLocaleString();
+      body.innerHTML =
+        `<div class="ach-name">${a.name}</div>` +
+        `<div class="ach-desc">${a.desc}</div>` +
+        `<div class="ach-reward">Reward: <span class="ach-coin">&#9670;</span> ${a.reward.toLocaleString()}</div>`;
+
+      const barWrap = document.createElement('div');
+      barWrap.className = 'ach-bar-wrap';
+      const bar = document.createElement('div');
+      bar.className = 'ach-bar';
+      bar.style.width = `${Math.round(a.progress * 100)}%`;
+      barWrap.appendChild(bar);
+      const prog = document.createElement('div');
+      prog.className = 'ach-prog-text';
+      prog.textContent = a.claimed ? 'CLAIMED' : `${curLabel} / ${goalLabel}`;
+      body.appendChild(barWrap);
+      body.appendChild(prog);
+      card.appendChild(body);
+
+      if (a.complete && !a.claimed) {
+        const btn = document.createElement('button');
+        btn.className = 'ach-claim-btn';
+        btn.textContent = 'CLAIM';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const res = Achievements.claim(this._currentUser, a.id);
+          if (res.ok) {
+            this._refreshCoins();
+            this._renderAchievements();
+          }
+        });
+        card.appendChild(btn);
+      }
+      grid.appendChild(card);
+    }
   }
 
   // Dedicated full-body character render on the profile (the equipped soldier).

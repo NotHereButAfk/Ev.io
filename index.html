@@ -140,6 +140,10 @@
               <span class="pm-icon">&#9733;</span>
               <div class="pm-body"><div class="pm-name">CAREER</div><div class="pm-sub">Stats, rank &amp; record</div></div>
             </button>
+            <button class="profile-menu-item" data-panel="achievements">
+              <span class="pm-icon">&#127942;</span>
+              <div class="pm-body"><div class="pm-name">ACHIEVEMENTS</div><div class="pm-sub">Challenges &amp; rewards</div></div>
+            </button>
             <button class="profile-menu-item profile-menu-logout" id="profile-menu-logout">
               <span class="pm-icon">&#8617;</span>
               <div class="pm-body"><div class="pm-name">LOG OUT</div><div class="pm-sub">Sign out of your account</div></div>
@@ -334,6 +338,15 @@
         </div>
       </div>
       <button id="profile-logout-btn" class="ghost-btn" style="margin-top:16px;display:none">LOGOUT</button>
+    </div>
+
+    <!-- ===================== PANEL: ACHIEVEMENTS ===================== -->
+    <div id="panel-achievements" class="nav-panel nav-panel-wide hidden">
+      <div class="ach-header">
+        <div class="inv-section-label" style="margin-top:0">ACHIEVEMENTS</div>
+        <div class="ach-progress-pill"><span id="ach-done">0</span> / <span id="ach-total">0</span> COMPLETE</div>
+      </div>
+      <div id="ach-grid" class="ach-grid"></div>
     </div>
 
     <!-- ===================== PANEL: SHOP ===================== -->

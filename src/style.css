@@ -3879,3 +3879,58 @@ html, body {
   color: var(--kx-cyan-soft) !important; background: rgba(20,224,255,0.08) !important;
   box-shadow: inset 0 -2px 0 var(--kx-cyan);
 }
+
+/* ============================================================================
+   ===============   KYX.IO  ACHIEVEMENTS PAGE  (ev.io-style)   ===============
+   ============================================================================ */
+.ach-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ach-progress-pill {
+  background: rgba(20,224,255,0.12); border: 1px solid rgba(20,224,255,0.3);
+  color: var(--kx-cyan-soft); font-size: 11px; font-weight: 800; letter-spacing: 1px;
+  padding: 5px 13px; border-radius: 20px;
+}
+.ach-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  max-height: 64vh; overflow-y: auto; padding-right: 6px;
+}
+.ach-card {
+  display: flex; align-items: center; gap: 14px; position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid var(--kx-line-soft); border-radius: 12px; padding: 14px 16px;
+  transition: border-color .15s, transform .15s;
+}
+.ach-card:hover { border-color: rgba(20,224,255,0.3); transform: translateY(-2px); }
+.ach-icon {
+  width: 48px; height: 48px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20,224,255,0.07); border: 1px solid rgba(20,224,255,0.2); border-radius: 10px;
+}
+.ach-icon svg { width: 27px; height: 27px; }
+.ach-body { flex: 1 1 auto; min-width: 0; }
+.ach-name { color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.4px; }
+.ach-desc { color: var(--kx-dim); font-size: 11px; margin: 2px 0 7px; }
+.ach-reward { color: #9fb0c4; font-size: 11px; font-weight: 600; }
+.ach-coin { color: #ffcf3b; }
+.ach-bar-wrap {
+  height: 6px; background: rgba(4,8,15,0.6); border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px; overflow: hidden; margin: 9px 0 4px;
+}
+.ach-bar {
+  height: 100%; border-radius: 4px; transition: width .3s ease;
+  background: linear-gradient(90deg, var(--kx-blue), var(--kx-cyan));
+  box-shadow: 0 0 8px rgba(20,224,255,0.4);
+}
+.ach-prog-text { font-size: 10px; color: var(--kx-dim); letter-spacing: 0.5px; text-align: right; font-weight: 700; }
+.ach-complete { border-color: rgba(20,224,255,0.4); }
+.ach-complete .ach-bar { box-shadow: 0 0 13px rgba(20,224,255,0.65); }
+.ach-claimed { opacity: 0.62; }
+.ach-claimed .ach-prog-text { color: #6fe09a; }
+.ach-claim-btn {
+  flex: 0 0 auto; align-self: center;
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue)); color: #04121b;
+  font-weight: 800; letter-spacing: 1px; border: none; border-radius: 8px;
+  padding: 10px 15px; cursor: pointer; font-size: 11px;
+  box-shadow: 0 0 16px rgba(20,224,255,0.3); transition: filter .14s, transform .14s;
+}
+.ach-claim-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+@media (max-width: 720px) { .ach-grid { grid-template-columns: 1fr; } }
