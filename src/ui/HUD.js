@@ -220,17 +220,27 @@ export class HUD {
   }
 
   // Post-match leaderboard (outside #hud, so hud.hide() won't touch it).
-  showLeaderboard(rows, playerName) {
+  showLeaderboard(rows, playerName, earnedCoins = 0) {
     const overlay = document.getElementById('leaderboard-overlay');
     const tbody   = document.getElementById('lb-rows');
     if (!overlay || !tbody) return;
     tbody.innerHTML = '';
+
+    // Winner banner + earned coins
+    const winner = rows[0];
+    const winEl  = document.getElementById('lb-winner-name');
+    if (winEl && winner) winEl.textContent = winner.name;
+    const earnedEl = document.getElementById('lb-earned-val');
+    if (earnedEl) earnedEl.textContent = earnedCoins.toLocaleString();
+
     rows.forEach((row, i) => {
       const rank   = i + 1;
       const rankCls = rank <= 3 ? `lb-rank lb-rank-${rank}` : 'lb-rank';
       const tr = document.createElement('tr');
       tr.className = row.isYou ? 'lb-row-you' : '';
+
       const nameTd = document.createElement('td');
+      nameTd.className = 'lb-name-cell';
       nameTd.textContent = row.name;
       if (row.isYou) {
         const badge = document.createElement('span');
@@ -238,16 +248,22 @@ export class HUD {
         badge.textContent = 'YOU';
         nameTd.appendChild(badge);
       }
+
       tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
       tr.appendChild(nameTd);
-      const killsTd = document.createElement('td');
-      killsTd.className = 'lb-kills';
-      killsTd.textContent = row.kills;
-      tr.appendChild(killsTd);
-      const scoreTd = document.createElement('td');
-      scoreTd.className = 'lb-score-cell';
-      scoreTd.textContent = row.score.toLocaleString();
-      tr.appendChild(scoreTd);
+
+      const cell = (val, cls) => {
+        const td = document.createElement('td');
+        if (cls) td.className = cls;
+        td.textContent = val;
+        tr.appendChild(td);
+      };
+      cell(row.score.toLocaleString(), 'lb-score-cell');
+      cell(row.assists ?? 0, 'lb-dim-cell');
+      cell(row.kills, 'lb-kills');
+      cell(row.deaths ?? 0, 'lb-dim-cell');
+      cell(row.kd ?? '0.0', 'lb-kd-cell');
+
       tbody.appendChild(tr);
     });
     overlay.classList.remove('hidden');

@@ -3755,3 +3755,87 @@ html, body {
 
 /* ---- hitmarker headshot = cyan ---- */
 #hitmarker.headshot::before, #hitmarker.headshot::after { background: #ffdd00 !important; }
+
+/* ============================================================================
+   ====   KYX.IO  DAMAGE NUMBERS + POST-MATCH LEADERBOARD  (ev.io-style)  ====
+   ============================================================================ */
+
+/* ---- floating damage numbers ---- */
+#damage-numbers {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 7;
+}
+.dmg-anchor { position: absolute; transform: translate(-50%, -50%); }
+.dmg-num {
+  font-weight: 900; font-size: 23px; color: #fff; line-height: 1; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  /* dark stroke behind the fill keeps numbers readable on bright maps */
+  -webkit-text-stroke: 1.4px rgba(0,0,0,0.6);
+  paint-order: stroke fill;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.95), 0 0 9px rgba(0,0,0,0.6);
+  animation: dmgFloat 0.8s ease-out forwards;
+  will-change: transform, opacity;
+}
+@keyframes dmgFloat {
+  0%   { opacity: 0; transform: translateY(2px) scale(0.5); }
+  18%  { opacity: 1; transform: translate(calc(var(--dx,0px) * 0.3), -12px) scale(1.18); }
+  100% { opacity: 0; transform: translate(var(--dx,0px), -54px) scale(0.95); }
+}
+.dmg-head {
+  color: #ffd23b; font-size: 29px;
+  text-shadow: 0 0 11px rgba(255,200,40,0.7), 0 2px 4px rgba(0,0,0,0.9);
+}
+.dmg-kill {
+  color: #ff5a4a; font-size: 31px;
+  text-shadow: 0 0 13px rgba(255,80,60,0.7), 0 2px 4px rgba(0,0,0,0.9);
+}
+
+/* ---- post-match leaderboard (ev.io-style) ---- */
+.lb-panel {
+  width: min(680px, 95vw) !important;
+  background: linear-gradient(180deg, rgba(9,14,24,0.95), rgba(5,8,16,0.97)) !important;
+  border: 1px solid rgba(120,200,255,0.22) !important;
+  box-shadow: 0 0 60px rgba(20,224,255,0.08), 0 16px 56px rgba(0,0,0,0.85) !important;
+}
+.lb-winner {
+  text-align: center; font-size: 27px; font-weight: 900; letter-spacing: 1.5px;
+  color: #fff; margin-bottom: 4px; text-shadow: 0 0 24px rgba(20,224,255,0.3);
+}
+.lb-won {
+  color: var(--kx-cyan);
+  text-shadow: 0 0 20px rgba(20,224,255,0.6);
+}
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th {
+  color: var(--kx-cyan-soft) !important; font-size: 10px !important;
+  letter-spacing: 1px !important; text-align: center; padding: 8px 6px !important;
+  border-bottom: 1px solid rgba(120,200,255,0.18) !important;
+}
+.lb-th-rank { width: 36px; }
+.lb-th-name { text-align: left !important; }
+.lb-table td {
+  text-align: center; padding: 9px 6px !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+}
+.lb-name-cell { text-align: left !important; font-weight: 700; color: #e9f3fb; }
+.lb-dim-cell, .lb-kd-cell { color: #9fb0c4 !important; }
+.lb-kd-cell { font-weight: 700; color: #c9d4e0 !important; }
+.lb-kills { color: #fff !important; font-weight: 800 !important; }
+.lb-score-cell { color: var(--kx-cyan-soft) !important; font-weight: 700 !important; }
+.lb-row-you td {
+  background: rgba(20,224,255,0.09) !important;
+  color: #fff !important;
+}
+.lb-row-you .lb-name-cell { color: #fff !important; }
+.lb-row-you .lb-score-cell { color: #8ff0ff !important; }
+.lb-you-badge {
+  display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 5px;
+  background: var(--kx-cyan); color: #04121b; font-size: 9px; font-weight: 800;
+  letter-spacing: 1px; vertical-align: middle;
+}
+.lb-earned {
+  text-align: center; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid rgba(120,200,255,0.12);
+  color: var(--kx-dim); font-weight: 700; letter-spacing: 1.5px; font-size: 12px;
+}
+.lb-earned #lb-earned-val { color: #fff; font-size: 15px; }
+.lb-earned-coin { color: #ffcf3b; }

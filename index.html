@@ -506,17 +506,21 @@
     <!-- Sits outside #hud so hud.hide() doesn't bury it -->
     <div id="leaderboard-overlay" class="hidden">
       <div class="lb-panel">
-        <div class="lb-match-over">MATCH OVER</div>
+        <div class="lb-winner"><span id="lb-winner-name">SPARTAN</span> <span class="lb-won">WON</span></div>
         <div class="lb-match-over-sub">FREE FOR ALL &bull; FORERUNNER DISTRICT</div>
         <table class="lb-table">
           <thead><tr>
             <th class="lb-th-rank">#</th>
-            <th>SPARTAN</th>
-            <th>KILLS</th>
+            <th class="lb-th-name">PLAYER</th>
             <th>SCORE</th>
+            <th>ASSISTS</th>
+            <th>KILLS</th>
+            <th>DEATHS</th>
+            <th>K/D</th>
           </tr></thead>
           <tbody id="lb-rows"></tbody>
         </table>
+        <div class="lb-earned">YOU EARNED <span class="lb-earned-coin">&#9670;</span> <span id="lb-earned-val">0</span></div>
         <!-- Ad: post-match banner — 10-second countdown = captive audience -->
         <div class="ad-slot ad-slot-leaderboard">
           <ins class="adsbygoogle"

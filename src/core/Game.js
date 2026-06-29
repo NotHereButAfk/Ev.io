@@ -11,6 +11,7 @@ import { BotManager } from '../entities/BotManager.js';
 import { InputManager } from './InputManager.js';
 import { AudioManager } from './AudioManager.js';
 import { HUD } from '../ui/HUD.js';
+import { DamageNumbers } from '../ui/DamageNumbers.js';
 import { MenuUI } from '../ui/MainMenu.js';
 import { AuthUI } from '../ui/AuthUI.js';
 import { UserAccount } from './UserAccount.js';
@@ -117,6 +118,7 @@ export class Game {
       ? new MobileControls(this.input, { onMenu: () => this._openMenu() })
       : null;
     this.hud            = new HUD();
+    this.damageNumbers  = new DamageNumbers();
     this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
@@ -152,6 +154,7 @@ export class Game {
     this.state   = 'menu';
     this.kills   = 0;
     this.score   = 0;
+    this.deaths  = 0;
     this.playTime = 0;
     this._statsSaved  = true;
     this.currentUsername = null;
@@ -293,6 +296,7 @@ export class Game {
       const killed = enemy.takeDamage(dmg);
       this.audio.playHit();
       this.hud.flashHitmarker(meta?.headshot);
+      this.damageNumbers.spawn(this.player.camera, point, dmg, { headshot: meta?.headshot, killed });
       if (meta?.headshot) this.hud.showHeadshotFlair?.();
       if (killed) {
         const def     = this.weaponSystem.currentDef;
@@ -443,6 +447,7 @@ export class Game {
     this._mode    = getMode(modeId);
     this.kills    = 0;
     this.score    = 0;
+    this.deaths   = 0;
     this.playTime = 0;
     this._statsSaved   = false;
     this._pendingCoins = 0;
@@ -591,17 +596,24 @@ export class Game {
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
 
     // Build leaderboard: player + all current bots with generated kill stats.
+    const kd = (k, d) => (d > 0 ? (k / d).toFixed(1) : k.toFixed(1));
     const rows = [{
-      name:  this.player.name,
-      kills: this.kills,
-      score: this.score,
-      isYou: true,
+      name:    this.player.name,
+      score:   this.score,
+      assists: Math.floor(this.kills * 0.4),
+      kills:   this.kills,
+      deaths:  this.deaths,
+      kd:      kd(this.kills, this.deaths),
+      isYou:   true,
     }];
     for (const bot of this.botManager.bots) {
       const k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
-      rows.push({ name: bot.displayName, kills: k, score: k * 100, isYou: false });
+      const d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
+      const a = Math.floor(Math.random() * 6);
+      rows.push({ name: bot.displayName, score: k * 100, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
     }
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
+    const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
 
     this.state    = 'leaderboard';
     this._lbTimer = 10;
@@ -610,7 +622,7 @@ export class Game {
     this.hud.hide();         // hide crosshair / ammo / health
     this.hud.hideDMTimer();
     this.hud.hideLeaderboard(); // reset in case it was shown before
-    this.hud.showLeaderboard(rows, this.player.name);
+    this.hud.showLeaderboard(rows, this.player.name, earnedCoins);
     this.hud.updateLeaderboardCountdown(10, 10);
   }
 
@@ -705,6 +717,7 @@ export class Game {
   }
 
   _onPlayerDeath() {
+    this.deaths++;
     // Survival: enter downed state instead of immediate death
     if (this._isSurvival) {
       if (this._playerDowned) return; // already downed
