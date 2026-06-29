@@ -199,9 +199,68 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   return group;
 }
 
+// ── Procedural PBR detail textures (worn metal: albedo + normal + roughness) ──
+// Adds real surface detail — panel grain, scratches, grime — so the armour reads
+// as a textured plated suit instead of smooth plastic. Generated once, shared.
+let _detailTex = null;
+function _getDetailTex() {
+  if (_detailTex) return _detailTex;
+  const S = 512;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
+
+  // Albedo: dark gunmetal base with brushed grain, grime blotches and scratches.
+  const aC = mk(), a = aC.getContext('2d');
+  a.fillStyle = '#3b4046'; a.fillRect(0, 0, S, S);
+  for (let i = 0; i < S * 6; i++) { // horizontal brushed grain
+    const y = Math.random() * S, x = Math.random() * S, w = 8 + Math.random() * 40;
+    const v = 50 + Math.random() * 28;
+    a.strokeStyle = `rgba(${v},${v + 4},${v + 8},0.10)`; a.lineWidth = 1;
+    a.beginPath(); a.moveTo(x, y); a.lineTo(x + w, y); a.stroke();
+  }
+  for (let i = 0; i < 40; i++) { // grime / oxidation blotches
+    const x = Math.random() * S, y = Math.random() * S, r = 20 + Math.random() * 70;
+    const g = a.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(20,18,16,0.22)'); g.addColorStop(1, 'rgba(20,18,16,0)');
+    a.fillStyle = g; a.beginPath(); a.arc(x, y, r, 0, Math.PI * 2); a.fill();
+  }
+  for (let i = 0; i < 120; i++) { // bright scratches (exposed metal)
+    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 6 + Math.random() * 30;
+    a.strokeStyle = `rgba(190,196,205,${0.10 + Math.random() * 0.18})`; a.lineWidth = Math.random() < 0.3 ? 1.5 : 0.7;
+    a.beginPath(); a.moveTo(x, y); a.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); a.stroke();
+  }
+
+  // Normal: neutral blue with the same scratches/grain perturbing the surface.
+  const nC = mk(), n = nC.getContext('2d');
+  n.fillStyle = 'rgb(128,128,255)'; n.fillRect(0, 0, S, S);
+  for (let i = 0; i < 160; i++) {
+    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 6 + Math.random() * 34;
+    const lift = Math.random() < 0.5;
+    n.strokeStyle = lift ? 'rgba(150,150,255,0.5)' : 'rgba(106,106,255,0.5)';
+    n.lineWidth = Math.random() < 0.3 ? 2 : 1;
+    n.beginPath(); n.moveTo(x, y); n.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); n.stroke();
+  }
+
+  // Roughness: mottled — worn areas rougher, scratches shinier.
+  const rC = mk(), r = rC.getContext('2d');
+  r.fillStyle = '#8a8a8a'; r.fillRect(0, 0, S, S);
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * S, y = Math.random() * S, rad = 24 + Math.random() * 80;
+    const g = r.createRadialGradient(x, y, 0, x, y, rad);
+    const dark = Math.random() < 0.5;
+    g.addColorStop(0, dark ? 'rgba(60,60,60,0.5)' : 'rgba(200,200,200,0.4)');
+    g.addColorStop(1, 'rgba(128,128,128,0)');
+    r.fillStyle = g; r.beginPath(); r.arc(x, y, rad, 0, Math.PI * 2); r.fill();
+  }
+
+  const tex = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  _detailTex = { map: tex(aC, true), normalMap: tex(nC, false), roughnessMap: tex(rC, false) };
+  return _detailTex;
+}
+
 const _tintC = new THREE.Color();
 function _applyArmorLook(bodyMats, visorMats, look) {
   _tintC.setHex(look.body);
+  const det = _getDetailTex();
   for (const m of bodyMats) {
     if (m.map) {
       // REALISTIC: keep the GLB's authored texture (skin, fatigues, gear, wear)
@@ -211,12 +270,18 @@ function _applyArmorLook(bodyMats, visorMats, look) {
       m.map.colorSpace = THREE.SRGBColorSpace;
       m.map.anisotropy = 8;
     } else {
-      // Untextured plates: take the full variant colour.
-      m.color.copy(_tintC);
+      // No authored texture — give the plate a realistic worn-metal albedo tinted
+      // to the variant colour.
+      m.color.setRGB(0.5 + 0.5 * _tintC.r, 0.5 + 0.5 * _tintC.g, 0.5 + 0.5 * _tintC.b);
+      m.map = det.map;
     }
+    // Surface detail on every body material — adds depth even over a real albedo.
+    m.normalMap = det.normalMap;
+    m.normalScale = new THREE.Vector2(0.45, 0.45);
+    if (!m.roughnessMap) m.roughnessMap = det.roughnessMap;
     m.roughness = look.roughness;
     m.metalness = look.metalness;
-    m.envMapIntensity = 0.8;
+    m.envMapIntensity = 0.9;
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
