@@ -1098,7 +1098,7 @@ export class WeaponSystem {
       reserveAmmo: st.reserveAmmo,
       isReloading: st.isReloading,
       currentIndex: this.currentIndex,
-      slots: this.loadout.map((_, i) => String(i + 1))
+      slots: this.loadout.map((w, i) => ({ key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee' }))
     };
   }
 }

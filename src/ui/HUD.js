@@ -1,3 +1,5 @@
+import { getWeaponThumb } from './WeaponThumbnails.js';
+
 export class HUD {
   constructor() {
     this.root        = document.getElementById('hud');
@@ -115,15 +117,43 @@ export class HUD {
     this._waveBannerTimer = setTimeout(() => this.waveBanner.classList.add('hidden'), 3000);
   }
 
-  buildWeaponSlots(labels, activeIndex) {
+  buildWeaponSlots(slots, activeIndex) {
     this.weaponSlots.innerHTML = '';
-    labels.forEach((label, i) => {
+    slots.forEach((slot, i) => {
+      const key = (typeof slot === 'object') ? slot.key : slot;
+      const id  = (typeof slot === 'object') ? slot.id  : null;
       const el = document.createElement('div');
       el.className = 'weapon-slot' + (i === activeIndex ? ' active' : '');
-      el.textContent = label;
       el.dataset.index = i;
+
+      const thumb = id ? getWeaponThumb(id) : null;
+      if (thumb) {
+        const img = document.createElement('div');
+        img.className = 'ws-thumb';
+        img.style.backgroundImage = `url(${thumb})`;
+        el.appendChild(img);
+      }
+      const k = document.createElement('span');
+      k.className = 'ws-key';
+      k.textContent = key;
+      el.appendChild(k);
+
       this.weaponSlots.appendChild(el);
     });
+  }
+
+  // Floating "+N" coin-earn popup near the crosshair (ev.io-style).
+  showCoinEarn(amount) {
+    const amt = Math.round(amount * 100) / 100;
+    if (!amt) return;
+    const host = this.root || document.getElementById('hud') || document.body;
+    const el = document.createElement('div');
+    el.className = 'coin-earn';
+    el.innerHTML = `+${amt} <span class="coin-earn-icon">&#9670;</span>`;
+    el.style.setProperty('--cx', `${(Math.random() * 2 - 1) * 30}px`);
+    host.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+    setTimeout(() => el.remove(), 1300);
   }
 
   setActiveSlot(index) {

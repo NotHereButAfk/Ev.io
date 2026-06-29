@@ -12,6 +12,7 @@ import { InputManager } from './InputManager.js';
 import { AudioManager } from './AudioManager.js';
 import { HUD } from '../ui/HUD.js';
 import { DamageNumbers } from '../ui/DamageNumbers.js';
+import { Nameplates } from '../ui/Nameplates.js';
 import { MenuUI } from '../ui/MainMenu.js';
 import { AuthUI } from '../ui/AuthUI.js';
 import { UserAccount } from './UserAccount.js';
@@ -119,6 +120,7 @@ export class Game {
       : null;
     this.hud            = new HUD();
     this.damageNumbers  = new DamageNumbers();
+    this.nameplates     = new Nameplates();
     this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
@@ -347,6 +349,7 @@ export class Game {
         this._pendingCoins -= Math.floor(this._pendingCoins);
       }
       BattlePass.addXP(10 * rewardMult);
+      this.hud.showCoinEarn(coins);
       this.hud.addKillFeed(`ZOMBIE DOWN!  💰+${coins}${hsTag}${knifeTag}`);
     } else if (this._isDM) {
       const { coins, streak } = this.dmManager.onKill();
@@ -355,6 +358,7 @@ export class Game {
       Shop.addCoins(Math.round(reward));
       BattlePass.addXP(25 * rewardMult);
       this._refreshNavCoins();
+      this.hud.showCoinEarn(reward);
       if (streak >= 2) {
         this.hud.showStreak(streak, reward.toFixed(1));
         this.hud.addKillFeed(`ELIMINATED — 🔥 x${streak} STREAK  💰+${reward.toFixed(1)}${hsTag}${knifeTag}`);
@@ -365,6 +369,7 @@ export class Game {
       this.score += 100 * rewardMult;
       Shop.addCoins(10 * rewardMult);
       BattlePass.addXP(25 * rewardMult);
+      this.hud.showCoinEarn(10 * rewardMult);
       this.hud.addKillFeed(`${this.player.name} eliminated a target  +${100 * rewardMult}  💰+${10 * rewardMult}${hsTag}${knifeTag}`);
     }
   }
@@ -465,6 +470,7 @@ export class Game {
     this.hud.hideDowned();
     this.hud.hideModeHUD();
     this.hud.hideWaveBonus();   // only survival shows it
+    this.nameplates.clear();
     this.waveBanner?.classList?.add('hidden');
 
     if (this._isDM) {
@@ -896,6 +902,14 @@ export class Game {
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
+
+    // Enemy nameplates (name + health bar) over living opponents.
+    if (!menuOpen && this.botManager?.bots?.length) {
+      this.nameplates.container.style.display = '';
+      this.nameplates.update(this.player.camera, this.botManager.bots);
+    } else {
+      this.nameplates.container.style.display = 'none';
+    }
 
     // In-game scoreboard — hold TAB to view live scores
     const sbDown = !menuOpen && this.input.isDown('Tab');
