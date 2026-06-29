@@ -123,13 +123,29 @@
             </button>
           </div>
         </div>
-        <button class="nav-item" data-panel="loadout">LOADOUT &#9660;</button>
         <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
         <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
         <button class="nav-item" data-panel="party">FIRETEAM &#9660;</button>
         <button class="nav-item" data-panel="private">PRIVATE &#9660;</button>
         <button class="nav-item" data-panel="settings">SETTINGS</button>
-        <button class="nav-item" data-panel="profile">PROFILE &#9660;</button>
+        <!-- PROFILE dropdown (ev.io-style): groups Inventory + Career -->
+        <div class="nav-profile-wrap" id="nav-profile-wrap">
+          <button class="nav-item nav-profile-btn" id="nav-profile-btn">PROFILE &#9660;</button>
+          <div class="profile-dropdown hidden" id="profile-dropdown">
+            <button class="profile-menu-item" data-panel="loadout">
+              <span class="pm-icon">&#9776;</span>
+              <div class="pm-body"><div class="pm-name">INVENTORY</div><div class="pm-sub">Weapons, skins &amp; character</div></div>
+            </button>
+            <button class="profile-menu-item" data-panel="profile">
+              <span class="pm-icon">&#9733;</span>
+              <div class="pm-body"><div class="pm-name">CAREER</div><div class="pm-sub">Stats, rank &amp; record</div></div>
+            </button>
+            <button class="profile-menu-item profile-menu-logout" id="profile-menu-logout">
+              <span class="pm-icon">&#8617;</span>
+              <div class="pm-body"><div class="pm-name">LOG OUT</div><div class="pm-sub">Sign out of your account</div></div>
+            </button>
+          </div>
+        </div>
       </nav>
       <div class="nav-right">
         <span id="nav-coins" class="nav-coins">&#128176; 500</span>

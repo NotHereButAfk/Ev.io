@@ -144,11 +144,32 @@ export class MenuUI {
       });
     });
 
+    // Profile dropdown toggle (ev.io-style: Inventory / Career / Log out)
+    const profBtn = document.getElementById('nav-profile-btn');
+    const profDd  = document.getElementById('profile-dropdown');
+    profBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = !profDd.classList.contains('hidden');
+      this._closeModeDropdown();
+      this._closeProfileDropdown();
+      if (!open) {
+        profDd.classList.remove('hidden');
+        profBtn.classList.add('open');
+        this._closeAllPanels();
+      }
+    });
+    document.getElementById('profile-menu-logout')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._closeProfileDropdown();
+      this.onLogout?.();
+    });
+
     // Nav dropdown items (panels)
     document.querySelectorAll('[data-panel]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         this._closeModeDropdown();
+        this._closeProfileDropdown();
         this._togglePanel(btn.dataset.panel);
       });
     });
@@ -156,6 +177,7 @@ export class MenuUI {
     // Click anywhere outside closes panels and modes dropdown
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.nav-modes-wrap')) this._closeModeDropdown();
+      if (!e.target.closest('.nav-profile-wrap')) this._closeProfileDropdown();
       if (this._activePanel && !e.target.closest('.nav-panel') && !e.target.closest('[data-panel]')) {
         this._closeAllPanels();
       }
@@ -174,6 +196,11 @@ export class MenuUI {
     document.getElementById('nav-modes-btn')?.classList.remove('open');
   }
 
+  _closeProfileDropdown() {
+    document.getElementById('profile-dropdown')?.classList.add('hidden');
+    document.getElementById('nav-profile-btn')?.classList.remove('open');
+  }
+
   _togglePanel(id) {
     if (this._activePanel === id) {
       this._closeAllPanels();
@@ -183,6 +210,9 @@ export class MenuUI {
     this._activePanel = id;
     document.getElementById('panel-' + id)?.classList.remove('hidden');
     document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
+    // PROFILE dropdown owns Inventory + Career — keep its nav button lit for both
+    document.getElementById('nav-profile-btn')
+      ?.classList.toggle('active', id === 'loadout' || id === 'profile');
 
     if (id === 'loadout') {
       this._refreshInventory();
@@ -207,6 +237,7 @@ export class MenuUI {
     this._activePanel = null;
     document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
     document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('active'));
+    document.getElementById('nav-profile-btn')?.classList.remove('active');
   }
 
   // ── Player skin grid ───────────────────────────────────────────────────────

@@ -3839,3 +3839,43 @@ html, body {
 }
 .lb-earned #lb-earned-val { color: #fff; font-size: 15px; }
 .lb-earned-coin { color: #ffcf3b; }
+
+/* ============================================================================
+   ====   KYX.IO  PROFILE NAV DROPDOWN  (ev.io-style: Inventory / Career)  ====
+   ============================================================================ */
+.nav-profile-wrap { position: relative; }
+.profile-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0; min-width: 256px;
+  background: linear-gradient(180deg, var(--kx-glass-a), var(--kx-glass-b));
+  backdrop-filter: blur(30px) saturate(1.5);
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid var(--kx-line); border-radius: 12px;
+  box-shadow: 0 22px 54px rgba(0,0,0,0.62); overflow: hidden;
+  z-index: 100; animation: kxDropIn 0.18s ease;
+}
+.profile-dropdown.hidden { display: none; }
+.profile-menu-item {
+  display: flex; align-items: center; gap: 13px; width: 100%;
+  background: transparent; border: none; cursor: pointer; text-align: left;
+  padding: 12px 16px; border-bottom: 1px solid var(--kx-line-soft);
+  transition: background .14s, padding-left .14s; position: relative;
+}
+.profile-menu-item:last-child { border-bottom: none; }
+.profile-menu-item:hover { background: rgba(20,224,255,0.09); padding-left: 22px; }
+.profile-menu-item:hover::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+  background: var(--kx-cyan); box-shadow: 0 0 8px var(--kx-cyan);
+}
+.pm-icon {
+  font-size: 16px; color: var(--kx-cyan-soft); width: 22px; text-align: center;
+  filter: drop-shadow(0 0 6px rgba(20,224,255,0.3));
+}
+.pm-name { color: var(--kx-ink); font-size: 13px; font-weight: 700; letter-spacing: 0.5px; }
+.pm-sub  { color: var(--kx-dim); font-size: 10px; margin-top: 1px; }
+.profile-menu-logout .pm-icon { color: #ff7a6a; filter: drop-shadow(0 0 6px rgba(255,90,70,0.3)); }
+.profile-menu-logout:hover { background: rgba(255,90,70,0.09); }
+.profile-menu-logout:hover::before { background: #ff5a4a; box-shadow: 0 0 8px #ff5a4a; }
+.nav-profile-btn.active, .nav-profile-btn.open {
+  color: var(--kx-cyan-soft) !important; background: rgba(20,224,255,0.08) !important;
+  box-shadow: inset 0 -2px 0 var(--kx-cyan);
+}
