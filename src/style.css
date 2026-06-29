@@ -3289,3 +3289,330 @@ html, body {
   color: #cdd6dc; font-size: 9px; font-weight: 700; letter-spacing: 1px;
   padding: 3px 7px; border-radius: 4px;
 }
+
+/* ============================================================================
+   ============   KYX.IO  PAGE UI OVERHAUL  (cohesive premium pass)   =========
+   Appended last so these rules win. Restyles every menu PAGE/panel into one
+   consistent, clean, ev.io-inspired dark-glass system with cyan accents.
+   Structure (nav + panel framework) is untouched; only the pages are upgraded.
+   ============================================================================ */
+:root {
+  --kx-cyan:      #14e0ff;
+  --kx-cyan-soft: #5fe9ff;
+  --kx-blue:      #2f93dd;
+  --kx-blue-deep: #1c5e9e;
+  --kx-ink:       #e9f3fb;
+  --kx-dim:       #8aa0b6;
+  --kx-faint:     #5f7488;
+  --kx-line:      rgba(120,200,255,0.13);
+  --kx-line-soft: rgba(120,180,220,0.08);
+  --kx-glass-a:   rgba(9,14,24,0.70);
+  --kx-glass-b:   rgba(5,8,16,0.82);
+}
+
+/* ---- entrance animation shared by panels + dropdown ---- */
+@keyframes kxPanelIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes kxDropIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== 1. UNIFIED PANEL GLASS (every page looks the same) ================= */
+.nav-panel {
+  background: linear-gradient(180deg, var(--kx-glass-a), var(--kx-glass-b)) !important;
+  backdrop-filter: blur(30px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5) !important;
+  border: 1px solid var(--kx-line) !important;
+  border-top: none !important;
+  border-radius: 0 0 16px 16px !important;
+  box-shadow: 0 26px 70px rgba(0,0,0,0.62),
+              inset 0 1px 0 rgba(255,255,255,0.04) !important;
+  padding: 24px 26px 28px !important;
+  animation: kxPanelIn 0.22s cubic-bezier(.2,.8,.2,1);
+}
+/* cyan hairline that ties the open page to the nav above it */
+.nav-panel::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--kx-cyan), transparent);
+  opacity: 0.7;
+  border-radius: 2px;
+}
+.nav-panel-inv  { width: min(97vw, 1010px) !important; }
+.nav-panel-wide { width: min(96vw, 720px) !important; }
+.nav-panel-shop { width: min(96vw, 1080px) !important; }
+
+/* keep loadout/profile from the older transparent override in sync */
+.nav-panel-inv, #panel-profile {
+  background: linear-gradient(180deg, var(--kx-glass-a), var(--kx-glass-b)) !important;
+  border-color: var(--kx-line) !important;
+}
+
+/* refined scrollbar inside panels */
+.nav-panel::-webkit-scrollbar { width: 9px; }
+.nav-panel::-webkit-scrollbar-track { background: transparent; }
+.nav-panel::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(20,224,255,0.4), rgba(31,94,158,0.4));
+  border-radius: 6px; border: 2px solid transparent; background-clip: padding-box;
+}
+.nav-panel::-webkit-scrollbar-thumb:hover { background: rgba(20,224,255,0.6); background-clip: padding-box; }
+
+/* ===== 2. UNIFIED SECTION LABELS (accent bar + consistent type) ========== */
+.inv-section-label, .panel-label, .settings-section, .private-section-label {
+  position: relative;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 2.2px !important;
+  text-transform: uppercase;
+  color: var(--kx-cyan-soft) !important;
+  padding-left: 12px;
+  margin: 22px 0 12px !important;
+  text-shadow: 0 0 12px rgba(20,224,255,0.25);
+}
+.inv-section-label:first-child, .panel-label:first-child,
+.settings-section:first-child { margin-top: 4px !important; }
+.inv-section-label::before, .panel-label::before,
+.settings-section::before, .private-section-label::before {
+  content: '';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 13px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue-deep));
+  box-shadow: 0 0 8px rgba(20,224,255,0.6);
+}
+.inv-map-label { color: var(--kx-faint) !important; }
+.inv-map-label::before { background: linear-gradient(180deg, #6b7a8c, #3a4654); box-shadow: none; }
+.modes-intro, .private-desc, .party-hint {
+  color: var(--kx-dim) !important; font-size: 13px; line-height: 1.5;
+}
+
+/* ===== 3. PRIMARY / GHOST BUTTONS ======================================== */
+.play-btn {
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue)) !important;
+  color: #04121b !important;
+  font-weight: 800 !important; letter-spacing: 1.5px !important; text-transform: uppercase;
+  border: none !important; border-radius: 10px !important;
+  box-shadow: 0 8px 22px rgba(20,150,210,0.35), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+  transition: transform .14s, box-shadow .14s, filter .14s !important;
+}
+.play-btn:hover {
+  filter: brightness(1.08); transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(20,200,255,0.5), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+}
+.play-btn:active { transform: translateY(0); }
+.ghost-btn {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1px solid var(--kx-line) !important;
+  color: var(--kx-ink) !important; font-weight: 700 !important; letter-spacing: 1px !important;
+  border-radius: 10px !important; transition: all .14s !important;
+}
+.ghost-btn:hover {
+  border-color: rgba(20,224,255,0.55) !important;
+  background: rgba(20,224,255,0.08) !important; color: #fff !important;
+}
+
+/* ===== 4. SEGMENTED TOGGLES (kill the muddy orange; unify to cyan) ======= */
+.quality-btn, .invert-btn, .private-mode-btn, .stp-filter {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--kx-line-soft) !important;
+  color: var(--kx-dim) !important;
+  font-weight: 700 !important; letter-spacing: 0.6px !important;
+  border-radius: 8px !important; transition: all .14s !important;
+}
+.quality-btn:hover, .invert-btn:hover, .private-mode-btn:hover, .stp-filter:hover {
+  color: #fff !important; border-color: rgba(20,224,255,0.4) !important;
+  background: rgba(20,224,255,0.07) !important;
+}
+.quality-btn.active, .invert-btn.active, .private-mode-btn.active, .stp-filter.active {
+  background: linear-gradient(180deg, rgba(20,224,255,0.22), rgba(31,94,158,0.22)) !important;
+  border-color: var(--kx-cyan) !important;
+  color: var(--kx-cyan-soft) !important;
+  box-shadow: 0 0 0 1px rgba(20,224,255,0.4), 0 0 16px rgba(20,224,255,0.25) !important;
+  text-shadow: 0 0 10px rgba(20,224,255,0.4);
+}
+
+/* ===== 5. INPUTS + SLIDERS ============================================== */
+.text-input, .inv-name-input, #party-invite-input {
+  background: rgba(4,8,15,0.6) !important;
+  border: 1px solid var(--kx-line) !important;
+  color: var(--kx-ink) !important; border-radius: 9px !important;
+  transition: border-color .15s, box-shadow .15s !important;
+}
+.text-input:focus, .inv-name-input:focus, #party-invite-input:focus {
+  border-color: var(--kx-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(20,224,255,0.16) !important; outline: none !important;
+}
+.setting-slider {
+  -webkit-appearance: none; appearance: none;
+  height: 6px !important; border-radius: 4px !important;
+  background: linear-gradient(90deg, rgba(20,224,255,0.55), rgba(31,94,158,0.25)) !important;
+}
+.setting-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px !important; height: 18px !important; border-radius: 50% !important;
+  background: radial-gradient(circle at 35% 30%, #b8f6ff, var(--kx-cyan)) !important;
+  border: 2px solid #06141d !important;
+  box-shadow: 0 0 12px rgba(20,224,255,0.6), 0 2px 4px rgba(0,0,0,0.5) !important;
+  cursor: pointer; transition: transform .1s;
+}
+.setting-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.setting-val { color: var(--kx-cyan-soft) !important; font-weight: 800 !important; }
+.setting-row { gap: 16px !important; }
+
+/* ===== 6. NAV ACTIVE INDICATOR (tie pages to cyan instead of orange) ===== */
+.nav-item.active {
+  color: var(--kx-cyan-soft) !important;
+  background: rgba(20,224,255,0.08) !important;
+  box-shadow: inset 0 -2px 0 var(--kx-cyan);
+}
+
+/* ===== 7. MODES DROPDOWN ================================================ */
+.modes-dropdown {
+  background: linear-gradient(180deg, var(--kx-glass-a), var(--kx-glass-b)) !important;
+  backdrop-filter: blur(30px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5) !important;
+  border: 1px solid var(--kx-line) !important; border-top: none !important;
+  border-radius: 0 0 14px 14px !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6) !important;
+  overflow: hidden; animation: kxDropIn 0.18s ease;
+}
+.mode-option {
+  border-bottom: 1px solid var(--kx-line-soft) !important;
+  transition: background .14s, padding-left .14s !important;
+  position: relative;
+}
+.mode-option:hover {
+  background: rgba(20,224,255,0.09) !important; padding-left: 22px !important;
+}
+.mode-option:hover::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+  background: var(--kx-cyan); box-shadow: 0 0 8px var(--kx-cyan);
+}
+.mode-opt-name { color: var(--kx-ink) !important; }
+.mode-opt-sub  { color: var(--kx-dim) !important; }
+.mode-opt-icon { filter: drop-shadow(0 0 6px rgba(20,224,255,0.3)); }
+
+/* ===== 8. FIRETEAM (party) ============================================== */
+.party-slot {
+  background: rgba(255,255,255,0.025) !important;
+  border: 1px solid var(--kx-line-soft) !important;
+  border-radius: 12px !important; transition: all .15s !important;
+}
+.party-slot-you {
+  border-color: rgba(20,224,255,0.4) !important;
+  background: linear-gradient(160deg, rgba(20,224,255,0.10), rgba(20,224,255,0.02)) !important;
+  box-shadow: inset 0 0 24px rgba(20,224,255,0.08) !important;
+}
+.party-slot-empty:hover {
+  opacity: 0.8 !important; border-color: rgba(20,224,255,0.3) !important;
+  border-style: dashed !important;
+}
+.party-slot-avatar {
+  background: radial-gradient(circle at 35% 30%, var(--kx-cyan-soft), var(--kx-blue-deep)) !important;
+  box-shadow: 0 0 16px rgba(20,224,255,0.5) !important;
+}
+.party-slot-badge, .party-size-badge {
+  background: rgba(20,224,255,0.14) !important; color: var(--kx-cyan-soft) !important;
+  border: 1px solid rgba(20,224,255,0.3) !important;
+}
+.party-code {
+  background: linear-gradient(180deg, rgba(20,224,255,0.08), rgba(4,8,15,0.5)) !important;
+  border: 1px dashed rgba(20,224,255,0.4) !important;
+  color: var(--kx-cyan-soft) !important; letter-spacing: 5px !important;
+  text-shadow: 0 0 14px rgba(20,224,255,0.4);
+}
+
+/* ===== 9. PROFILE ====================================================== */
+.prof-username {
+  color: #fff !important;
+  text-shadow: 0 0 22px rgba(20,224,255,0.3);
+  border-bottom: 1px solid var(--kx-line) !important;
+}
+.prof-tab {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid var(--kx-line-soft) !important; color: var(--kx-dim) !important;
+  border-radius: 8px !important; transition: all .14s !important;
+}
+.prof-tab.active {
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue)) !important;
+  border-color: var(--kx-cyan) !important; color: #04121b !important;
+  box-shadow: 0 0 16px rgba(20,224,255,0.35) !important;
+}
+.prof-char {
+  border: 1px solid var(--kx-line) !important;
+  background: radial-gradient(circle at 50% 32%, #12283a, #050a12) !important;
+  box-shadow: inset 0 0 40px rgba(20,224,255,0.06) !important;
+}
+.prof-stat {
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)) !important;
+  border: 1px solid var(--kx-line-soft) !important; border-radius: 10px !important;
+  transition: border-color .15s, transform .15s !important;
+}
+.prof-stat:hover {
+  border-color: rgba(20,224,255,0.3) !important; transform: translateY(-2px);
+}
+.prof-stat-label { color: var(--kx-cyan-soft) !important; }
+
+/* ===== 10. SHOP ======================================================== */
+.stp-topbar { border-bottom: 1px solid var(--kx-line) !important; }
+.stp-logo-word  { color: #fff !important; text-shadow: 0 0 16px rgba(20,224,255,0.35); }
+.stp-logo-accent{ color: var(--kx-cyan) !important; }
+.stp-store-label{ color: var(--kx-dim) !important; letter-spacing: 3px !important; }
+.stp-currency {
+  background: linear-gradient(180deg, rgba(20,224,255,0.08), rgba(4,8,15,0.4)) !important;
+  border: 1px solid rgba(20,224,255,0.25) !important; border-radius: 10px !important;
+}
+.shop-skin-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008)) !important;
+  border: 1px solid var(--kx-line-soft) !important; border-radius: 12px !important;
+  transition: transform .15s, border-color .15s, box-shadow .15s !important;
+}
+.shop-skin-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(20,224,255,0.45) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.5), 0 0 18px rgba(20,224,255,0.15) !important;
+}
+.shop-btn-buy {
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue)) !important;
+  color: #04121b !important;
+}
+.shop-btn-owned {
+  background: rgba(20,224,255,0.12) !important; color: var(--kx-cyan-soft) !important;
+  border: 1px solid rgba(20,224,255,0.35) !important;
+}
+.shop-auth-wall .saw-title { color: #fff !important; text-shadow: 0 0 16px rgba(20,224,255,0.25); }
+
+/* ===== 11. BATTLE PASS ================================================= */
+.bp-season-tag {
+  background: rgba(20,224,255,0.14) !important; color: var(--kx-cyan-soft) !important;
+  border: 1px solid rgba(20,224,255,0.3) !important;
+}
+.bp-tier-label { color: #fff !important; }
+.bp-xp-bar-bg {
+  background: rgba(4,8,15,0.6) !important; border: 1px solid var(--kx-line-soft) !important;
+}
+.bp-xp-bar-fill {
+  background: linear-gradient(90deg, var(--kx-blue), var(--kx-cyan)) !important;
+  box-shadow: 0 0 12px rgba(20,224,255,0.5) !important;
+}
+.bp-xp-text { color: var(--kx-cyan-soft) !important; }
+.bp-premium-box {
+  background: linear-gradient(160deg, rgba(160,96,240,0.16), rgba(20,224,255,0.06)) !important;
+  border: 1px solid rgba(160,96,240,0.4) !important; border-radius: 12px !important;
+}
+.bp-unlock-btn {
+  background: linear-gradient(180deg, #b06cf0, #7a3fd0) !important;
+  color: #fff !important; font-weight: 800 !important;
+  box-shadow: 0 8px 22px rgba(140,80,220,0.35) !important;
+}
+.bp-reward-card {
+  border-radius: 10px !important; border: 1px solid var(--kx-line-soft) !important;
+  transition: transform .14s, border-color .14s !important;
+}
+.bp-reward-card:hover { transform: translateY(-2px); border-color: rgba(20,224,255,0.3) !important; }
+.bp-claim-btn {
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue)) !important;
+  color: #04121b !important; font-weight: 800 !important;
+}
