@@ -9,36 +9,32 @@ const TAXI_YELLOW = 0xffcf3d;
 // ---------------------------------------------------------------------------
 
 function makeTechFloorTexture() {
+  // Winter-Bishop snow: soft white with subtle blue-grey drift + sparkle, no grid.
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // Clean light-grey arena floor with subtle panel seams (ev.io style).
-  ctx.fillStyle = '#97a3aa';
+  ctx.fillStyle = '#e9eef4';
   ctx.fillRect(0, 0, size, size);
-  // minor panel grid — faint grey
-  ctx.strokeStyle = 'rgba(120,140,150,0.16)';
-  ctx.lineWidth = 0.7;
-  for (let i = 0; i < size; i += 16) {
-    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
+  // gentle blue-grey drifts (wind-blown snow)
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 30 + Math.random() * 90;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const blue = Math.random() < 0.5;
+    g.addColorStop(0, blue ? 'rgba(176,196,214,0.18)' : 'rgba(255,255,255,0.16)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
-  // major seams — soft teal-grey
-  ctx.strokeStyle = 'rgba(70,140,155,0.32)';
-  ctx.lineWidth = 1.4;
-  for (let i = 0; i < size; i += 64) {
-    ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,size); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(size,i); ctx.stroke();
+  // fine speckle (compacted snow / sparkle)
+  for (let i = 0; i < 1800; i++) {
+    const v = 200 + Math.random() * 55;
+    ctx.fillStyle = `rgba(${v},${v + 4},${Math.min(255, v + 10)},0.5)`;
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
   }
-  // intersection bolts — subtle orange accents
-  ctx.fillStyle = 'rgba(230,130,50,0.5)';
-  for (let x = 0; x < size; x += 64)
-    for (let y = 0; y < size; y += 64) {
-      ctx.beginPath(); ctx.arc(x,y,2.0,0,Math.PI*2); ctx.fill();
-    }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(ARENA_HALF / 8, ARENA_HALF / 8);
+  tex.repeat.set(ARENA_HALF / 10, ARENA_HALF / 10);
   return tex;
 }
 
@@ -77,11 +73,12 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0.00, '#123a72'); // deep blue zenith
-  grad.addColorStop(0.32, '#2769a8');
-  grad.addColorStop(0.55, '#3f9ec6');
-  grad.addColorStop(0.78, '#86d2db');
-  grad.addColorStop(1.00, '#e6f4ee'); // bright teal-white horizon
+  // Winter-Bishop overcast: muted blue-grey zenith melting into a pale warm haze.
+  grad.addColorStop(0.00, '#7d93a8'); // soft overcast blue-grey
+  grad.addColorStop(0.40, '#9fb1c0');
+  grad.addColorStop(0.70, '#c8cdd0');
+  grad.addColorStop(0.88, '#e4dcd6'); // warm pale band near horizon
+  grad.addColorStop(1.00, '#efe7e0'); // hazy warm horizon
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -391,8 +388,8 @@ export class World {
     this.scene = new THREE.Scene();
     // Clean, bright ev.io-style arena: a light cool-grey sky and a soft, far
     // haze (not a dark moody fog) so distant structure fades cleanly to white.
-    this.scene.background = new THREE.Color(0x2769a8);
-    this.scene.fog = new THREE.Fog(0x7fb6cb, 150, 460);
+    this.scene.background = new THREE.Color(0x9fb1c0);
+    this.scene.fog = new THREE.Fog(0xc9ccce, 120, 420); // cold snow haze
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -513,6 +510,7 @@ export class World {
     this._buildGroundChannels();  // glowing floor lane markings
     this._buildArenaStructures(); // central deck, ramps, wing platforms, grav-lifts, teleporters
     this._buildArenaPillars();    // tall pillars (cover + verticality)
+    this._buildSnowProps();       // crates + festive string lights (Winter-Bishop)
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -536,12 +534,11 @@ export class World {
     // directional key/fill, no point lights, no shadows. Surfaces are lit by this
     // single hemisphere (sky) light plus the scene's environment map (IBL) and
     // emissive accents, which is the cheapest possible lighting to render.
-    const hemi = new THREE.HemisphereLight(0xdfeef7, 0x55626e, 1.25);
+    // Winter overcast: cool soft sky light + a gentle warm sun for low contrast.
+    const hemi = new THREE.HemisphereLight(0xe3ecf3, 0x6b7480, 1.15);
     this.scene.add(hemi);
-    // A soft directional key gives surfaces shape + a sense of sun direction so
-    // the arena reads with depth instead of flat ambient white. (No shadows — cheap.)
-    const key = new THREE.DirectionalLight(0xfff0e0, 1.15);
-    key.position.set(60, 120, 40);
+    const key = new THREE.DirectionalLight(0xffe9d2, 0.8);
+    key.position.set(50, 110, 30);
     key.castShadow = false;
     this.scene.add(key);
   }
@@ -550,9 +547,9 @@ export class World {
     const floorTex  = makeTechFloorTexture();
     const roadMat = new THREE.MeshStandardMaterial({
       map:          floorTex,
-      roughness:    0.95,
+      roughness:    0.96,
       metalness:    0.0,
-      color:        0x8a99a3, // tint the floor so it reads as a surface, not white
+      color:        0xeef3f8, // snow
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;
@@ -620,12 +617,12 @@ export class World {
   }
 
   _neonMat(c) {
-    let m = this._neonMats.get(c);
+    // Winter-Bishop theme: the map has no neon. Re-purpose every "glowing edge"
+    // as a matte dark-wood trim so platforms/walls get a wooden rim instead.
+    let m = this._neonMats.get('wood');
     if (!m) {
-      m = new THREE.MeshStandardMaterial({
-        color: c, emissive: c, emissiveIntensity: 0.85, roughness: 0.5, metalness: 0.2
-      });
-      this._neonMats.set(c, m);
+      m = new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.92, metalness: 0.05 });
+      this._neonMats.set('wood', m);
     }
     return m;
   }
@@ -2201,9 +2198,9 @@ export class World {
   _buildArenaWalls() {
     const half = ARENA_HALF;
     const H = 24, T = 2.5;
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xc2cace, roughness: 0.72, metalness: 0.12 });
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0x9aa6ae, roughness: 0.6, metalness: 0.2 });
-    const trimMat = this._neonMat(0x33a8ec);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xa9663f, roughness: 0.92, metalness: 0.03 });  // terracotta
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0x8a5a3a, roughness: 0.9, metalness: 0.04 });  // darker clay
+    const trimMat = this._neonMat(0x4a3320);
 
     const specs = [
       { w: half * 2 + T * 2, d: T, x: 0, z: -half },
@@ -2498,12 +2495,12 @@ export class World {
   // placement keeps the map balanced for TDM/CTF.
   _buildArenaPillars() {
     const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0xdfe5e8, roughness: 0.55, metalness: 0.14, envMapIntensity: 0.5,
+      color: 0xb79c78, roughness: 0.9, metalness: 0.04, envMapIntensity: 0.4, // stone column
     });
     const capMat = new THREE.MeshStandardMaterial({
-      color: 0xb6c0c6, roughness: 0.6, metalness: 0.2,
+      color: 0x8f7a5c, roughness: 0.9, metalness: 0.05, // weathered stone cap
     });
-    const ringMat = this._neonMat(0x33a8ec); // glowing blue ring
+    const ringMat = this._neonMat(0x4a3320); // wooden band
 
     // Symmetric ring of pillars around the central courtyard + outer pairs,
     // placed in open lanes so they read as cover, not clutter.
@@ -2559,6 +2556,73 @@ export class World {
     }
   }
 
+  // Winter-Bishop props: stacked wooden crates for cover + festive string lights
+  // strung between the perimeter wall tops (the colored bulbs from the map).
+  _buildSnowProps() {
+    const wood  = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.95 });
+    const band  = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.8 });
+    const snow  = new THREE.MeshStandardMaterial({ color: 0xeef3f8, roughness: 0.95 });
+
+    const crate = (x, z, s, y = 0) => {
+      const g = new THREE.Group();
+      const box = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), wood);
+      box.position.y = s / 2; g.add(box);
+      // edge bands
+      for (const ax of ['x', 'z']) {
+        const b = new THREE.Mesh(new THREE.BoxGeometry(ax === 'x' ? s + 0.04 : 0.12, 0.12, ax === 'z' ? s + 0.04 : 0.12), band);
+        b.position.set(0, s / 2, 0); g.add(b);
+      }
+      // snow cap
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(s + 0.05, 0.12, s + 0.05), snow);
+      cap.position.y = s + 0.02; g.add(cap);
+      g.position.set(x, y, z);
+      g.updateMatrixWorld(true);
+      this.scene.add(g);
+      const half = s / 2;
+      this.colliders.push({ box: new THREE.Box3(
+        new THREE.Vector3(x - half, y, z - half),
+        new THREE.Vector3(x + half, y + s, z + half)), mesh: box });
+    };
+
+    // Crate clusters scattered in the lanes (cover), clear of the centre + ramps.
+    const clusters = [
+      [22, 40], [-22, 40], [40, 22], [-40, 22],
+      [22, -40], [-22, -40], [40, -22], [-40, -22],
+      [58, 8], [-58, 8], [8, 58], [-8, -58],
+    ];
+    for (const [x, z] of clusters) {
+      crate(x, z, 1.9);
+      crate(x + 1.95, z, 1.6);
+      if ((x + z) % 3 === 0) crate(x, z, 1.4, 1.9); // a stacked one
+    }
+
+    // Festive string lights along the inner top of the four perimeter walls.
+    const half = ARENA_HALF;
+    const bulbColors = [0xff4040, 0x40c060, 0xffd23b, 0x4090ff, 0xff8a3b, 0xffffff];
+    const strand = (x0, z0, x1, z1) => {
+      const segs = 26, y0 = 21;
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const droop = Math.sin(t * Math.PI) * 2.2; // catenary sag
+        const x = x0 + (x1 - x0) * t;
+        const z = z0 + (z1 - z0) * t;
+        const c = bulbColors[i % bulbColors.length];
+        const bulb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.22, 6, 5),
+          new THREE.MeshBasicMaterial({ color: c })
+        );
+        bulb.position.set(x, y0 - droop, z);
+        bulb.matrixAutoUpdate = false; bulb.updateMatrix();
+        this.scene.add(bulb);
+      }
+    };
+    const e = half - 1.6;
+    strand(-e, -e,  e, -e);
+    strand( e, -e,  e,  e);
+    strand( e,  e, -e,  e);
+    strand(-e,  e, -e, -e);
+  }
+
   // ── ev.io-style arena structures ────────────────────────────────────────────
   // Walkable raised platforms + ramps (strong verticality), grav-lift launch
   // columns, and teleporter pads — the structural language that defines ev.io
@@ -2567,9 +2631,9 @@ export class World {
   _buildArenaStructures() {
     // Iconic ev.io look: clean near-white platforms with glowing blue edges.
     const deckMat = new THREE.MeshStandardMaterial({
-      color: 0xd6dde1, roughness: 0.62, metalness: 0.12, envMapIntensity: 0.5,
+      color: 0xc9a878, roughness: 0.9, metalness: 0.04, envMapIntensity: 0.4, // warm sandstone
     });
-    const trimColor = 0x33a8ec; // glowing blue edge
+    const trimColor = 0x4a3320; // wooden edge trim
 
     // 1) Central command deck around the spire (the high-ground power position).
     const DECK = 8, DECK_Y = 4.5;
