@@ -4009,3 +4009,49 @@ html, body {
   display: block; font-size: 20px; font-weight: 900; color: #ffc24a;
   text-shadow: 0 0 12px rgba(255,194,74,0.5); font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================================
+   ===============   KYX.IO  INVENTORY SKIN CARDS  (ev.io 1:1)   ===============
+   Grid of skin cards under the weapon tabs: gun silhouette over the skin's
+   colours, rarity label top-left, name bottom, equipped highlight.
+   ============================================================================ */
+.inv-skin-card {
+  position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 9px;
+  overflow: hidden; cursor: pointer; background: #0b1119;
+  border: 1px solid rgba(80,110,135,0.3);
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.inv-skin-card:hover {
+  transform: translateY(-3px); border-color: rgba(120,190,230,0.7);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+}
+.inv-skin-card.equipped {
+  border-color: #4db6ff; box-shadow: 0 0 0 1px #4db6ff, 0 0 16px rgba(77,182,255,0.45);
+}
+.inv-skin-card-bg  { position: absolute; inset: 0; }
+.inv-skin-card-sil {
+  position: absolute; inset: 12px 8px 26px;
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.65));
+}
+.inv-skin-rarity {
+  position: absolute; top: 6px; left: 7px; z-index: 2;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.8px; color: #cdd6dc;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+.inv-skin-eqbadge {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  background: #2a73b8; color: #fff; font-size: 8px; font-weight: 800;
+  letter-spacing: 0.5px; padding: 3px 6px; border-radius: 4px;
+}
+.inv-skin-card-name {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  background: linear-gradient(180deg, rgba(6,10,16,0), rgba(6,10,16,0.92));
+  color: #fff; font-size: 12px; font-weight: 600; text-align: center;
+  padding: 14px 5px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* rarity tint on the card border */
+.inv-skin-card[data-rarity="mythic"]    { border-color: rgba(255,43,208,0.45); }
+.inv-skin-card[data-rarity="legendary"] { border-color: rgba(255,173,0,0.4); }
+.inv-skin-card[data-rarity="epic"]      { border-color: rgba(180,50,255,0.35); }
+.inv-skin-card[data-rarity="rare"]      { border-color: rgba(40,120,255,0.3); }
