@@ -566,6 +566,31 @@
         </div>
       </div>
     </div>
+
+    <!-- ===================== IN-GAME SCOREBOARD (hold TAB) ===================== -->
+    <div id="scoreboard-overlay" class="hidden">
+      <div class="sb-panel">
+        <div class="sb-head">
+          <div class="sb-title">SCOREBOARD</div>
+          <div class="sb-sub" id="sb-sub">FREE FOR ALL</div>
+        </div>
+        <div class="sb-tabs">
+          <button class="sb-tab active">LEADERBOARD</button>
+          <button class="sb-tab sb-tab-dim">EARN</button>
+          <button class="sb-tab sb-tab-dim">PERFORMANCE</button>
+        </div>
+        <table class="sb-table">
+          <thead><tr>
+            <th class="sb-th-rank">#</th>
+            <th class="sb-th-name">PLAYER</th>
+            <th>KILLS</th>
+            <th>SCORE</th>
+          </tr></thead>
+          <tbody id="sb-rows"></tbody>
+        </table>
+        <div class="sb-hint">Hold <span class="sb-key">TAB</span> to view scores</div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

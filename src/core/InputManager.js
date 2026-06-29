@@ -18,6 +18,8 @@ export class InputManager {
     this._virtualKeys = new Set();
 
     this._onKeyDown = (e) => {
+      // Tab is the in-game scoreboard — stop it from cycling focus / leaving the page.
+      if (e.code === 'Tab') e.preventDefault();
       if (!this.keys.has(e.code)) this.justPressed.add(e.code);
       this.keys.add(e.code);
     };

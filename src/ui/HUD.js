@@ -273,6 +273,42 @@ export class HUD {
     document.getElementById('leaderboard-overlay')?.classList.add('hidden');
   }
 
+  // In-game scoreboard (hold TAB). rows: [{name, kills, score, isYou}], sub: mode label.
+  showScoreboard(rows, sub = '') {
+    const ov = document.getElementById('scoreboard-overlay');
+    const tb = document.getElementById('sb-rows');
+    if (!ov || !tb) return;
+    const subEl = document.getElementById('sb-sub');
+    if (subEl && sub) subEl.textContent = sub;
+    tb.innerHTML = '';
+    rows.forEach((r, i) => {
+      const rank = i + 1;
+      const tr = document.createElement('tr');
+      if (r.isYou) tr.className = 'sb-row-you';
+      const rankCls = rank <= 3 ? `sb-rank sb-rank-${rank}` : 'sb-rank';
+
+      const nameTd = document.createElement('td');
+      nameTd.className = 'sb-name-cell';
+      nameTd.textContent = r.name;
+      if (r.isYou) {
+        const b = document.createElement('span');
+        b.className = 'sb-you-badge'; b.textContent = 'YOU';
+        nameTd.appendChild(b);
+      }
+      tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
+      tr.appendChild(nameTd);
+      const k = document.createElement('td'); k.className = 'sb-kills'; k.textContent = r.kills;
+      const s = document.createElement('td'); s.className = 'sb-score'; s.textContent = (r.score || 0).toLocaleString();
+      tr.appendChild(k); tr.appendChild(s);
+      tb.appendChild(tr);
+    });
+    ov.classList.remove('hidden');
+  }
+
+  hideScoreboard() {
+    document.getElementById('scoreboard-overlay')?.classList.add('hidden');
+  }
+
   updateLeaderboardCountdown(secsLeft, total) {
     const el = document.getElementById('lb-countdown');
     if (el) el.textContent = secsLeft;

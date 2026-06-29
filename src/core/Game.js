@@ -155,6 +155,9 @@ export class Game {
     this.kills   = 0;
     this.score   = 0;
     this.deaths  = 0;
+    this._sbShown = false;   // in-game scoreboard (hold TAB)
+    this._sbStats = {};      // stable per-match bot scores
+    this._sbRefreshT = 0;
     this.playTime = 0;
     this._statsSaved  = true;
     this.currentUsername = null;
@@ -448,6 +451,7 @@ export class Game {
     this.kills    = 0;
     this.score    = 0;
     this.deaths   = 0;
+    this._sbStats = {};
     this.playTime = 0;
     this._statsSaved   = false;
     this._pendingCoins = 0;
@@ -586,6 +590,24 @@ export class Game {
     }
   }
 
+  // Live scoreboard rows (you + opponents). Bot scores are seeded once per match
+  // so they stay stable while you hold TAB. Survival shows just you (vs. zombies).
+  _buildScoreboardRows() {
+    const rows = [{ name: this.player.name || 'You', kills: this.kills, score: this.score, isYou: true }];
+    if (!this._isSurvival) {
+      for (const bot of (this.botManager?.bots || [])) {
+        const key = bot.displayName || 'Spartan';
+        if (this._sbStats[key] == null) {
+          const k = Math.floor(Math.random() * 9);
+          this._sbStats[key] = { kills: k, score: k * 100 };
+        }
+        rows.push({ name: key, kills: this._sbStats[key].kills, score: this._sbStats[key].score, isYou: false });
+      }
+    }
+    rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
+    return rows;
+  }
+
   // ── Post-match leaderboard ───────────────────────────────────────────────────
 
   _showLeaderboard() {
@@ -621,6 +643,7 @@ export class Game {
     this.mobileControls?.hide();
     this.hud.hide();         // hide crosshair / ammo / health
     this.hud.hideDMTimer();
+    this.hud.hideScoreboard(); this._sbShown = false;
     this.hud.hideLeaderboard(); // reset in case it was shown before
     this.hud.showLeaderboard(rows, this.player.name, earnedCoins);
     this.hud.updateLeaderboardCountdown(10, 10);
@@ -862,6 +885,20 @@ export class Game {
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
+
+    // In-game scoreboard — hold TAB to view live scores
+    const sbDown = !menuOpen && this.input.isDown('Tab');
+    if (sbDown) {
+      this._sbRefreshT -= dt;
+      if (!this._sbShown || this._sbRefreshT <= 0) {
+        this.hud.showScoreboard(this._buildScoreboardRows(), this._mode?.name || '');
+        this._sbRefreshT = 0.4;
+      }
+      this._sbShown = true;
+    } else if (this._sbShown) {
+      this.hud.hideScoreboard();
+      this._sbShown = false;
+    }
     this.hud.updateTeleport(1 - this.player.teleportCooldown / this.player.teleportMaxCooldown);
 
     // Scope overlay — shown when ADS on a scoped weapon (hidden while menu open)
