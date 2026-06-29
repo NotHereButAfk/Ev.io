@@ -199,20 +199,32 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   return group;
 }
 
+const _tintC = new THREE.Color();
 function _applyArmorLook(bodyMats, visorMats, look) {
+  _tintC.setHex(look.body);
   for (const m of bodyMats) {
-    m.color.setHex(look.body);
+    if (m.map) {
+      // REALISTIC: keep the GLB's authored texture (skin, fatigues, gear, wear)
+      // and apply only a gentle tint so the armour variant still reads — instead
+      // of flattening the whole soldier to a solid plastic colour.
+      m.color.setRGB(0.68 + 0.32 * _tintC.r, 0.68 + 0.32 * _tintC.g, 0.68 + 0.32 * _tintC.b);
+      m.map.colorSpace = THREE.SRGBColorSpace;
+      m.map.anisotropy = 8;
+    } else {
+      // Untextured plates: take the full variant colour.
+      m.color.copy(_tintC);
+    }
     m.roughness = look.roughness;
     m.metalness = look.metalness;
-    if (m.map) m.map = m.map; // keep the texture detail if present (real GLB)
+    m.envMapIntensity = 0.8;
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
     m.color.setHex(look.visor);
     m.emissive?.setHex?.(look.visor);
-    m.emissiveIntensity = 1.0;
+    m.emissiveIntensity = 0.9;
     m.metalness = 0.95;
-    m.roughness = 0.16;
+    m.roughness = 0.14;
     m.needsUpdate = true;
   }
 }
@@ -386,9 +398,14 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
   if (!mats || !mats.length) return;
   const hex = armorSkin ? armorSkin.primary : skin?.primary;
   if (hex == null) return;
-  const anchor = new THREE.Color(group.userData?.baseBodyColor ?? 0x5a7d35);
+  const tint = new THREE.Color(hex);
   for (const m of mats) {
-    m.color.setHex(hex).lerp(anchor, 0.35);
+    if (m.map) {
+      // Keep the realistic texture; tint only lightly toward the skin colour.
+      m.color.setRGB(0.68 + 0.32 * tint.r, 0.68 + 0.32 * tint.g, 0.68 + 0.32 * tint.b);
+    } else {
+      m.color.copy(tint).lerp(new THREE.Color(group.userData?.baseBodyColor ?? 0x5a7d35), 0.35);
+    }
     m.needsUpdate = true;
   }
 }
