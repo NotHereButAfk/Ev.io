@@ -77,11 +77,11 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0.00, '#6f9cb2'); // muted blue zenith
-  grad.addColorStop(0.35, '#86aabc');
-  grad.addColorStop(0.62, '#9fc0cc');
-  grad.addColorStop(0.82, '#b6d2da');
-  grad.addColorStop(1.00, '#c8dde2'); // soft horizon (not white)
+  grad.addColorStop(0.00, '#123a72'); // deep blue zenith
+  grad.addColorStop(0.32, '#2769a8');
+  grad.addColorStop(0.55, '#3f9ec6');
+  grad.addColorStop(0.78, '#86d2db');
+  grad.addColorStop(1.00, '#e6f4ee'); // bright teal-white horizon
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -391,8 +391,8 @@ export class World {
     this.scene = new THREE.Scene();
     // Clean, bright ev.io-style arena: a light cool-grey sky and a soft, far
     // haze (not a dark moody fog) so distant structure fades cleanly to white.
-    this.scene.background = new THREE.Color(0x9cbcc8);
-    this.scene.fog = new THREE.Fog(0xa8c4cc, 180, 470);
+    this.scene.background = new THREE.Color(0x2769a8);
+    this.scene.fog = new THREE.Fog(0x7fb6cb, 150, 460);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -536,17 +536,23 @@ export class World {
     // directional key/fill, no point lights, no shadows. Surfaces are lit by this
     // single hemisphere (sky) light plus the scene's environment map (IBL) and
     // emissive accents, which is the cheapest possible lighting to render.
-    const hemi = new THREE.HemisphereLight(0xeef5f9, 0x8a96a0, 1.7);
+    const hemi = new THREE.HemisphereLight(0xdfeef7, 0x55626e, 1.25);
     this.scene.add(hemi);
+    // A soft directional key gives surfaces shape + a sense of sun direction so
+    // the arena reads with depth instead of flat ambient white. (No shadows — cheap.)
+    const key = new THREE.DirectionalLight(0xfff0e0, 1.15);
+    key.position.set(60, 120, 40);
+    key.castShadow = false;
+    this.scene.add(key);
   }
 
   _buildGround() {
     const floorTex  = makeTechFloorTexture();
     const roadMat = new THREE.MeshStandardMaterial({
       map:          floorTex,
-      roughness:    0.9,
-      metalness:    0.05,
-      color:        0xffffff, // let the light texture define the tone
+      roughness:    0.95,
+      metalness:    0.0,
+      color:        0x8a99a3, // tint the floor so it reads as a surface, not white
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;

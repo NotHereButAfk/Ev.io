@@ -65,7 +65,7 @@ export class Game {
     this.renderer.setPixelRatio(_q === 'high' ? Math.min(window.devicePixelRatio, 2) : _q === 'low' ? 0.6 : 1);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.85;
+    this.renderer.toneMappingExposure = 0.78;
 
     // Kick off model fetches immediately so they're ready before first use.
     // The real rigged human soldier is preferred; both callbacks swap the
@@ -83,7 +83,8 @@ export class Game {
 
     // IBL — makes every MeshStandardMaterial look physically accurate
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.6)).texture;
+    this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.35)).texture;
+    this.world.scene.environmentIntensity = 0.5; // keep IBL from washing surfaces to white
     pmrem.dispose();
 
     // ── HDR bloom post-processing ──────────────────────────────────────────
