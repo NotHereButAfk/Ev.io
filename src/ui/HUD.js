@@ -44,8 +44,8 @@ export class HUD {
   show() { this.root?.classList.remove('hidden'); }
   hide() { this.root?.classList.add('hidden'); }
 
-  // Mode-specific top-center overlay (timer, wave, lives).
-  setModeHUD(primary, secondary = '') {
+  // Mode-specific top-center overlay (timer, wave, lives, + optional 3rd line).
+  setModeHUD(primary, secondary = '', tertiary = '') {
     this.modeInfo.classList.remove('hidden');
     this.modeInfo.textContent = '';
     const p = document.createElement('span');
@@ -58,9 +58,28 @@ export class HUD {
       s.textContent = secondary;
       this.modeInfo.appendChild(s);
     }
+    if (tertiary) {
+      const t = document.createElement('span');
+      t.className = 'mode-tertiary';
+      t.textContent = tertiary;
+      this.modeInfo.appendChild(t);
+    }
   }
 
   hideModeHUD() { this.modeInfo.classList.add('hidden'); }
+
+  // Survival "Wave Bonus" coin multiplier (top-right).
+  setWaveBonus(mult) {
+    let el = document.getElementById('wave-bonus');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'wave-bonus';
+      (this.root || document.getElementById('hud') || document.body).appendChild(el);
+    }
+    el.classList.remove('hidden');
+    el.innerHTML = `<span class="wb-label">WAVE BONUS</span><span class="wb-mult">${mult}x</span>`;
+  }
+  hideWaveBonus() { document.getElementById('wave-bonus')?.classList.add('hidden'); }
 
   // Large centered deathmatch countdown timer
   showDMTimer(timeStr, isLow = false) {

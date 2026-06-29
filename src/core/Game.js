@@ -339,7 +339,7 @@ export class Game {
     const knifeTag = rewardMult > 1 ? `  🔪 KNIFE THROW x${rewardMult.toFixed(1)}!` : '';
 
     if (this._isSurvival) {
-      const coins = this.survivalManager.zombieKillReward() * rewardMult;
+      const coins = this.survivalManager.zombieKillReward() * rewardMult * this.survivalManager.waveBonus();
       this.score += 50 * rewardMult;
       this._pendingCoins += coins;
       if (this._pendingCoins >= 1) {
@@ -464,6 +464,7 @@ export class Game {
     this.hud.hideDMTimer();
     this.hud.hideDowned();
     this.hud.hideModeHUD();
+    this.hud.hideWaveBonus();   // only survival shows it
     this.waveBanner?.classList?.add('hidden');
 
     if (this._isDM) {
@@ -570,7 +571,9 @@ export class Game {
     sm.onGameOver = () => {
       this._playerDowned = false;
       this.hud.hideDowned();
-      this._endGame('GAME OVER', `SURVIVED ${sm.wave} WAVES`);
+      this.hud.hideWaveBonus();
+      sm.recordBest();
+      this._endGame('GAME OVER', `SURVIVED ${sm.wave} WAVES · ${this._fmtHMS(sm.elapsed)}`);
     };
   }
 
@@ -588,6 +591,14 @@ export class Game {
     } else {
       this.hud.hideModeHUD();
     }
+  }
+
+  // Format seconds as HH:MM:SS (survival best-time display).
+  _fmtHMS(secs) {
+    secs = Math.max(0, Math.floor(secs));
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
   }
 
   // Live scoreboard rows (you + opponents). Bot scores are seeded once per match
@@ -979,16 +990,18 @@ export class Game {
         this.hud.hideDowned();
       }
 
-      // Mode info panel
+      // Mode info panel (ev.io-style 3-line wave HUD)
+      const alive = this.zombieManager.zombies.filter((z) => z.alive).length;
+      const best  = `YOUR BEST TIME: ${this._fmtHMS(sm.bestTime())}`;
+      const mmss  = (t) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${m}:${String(s).padStart(2, '0')}`; };
       if (sm.graceActive) {
-        const m = Math.floor(sm.graceTimer / 60);
-        const s = Math.floor(sm.graceTimer % 60);
-        this.hud.setModeHUD('GRACE PERIOD', `${m}:${String(s).padStart(2,'0')} REMAINING`);
+        this.hud.setModeHUD(`WAVE 1 SPAWNS IN ${mmss(sm.graceTimer)}`, `${alive} BOTS ALIVE`, best);
       } else if (sm.betweenWave) {
-        this.hud.setModeHUD(`WAVE ${sm.wave} CLEARED`, `NEXT WAVE IN ${Math.ceil(sm.betweenTimer)}s`);
+        this.hud.setModeHUD(`WAVE ${sm.wave + 1} SPAWNS IN ${mmss(sm.betweenTimer)}`, `${alive} BOTS ALIVE`, best);
       } else {
-        this.hud.setModeHUD(`WAVE ${sm.wave}`, `${Math.ceil(Math.max(0, sm.waveTimer))}s REMAINING`);
+        this.hud.setModeHUD(`WAVE ${sm.wave}`, `${alive} BOTS ALIVE`, best);
       }
+      this.hud.setWaveBonus(sm.waveBonus());
       return;
     }
 

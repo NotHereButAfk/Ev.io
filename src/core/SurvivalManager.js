@@ -22,6 +22,7 @@ export class SurvivalManager {
     this.downedTimer   = 0;
     this.revivesLeft   = 2;    // player gets 2 auto-revives per game
     this.gameOver      = false;
+    this.elapsed       = 0;    // seconds survived this run (for best-time)
 
     // Callbacks — set by Game.js before calling update()
     this.onWaveStart  = null; // (wave, count, hpMult, speedMult, armedRatio) => void
@@ -46,6 +47,22 @@ export class SurvivalManager {
   // Coin reward for killing a zombie: 0.10–0.27
   zombieKillReward() {
     return +( 0.10 + Math.random() * 0.17 ).toFixed(2);
+  }
+
+  // Escalating coin multiplier shown in the HUD; grows each wave.
+  waveBonus() {
+    return +Math.min(5, 1 + Math.max(0, this.wave) * 0.1).toFixed(1);
+  }
+
+  // Best survival time, persisted across runs.
+  bestTime() {
+    try { return Math.max(0, +localStorage.getItem('sio_survival_best') || 0); }
+    catch { return 0; }
+  }
+  recordBest() {
+    if (this.elapsed > this.bestTime()) {
+      try { localStorage.setItem('sio_survival_best', String(Math.floor(this.elapsed))); } catch { /* ignore */ }
+    }
   }
 
   _startNextWave() {
@@ -77,6 +94,7 @@ export class SurvivalManager {
   // allZombiesDead: ZombieManager.allDead() result passed in each frame
   update(dt, allZombiesDead) {
     if (this.gameOver) return;
+    this.elapsed += dt;   // count total time survived
 
     // Grace period countdown
     if (this.graceActive) {

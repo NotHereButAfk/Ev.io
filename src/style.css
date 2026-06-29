@@ -3988,3 +3988,24 @@ html, body {
 }
 .sb-hint { text-align: center; margin-top: 10px; color: var(--kx-faint); font-size: 10px; letter-spacing: 1px; }
 .sb-key { background: rgba(255,255,255,0.08); border: 1px solid var(--kx-line); border-radius: 4px; padding: 1px 6px; color: #cdd9e5; font-weight: 700; }
+
+/* ============================================================================
+   =============   KYX.IO  SURVIVAL HUD  (wave bonus + 3-line)   ===============
+   ============================================================================ */
+.mode-tertiary {
+  display: block; font-size: 9px; font-weight: 700; letter-spacing: 2px;
+  color: var(--kx-faint); text-transform: uppercase; margin-top: 3px;
+}
+#wave-bonus {
+  position: absolute; top: 96px; right: 22px; text-align: right;
+  background: linear-gradient(180deg, rgba(9,14,24,0.62), rgba(5,8,16,0.72));
+  border: 1px solid rgba(255,194,74,0.3); border-radius: 10px;
+  padding: 8px 14px; backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4); z-index: 6;
+}
+#wave-bonus.hidden { display: none; }
+.wb-label { display: block; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: var(--kx-dim); }
+.wb-mult {
+  display: block; font-size: 20px; font-weight: 900; color: #ffc24a;
+  text-shadow: 0 0 12px rgba(255,194,74,0.5); font-variant-numeric: tabular-nums;
+}
