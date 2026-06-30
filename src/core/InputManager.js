@@ -10,11 +10,15 @@ export class InputManager {
     this.pointerLocked = false;
     this.justPressed = new Set();
 
-    // Treat any coarse-pointer / touch device as mobile.
-    // Use three independent signals so one false negative doesn't break it.
-    this.isMobile = ('ontouchstart' in window)
-      || (navigator.maxTouchPoints > 0)
-      || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+    // Only treat as mobile if it's a phone/tablet — NOT a touchscreen laptop.
+    // Touch-capable laptops still have a mouse/trackpad (a "fine" pointer), so
+    // requiring "coarse pointer AND no fine pointer" (or a mobile UA) keeps the
+    // desktop experience (pointer lock + no on-screen controls) on those.
+    const ua       = navigator.userAgent || '';
+    const mobileUA = /Android|iPhone|iPad|iPod|IEMobile|BlackBerry|Opera Mini|Mobile/i.test(ua);
+    const hasFine  = window.matchMedia?.('(any-pointer: fine)').matches ?? true;   // a mouse/trackpad exists
+    const coarse   = window.matchMedia?.('(pointer: coarse)').matches ?? false;     // primary pointer is touch
+    this.isMobile  = mobileUA || (coarse && !hasFine);
     this._virtualKeys = new Set();
 
     this._onKeyDown = (e) => {

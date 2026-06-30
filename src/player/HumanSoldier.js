@@ -46,9 +46,9 @@ const MODEL_SCALE = 1.0;
 // scale. This is what makes the loadout's armor cards each preview a different
 // "model" instead of the same green Chief four times.
 export const ARMOR_LOOKS = {
-  assault: { // Master Chief green — the iconic default
-    body: 0x5a7d35, visor: 0xffb02a,
-    roughness: 0.55, metalness: 0.35, scale: 1.00,
+  assault: { // white / silver plated spartan with orange energy glow (default)
+    body: 0xe9edf2, visor: 0xff8a1f,
+    roughness: 0.42, metalness: 0.5, scale: 1.00,
   },
   recon: {   // sleek light-blue scout exo
     body: 0x2f6fae, visor: 0x36f0ff,
@@ -519,8 +519,9 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
   const tint = new THREE.Color(hex);
   for (const m of mats) {
     if (m.map) {
-      // Keep the realistic texture; tint only lightly toward the skin colour.
-      m.color.setRGB(0.68 + 0.32 * tint.r, 0.68 + 0.32 * tint.g, 0.68 + 0.32 * tint.b);
+      // Brighten toward the skin colour so light skins (white armour) read bright,
+      // while keeping the texture detail (values can exceed 1 to lift the GLB grey).
+      m.color.setRGB(0.45 + 0.7 * tint.r, 0.45 + 0.7 * tint.g, 0.45 + 0.7 * tint.b);
     } else {
       m.color.copy(tint).lerp(new THREE.Color(group.userData?.baseBodyColor ?? 0x5a7d35), 0.35);
     }
