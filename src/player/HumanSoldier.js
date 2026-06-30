@@ -205,51 +205,104 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 let _detailTex = null;
 function _getDetailTex() {
   if (_detailTex) return _detailTex;
-  const S = 512;
+  const S = 1024;
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
+  const CELL = 128;                       // armour-plate cell size
+  const rivets = [];                       // shared bolt positions for albedo+normal
 
-  // Albedo: dark gunmetal base with brushed grain, grime blotches and scratches.
+  // ── Albedo: gunmetal plating with seams, rivets, greebles, grime, scratches ──
   const aC = mk(), a = aC.getContext('2d');
-  a.fillStyle = '#3b4046'; a.fillRect(0, 0, S, S);
-  for (let i = 0; i < S * 6; i++) { // horizontal brushed grain
-    const y = Math.random() * S, x = Math.random() * S, w = 8 + Math.random() * 40;
-    const v = 50 + Math.random() * 28;
-    a.strokeStyle = `rgba(${v},${v + 4},${v + 8},0.10)`; a.lineWidth = 1;
+  a.fillStyle = '#3a3f45'; a.fillRect(0, 0, S, S);
+  for (let i = 0; i < S * 10; i++) {       // brushed grain
+    const y = Math.random() * S, x = Math.random() * S, w = 10 + Math.random() * 60;
+    const v = 48 + Math.random() * 30;
+    a.strokeStyle = `rgba(${v},${v + 4},${v + 9},0.09)`; a.lineWidth = 1;
     a.beginPath(); a.moveTo(x, y); a.lineTo(x + w, y); a.stroke();
   }
-  for (let i = 0; i < 40; i++) { // grime / oxidation blotches
-    const x = Math.random() * S, y = Math.random() * S, r = 20 + Math.random() * 70;
+  // plate panels: each cell slightly different shade for a paneled look
+  for (let gx = 0; gx < S; gx += CELL)
+    for (let gy = 0; gy < S; gy += CELL) {
+      const v = 52 + Math.random() * 18;
+      a.fillStyle = `rgba(${v},${v + 5},${v + 11},0.18)`;
+      a.fillRect(gx + 3, gy + 3, CELL - 6, CELL - 6);
+    }
+  // recessed seam lines (dark) + highlight lip (light)
+  a.lineWidth = 3;
+  for (let g = 0; g <= S; g += CELL) {
+    a.strokeStyle = 'rgba(12,13,15,0.7)';
+    a.beginPath(); a.moveTo(g, 0); a.lineTo(g, S); a.stroke();
+    a.beginPath(); a.moveTo(0, g); a.lineTo(S, g); a.stroke();
+    a.strokeStyle = 'rgba(150,160,170,0.18)'; a.lineWidth = 1;
+    a.beginPath(); a.moveTo(g + 2, 0); a.lineTo(g + 2, S); a.stroke();
+    a.beginPath(); a.moveTo(0, g + 2); a.lineTo(S, g + 2); a.stroke();
+    a.lineWidth = 3;
+  }
+  // rivets/bolts near seam corners + small greeble vents
+  for (let gx = 0; gx < S; gx += CELL)
+    for (let gy = 0; gy < S; gy += CELL) {
+      for (const [ox, oy] of [[10, 10], [CELL - 10, 10], [10, CELL - 10], [CELL - 10, CELL - 10]]) {
+        if (Math.random() < 0.5) continue;
+        const x = gx + ox, y = gy + oy; rivets.push([x, y]);
+        a.fillStyle = 'rgba(20,22,25,0.8)'; a.beginPath(); a.arc(x, y, 3.2, 0, Math.PI * 2); a.fill();
+        a.fillStyle = 'rgba(170,178,188,0.7)'; a.beginPath(); a.arc(x - 0.8, y - 0.8, 1.6, 0, Math.PI * 2); a.fill();
+      }
+      if (Math.random() < 0.22) { // vent slats greeble
+        a.fillStyle = 'rgba(14,15,18,0.6)';
+        for (let s = 0; s < 4; s++) a.fillRect(gx + 30, gy + 40 + s * 7, CELL - 60, 3);
+      }
+    }
+  for (let i = 0; i < 70; i++) {           // grime / oxidation
+    const x = Math.random() * S, y = Math.random() * S, r = 30 + Math.random() * 120;
     const g = a.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(20,18,16,0.22)'); g.addColorStop(1, 'rgba(20,18,16,0)');
+    g.addColorStop(0, 'rgba(18,15,12,0.22)'); g.addColorStop(1, 'rgba(18,15,12,0)');
     a.fillStyle = g; a.beginPath(); a.arc(x, y, r, 0, Math.PI * 2); a.fill();
   }
-  for (let i = 0; i < 120; i++) { // bright scratches (exposed metal)
-    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 6 + Math.random() * 30;
-    a.strokeStyle = `rgba(190,196,205,${0.10 + Math.random() * 0.18})`; a.lineWidth = Math.random() < 0.3 ? 1.5 : 0.7;
+  for (let i = 0; i < 240; i++) {          // exposed-metal scratches
+    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 8 + Math.random() * 46;
+    a.strokeStyle = `rgba(195,201,210,${0.08 + Math.random() * 0.2})`; a.lineWidth = Math.random() < 0.25 ? 1.6 : 0.7;
     a.beginPath(); a.moveTo(x, y); a.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); a.stroke();
   }
 
-  // Normal: neutral blue with the same scratches/grain perturbing the surface.
+  // ── Normal: emboss the seams (grooves), rivets (bumps) and scratches ──
   const nC = mk(), n = nC.getContext('2d');
   n.fillStyle = 'rgb(128,128,255)'; n.fillRect(0, 0, S, S);
-  for (let i = 0; i < 160; i++) {
-    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 6 + Math.random() * 34;
-    const lift = Math.random() < 0.5;
-    n.strokeStyle = lift ? 'rgba(150,150,255,0.5)' : 'rgba(106,106,255,0.5)';
+  for (let g = 0; g <= S; g += CELL) {     // seam grooves: dark/light edges = bevel
+    n.strokeStyle = 'rgba(70,128,235,0.9)'; n.lineWidth = 3;
+    n.beginPath(); n.moveTo(g, 0); n.lineTo(g, S); n.stroke();
+    n.strokeStyle = 'rgba(186,128,235,0.9)';
+    n.beginPath(); n.moveTo(g + 3, 0); n.lineTo(g + 3, S); n.stroke();
+    n.strokeStyle = 'rgba(128,70,235,0.9)';
+    n.beginPath(); n.moveTo(0, g); n.lineTo(S, g); n.stroke();
+    n.strokeStyle = 'rgba(128,186,235,0.9)';
+    n.beginPath(); n.moveTo(0, g + 3); n.lineTo(S, g + 3); n.stroke();
+  }
+  for (const [x, y] of rivets) {           // rivet bumps
+    const g = n.createRadialGradient(x - 1, y - 1, 0, x, y, 4);
+    g.addColorStop(0, 'rgba(180,180,255,1)'); g.addColorStop(1, 'rgba(128,128,255,0)');
+    n.fillStyle = g; n.beginPath(); n.arc(x, y, 4, 0, Math.PI * 2); n.fill();
+  }
+  for (let i = 0; i < 220; i++) {          // scratch grooves
+    const x = Math.random() * S, y = Math.random() * S, ang = Math.random() * Math.PI, len = 8 + Math.random() * 40;
+    n.strokeStyle = Math.random() < 0.5 ? 'rgba(150,150,255,0.45)' : 'rgba(106,106,255,0.45)';
     n.lineWidth = Math.random() < 0.3 ? 2 : 1;
     n.beginPath(); n.moveTo(x, y); n.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); n.stroke();
   }
 
-  // Roughness: mottled — worn areas rougher, scratches shinier.
+  // ── Roughness: panels mid, seams matte, scratches/rivets shinier ──
   const rC = mk(), r = rC.getContext('2d');
-  r.fillStyle = '#8a8a8a'; r.fillRect(0, 0, S, S);
-  for (let i = 0; i < 60; i++) {
-    const x = Math.random() * S, y = Math.random() * S, rad = 24 + Math.random() * 80;
+  r.fillStyle = '#888'; r.fillRect(0, 0, S, S);
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * S, y = Math.random() * S, rad = 30 + Math.random() * 110;
     const g = r.createRadialGradient(x, y, 0, x, y, rad);
     const dark = Math.random() < 0.5;
-    g.addColorStop(0, dark ? 'rgba(60,60,60,0.5)' : 'rgba(200,200,200,0.4)');
-    g.addColorStop(1, 'rgba(128,128,128,0)');
+    g.addColorStop(0, dark ? 'rgba(60,60,60,0.5)' : 'rgba(205,205,205,0.4)');
+    g.addColorStop(1, 'rgba(136,136,136,0)');
     r.fillStyle = g; r.beginPath(); r.arc(x, y, rad, 0, Math.PI * 2); r.fill();
+  }
+  r.strokeStyle = 'rgba(170,170,170,0.5)'; r.lineWidth = 3; // seams matte
+  for (let g = 0; g <= S; g += CELL) {
+    r.beginPath(); r.moveTo(g, 0); r.lineTo(g, S); r.stroke();
+    r.beginPath(); r.moveTo(0, g); r.lineTo(S, g); r.stroke();
   }
 
   const tex = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
@@ -277,7 +330,7 @@ function _applyArmorLook(bodyMats, visorMats, look) {
     }
     // Surface detail on every body material — adds depth even over a real albedo.
     m.normalMap = det.normalMap;
-    m.normalScale = new THREE.Vector2(0.45, 0.45);
+    m.normalScale = new THREE.Vector2(0.85, 0.85);
     if (!m.roughnessMap) m.roughnessMap = det.roughnessMap;
     m.roughness = look.roughness;
     m.metalness = look.metalness;
