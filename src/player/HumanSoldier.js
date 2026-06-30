@@ -305,7 +305,7 @@ function _getDetailTex() {
     r.beginPath(); r.moveTo(0, g); r.lineTo(S, g); r.stroke();
   }
 
-  const tex = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const tex = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.4, 1.4); t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
   _detailTex = { map: tex(aC, true), normalMap: tex(nC, false), roughnessMap: tex(rC, false) };
   return _detailTex;
 }
@@ -330,11 +330,11 @@ function _applyArmorLook(bodyMats, visorMats, look) {
     }
     // Surface detail on every body material — adds depth even over a real albedo.
     m.normalMap = det.normalMap;
-    m.normalScale = new THREE.Vector2(0.85, 0.85);
-    if (!m.roughnessMap) m.roughnessMap = det.roughnessMap;
-    m.roughness = look.roughness;
-    m.metalness = look.metalness;
-    m.envMapIntensity = 0.9;
+    m.normalScale = new THREE.Vector2(1.4, 1.4);
+    m.roughnessMap = det.roughnessMap;
+    m.roughness = Math.min(1, look.roughness + 0.1);
+    m.metalness = Math.min(1, look.metalness + 0.15); // shinier so the bevels read
+    m.envMapIntensity = 1.1;
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
