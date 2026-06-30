@@ -2,6 +2,36 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
 
+// ── Blender-built Spartan GLB (the white/orange armoured soldier) ────────────
+let _spartanTemplate = null, _spartanLoading = false;
+const _spartanCbs = [];
+export function preloadSpartanModel(onLoad) {
+  if (onLoad) _spartanCbs.push(onLoad);
+  if (_spartanTemplate) { onLoad?.(); return; }
+  if (_spartanLoading) return;
+  _spartanLoading = true;
+  new GLTFLoader().load('/spartan.glb',
+    (gltf) => {
+      gltf.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+      _spartanTemplate = gltf.scene;
+      _spartanLoading = false;
+      _spartanCbs.splice(0).forEach((cb) => cb());
+    },
+    undefined,
+    (err) => { console.warn('[Spartan] load failed:', err?.message); _spartanLoading = false; }
+  );
+}
+export function isSpartanReady() { return !!_spartanTemplate; }
+export function buildSpartanModel() {
+  if (!_spartanTemplate) return null;
+  const g = new THREE.Group();
+  const m = _spartanTemplate.clone(true);
+  m.traverse((o) => { if (o.isMesh && o.material) o.material = o.material.clone(); });
+  g.add(m);
+  g.userData = { isSpartan: true, primaryMat: null, secondaryMat: null };
+  return g;
+}
+
 // ── Blender GLB player model loader ─────────────────────────────────────────
 let _playerTemplate = null, _playerLoading = false;
 const _loadCallbacks = [];
@@ -310,6 +340,11 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null, opts = {}) {
+  // The Blender-built Spartan (static mesh) — used for menu/loadout previews.
+  if (opts.preferSpartan && isSpartanReady()) {
+    const sp = buildSpartanModel();
+    if (sp) return sp;
+  }
   // Prefer the real rigged human soldier (the player). Bots opt out with
   // allowHuman:false — they rely on the procedural model's limb-pivot rig,
   // per-part headshot zones, and weapon-hand attachment.

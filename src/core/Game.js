@@ -37,7 +37,7 @@ import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
 import { ServerSim } from './ServerSim.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
-import { preloadPlayerModel } from '../player/PreviewCharacter.js';
+import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
@@ -77,6 +77,7 @@ export class Game {
     };
     preloadHumanSoldier(swapPreview);
     preloadPlayerModel(swapPreview);
+    preloadSpartanModel(swapPreview);
     preloadWeaponModels();
 
     this.world        = new World();

@@ -64,7 +64,7 @@ export class ArmorPreviewRenderer {
       this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
       this._group = null;
     }
-    const g = buildPreviewCharacter(playerSkin, armorTypeId, armorSkin);
+    const g = buildPreviewCharacter(playerSkin, armorTypeId, armorSkin, { preferSpartan: true });
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
 
     // center horizontally, sit feet on the disc, frame the whole body.
