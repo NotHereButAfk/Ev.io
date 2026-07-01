@@ -947,10 +947,8 @@ export class Game {
     // Real human soldier: drive its skeletal Idle/Walk/Run clips.
     const ud = this._playerBody?.userData;
     if (ud?.isHuman) {
-      const grounded = p.onGround;
-      let motion = 'idle';
-      if (grounded && speed > 0.6) motion = (p.isSprinting || speed > 6.5) ? 'run' : 'walk';
-      ud.setMotion(motion);
+      if (ud.setLocomotion) ud.setLocomotion(speed, p.onGround, p.isSprinting);
+      else ud.setMotion(speed > 0.6 && p.onGround ? (speed > 6.5 ? 'run' : 'walk') : 'idle');
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
       return;

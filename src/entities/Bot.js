@@ -322,7 +322,9 @@ export class Bot {
     if (this._isHuman) {
       const ud = this.mesh.userData;
       const moving = !!moveTarget;
-      ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
+      const spd = moving ? (this.speed || 3) : 0;
+      if (ud.setLocomotion) ud.setLocomotion(spd, true, this.speed > 3.4);
+      else ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
     }

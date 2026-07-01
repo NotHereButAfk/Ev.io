@@ -137,14 +137,40 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     next.setEffectiveTimeScale(1);
     next.setEffectiveWeight(1);
     next.reset().play();
-    if (current) current.crossFadeTo(next, 0.25, false);
+    if (current) {
+      // Warp between walk<->run so foot cadence stays in sync during the blend;
+      // a quick plain fade in/out of idle.
+      const warp = (name === 'run' || current === actions.run);
+      current.crossFadeTo(next, 0.2, warp);
+    }
     current = next;
   };
   setMotion('idle');
 
   // ── Per-armor motion: animation speed + additive stance + animated armour ──
   const motion = ARMOR_MOTION[armorTypeId] || ARMOR_MOTION.assault;
-  mixer.timeScale = motion.speed;
+  const baseTS = motion.speed;
+  mixer.timeScale = baseTS;
+
+  // Locomotion driver: choose the clip (with hysteresis to stop flicker) and
+  // scale playback to the real movement speed so the feet track the ground and
+  // don't slide. speed is in m/s.
+  const _clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  let _locName = 'idle';
+  const setLocomotion = (speed, grounded = true, sprinting = false) => {
+    let name = 'idle', ts = baseTS;
+    if (grounded) {
+      const runOn = _locName === 'run';
+      if (sprinting || speed > (runOn ? 4.4 : 5.4)) {
+        name = 'run';  ts = baseTS * _clamp(speed / 5.5, 0.7, 1.55);
+      } else if (speed > (_locName === 'idle' ? 0.55 : 0.32)) {
+        name = 'walk'; ts = baseTS * _clamp(speed / 1.6, 0.55, 1.9);
+      }
+    }
+    _locName = name;
+    setMotion(name);
+    mixer.timeScale = ts;
+  };
 
   const poseOffsets = [];
   const spineBone = root.getObjectByName('mixamorig:Spine1');
@@ -172,6 +198,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     }
     // Stance offsets are re-applied each frame after mixer.update overwrites the pose.
     for (const p of poseOffsets) p.bone.quaternion.multiply(p.q);
+    // Idle breathing + subtle head look-around when standing still, so the
+    // soldier feels alive instead of frozen between the clip's own motion.
+    if (_locName === 'idle') {
+      if (spineBone) spineBone.quaternion.multiply(_bq1.setFromAxisAngle(_AX_X, Math.sin(t * 1.5) * 0.014));
+      if (headBone)  headBone.quaternion.multiply(_bq2.setFromAxisAngle(_AX_Y, Math.sin(t * 0.55) * 0.05));
+    }
   };
 
   group.userData = {
@@ -179,6 +211,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     mixer,
     actions,
     setMotion,
+    setLocomotion,
     armorTick,
     bodyMats,
     visorMats,
@@ -381,6 +414,9 @@ const ARMOR_MOTION = {
   stealth: { speed: 0.92, spineLean:  0.13, headPitch:  0.09 }, // low, prowling
 };
 const _AX_X = new THREE.Vector3(1, 0, 0);
+const _AX_Y = new THREE.Vector3(0, 1, 0);
+const _bq1  = new THREE.Quaternion();
+const _bq2  = new THREE.Quaternion();
 
 // Returns { animated: [...] } — armour meshes that pulse / blink / sway every
 // frame via the group's armorTick(dt).
