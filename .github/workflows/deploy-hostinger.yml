@@ -26,7 +26,11 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - name: Upload dist/ to Hostinger via FTP
+      # Hostinger's FTPS control socket occasionally times out from GitHub's
+      # runners, so retry the upload a few times before giving up.
+      - name: Upload dist/ to Hostinger via FTPS (attempt 1)
+        id: ftp1
+        continue-on-error: true
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -36,4 +40,40 @@ jobs:
           port: 21
           local-dir: ./dist/
           server-dir: /public_html/
-          timeout: 60000
+          timeout: 120000
+
+      - name: Wait before retry
+        if: steps.ftp1.outcome == 'failure'
+        run: sleep 25
+
+      - name: Upload dist/ to Hostinger via FTPS (attempt 2)
+        id: ftp2
+        if: steps.ftp1.outcome == 'failure'
+        continue-on-error: true
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./dist/
+          server-dir: /public_html/
+          timeout: 120000
+
+      - name: Wait before final retry
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        run: sleep 40
+
+      - name: Upload dist/ to Hostinger via FTPS (attempt 3)
+        if: steps.ftp1.outcome == 'failure' && steps.ftp2.outcome == 'failure'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./dist/
+          server-dir: /public_html/
+          timeout: 120000
