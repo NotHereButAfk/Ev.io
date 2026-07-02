@@ -86,6 +86,44 @@ function makeSkyGradientTexture() {
   return tex;
 }
 
+// Winter-Bishop building wall: base plaster/clay tone with panel wear and a
+// loose grid of dark window insets (a few warmly lit). One texture per palette
+// colour, shared by every building of that colour — zero extra meshes.
+function makeBuildingWallTexture(baseCss, darkCss) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = baseCss;
+  g.fillRect(0, 0, S, S);
+  // weathering: subtle vertical streaks + tonal patches
+  for (let i = 0; i < 26; i++) {
+    const x = Math.random() * S, w = 4 + Math.random() * 18;
+    g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${0.03 + Math.random() * 0.05})`;
+    g.fillRect(x, 0, w, S);
+  }
+  // storey bands
+  g.fillStyle = 'rgba(0,0,0,0.10)';
+  for (let y = 84; y < S; y += 84) g.fillRect(0, y, S, 3);
+  // windows: 4 cols x 3 rows, some skipped, some lit warm
+  for (let r = 0; r < 3; r++) {
+    for (let col = 0; col < 4; col++) {
+      if (Math.random() < 0.28) continue;               // skip some — irregular look
+      const x = 18 + col * 60, y = 22 + r * 84;
+      const lit = Math.random() < 0.22;
+      g.fillStyle = darkCss;
+      g.fillRect(x, y, 30, 40);
+      g.fillStyle = lit ? 'rgba(255,214,150,0.95)' : 'rgba(120,150,175,0.35)';
+      g.fillRect(x + 3, y + 3, 24, 34);
+      g.fillStyle = 'rgba(255,255,255,0.25)';           // snow on the sill
+      g.fillRect(x - 2, y + 40, 34, 3);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // Concrete sidewalk with expansion-joint lines.
 function makeSidewalkTexture() {
   const size = 256;
@@ -494,23 +532,16 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // A focused ev.io ARENA — not a city. The old city builders (building grid,
-    // skyline, holograms, flying traffic, crosswalks, street lamps, greenery) are
-    // intentionally gone; what remains is the arena: enclosing walls, a central
-    // landmark, multi-level platforms/ramps, pillars, grav-lifts, teleporters,
-    // and cover.
+    // Winter-Bishop-style TOWN (ev.io): dense blocks of multi-storey buildings
+    // forming streets, alleys and a central plaza — not an open pillar arena.
+    // Walkable rooftops, ramps + a rooftop bridge, grav-lifts for verticality,
+    // a round pavilion landmark, snow drifts and string lights.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildArenaWalls();      // solid perimeter walls (replaces the force-field boundary)
-    this._buildObstacles();       // mid-field cover (energy barriers + crates)
-    this._buildOrbitalRing();     // overhead sci-fi landmark
-    this._buildArenaCore();       // central spire landmark
-    this._buildLandingPads();     // accent pads
-    this._buildGroundChannels();  // glowing floor lane markings
-    this._buildArenaStructures(); // central deck, ramps, wing platforms, grav-lifts, teleporters
-    this._buildArenaPillars();    // tall pillars (cover + verticality)
-    this._buildSnowProps();       // crates + festive string lights (Winter-Bishop)
+    this._buildArenaWalls();      // terracotta perimeter (the town's outer edge)
+    this._buildWinterTown();      // building blocks, plaza + pavilion, ramps, bridges, lifts
+    this._buildSnowProps();       // crates + perimeter string lights
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -2553,6 +2584,158 @@ export class World {
         new THREE.Vector3(x + 1.05, h + 1.4, z + 1.05)
       );
       this.colliders.push({ box, mesh: shaft });
+    }
+  }
+
+  // ── Winter-Bishop town ───────────────────────────────────────────────────────
+  // Street grid: open avenues along x=0 and z=0 (|coord| < 19), cross-streets at
+  // |coord| in 35..43, a wide outer ring, and a central plaza with the round
+  // pavilion. 16 buildings in 3 rings; every roof is walkable.
+  _buildWinterTown() {
+    const mats = {
+      roof:  new THREE.MeshStandardMaterial({ color: 0x8a94a0, roughness: 0.9, metalness: 0.05 }),
+      trim:  new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.9, metalness: 0.05 }),
+      snow:  new THREE.MeshStandardMaterial({ color: 0xeef3f8, roughness: 0.95, metalness: 0 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0xb79c78, roughness: 0.9, metalness: 0.04 }),
+      cream: new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.85, metalness: 0.04 }),
+    };
+    // one shared textured material per palette colour
+    const wall = (css, dark) => new THREE.MeshStandardMaterial({
+      map: makeBuildingWallTexture(css, dark), roughness: 0.92, metalness: 0.03,
+    });
+    const CLAY  = wall('#a9663f', '#3a2318');
+    const CLAY2 = wall('#8a5a3a', '#33201a');
+    const SLATE = wall('#5f6d7d', '#22282f');
+    const TAN   = wall('#c9a878', '#4a3a26');
+
+    // [cx, cz, w, d, h, mat, hut?]
+    const blocks = [
+      // inner ring (quadrant corners around the plaza)
+      [ 27,  27, 16, 16, 10, CLAY,  false],
+      [-27,  27, 16, 16, 12, SLATE, true ],
+      [ 27, -27, 16, 16, 11, TAN,   true ],
+      [-27, -27, 16, 16,  8, CLAY2, false],
+      // mid ring (along the avenues)
+      [ 27,  52, 16, 18, 14, SLATE, true ], [-27,  52, 16, 18,  9, CLAY,  false],
+      [ 27, -52, 16, 18, 12, TAN,   false], [-27, -52, 16, 18, 15, SLATE, true ],
+      [ 52,  27, 18, 16, 10, CLAY,  false], [-52,  27, 18, 16, 13, SLATE, false],
+      [ 52, -27, 18, 16, 16, CLAY2, true ], [-52, -27, 18, 16, 11, TAN,   false],
+      // corner towers
+      [ 52,  52, 18, 18, 18, SLATE, true ], [-52,  52, 18, 18, 13, CLAY,  false],
+      [ 52, -52, 18, 18, 16, TAN,   true ], [-52, -52, 18, 18, 20, SLATE, false],
+    ];
+    for (const [cx, cz, w, d, h, m, hut] of blocks) this._townBuilding(cx, cz, w, d, h, m, mats, hut);
+
+    // ── roof access: two long ramps (one per short block) + landings ──
+    // SW block (-27,-27) h=8 — ramp up its west wall from the avenue.
+    this._rampBox(-38.5, -35.5, -27, -1, 8.46, 0, 'z', mats.stone, 0);
+    this._townLanding(-38.5, -35, -31, -27, 8.46, mats.stone);
+    // NE block (27,27) h=10 — ramp up its east wall.
+    this._rampBox(35.5, 38.5, 3, 29, 0, 10.46, 'z', mats.stone, 0);
+    this._townLanding(35, 38.5, 29, 35, 10.46, mats.stone);
+
+    // ── rooftop bridges across the cross-streets (slight slope between roofs) ──
+    this._rampBox(-28.5, -25.5, 35, 43, 12.46, 9.46, 'z', mats.trim, 0);   // (-27,27)h12 → (-27,52)h9
+    this._rampBox(25.5, 28.5, -43, -35, 12.46, 11.46, 'z', mats.trim, 0);  // (27,-52)h12 → (27,-27)h11
+
+    // ── grav-lifts at the plaza-side corners of each inner block ──
+    this._gravLift( 18,  18, 12.0, 14);
+    this._gravLift(-18,  18, 14.0, 14);
+    this._gravLift( 18, -18, 13.0, 14);
+    this._gravLift(-18, -18, 10.0, 14);
+
+    // ── central pavilion landmark (round two-tier platform, cream top) ──
+    const t1 = new THREE.Mesh(new THREE.CylinderGeometry(5, 5.3, 0.5, 24), mats.stone);
+    t1.position.set(0, 0.25, 0); this.scene.add(t1);
+    const t2 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.5, 24), mats.cream);
+    t2.position.set(0, 0.75, 0); this.scene.add(t2);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.12, 8, 32), mats.trim);
+    rim.rotation.x = Math.PI / 2; rim.position.y = 1.02; this.scene.add(rim);
+    const med = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.12, 16), mats.trim);
+    med.position.y = 1.06; this.scene.add(med);
+    this.platforms.push({ minX: -4.2, maxX: 4.2, minZ: -4.2, maxZ: 4.2, y0: 0.5, y1: 0.5 });
+    this.platforms.push({ minX: -3.2, maxX: 3.2, minZ: -3.2, maxZ: 3.2, y0: 1.0, y1: 1.0 });
+
+    // ── snow drifts hugging building bases ──
+    const driftMat = mats.snow;
+    for (const [cx, cz, w, d] of blocks) {
+      for (let i = 0; i < 2; i++) {
+        const side = Math.floor(Math.random() * 4);
+        const drift = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), driftMat);
+        const len = 2.5 + Math.random() * 3;
+        let dx = 0, dz = 0;
+        if (side === 0)      { dx =  w / 2 + 0.4; drift.scale.set(1.1, 0.55, len); }
+        else if (side === 1) { dx = -w / 2 - 0.4; drift.scale.set(1.1, 0.55, len); }
+        else if (side === 2) { dz =  d / 2 + 0.4; drift.scale.set(len, 0.55, 1.1); }
+        else                 { dz = -d / 2 - 0.4; drift.scale.set(len, 0.55, 1.1); }
+        drift.position.set(cx + dx + (Math.random() - 0.5) * 4, 0.1, cz + dz + (Math.random() - 0.5) * 4);
+        drift.userData.noHit = true;
+        this.scene.add(drift);
+      }
+    }
+
+    // ── festive string lights across the avenues between rooflines ──
+    this._bulbStrand(-19,  27, 10.5,  19,  27, 10.5);
+    this._bulbStrand(-19, -27,  8.5,  19, -27,  8.5);
+    this._bulbStrand( 27, -19, 10.0,  27,  19, 10.0);
+    this._bulbStrand(-27, -19,  8.5, -27,  19, 12.0);
+  }
+
+  // One town building: textured walls, parapet lip, snowy walkable roof.
+  _townBuilding(cx, cz, w, d, h, sideMat, mats, hut) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d),
+      [sideMat, sideMat, mats.roof, mats.roof, sideMat, sideMat]
+    );
+    body.position.y = h / 2;
+    g.add(body);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.4, d + 0.6), mats.trim);
+    lip.position.y = h + 0.1; g.add(lip);
+    const snow = new THREE.Mesh(new THREE.BoxGeometry(w - 0.8, 0.22, d - 0.8), mats.snow);
+    snow.position.y = h + 0.35; g.add(snow);
+    if (hut) {
+      const hw = Math.min(5, w * 0.35);
+      const hutM = new THREE.Mesh(new THREE.BoxGeometry(hw, 2.2, hw), mats.stone);
+      hutM.position.set(w * 0.16, h + 1.45, -d * 0.16); g.add(hutM);
+      const hutSnow = new THREE.Mesh(new THREE.BoxGeometry(hw + 0.2, 0.16, hw + 0.2), mats.snow);
+      hutSnow.position.set(w * 0.16, h + 2.62, -d * 0.16); g.add(hutSnow);
+    }
+    g.position.set(cx, 0, cz);
+    g.updateMatrixWorld(true);
+    this.scene.add(g);
+    this.colliders.push({
+      box: new THREE.Box3(new THREE.Vector3(cx - w / 2, 0, cz - d / 2), new THREE.Vector3(cx + w / 2, h, cz + d / 2)),
+      mesh: body,
+    });
+    this.platforms.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y0: h + 0.46, y1: h + 0.46 });
+  }
+
+  // Flat landing shelf joining a ramp top to a roof edge.
+  _townLanding(minX, maxX, minZ, maxZ, y, mat) {
+    const land = new THREE.Mesh(new THREE.BoxGeometry(maxX - minX, 0.4, maxZ - minZ), mat);
+    land.position.set((minX + maxX) / 2, y - 0.2, (minZ + maxZ) / 2);
+    this.scene.add(land);
+    this.platforms.push({ minX, maxX, minZ, maxZ, y0: y, y1: y });
+  }
+
+  // A sagging strand of coloured festive bulbs between two anchor points.
+  _bulbStrand(x0, z0, y0, x1, z1, y1) {
+    const colors = [0xff4040, 0x40c060, 0xffd23b, 0x4090ff, 0xff8a3b, 0xffffff];
+    const segs = 18;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 6, 5),
+        new THREE.MeshBasicMaterial({ color: colors[i % colors.length] })
+      );
+      bulb.position.set(
+        x0 + (x1 - x0) * t,
+        y0 + (y1 - y0) * t - Math.sin(t * Math.PI) * 1.4,
+        z0 + (z1 - z0) * t
+      );
+      bulb.matrixAutoUpdate = false; bulb.updateMatrix();
+      this.scene.add(bulb);
     }
   }
 

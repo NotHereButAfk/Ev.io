@@ -474,6 +474,7 @@ export class Game {
     this.hud.hideWaveBonus();   // only survival shows it
     this.nameplates.clear();
     this.waveBanner?.classList?.add('hidden');
+    this._showMapLoading(modeId);
 
     if (this._isDM) {
       this._activeManager = this.botManager;
@@ -702,6 +703,41 @@ export class Game {
 
   // ESC during a match opens the menu as an overlay. The state stays 'playing'
   // so zombies/bots/timers keep running — you can't freeze a multiplayer match.
+  // ev.io-style map loading card: map name / region / mode / players / TIP,
+  // shown over the fly-through for a beat as the match starts, then fades.
+  _showMapLoading(modeId) {
+    const el = document.getElementById('map-loading');
+    if (!el) return;
+    const TIPS = [
+      'TIP: press Q to blink-teleport forward',
+      'TIP: hold TAB to check the scoreboard mid-match',
+      'TIP: F throws a frag grenade, E throws smoke',
+      'TIP: headshots deal bonus damage — aim high',
+      'TIP: grav-lifts by the plaza launch you onto the rooftops',
+      'TIP: rarer skins earn more coins per kill',
+    ];
+    const modeNames = {
+      deathmatch: 'Deathmatch', teamslayer: 'Team Slayer', ctf: 'Capture the Flag',
+      koth: 'King of the Hill', survival: 'Firefight',
+    };
+    const mode = document.getElementById('ml-mode');
+    if (mode) mode.textContent = modeNames[modeId] || 'Deathmatch';
+    const players = document.getElementById('ml-players');
+    if (players) players.textContent = `${MAX_PLAYERS} players`;
+    const tip = document.getElementById('ml-tip');
+    if (tip) tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+
+    clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    el.classList.remove('hidden', 'ml-fade');
+    this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
+    this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
+  }
+
+  _hideMapLoading() {
+    clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    document.getElementById('map-loading')?.classList.add('hidden');
+  }
+
   _openMenu() {
     this._menuOpen = true;
     this.mobileControls?.hide();
@@ -711,6 +747,7 @@ export class Game {
   _quitToMenu() {
     if (this.state === 'playing' || this.state === 'leaderboard') this._saveStats();
     this._lbTimer = Infinity; // cancel any pending auto-restart
+    this._hideMapLoading();
     this.hud.hideLeaderboard();
     this.audio.stopAmbientCity();
     this.serverSim?.stop();

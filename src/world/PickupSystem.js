@@ -18,9 +18,9 @@ const SPAWN_LAYOUT = [
   ['health', [ 28,   0]], ['ammo',   [-28,   0]],
   ['health', [  0,  58]], ['ammo',   [  0, -58]],
   ['health', [ 58,   0]], ['ammo',   [-58,   0]],
-  // Corner plazas
-  ['shield', [ 52,  52]], ['shield', [-52,  52]],
-  ['shield', [ 52, -52]], ['shield', [-52, -52]],
+  // Cross-street corners (the old corner spots are now inside the towers)
+  ['shield', [ 38,  38]], ['shield', [-38,  38]],
+  ['shield', [ 38, -38]], ['shield', [-38, -38]],
   // Mid-range scatter
   ['ammo',   [ 36,  36]], ['ammo',   [-36,  36]],
   ['ammo',   [ 36, -36]], ['ammo',   [-36, -36]],
