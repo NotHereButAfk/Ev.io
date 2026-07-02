@@ -983,8 +983,17 @@ export class MenuUI {
     this._closeAllPanels();
   }
 
-  showPause()    { this.pauseMenu.classList.remove('hidden'); }
-  hidePause()    { this.pauseMenu.classList.add('hidden'); }
+  // Esc during a match opens the full nav GUI (Loadout / Shop / Settings /
+  // Profile / …) — the same menu as the main screen — plus the Resume/Quit box.
+  showPause() {
+    this.topNav.classList.remove('hidden');
+    this.pauseMenu.classList.remove('hidden');
+  }
+  hidePause() {
+    this.pauseMenu.classList.add('hidden');
+    this.topNav.classList.add('hidden');
+    this._closeAllPanels();
+  }
 
   showGameOver(stats, title = 'YOU DIED') {
     document.getElementById('gameover-title').textContent = title;
