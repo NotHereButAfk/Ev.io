@@ -51,6 +51,10 @@ const ICON_ACH = {
   score: '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><path d="M12 2l2.9 6 6.6.6-5 4.3 1.5 6.5L12 16.9 5.9 19.4 7.4 12.9l-5-4.3 6.6-.6z"/></svg>',
   kd:    '<svg viewBox="0 0 24 24" fill="none" stroke="#5fe9ff" stroke-width="1.6"><path d="M12 2l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V5z"/><path d="M9 12l2 2 4-4"/></svg>',
 };
+// Cache of real skinned-weapon renders (dataURLs) keyed `${weaponId}:${skinId}`
+// so each inventory card only ever pays its 3D render cost once per session.
+const _skinThumbCache = new Map();
+
 function _grad(a, b) { return `linear-gradient(150deg, #${_hex(a >>> 0)}, #${_hex(b >>> 0)})`; }
 function _darken(hex, f) {
   const r = Math.floor((hex >> 16 & 255) * f), g = Math.floor((hex >> 8 & 255) * f), b = Math.floor((hex & 255) * f);
@@ -244,6 +248,7 @@ export class MenuUI {
       this._profilePreview?.stop();
     }
     this._activePanel = null;
+    this._skinRenderToken = (this._skinRenderToken || 0) + 1; // stop any skin-render pump
     document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
     document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('active'));
     document.getElementById('nav-profile-btn')?.classList.remove('active');
@@ -491,8 +496,9 @@ export class MenuUI {
     if (w) this._renderSkinCards(grid, w);
   }
 
-  // ev.io-style skin cards: one card per skin (incl. Default), each showing the
-  // gun silhouette over the skin's colours, a rarity label, and the name.
+  // Skin cards with REAL skinned-gun renders (progressive + cached), a search
+  // box and rarity filter chips — every card shows the actual weapon wearing
+  // that skin instead of a flat colour swatch.
   _renderSkinCards(grid, w) {
     const isMelee = w.kind === 'melee';
     const skins   = isMelee ? SWORD_SKINS : WEAPON_SKINS;
@@ -500,7 +506,56 @@ export class MenuUI {
     const equippedThis = isMelee ? (Loadout.getMelee() === w.id) : (Loadout.getGun() === w.id);
     const sil = getWeaponThumb(w.id);
 
+    // ── toolbar: search + rarity chips + live count ──
+    const bar = document.createElement('div');
+    bar.className = 'inv-skinbar';
+    const search = document.createElement('input');
+    search.className = 'inv-skin-search';
+    search.type = 'text';
+    search.placeholder = `Search ${skins.length + 1} skins…`;
+    bar.appendChild(search);
+    const chipRow = document.createElement('div');
+    chipRow.className = 'inv-chiprow';
+    bar.appendChild(chipRow);
+    const countEl = document.createElement('span');
+    countEl.className = 'inv-skin-count';
+    bar.appendChild(countEl);
+    grid.appendChild(bar);
+
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+    const present = RARITY_ORDER.filter((r) => skins.some((s) => (s.rarity || 'common') === r));
+    const state = { q: '', rarity: 'all' };
+    const chips = [];
+    const mkChip = (id, label, color) => {
+      const c = document.createElement('button');
+      c.className = 'inv-chip' + (id === 'all' ? ' active' : '');
+      c.textContent = label;
+      if (color != null) c.style.setProperty('--chip', `#${_hex(color)}`);
+      c.addEventListener('click', () => {
+        state.rarity = id;
+        chips.forEach((x) => x.el.classList.toggle('active', x.id === id));
+        applyFilter();
+      });
+      chipRow.appendChild(c);
+      chips.push({ id, el: c });
+    };
+    mkChip('all', 'ALL', null);
+    for (const r of present) mkChip(r, r.toUpperCase(), RARITY_COLORS?.[r]);
+
     const cards = [];
+    const applyFilter = () => {
+      let shown = 0;
+      for (const c of cards) {
+        const okQ = !state.q || c.name.toLowerCase().includes(state.q);
+        const okR = state.rarity === 'all' || c.rarity === state.rarity;
+        const on = okQ && okR;
+        c.el.style.display = on ? '' : 'none';
+        if (on) shown++;
+      }
+      countEl.textContent = `${shown} / ${cards.length}`;
+    };
+    search.addEventListener('input', () => { state.q = search.value.trim().toLowerCase(); applyFilter(); });
+
     // Selecting a skin equips this weapon (+ the skin) — every gun is equippable.
     const select = (id) => {
       if (isMelee) Loadout.setMelee(w.id); else Loadout.setGun(w.id);
@@ -516,8 +571,11 @@ export class MenuUI {
       equipped: equippedThis && !curSkinId, onClick: () => select(null),
     });
     grid.appendChild(defCard);
-    cards.push({ id: '__def__', el: defCard });
+    cards.push({ id: '__def__', el: defCard, name: 'default', rarity: 'common' });
 
+    // Queue every skin for a real 3D render — a couple per frame so the panel
+    // stays responsive; results cached so revisits are instant.
+    const jobs = [];
     for (const s of skins) {
       const bg = isMelee
         ? _grad(s.blade ?? 0x8090a0, s.guard ?? 0x303840)
@@ -527,8 +585,34 @@ export class MenuUI {
         equipped: equippedThis && s.id === curSkinId, onClick: () => select(s.id),
       });
       grid.appendChild(card);
-      cards.push({ id: s.id, el: card });
+      cards.push({ id: s.id, el: card, name: s.name.toLowerCase(), rarity: s.rarity || 'common' });
+      const im = card.querySelector('.inv-skin-card-sil');
+      if (im) jobs.push({ im, skin: s });
     }
+    applyFilter();
+
+    this._skinRenderToken = (this._skinRenderToken || 0) + 1;
+    const token = this._skinRenderToken;
+    const pump = () => {
+      if (token !== this._skinRenderToken) return;   // tab switched — abandon
+      let n = 0;
+      while (jobs.length && n < 2) {
+        const job = jobs.shift();
+        const key = `${w.id}:${job.skin.id}`;
+        let src = _skinThumbCache.get(key);
+        if (!src) {
+          try { src = renderWeaponSkinned(w, job.skin); } catch { src = null; }
+          if (src) _skinThumbCache.set(key, src);
+        }
+        if (src) {
+          job.im.style.backgroundImage = `url(${src})`;
+          job.im.classList.add('ready');
+        }
+        n++;
+      }
+      if (jobs.length) requestAnimationFrame(pump);
+    };
+    if (jobs.length) requestAnimationFrame(pump);
   }
 
   _skinCard({ bg, sil, name, rarity, equipped, onClick }) {

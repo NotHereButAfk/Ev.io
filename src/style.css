@@ -4155,3 +4155,49 @@ html, body {
   position: absolute; bottom: 26px; left: 34px; right: 20px;
   color: #d9c07a; font-size: 12.5px; letter-spacing: 0.3px;
 }
+
+/* ============================================================================
+   =========   KYX.IO  INVENTORY v2: real renders + search + rarity   =========
+   ============================================================================ */
+/* toolbar spans the whole card grid */
+.inv-skinbar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 2px 0 4px;
+}
+.inv-skin-search {
+  background: rgba(4,8,15,0.6); border: 1px solid var(--kx-line);
+  color: var(--kx-ink); border-radius: 9px; padding: 8px 13px; font-size: 13px;
+  width: 210px; transition: border-color .15s, box-shadow .15s;
+}
+.inv-skin-search:focus {
+  border-color: var(--kx-cyan); outline: none;
+  box-shadow: 0 0 0 3px rgba(20,224,255,0.16);
+}
+.inv-chiprow { display: flex; gap: 6px; flex-wrap: wrap; }
+.inv-chip {
+  --chip: #8aa0b6;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--kx-line-soft);
+  color: var(--chip); font-size: 10px; font-weight: 800; letter-spacing: 0.8px;
+  padding: 6px 11px; border-radius: 14px; cursor: pointer; transition: all .13s;
+}
+.inv-chip:hover { border-color: var(--chip); }
+.inv-chip.active {
+  border-color: var(--chip); background: rgba(255,255,255,0.09);
+  box-shadow: 0 0 10px -2px var(--chip); color: #fff;
+}
+.inv-skin-count { margin-left: auto; color: var(--kx-dim); font-size: 11px; font-weight: 700; letter-spacing: 0.6px; }
+
+/* real render fades in over the placeholder silhouette */
+.inv-skin-card-sil { transition: opacity .25s; }
+.inv-skin-card-sil.ready { animation: skinPop .3s ease; }
+@keyframes skinPop { from { opacity: 0.2; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+
+/* rarity presence: tinted frame + glow that strengthens up the tiers */
+.inv-skin-card[data-rarity="rare"]:hover      { box-shadow: 0 0 16px -2px rgba(40,120,255,0.55); }
+.inv-skin-card[data-rarity="epic"]            { box-shadow: 0 0 12px -4px rgba(180,50,255,0.35); }
+.inv-skin-card[data-rarity="epic"]:hover      { box-shadow: 0 0 20px -2px rgba(180,50,255,0.65); }
+.inv-skin-card[data-rarity="legendary"]       { box-shadow: 0 0 14px -4px rgba(255,173,0,0.45); }
+.inv-skin-card[data-rarity="legendary"]:hover { box-shadow: 0 0 24px -2px rgba(255,173,0,0.7); }
+.inv-skin-card[data-rarity="mythic"]          { box-shadow: 0 0 16px -4px rgba(255,43,208,0.5); }
+.inv-skin-card[data-rarity="mythic"]:hover    { box-shadow: 0 0 26px -2px rgba(255,43,208,0.75); }
