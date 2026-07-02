@@ -4201,3 +4201,339 @@ html, body {
 .inv-skin-card[data-rarity="legendary"]:hover { box-shadow: 0 0 24px -2px rgba(255,173,0,0.7); }
 .inv-skin-card[data-rarity="mythic"]          { box-shadow: 0 0 16px -4px rgba(255,43,208,0.5); }
 .inv-skin-card[data-rarity="mythic"]:hover    { box-shadow: 0 0 26px -2px rgba(255,43,208,0.75); }
+
+/* ============================================================================
+   ===============   KYX.IO  INVENTORY v3  (two-pane loadout hub)   ============
+   Categorised weapon sidebar + live 3D inspector + stat sheet + skin grid,
+   loadout presets, favorites, sort and perk summary. Appended last to win.
+   ============================================================================ */
+.nav-panel-inv { width: min(98vw, 1240px) !important; }
+
+/* header perk summary */
+.inv3-perks {
+  margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: center; max-width: 360px; justify-content: flex-end;
+}
+.inv3-perks-label {
+  width: 100%; text-align: right; color: var(--kx-faint);
+  font-size: 10px; font-weight: 800; letter-spacing: 1.2px; margin-bottom: 2px;
+}
+.inv3-perk-chip {
+  background: rgba(20,224,255,0.08); border: 1px solid rgba(20,224,255,0.22);
+  color: var(--kx-cyan-soft); font-size: 11px; font-weight: 700;
+  padding: 4px 9px; border-radius: 13px; white-space: nowrap;
+}
+.inv-actions { margin-left: 18px; }
+
+/* loadout preset bar */
+.inv3-loadoutbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 12px 0 14px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--kx-line-soft);
+}
+.inv3-bar-label { color: var(--kx-faint); font-size: 11px; font-weight: 800; letter-spacing: 1.4px; margin-right: 4px; }
+.inv3-preset { display: flex; align-items: stretch; }
+.inv3-preset-main {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(10,16,26,0.7); border: 1px solid var(--kx-line);
+  color: var(--kx-ink); font-size: 12px; font-weight: 600;
+  padding: 8px 12px; border-radius: 9px 0 0 9px; cursor: pointer;
+  max-width: 210px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: all .13s;
+}
+.inv3-preset.empty .inv3-preset-main { border-radius: 9px; color: var(--kx-dim); border-style: dashed; }
+.inv3-preset-main:hover { border-color: var(--kx-cyan); color: #fff; }
+.inv3-preset-main.applied { border-color: #2fae5a; color: #9be8b4; }
+.inv3-preset-slot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto;
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue-deep));
+  color: #04121c; font-size: 11px; font-weight: 900;
+}
+.inv3-preset-io {
+  width: 24px; border: 1px solid var(--kx-line); border-left: none;
+  background: rgba(10,16,26,0.7); color: var(--kx-dim);
+  font-size: 12px; cursor: pointer; transition: all .13s;
+}
+.inv3-preset-io:last-child { border-radius: 0 9px 9px 0; }
+.inv3-preset-io:hover { color: #fff; background: rgba(20,44,60,0.9); }
+.inv3-dice {
+  margin-left: auto; background: linear-gradient(180deg, rgba(180,50,255,0.22), rgba(120,30,180,0.18));
+  border: 1px solid rgba(180,80,255,0.4); color: #e6c8ff;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.8px;
+  padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: all .13s;
+}
+.inv3-dice:hover { filter: brightness(1.2); box-shadow: 0 0 16px -3px rgba(180,80,255,0.6); }
+
+/* two-pane body */
+.inv3-body { display: grid; grid-template-columns: 236px 1fr; gap: 18px; align-items: start; }
+
+/* sidebar */
+.inv3-side {
+  max-height: 62vh; overflow-y: auto; padding-right: 6px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.inv3-side::-webkit-scrollbar { width: 7px; }
+.inv3-side::-webkit-scrollbar-thumb { background: rgba(20,224,255,0.3); border-radius: 4px; }
+.inv3-cat-label {
+  color: var(--kx-faint); font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
+  margin: 12px 0 4px; padding-left: 2px;
+}
+.inv3-cat-label:first-child { margin-top: 0; }
+.inv3-wrow {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  background: rgba(9,14,24,0.55); border: 1px solid var(--kx-line-soft);
+  border-radius: 9px; padding: 7px 9px; transition: all .12s; position: relative;
+}
+.inv3-wrow:hover { border-color: rgba(120,190,230,0.5); background: rgba(16,26,40,0.7); transform: translateX(2px); }
+.inv3-wrow.active {
+  border-color: var(--kx-cyan);
+  background: linear-gradient(90deg, rgba(20,224,255,0.14), rgba(20,224,255,0.03));
+  box-shadow: inset 2px 0 0 var(--kx-cyan);
+}
+.inv3-wrow-thumb {
+  width: 40px; height: 32px; flex: 0 0 auto; border-radius: 6px;
+  background: #0a121c center/contain no-repeat;
+  display: flex; align-items: center; justify-content: center;
+}
+.inv3-wrow-thumb svg { width: 60%; height: 60%; }
+.inv3-wrow-body { min-width: 0; flex: 1 1 auto; }
+.inv3-wrow-name {
+  color: var(--kx-ink); font-size: 12.5px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv3-wrow-sub {
+  color: var(--kx-dim); font-size: 10.5px; font-weight: 600; margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv3-wrow-eq {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: #2fae5a; box-shadow: 0 0 8px #2fae5a;
+}
+
+/* main column */
+.inv3-main { min-width: 0; }
+.inv3-hero { display: flex; gap: 18px; margin-bottom: 14px; align-items: stretch; }
+.inv3-stage {
+  --rar: #5fe9ff;
+  position: relative; flex: 0 0 460px; height: 300px; border-radius: 12px;
+  overflow: hidden; border: 1px solid var(--kx-line);
+  background: radial-gradient(circle at 50% 42%, #33424e, #141c26 55%, #080c12);
+  box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
+}
+.inv3-stage::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 40px -8px var(--rar); opacity: 0.5;
+  transition: box-shadow .25s;
+}
+.inv3-stage canvas { width: 100%; height: 100%; display: block; position: relative; z-index: 1; }
+.inv3-stage canvas.hidden { display: none; }
+.inv3-hero-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.inv3-skin-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.inv3-skin-name { font-size: 24px; font-weight: 800; letter-spacing: 0.3px; }
+.inv3-pill {
+  --rar: #5fe9ff; font-size: 10px; font-weight: 900; letter-spacing: 1px;
+  color: var(--rar); border: 1px solid var(--rar); border-radius: 12px;
+  padding: 3px 10px; background: color-mix(in srgb, var(--rar) 14%, transparent);
+}
+.inv3-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.inv3-tag {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px; color: var(--kx-cyan-soft);
+  border: 1px solid rgba(20,224,255,0.3); border-radius: 4px; padding: 3px 6px;
+}
+.inv3-perkline { color: #9be8b4; font-size: 12.5px; font-weight: 700; margin-top: 8px; min-height: 16px; }
+.inv3-wname { color: var(--kx-ink); font-size: 15px; font-weight: 800; margin-top: 10px; letter-spacing: 0.5px; }
+.inv3-wkind { color: var(--kx-faint); font-size: 10px; font-weight: 800; letter-spacing: 1.2px; margin-left: 6px; }
+.inv3-chardesc { color: var(--kx-dim); font-size: 12.5px; margin-top: 6px; line-height: 1.4; }
+
+.inv3-stats { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.inv3-stat { display: grid; grid-template-columns: 78px 1fr 60px; align-items: center; gap: 10px; }
+.inv3-stat .k { color: var(--kx-faint); font-size: 10px; font-weight: 800; letter-spacing: 0.6px; }
+.inv3-stat .v { color: #fff; font-size: 12px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.inv3-bar-bg { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.inv3-bar-fg {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--kx-blue), var(--kx-cyan));
+  box-shadow: 0 0 8px -2px var(--kx-cyan); transition: width .3s ease;
+}
+.inv3-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.inv3-chip {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; color: var(--kx-dim);
+  border: 1px solid var(--kx-line); border-radius: 5px; padding: 4px 8px;
+  background: rgba(255,255,255,0.02);
+}
+.inv3-actions-row { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 14px; }
+.inv3-equip { min-width: 150px; }
+.inv3-fav-btn {
+  width: 40px; height: 40px; border-radius: 9px; cursor: pointer;
+  background: rgba(10,16,26,0.7); border: 1px solid var(--kx-line);
+  color: #ffd23b; font-size: 20px; line-height: 1; transition: all .13s;
+}
+.inv3-fav-btn:hover { border-color: #ffd23b; }
+.inv3-fav-btn.on { background: rgba(255,210,59,0.14); border-color: #ffd23b; box-shadow: 0 0 12px -3px #ffd23b; }
+
+/* toolbar additions */
+.inv3-toolbar { margin-top: 2px; }
+.inv3-toolbar.hidden { display: none; }
+.inv3-sort {
+  background: rgba(4,8,15,0.6); border: 1px solid var(--kx-line);
+  color: var(--kx-ink); border-radius: 9px; padding: 7px 10px;
+  font-size: 11px; font-weight: 700; cursor: pointer; letter-spacing: 0.4px;
+}
+.inv3-togglechip.active { color: #fff; }
+
+/* skin grid (reuses inv-skin-card) */
+.inv3-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px; margin-top: 14px; max-height: 38vh; overflow-y: auto; padding: 2px 4px 6px 2px;
+}
+.inv3-grid::-webkit-scrollbar { width: 8px; }
+.inv3-grid::-webkit-scrollbar-thumb { background: rgba(20,224,255,0.3); border-radius: 4px; }
+.inv3-grid .inv-skin-card { animation: invCardIn .32s ease both; }
+@keyframes invCardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.inv3-gridlabel {
+  grid-column: 1 / -1; color: var(--kx-faint); font-size: 10px; font-weight: 800;
+  letter-spacing: 1.4px; margin: 8px 0 -2px;
+}
+.inv3-card-icon { position: absolute; inset: 10px 10px 24px; display: flex; align-items: center; justify-content: center; }
+.inv3-card-icon svg { width: 62%; height: 62%; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
+.inv3-card-fav {
+  position: absolute; top: 5px; right: 6px; z-index: 3;
+  width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+  background: rgba(6,10,16,0.55); border: none; color: #ffd23b;
+  font-size: 14px; line-height: 1; opacity: 0; transition: opacity .12s;
+}
+.inv-skin-card:hover .inv3-card-fav, .inv3-card-fav.on { opacity: 1; }
+.inv3-card-fav.on { background: rgba(255,210,59,0.2); }
+.inv3-card-sub {
+  position: absolute; left: 0; right: 0; bottom: 26px; z-index: 2; text-align: center;
+  color: #ffd23b; font-size: 11px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+.inv3-lock { filter: grayscale(1) brightness(1.4); }
+.inv-skin-card.inv3-locked { opacity: 0.72; }
+.inv-skin-card.inv3-locked:hover { opacity: 1; }
+.inv3-shine { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+.inv3-shine::before {
+  content: ''; position: absolute; top: -60%; left: -30%; width: 40%; height: 220%;
+  background: linear-gradient(115deg, transparent, rgba(255,255,255,0.28), transparent);
+  transform: rotate(18deg); animation: invShine 3.6s ease-in-out infinite;
+}
+@keyframes invShine { 0%, 70% { left: -40%; } 100% { left: 130%; } }
+
+/* responsive: collapse to single column on narrow screens */
+@media (max-width: 900px) {
+  .inv3-body { grid-template-columns: 1fr; }
+  .inv3-side { flex-direction: row; overflow-x: auto; max-height: none; }
+  .inv3-hero { flex-direction: column; }
+  .inv3-stage { flex-basis: auto; width: 100%; height: 240px; }
+}
+
+/* ============================================================================
+   ===============   KYX.IO  ev.io GUI: nav dropdowns + auth   ================
+   Generic top-nav dropdown system (PUBLIC GAME / PROFILE / STORE / SOCIAL /
+   CRYPTO), the login/logout auth control, and the full-page login screen.
+   Appended last to win specificity.
+   ============================================================================ */
+
+/* generic nav dropdowns (reuse .modes-dropdown / .profile-dropdown visuals) */
+.nav-dd-wrap { position: relative; }
+.nav-dd { position: absolute; top: calc(100% + 8px); left: 0; right: auto; }
+.nav-dd.hidden { display: none !important; }
+.nav-dd-btn.open, .nav-dd-btn.nav-dd-active {
+  color: var(--kx-cyan-soft) !important; background: rgba(20,224,255,0.08) !important;
+  box-shadow: inset 0 -2px 0 var(--kx-cyan);
+}
+/* anchor the last dropdowns to their right edge so they never clip off-screen */
+#dd-crypto, #dd-social { left: auto; right: 0; }
+/* let anchor-based menu items sit inline like the button ones */
+a.profile-menu-item { text-decoration: none; }
+
+/* right-side auth control */
+.nav-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.nav-username { color: rgba(190, 210, 240, 0.8); font-weight: 700; letter-spacing: 0.6px; }
+.nav-auth-btn {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;
+  padding: 8px 16px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  background: linear-gradient(180deg, var(--kx-cyan), var(--kx-blue-deep));
+  border: 1px solid var(--kx-cyan); color: #04121c; transition: all .14s;
+}
+.nav-auth-btn:hover { filter: brightness(1.12); box-shadow: 0 0 16px -3px var(--kx-cyan); }
+.nav-logout-btn { background: transparent; color: var(--kx-dim); border: 1px solid var(--kx-line); }
+.nav-logout-btn:hover {
+  color: #ff8a7a; border-color: rgba(255,120,100,0.5);
+  background: rgba(255,90,70,0.08); box-shadow: none; filter: none;
+}
+
+/* ---- full-page login (ev.io /user/login) ---- */
+#auth-screen {
+  position: absolute; inset: 0; z-index: 400;
+  background: #0a0d12; color: #e8edf2; overflow-y: auto;
+  font-family: inherit;
+}
+#auth-screen.hidden { display: none !important; }
+.login-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22px 44px; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.login-brand { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: #fff; }
+.login-brand span { color: var(--kx-cyan); }
+.login-nav { display: flex; gap: 28px; }
+.login-nav-link {
+  background: none; border: none; color: #c2ccd6; font-size: 15px; cursor: pointer;
+  padding: 4px 2px; transition: color .14s;
+}
+.login-nav-link:hover, .login-nav-link.active { color: #fff; }
+.login-main { max-width: 820px; margin: 0 auto; padding: 34px 44px 60px; }
+.login-title { font-size: 40px; font-weight: 800; margin: 6px 0 26px; letter-spacing: 0.5px; }
+.login-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,255,255,0.12); margin-bottom: 30px;
+}
+.login-tabs .auth-tab {
+  flex: 0 0 auto; padding: 12px 22px; background: transparent; border: none;
+  border-radius: 6px 6px 0 0; color: #9fb0bc; font-size: 15px; font-weight: 700;
+  letter-spacing: 0.3px; cursor: pointer; margin-bottom: -1px; transition: all .14s;
+}
+.login-tabs .auth-tab:hover { color: #fff; }
+.login-tabs .auth-tab.active { background: #1a9fe0; color: #fff; }
+.login-forms { max-width: 580px; }
+.login-label { display: block; font-size: 14px; font-weight: 700; color: #dfe7ee; margin: 20px 0 7px; }
+.login-label:first-child { margin-top: 0; }
+.login-label .req { color: #ff4a4a; }
+.login-input {
+  width: 100%; background: #23262b; border: 1px solid #33373d; border-radius: 3px;
+  color: #fff; font-size: 15px; padding: 11px 12px; transition: border-color .14s;
+}
+.login-input:focus { outline: none; border-color: var(--kx-cyan); box-shadow: 0 0 0 3px rgba(20,224,255,0.14); }
+.login-hint { font-size: 12.5px; color: #8a97a2; margin-top: 7px; line-height: 1.5; }
+.login-hint-warn { color: #ffb54a; }
+.login-submit {
+  margin-top: 24px; display: inline-flex; align-items: center; gap: 9px;
+  background: #2a2d33; border: 1px solid #3a3e45; border-radius: 4px; color: #fff;
+  font-size: 15px; font-weight: 700; padding: 11px 22px; cursor: pointer; transition: all .14s;
+}
+.login-submit:hover { background: #33373d; border-color: #4a4f57; }
+.login-ico { font-size: 17px; line-height: 1; }
+#auth-screen .auth-error { max-width: 560px; }
+.login-alt { margin-top: 34px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+.login-guest { background: none; border: none; color: #7fd8ff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.login-guest:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .login-topbar { padding: 18px 20px; }
+  .login-main { padding: 26px 20px 50px; }
+  .login-title { font-size: 30px; }
+  .login-nav { gap: 16px; }
+}
+
+/* Inventory v3 fixes: equipped badge only on equipped cards; static weapon hero */
+.inv-skin-card .inv-skin-eqbadge { display: none; }
+.inv-skin-card.equipped .inv-skin-eqbadge { display: block; }
+.inv3-stage-img {
+  position: absolute; inset: 18px; z-index: 1;
+  background-position: center; background-repeat: no-repeat; background-size: contain;
+  filter: drop-shadow(0 8px 22px rgba(0,0,0,0.6));
+  animation: inv3Float 4.5s ease-in-out infinite;
+}
+.inv3-stage-img.hidden { display: none !important; }
+@keyframes inv3Float { 0%,100% { transform: translateY(-4px); } 50% { transform: translateY(6px); } }

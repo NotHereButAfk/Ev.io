@@ -24,7 +24,7 @@ export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
 let _live = null;
 function _ensureLive() {
   if (_live) return _live;
-  const SIZE = 256;
+  const SIZE = 340;
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setSize(SIZE, SIZE);
   renderer.setPixelRatio(1);

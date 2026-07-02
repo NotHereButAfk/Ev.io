@@ -242,21 +242,26 @@ export class Game {
   // ── Auth ────────────────────────────────────────────────────────────────────
 
   _initAuth() {
-    if (UserAccount.isLoggedIn()) {
-      this._onAuth(UserAccount.current());
-    } else {
-      this.authUI.show(); // was previously visible by default; now we show it explicitly
-    }
     this.authUI.onAuth = (username) => {
       this.authUI.hide();
       this._onAuth(username);
     };
+    // Dismissing the login page (Play / Info) returns to the spectating menu.
+    this.authUI.onClose = () => {
+      this.authUI.hide();
+      if (!this.menu.topNav.classList.contains('hidden')) return; // menu already up
+      this._onAuth(UserAccount.current());
+    };
+    // ev.io-style: land on the main menu immediately (spectating). Registered
+    // accounts resume signed in; everyone else browses logged out until they
+    // open the login page from the nav or a gated page.
+    this._onAuth(UserAccount.isLoggedIn() ? UserAccount.current() : null);
   }
 
   _onAuth(username) {
     this.currentUsername = username;
     this.menu.setUsername(username);
-    if (!UserAccount.isGuest()) {
+    if (username && !UserAccount.isGuest()) {
       document.getElementById('player-name').value = UserAccount.getDisplayName(username);
     }
     this.menu.showMain();
@@ -414,11 +419,11 @@ export class Game {
       this._bloomEnabled = s.quality !== 'low';
       // shadows stay off — sky-only lighting has no shadow casters.
     };
+    this.menu.onLoginRequest = () => this.authUI.show('login');
     this.menu.onLogout = () => {
       UserAccount.logout();
-      this.currentUsername = null;
-      this.menu.hideMain();
-      this.authUI.show();
+      // Stay on the main menu, now as a logged-out spectator.
+      this._onAuth(null);
     };
   }
 

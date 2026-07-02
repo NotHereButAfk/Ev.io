@@ -42,50 +42,73 @@
       </div>
     </div>
 
-    <!-- ===================== AUTH SCREEN ===================== -->
-    <div id="auth-screen" class="overlay hidden">
-      <div class="menu-panel auth-panel">
-        <h1 class="logo">KYX<span>.IO</span></h1>
-        <p class="tagline">The Halo of Web3 &mdash; PvP &bull; PvE &bull; 5 Game Modes</p>
+    <!-- ===================== LOGIN / AUTH PAGE (ev.io-style) ===================== -->
+    <div id="auth-screen" class="hidden">
+      <header class="login-topbar">
+        <div class="login-brand">KYX<span>.IO</span></div>
+        <nav class="login-nav">
+          <button class="login-nav-link" id="login-nav-info">Info</button>
+          <button class="login-nav-link" id="login-nav-play">Play</button>
+          <button class="login-nav-link active" id="login-nav-login">Log in</button>
+        </nav>
+      </header>
 
-        <div class="auth-tabs">
-          <button class="auth-tab active" data-tab="login">LOGIN</button>
-          <button class="auth-tab" data-tab="register">REGISTER</button>
+      <main class="login-main">
+        <h1 class="login-title" id="login-title">Log in</h1>
+
+        <div class="login-tabs">
+          <button class="auth-tab active" data-tab="login">Log in</button>
+          <button class="auth-tab" data-tab="register">Create new account</button>
+          <button class="auth-tab" data-tab="reset">Reset your password</button>
         </div>
 
-        <div id="auth-login" class="auth-form">
-          <label class="field-label" for="auth-login-name">username</label>
-          <input id="auth-login-name" class="text-input" placeholder="Your username" autocomplete="username" />
-          <label class="field-label" for="auth-login-pass">password</label>
-          <input id="auth-login-pass" class="text-input" type="password" placeholder="Your password" autocomplete="current-password" />
-          <div id="auth-login-err" class="auth-error hidden"></div>
-          <button id="auth-login-btn" class="play-btn" style="margin-top:14px">LOGIN</button>
+        <div class="login-forms">
+          <!-- Log in -->
+          <div id="auth-login" class="auth-form">
+            <label class="login-label" for="auth-login-name">Username <span class="req">*</span></label>
+            <input id="auth-login-name" class="login-input" autocomplete="username" />
+            <label class="login-label" for="auth-login-pass">Password <span class="req">*</span></label>
+            <input id="auth-login-pass" class="login-input" type="password" autocomplete="current-password" />
+            <div id="auth-login-err" class="auth-error hidden"></div>
+            <button id="auth-login-btn" class="login-submit"><span class="login-ico">&#8677;</span> Log in</button>
+          </div>
+
+          <!-- Create new account -->
+          <div id="auth-register" class="auth-form hidden">
+            <label class="login-label" for="auth-reg-name">Username <span class="req">*</span></label>
+            <input id="auth-reg-name" class="login-input" autocomplete="username" />
+            <div class="login-hint">Spaces are allowed; letters, numbers and underscores. 2+ characters.</div>
+            <label class="login-label" for="auth-reg-pass">Password <span class="req">*</span></label>
+            <input id="auth-reg-pass" class="login-input" type="password" autocomplete="new-password" />
+            <label class="login-label" for="auth-reg-pass2">Confirm password <span class="req">*</span></label>
+            <input id="auth-reg-pass2" class="login-input" type="password" autocomplete="new-password" />
+            <div id="auth-reg-err" class="auth-error hidden"></div>
+            <button id="auth-reg-btn" class="login-submit"><span class="login-ico">&#8677;</span> Create new account</button>
+          </div>
+
+          <!-- Reset your password (local build: cosmetic) -->
+          <div id="auth-reset" class="auth-form hidden">
+            <label class="login-label" for="auth-reset-name">Username or email <span class="req">*</span></label>
+            <input id="auth-reset-name" class="login-input" />
+            <div id="auth-reset-note" class="login-hint">Password reset isn't available in this build — create a new account or play as guest.</div>
+            <button id="auth-reset-btn" class="login-submit"><span class="login-ico">&#9993;</span> Email new password</button>
+          </div>
         </div>
 
-        <div id="auth-register" class="auth-form hidden">
-          <label class="field-label" for="auth-reg-name">choose username</label>
-          <input id="auth-reg-name" class="text-input" placeholder="Letters, numbers, _" autocomplete="username" />
-          <label class="field-label" for="auth-reg-pass">password</label>
-          <input id="auth-reg-pass" class="text-input" type="password" placeholder="Min 3 characters" autocomplete="new-password" />
-          <label class="field-label" for="auth-reg-pass2">confirm password</label>
-          <input id="auth-reg-pass2" class="text-input" type="password" placeholder="Repeat password" autocomplete="new-password" />
-          <div id="auth-reg-err" class="auth-error hidden"></div>
-          <button id="auth-reg-btn" class="play-btn" style="margin-top:14px">CREATE ACCOUNT</button>
+        <div class="login-alt">
+          <button id="auth-guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
         </div>
-
-        <div class="auth-divider"><span>or</span></div>
-        <button id="auth-guest-btn" class="ghost-btn">PLAY AS GUEST</button>
-      </div>
+      </main>
     </div>
 
-    <!-- ===================== TOP NAV ===================== -->
+    <!-- ===================== TOP NAV (ev.io-style) ===================== -->
     <div id="top-nav" class="hidden">
       <div class="nav-brand">KYX<span>.IO</span></div>
       <nav class="nav-items">
-        <!-- MODES dropdown — replaces PUBLIC GAME + old MODES panel button -->
-        <div class="nav-modes-wrap" id="nav-modes-wrap">
-          <button class="nav-item nav-modes-btn" id="nav-modes-btn">MODES &#9660;</button>
-          <div class="modes-dropdown hidden" id="modes-dropdown">
+        <!-- PUBLIC GAME — game-mode picker dropdown -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="publicgame">PUBLIC GAME &#9660;</button>
+          <div class="nav-dd modes-dropdown hidden" id="dd-publicgame">
             <button class="mode-option" data-mode="deathmatch">
               <span class="mode-opt-icon">&#9876;</span>
               <div class="mode-opt-body">
@@ -123,37 +146,86 @@
             </button>
           </div>
         </div>
-        <button class="nav-item nav-shop-btn" data-panel="shop">SHOP &#9660;</button>
-        <button class="nav-item nav-bp-btn" data-panel="battlepass">BATTLE PASS &#9660;</button>
-        <button class="nav-item" data-panel="party">FIRETEAM &#9660;</button>
-        <button class="nav-item" data-panel="private">PRIVATE &#9660;</button>
-        <button class="nav-item" data-panel="settings">SETTINGS</button>
-        <!-- PROFILE dropdown (ev.io-style): groups Inventory + Career -->
-        <div class="nav-profile-wrap" id="nav-profile-wrap">
-          <button class="nav-item nav-profile-btn" id="nav-profile-btn">PROFILE &#9660;</button>
-          <div class="profile-dropdown hidden" id="profile-dropdown">
-            <button class="profile-menu-item" data-panel="loadout">
+
+        <!-- PRIVATE — gated (login required) -->
+        <button class="nav-item" data-panel="private" data-gated="1">PRIVATE</button>
+
+        <!-- PROFILE dropdown — Inventory / Career / Achievements (gated) -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="profile">PROFILE &#9660;</button>
+          <div class="nav-dd profile-dropdown hidden" id="dd-profile">
+            <button class="profile-menu-item" data-panel="loadout" data-gated="1">
               <span class="pm-icon">&#9776;</span>
               <div class="pm-body"><div class="pm-name">INVENTORY</div><div class="pm-sub">Weapons, skins &amp; character</div></div>
             </button>
-            <button class="profile-menu-item" data-panel="profile">
+            <button class="profile-menu-item" data-panel="profile" data-gated="1">
               <span class="pm-icon">&#9733;</span>
               <div class="pm-body"><div class="pm-name">CAREER</div><div class="pm-sub">Stats, rank &amp; record</div></div>
             </button>
-            <button class="profile-menu-item" data-panel="achievements">
+            <button class="profile-menu-item" data-panel="achievements" data-gated="1">
               <span class="pm-icon">&#127942;</span>
               <div class="pm-body"><div class="pm-name">ACHIEVEMENTS</div><div class="pm-sub">Challenges &amp; rewards</div></div>
             </button>
-            <button class="profile-menu-item profile-menu-logout" id="profile-menu-logout">
-              <span class="pm-icon">&#8617;</span>
-              <div class="pm-body"><div class="pm-name">LOG OUT</div><div class="pm-sub">Sign out of your account</div></div>
+          </div>
+        </div>
+
+        <!-- STORE dropdown — Store + Battle Pass (gated) -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="store">STORE &#9660;</button>
+          <div class="nav-dd profile-dropdown hidden" id="dd-store">
+            <button class="profile-menu-item" data-panel="shop" data-gated="1">
+              <span class="pm-icon">&#128722;</span>
+              <div class="pm-body"><div class="pm-name">STORE</div><div class="pm-sub">Armor &amp; weapon skins</div></div>
+            </button>
+            <button class="profile-menu-item" data-panel="battlepass" data-gated="1">
+              <span class="pm-icon">&#127903;</span>
+              <div class="pm-body"><div class="pm-name">BATTLE PASS</div><div class="pm-sub">Season 1 rewards track</div></div>
             </button>
           </div>
         </div>
+
+        <!-- SOCIAL dropdown — Fireteam + community links (gated fireteam) -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="social">SOCIAL &#9660;</button>
+          <div class="nav-dd profile-dropdown hidden" id="dd-social">
+            <button class="profile-menu-item" data-panel="party" data-gated="1">
+              <span class="pm-icon">&#128101;</span>
+              <div class="pm-body"><div class="pm-name">FIRETEAM</div><div class="pm-sub">Squad up with friends</div></div>
+            </button>
+            <a class="profile-menu-item" href="https://twitter.com" target="_blank" rel="noopener">
+              <span class="pm-icon">&#128038;</span>
+              <div class="pm-body"><div class="pm-name">TWITTER</div><div class="pm-sub">Follow for updates</div></div>
+            </a>
+            <a class="profile-menu-item" href="https://discord.com" target="_blank" rel="noopener">
+              <span class="pm-icon">&#128172;</span>
+              <div class="pm-body"><div class="pm-name">DISCORD</div><div class="pm-sub">Join the community</div></div>
+            </a>
+          </div>
+        </div>
+
+        <!-- CRYPTO dropdown — wallet + coins -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="crypto">CRYPTO &#9660;</button>
+          <div class="nav-dd profile-dropdown hidden" id="dd-crypto">
+            <button class="profile-menu-item" id="crypto-wallet-btn">
+              <span class="pm-icon">&#9783;</span>
+              <div class="pm-body"><div class="pm-name">CONNECT WALLET</div><div class="pm-sub">Link your Web3 wallet</div></div>
+            </button>
+            <button class="profile-menu-item" data-panel="shop" data-gated="1">
+              <span class="pm-icon">&#9670;</span>
+              <div class="pm-body"><div class="pm-name">BUY E-COINS</div><div class="pm-sub">Top up your balance</div></div>
+            </button>
+          </div>
+        </div>
+
+        <!-- SETTINGS — open to everyone (local config) -->
+        <button class="nav-item" data-panel="settings">SETTINGS</button>
       </nav>
       <div class="nav-right">
-        <span id="nav-coins" class="nav-coins">&#128176; 500</span>
-        <span id="nav-username" class="nav-username"></span>
+        <span id="nav-coins" class="nav-coins hidden">&#128176; 500</span>
+        <span id="nav-username" class="nav-username hidden"></span>
+        <button id="nav-auth-btn" class="nav-auth-btn">LOGIN / REGISTER</button>
+        <button id="nav-logout-btn" class="nav-auth-btn nav-logout-btn hidden">LOGOUT</button>
       </div>
     </div>
 
@@ -163,7 +235,7 @@
       <div class="spectate-hint">[ SPECTATING ]</div>
     </div>
 
-    <!-- ===================== PANEL: LOADOUT ===================== -->
+    <!-- ===================== PANEL: LOADOUT (INVENTORY v3) ===================== -->
     <div id="panel-loadout" class="nav-panel nav-panel-inv hidden">
 
       <div class="inv-header">
@@ -171,20 +243,32 @@
         <div class="inv-id">
           <input id="player-name" class="inv-name-input" maxlength="16" value="Recruit" />
           <div class="inv-meta">Balance: <span class="inv-coin">&#9678;</span> <span id="inv-balance">500</span></div>
-          <div class="inv-meta inv-meta-dim">Networth: <span id="inv-networth">0</span></div>
+          <div class="inv-meta inv-meta-dim">Networth: <span class="inv-coin">&#9670;</span> <span id="inv-networth">0</span></div>
+          <div class="inv-meta inv-meta-dim">Collection: <span id="inv-collection">&mdash;</span></div>
         </div>
+        <div class="inv3-perks" id="inv3-perks"></div>
         <div class="inv-actions">
           <button class="inv-btn" id="inv-wallet-btn">&#9783; Connect Wallet</button>
           <button class="inv-btn inv-btn-ghost" id="inv-account-btn">Account &#8599;</button>
         </div>
       </div>
 
-      <div class="inv-section-label">EQUIPPED</div>
-      <div id="inv-equipped" class="inv-card-row"></div>
+      <div class="inv3-loadoutbar" id="inv3-loadoutbar"></div>
 
-      <div class="inv-section-label">INVENTORY</div>
-      <div id="inv-tabs" class="inv-tabs"></div>
-      <div id="inv-grid" class="inv-card-grid"></div>
+      <div class="inv3-body">
+        <aside class="inv3-side" id="inv3-side"></aside>
+        <section class="inv3-main">
+          <div class="inv3-hero">
+            <div class="inv3-stage" id="inv3-stage">
+              <div id="inv3-weapon-img" class="inv3-stage-img"></div>
+              <canvas id="inv3-char-canvas" width="250" height="300" class="hidden"></canvas>
+            </div>
+            <div class="inv3-hero-info" id="inv3-hero-info"></div>
+          </div>
+          <div class="inv3-toolbar inv-skinbar" id="inv3-toolbar"></div>
+          <div class="inv3-grid" id="inv3-grid"></div>
+        </section>
+      </div>
 
     </div>
 
