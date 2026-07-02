@@ -29,10 +29,15 @@ AddType application/json .json
   </FilesMatch>
 </IfModule>
 
-# Single-page fallback: send unknown paths to index.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Clean URLs for the standalone auth pages (must come before the SPA fallback)
+  RewriteRule ^login/?$    /login.html    [L]
+  RewriteRule ^register/?$ /register.html [L]
+
+  # Single-page fallback: send remaining unknown paths to index.html
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

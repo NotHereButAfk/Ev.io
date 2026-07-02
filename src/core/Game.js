@@ -14,7 +14,6 @@ import { HUD } from '../ui/HUD.js';
 import { DamageNumbers } from '../ui/DamageNumbers.js';
 import { Nameplates } from '../ui/Nameplates.js';
 import { MenuUI } from '../ui/MainMenu.js';
-import { AuthUI } from '../ui/AuthUI.js';
 import { UserAccount } from './UserAccount.js';
 import { Armory } from './Armory.js';
 import { GameSettings } from './GameSettings.js';
@@ -130,7 +129,6 @@ export class Game {
     this.grenadeSystem  = new GrenadeSystem(this.world.scene);
     this.pickupSystem = null; // created on first play, cleared on restart
     this.menu           = new MenuUI();
-    this.authUI       = new AuthUI();
 
     this.menuCamera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
 
@@ -243,19 +241,9 @@ export class Game {
   // ── Auth ────────────────────────────────────────────────────────────────────
 
   _initAuth() {
-    this.authUI.onAuth = (username) => {
-      this.authUI.hide();
-      this._onAuth(username);
-    };
-    // Dismissing the login page (Play / Info) returns to the spectating menu.
-    this.authUI.onClose = () => {
-      this.authUI.hide();
-      if (!this.menu.topNav.classList.contains('hidden')) return; // menu already up
-      this._onAuth(UserAccount.current());
-    };
     // ev.io-style: land on the main menu immediately (spectating). Registered
-    // accounts resume signed in; everyone else browses logged out until they
-    // open the login page from the nav or a gated page.
+    // accounts resume signed in; login/register happen on their own /login and
+    // /register pages, which set the session and bounce back here.
     this._onAuth(UserAccount.isLoggedIn() ? UserAccount.current() : null);
   }
 
@@ -420,7 +408,7 @@ export class Game {
       this._bloomEnabled = s.quality !== 'low';
       // shadows stay off — sky-only lighting has no shadow casters.
     };
-    this.menu.onLoginRequest = () => this.authUI.show('login');
+    this.menu.onLoginRequest = () => { window.location.href = '/login'; };
     this.menu.onLogout = () => {
       UserAccount.logout();
       // Stay on the main menu, now as a logged-out spectator.

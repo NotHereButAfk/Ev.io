@@ -146,11 +146,8 @@ export class MenuUI {
       e.currentTarget.querySelector('.pm-name').textContent = 'WALLET LINKED ✓';
     });
 
-    // Auth control (right side): login/register when logged out, logout when in.
-    document.getElementById('nav-auth-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.onLoginRequest?.();
-    });
+    // Auth control (right-side menu). "login" is a plain link to /login; the
+    // logout button clears the session and drops back to spectating.
     document.getElementById('nav-logout-btn')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.onLogout?.();
@@ -339,25 +336,21 @@ export class MenuUI {
 
   // ── Profile ────────────────────────────────────────────────────────────────
 
-  // Drives the right-side auth control. A real account shows its name + LOGOUT
-  // and the coin balance; a guest or logged-out spectator shows LOGIN/REGISTER.
+  // Drives the right-side vertical menu. A real account shows its name + coins
+  // + logout; a guest or logged-out spectator shows the green "login" link.
   setUsername(username) {
     this._currentUser = username;
     const registered = !!username && username !== '__guest__';
 
-    const nameEl   = document.getElementById('nav-username');
-    const coinsEl  = document.getElementById('nav-coins');
-    const authBtn  = document.getElementById('nav-auth-btn');
-    const logoutBtn = document.getElementById('nav-logout-btn');
+    const nameEl    = document.getElementById('nav-username');
+    const loginLink = document.getElementById('nav-login-link');
+    const account   = document.getElementById('nav-account');
 
     if (nameEl) {
-      nameEl.textContent = registered ? UserAccount.getDisplayName(username).toUpperCase()
-                         : username === '__guest__' ? 'GUEST' : '';
-      nameEl.classList.toggle('hidden', !username);
+      nameEl.textContent = registered ? UserAccount.getDisplayName(username) : 'guest';
     }
-    coinsEl?.classList.toggle('hidden', !username);
-    authBtn?.classList.toggle('hidden', registered);
-    logoutBtn?.classList.toggle('hidden', !registered);
+    loginLink?.classList.toggle('hidden', registered);
+    account?.classList.toggle('hidden', !registered);
 
     // A guest / logged-out user must not keep an account-only panel open.
     if (!registered && (this._activePanel && this._activePanel !== 'settings')) {
@@ -475,14 +468,22 @@ export class MenuUI {
 
   // ── Visibility helpers ─────────────────────────────────────────────────────
 
+  _chrome(show) {
+    ['nav-side', 'share-game', 'social-icons'].forEach((id) => {
+      document.getElementById(id)?.classList.toggle('hidden', !show);
+    });
+  }
+
   showMain() {
     this.topNav.classList.remove('hidden');
     this.centerPlay.classList.remove('hidden');
+    this._chrome(true);
   }
 
   hideMain() {
     this.topNav.classList.add('hidden');
     this.centerPlay.classList.add('hidden');
+    this._chrome(false);
     this._closeAllPanels();
   }
 

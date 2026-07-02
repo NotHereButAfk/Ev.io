@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KYX.IO — Log in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="auth-page">
+    <header class="login-topbar">
+      <a class="login-brand" href="/">KYX<span>.IO</span></a>
+      <nav class="login-nav">
+        <a class="login-nav-link" href="/">Info</a>
+        <a class="login-nav-link" href="/">Play</a>
+        <a class="login-nav-link active" href="/login">Log in</a>
+      </nav>
+    </header>
+
+    <main class="login-main">
+      <h1 class="login-title">Log in</h1>
+
+      <div class="login-tabs">
+        <a class="auth-tab active" href="/login">Log in</a>
+        <a class="auth-tab" href="/register">Create new account</a>
+        <a class="auth-tab" href="/login?reset=1" id="tab-reset">Reset your password</a>
+      </div>
+
+      <div class="login-forms">
+        <div id="form-login" class="auth-form">
+          <label class="login-label" for="login-name">Username <span class="req">*</span></label>
+          <input id="login-name" class="login-input" autocomplete="username" autofocus />
+          <label class="login-label" for="login-pass">Password <span class="req">*</span></label>
+          <input id="login-pass" class="login-input" type="password" autocomplete="current-password" />
+          <div id="login-err" class="auth-error hidden"></div>
+          <button id="login-btn" class="login-submit"><span class="login-ico">&#8677;</span> Log in</button>
+        </div>
+
+        <div id="form-reset" class="auth-form hidden">
+          <label class="login-label" for="reset-name">Username or email <span class="req">*</span></label>
+          <input id="reset-name" class="login-input" />
+          <div class="login-hint">Password reset isn't available in this build — create a new account or play as guest.</div>
+          <button id="reset-btn" class="login-submit"><span class="login-ico">&#9993;</span> Email new password</button>
+        </div>
+      </div>
+
+      <div class="login-alt">
+        Don't have an account? <a href="/register" class="login-link">Create one</a>
+        <span class="login-sep">·</span>
+        <button id="guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/src/loginPage.js"></script>
+</body>
+</html>

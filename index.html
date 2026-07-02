@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>KYX.IO — The Halo of Web3</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/style.css" />
   <!--
     Google AdSense — replace data-ad-client with your publisher ID (ca-pub-XXXXXXXXXXXXXXXX)
@@ -24,64 +27,7 @@
       </div>
     </div>
 
-    <!-- ===================== LOGIN / AUTH PAGE (ev.io-style) ===================== -->
-    <div id="auth-screen" class="hidden">
-      <header class="login-topbar">
-        <div class="login-brand">KYX<span>.IO</span></div>
-        <nav class="login-nav">
-          <button class="login-nav-link" id="login-nav-info">Info</button>
-          <button class="login-nav-link" id="login-nav-play">Play</button>
-          <button class="login-nav-link active" id="login-nav-login">Log in</button>
-        </nav>
-      </header>
-
-      <main class="login-main">
-        <h1 class="login-title" id="login-title">Log in</h1>
-
-        <div class="login-tabs">
-          <button class="auth-tab active" data-tab="login">Log in</button>
-          <button class="auth-tab" data-tab="register">Create new account</button>
-          <button class="auth-tab" data-tab="reset">Reset your password</button>
-        </div>
-
-        <div class="login-forms">
-          <!-- Log in -->
-          <div id="auth-login" class="auth-form">
-            <label class="login-label" for="auth-login-name">Username <span class="req">*</span></label>
-            <input id="auth-login-name" class="login-input" autocomplete="username" />
-            <label class="login-label" for="auth-login-pass">Password <span class="req">*</span></label>
-            <input id="auth-login-pass" class="login-input" type="password" autocomplete="current-password" />
-            <div id="auth-login-err" class="auth-error hidden"></div>
-            <button id="auth-login-btn" class="login-submit"><span class="login-ico">&#8677;</span> Log in</button>
-          </div>
-
-          <!-- Create new account -->
-          <div id="auth-register" class="auth-form hidden">
-            <label class="login-label" for="auth-reg-name">Username <span class="req">*</span></label>
-            <input id="auth-reg-name" class="login-input" autocomplete="username" />
-            <div class="login-hint">Spaces are allowed; letters, numbers and underscores. 2+ characters.</div>
-            <label class="login-label" for="auth-reg-pass">Password <span class="req">*</span></label>
-            <input id="auth-reg-pass" class="login-input" type="password" autocomplete="new-password" />
-            <label class="login-label" for="auth-reg-pass2">Confirm password <span class="req">*</span></label>
-            <input id="auth-reg-pass2" class="login-input" type="password" autocomplete="new-password" />
-            <div id="auth-reg-err" class="auth-error hidden"></div>
-            <button id="auth-reg-btn" class="login-submit"><span class="login-ico">&#8677;</span> Create new account</button>
-          </div>
-
-          <!-- Reset your password (local build: cosmetic) -->
-          <div id="auth-reset" class="auth-form hidden">
-            <label class="login-label" for="auth-reset-name">Username or email <span class="req">*</span></label>
-            <input id="auth-reset-name" class="login-input" />
-            <div id="auth-reset-note" class="login-hint">Password reset isn't available in this build — create a new account or play as guest.</div>
-            <button id="auth-reset-btn" class="login-submit"><span class="login-ico">&#9993;</span> Email new password</button>
-          </div>
-        </div>
-
-        <div class="login-alt">
-          <button id="auth-guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
-        </div>
-      </main>
-    </div>
+    <!-- Login & register are standalone pages: /login and /register -->
 
     <!-- ===================== TOP NAV (ev.io-style) ===================== -->
     <div id="top-nav" class="hidden">
@@ -203,18 +149,36 @@
         <!-- SETTINGS — open to everyone (local config) -->
         <button class="nav-item" data-panel="settings">SETTINGS</button>
       </nav>
-      <div class="nav-right">
-        <span id="nav-coins" class="nav-coins hidden">&#128176; 500</span>
-        <span id="nav-username" class="nav-username hidden"></span>
-        <button id="nav-auth-btn" class="nav-auth-btn">LOGIN / REGISTER</button>
-        <button id="nav-logout-btn" class="nav-auth-btn nav-logout-btn hidden">LOGOUT</button>
+    </div>
+
+    <!-- Right-side vertical menu (ev.io): login / rankings / feedback / more -->
+    <div id="nav-side" class="hidden">
+      <a id="nav-login-link" class="side-login" href="/login">login</a>
+      <div id="nav-account" class="side-account hidden">
+        <span id="nav-username" class="side-user"></span>
+        <span id="nav-coins" class="side-coins">&#128176; 500</span>
+        <button id="nav-logout-btn" class="side-link side-logout">logout</button>
       </div>
+      <button class="side-link" data-panel="profile" data-gated="1">rankings</button>
+      <a class="side-link" href="https://discord.com" target="_blank" rel="noopener">feedback</a>
+      <button class="side-link" data-panel="settings">more</button>
+    </div>
+
+    <!-- Bottom-left: share game -->
+    <div id="share-game" class="hidden">
+      <span class="share-ico">&#128279;</span> share game
+    </div>
+
+    <!-- Right edge: community icons -->
+    <div id="social-icons" class="hidden">
+      <a class="social-ico social-tw" href="https://twitter.com" target="_blank" rel="noopener" title="Twitter">&#119990;</a>
+      <a class="social-ico social-dc" href="https://discord.com" target="_blank" rel="noopener" title="Discord">&#9862;</a>
     </div>
 
     <!-- ===================== CENTER PLAY ===================== -->
     <div id="center-play" class="hidden">
       <button id="play-btn" class="click-to-play">CLICK TO PLAY</button>
-      <div class="spectate-hint">[ SPECTATING ]</div>
+      <div class="spectate-hint">[ SPECTATE ]</div>
     </div>
 
     <!-- ===================== PANEL: LOADOUT (INVENTORY v3) ===================== -->

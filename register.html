@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KYX.IO — Create new account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="auth-page">
+    <header class="login-topbar">
+      <a class="login-brand" href="/">KYX<span>.IO</span></a>
+      <nav class="login-nav">
+        <a class="login-nav-link" href="/">Info</a>
+        <a class="login-nav-link" href="/">Play</a>
+        <a class="login-nav-link" href="/login">Log in</a>
+      </nav>
+    </header>
+
+    <main class="login-main">
+      <h1 class="login-title">Create new account</h1>
+
+      <div class="login-tabs">
+        <a class="auth-tab" href="/login">Log in</a>
+        <a class="auth-tab active" href="/register">Create new account</a>
+        <a class="auth-tab" href="/login?reset=1">Reset your password</a>
+      </div>
+
+      <div class="login-forms">
+        <div class="auth-form">
+          <label class="login-label" for="reg-name">Username <span class="req">*</span></label>
+          <input id="reg-name" class="login-input" autocomplete="username" autofocus />
+          <div class="login-hint">Letters, numbers and underscores. 2+ characters.</div>
+          <label class="login-label" for="reg-pass">Password <span class="req">*</span></label>
+          <input id="reg-pass" class="login-input" type="password" autocomplete="new-password" />
+          <label class="login-label" for="reg-pass2">Confirm password <span class="req">*</span></label>
+          <input id="reg-pass2" class="login-input" type="password" autocomplete="new-password" />
+          <div id="reg-err" class="auth-error hidden"></div>
+          <button id="reg-btn" class="login-submit"><span class="login-ico">&#8677;</span> Create new account</button>
+        </div>
+      </div>
+
+      <div class="login-alt">
+        Already have an account? <a href="/login" class="login-link">Log in</a>
+        <span class="login-sep">·</span>
+        <button id="guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/src/registerPage.js"></script>
+</body>
+</html>
