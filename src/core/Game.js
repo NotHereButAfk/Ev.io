@@ -207,36 +207,37 @@ export class Game {
 
   // ── Connect sequence ─────────────────────────────────────────────────────────
 
+  // ev.io-style boot flow: pulsating logo → map-loading card (map name) → GUI.
   _runConnectSequence() {
-    const screen   = document.getElementById('connect-screen');
-    const statusEl = document.getElementById('connect-status-text');
-    const barEl    = document.getElementById('connect-bar');
-    const pingEl   = document.getElementById('connect-ping');
-
-    // Fake latency ping display
-    setTimeout(() => { pingEl.textContent = Math.floor(28 + Math.random() * 40); }, 400);
-
-    const steps = [
-      { text: 'CONNECTING TO SERVER', pct: 20,  ms: 0    },
-      { text: 'AUTHENTICATING',       pct: 52,  ms: 900  },
-      { text: 'LOADING WORLD',        pct: 80,  ms: 1700 },
-      { text: 'READY',                pct: 100, ms: 2400 },
-    ];
-    steps.forEach(({ text, pct, ms }) => {
-      setTimeout(() => {
-        statusEl.textContent = text;
-        barEl.style.width    = pct + '%';
-      }, ms);
-    });
-
-    // Fade out connect screen, then show auth (or main menu if already logged in)
+    const screen = document.getElementById('connect-screen');
     setTimeout(() => {
       screen.classList.add('fade-out');
       setTimeout(() => {
         screen.classList.add('hidden');
-        this._initAuth();
+        this._runMapIntro();
       }, 700);
-    }, 3000);
+    }, 2000);
+  }
+
+  // Show the map-loading card (WINTER-BISHOP + map name) over the fly-through,
+  // then reveal the main menu GUI.
+  _runMapIntro() {
+    const el = document.getElementById('map-loading');
+    if (el) {
+      const region  = document.getElementById('ml-region');
+      const mode    = document.getElementById('ml-mode');
+      const players = document.getElementById('ml-players');
+      const tip     = document.getElementById('ml-tip');
+      if (region)  region.textContent  = 'Winter District';
+      if (mode)    mode.textContent     = 'Loading map…';
+      if (players) players.textContent  = 'Spectating';
+      if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
+      clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+      el.classList.remove('hidden', 'ml-fade');
+      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2000);
+      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 2700);
+    }
+    this._initAuth();
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────

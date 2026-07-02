@@ -4537,3 +4537,15 @@ a.profile-menu-item { text-decoration: none; }
 }
 .inv3-stage-img.hidden { display: none !important; }
 @keyframes inv3Float { 0%,100% { transform: translateY(-4px); } 50% { transform: translateY(6px); } }
+
+/* Boot screen: pulsating logo + name (ev.io-style load-in) */
+.boot-logo {
+  font-size: 64px; letter-spacing: 4px;
+  animation: bootPulse 1.5s ease-in-out infinite;
+}
+.boot-tagline { margin-top: 10px; font-size: 13px; letter-spacing: 3px; animation: bootFade 1.5s ease-in-out infinite; }
+@keyframes bootPulse {
+  0%, 100% { transform: scale(1);    text-shadow: 0 0 18px rgba(80,200,255,0.35); opacity: 0.85; }
+  50%      { transform: scale(1.06); text-shadow: 0 0 42px rgba(80,220,255,0.85); opacity: 1; }
+}
+@keyframes bootFade { 0%,100% { opacity: 0.4; } 50% { opacity: 0.9; } }
