@@ -488,13 +488,14 @@ export class MenuUI {
   }
 
   // Esc during a match opens the full nav GUI (Loadout / Shop / Settings /
-  // Profile / …) — the same menu as the main screen — plus the Resume/Quit box.
+  // Profile / …) — the same menu as the main screen. No paused box; click any
+  // nav item to change loadout, or press Esc again to hide the nav and resume.
   showPause() {
     this.topNav.classList.remove('hidden');
-    this.pauseMenu.classList.remove('hidden');
+    this._chrome(true);
   }
   hidePause() {
-    this.pauseMenu.classList.add('hidden');
+    this._chrome(false);
     this.topNav.classList.add('hidden');
     this._closeAllPanels();
   }
