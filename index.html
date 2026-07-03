@@ -112,7 +112,7 @@
       </nav>
     </div>
 
-    <!-- Right-side vertical menu (ev.io): login / rankings / feedback / more -->
+    <!-- Right-side vertical menu (ev.io): login / rankings -->
     <div id="nav-side" class="hidden">
       <a id="nav-login-link" class="side-login" href="/login">login</a>
       <div id="nav-account" class="side-account hidden">
@@ -120,9 +120,7 @@
         <span id="nav-coins" class="side-coins">&#128176; 500</span>
         <button id="nav-logout-btn" class="side-link side-logout">logout</button>
       </div>
-      <button class="side-link" data-panel="profile" data-gated="1">rankings</button>
-      <a class="side-link" href="https://discord.com" target="_blank" rel="noopener">feedback</a>
-      <button class="side-link" data-panel="settings">more</button>
+      <button class="side-link" data-panel="rankings">rankings</button>
     </div>
 
     <!-- Bottom-left: share game -->
@@ -327,6 +325,26 @@
       <div id="ach-grid" class="ach-grid"></div>
     </div>
 
+    <!-- ===================== PANEL: RANKINGS ===================== -->
+    <div id="panel-rankings" class="nav-panel nav-panel-wide hidden">
+      <div class="rnk-header">
+        <div class="inv-section-label" style="margin-top:0">RANKINGS</div>
+        <div class="rnk-sub">All players ranked by total kills</div>
+      </div>
+      <table class="rnk-table">
+        <thead><tr>
+          <th class="rnk-th-rank">#</th>
+          <th class="rnk-th-name">PLAYER</th>
+          <th>KILLS</th>
+          <th>DEATHS</th>
+          <th>K/D</th>
+          <th>SCORE</th>
+          <th>GAMES</th>
+        </tr></thead>
+        <tbody id="rnk-rows"></tbody>
+      </table>
+    </div>
+
     <!-- ===================== PANEL: SHOP ===================== -->
     <div id="panel-shop" class="nav-panel nav-panel-shop hidden">
       <!-- Top bar: title + currency -->
@@ -351,11 +369,10 @@
 
       <!-- Main store content (shown when logged in) -->
       <div id="shop-content" class="hidden">
-        <div class="stp-filter-row" id="shop-filter-row">
-          <button class="stp-filter active" data-filter="all">ALL</button>
-          <button class="stp-filter" data-filter="character">CHARACTER</button>
-          <button class="stp-filter" data-filter="weapon">WEAPONS</button>
-          <button class="stp-filter" data-filter="sword">SWORDS</button>
+        <div class="nm-header">
+          <div class="nm-title">NIGHT MARKET</div>
+          <div class="nm-sub">5 exclusive deals &mdash; resets daily</div>
+          <div class="nm-timer" id="nm-timer">Refreshes in 00:00:00</div>
         </div>
         <div id="shop-grid-root"></div>
         <div class="shop-earn-tip">Earn E-Coins in-game &middot; 10 per kill &middot; 100 match bonus &middot; Daily challenges</div>

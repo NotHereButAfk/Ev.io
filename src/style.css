@@ -4837,3 +4837,63 @@ html, body { margin: 0; }
 
 /* keep the ribbon + badges above the preview */
 .shop-rarity-ribbon, .shop-kind-badge, .shop-status-badge { z-index: 2; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NIGHT MARKET (Valorant-style daily rotating shop)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.nm-header {
+  text-align: center; padding: 18px 0 14px;
+  border-bottom: 1px solid rgba(100,200,255,0.12); margin-bottom: 18px;
+}
+.nm-title {
+  font-family: 'Michroma', sans-serif; font-size: 26px; letter-spacing: 3px;
+  color: #fff; text-shadow: 0 0 18px rgba(0,207,255,0.45);
+}
+.nm-sub {
+  font-family: 'Rajdhani', sans-serif; font-size: 15px; color: #7fa0bc;
+  margin-top: 4px; letter-spacing: 1px;
+}
+.nm-timer {
+  font-family: 'Rajdhani', sans-serif; font-size: 14px; color: #5fe9ff;
+  margin-top: 6px; letter-spacing: 0.6px;
+}
+.nm-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 18px !important; max-width: 100%;
+}
+@media (max-width: 900px) {
+  .nm-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 600px) {
+  .nm-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RANKINGS TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+.rnk-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.rnk-sub { color: #5a7a9a; font-size: 13px; font-family: 'Rajdhani', sans-serif; letter-spacing: 1px; }
+.rnk-table {
+  width: 100%; border-collapse: collapse;
+  font-family: 'Rajdhani', sans-serif; font-size: 15px;
+}
+.rnk-table thead th {
+  text-align: left; color: #5fe9ff; font-size: 12px; font-weight: 700;
+  letter-spacing: 1.5px; padding: 10px 12px;
+  border-bottom: 1px solid rgba(100,200,255,0.15);
+}
+.rnk-table tbody td {
+  padding: 10px 12px; color: #c8d4e0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.rnk-table tbody tr:hover { background: rgba(60,140,200,0.08); }
+.rnk-you { background: rgba(0,207,255,0.06) !important; }
+.rnk-you td { color: #fff !important; }
+.rnk-you-tag {
+  display: inline-block; background: #00cfff; color: #0a0e16; font-size: 10px;
+  font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+  letter-spacing: 0.5px;
+}
+.rnk-rank { color: #5fe9ff !important; font-weight: 700; width: 40px; }
+.rnk-name { font-weight: 600; }
