@@ -23,6 +23,23 @@ export const Armory = {
     return !!_load()[weaponId];
   },
 
+  // ── ownership (gun + sword skins) ────────────────────────────────────────
+  // The player's owned weapon/sword skin IDs. New accounts start with an
+  // empty list, so the inventory only shows Default. Skins get added here
+  // through the shop, battle pass, drops, etc.
+  ownedSkins() {
+    const d = _load();
+    return Array.isArray(d.__owned) ? d.__owned : [];
+  },
+  ownsSkin(skinId) {
+    return this.ownedSkins().includes(skinId);
+  },
+  grantSkin(skinId) {
+    const d = _load();
+    if (!Array.isArray(d.__owned)) d.__owned = [];
+    if (!d.__owned.includes(skinId)) { d.__owned.push(skinId); _save(d); }
+  },
+
   equipSkin(weaponId, skinId) {
     const d = _load();
     d[weaponId] = skinId;

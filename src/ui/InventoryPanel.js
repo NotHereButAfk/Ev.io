@@ -177,15 +177,17 @@ export class InventoryPanel {
     if (!gun) return;
     const isMelee = gun.kind === 'melee';
 
-    // Default card — the raw weapon with no skin.
+    // Default card — the raw weapon with no skin. Always shown.
     grid.appendChild(this._weaponCard(gun, null, this._isEquipped(gun.id, null), () => {
       this._equipWeapon(gun, null);
     }));
 
-    // Every skin card. Real skinned renders drop in progressively.
-    const skins = isMelee ? SWORD_SKINS : WEAPON_SKINS;
+    // Only the skins the player OWNS for this weapon. New accounts have
+    // none — the tab shows just Default until skins are earned/bought.
+    const allSkins = isMelee ? SWORD_SKINS : WEAPON_SKINS;
+    const owned = allSkins.filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
-    for (const s of skins) {
+    for (const s of owned) {
       const card = this._weaponCard(gun, s, this._isEquipped(gun.id, s.id), () => {
         this._equipWeapon(gun, s.id);
       });
@@ -202,8 +204,9 @@ export class InventoryPanel {
     grid.appendChild(
       this._defaultCharacterCard(playerSkin, !Shop.getEquipped(), () => this._equipCharacter(null))
     );
-    // One card per armor finish (owned or not; equipping locked ones opens the shop).
-    for (const s of ARMOR_SKINS) {
+    // Only the armor finishes the player OWNS. Nothing to buy here — the
+    // store is the store; this is just what the player has.
+    for (const s of ARMOR_SKINS.filter((s) => Shop.isOwned(s.id))) {
       grid.appendChild(this._characterCard(s, Shop.getEquipped() === s.id, () => this._equipCharacter(s)));
     }
   }
@@ -228,7 +231,6 @@ export class InventoryPanel {
       Shop.unequip();
       this.host.onArmorSkinEquipped?.(null);
     } else {
-      if (!Shop.isOwned(skin.id)) { this.host._togglePanel('shop'); return; }
       Shop.equip(skin.id);
       this.host.onArmorSkinEquipped?.(skin.id);
     }
@@ -285,7 +287,6 @@ export class InventoryPanel {
   }
 
   _characterCard(armorSkin, equipped, onClick) {
-    const owned = Shop.isOwned(armorSkin.id);
     const bg = _grad(armorSkin.primary, armorSkin.secondary);
     const card = this._cardBase({
       bg, rarity: armorSkin.rarity, equipped, onClick,
@@ -295,13 +296,6 @@ export class InventoryPanel {
     fig.className = 'inv-card-fig';
     fig.innerHTML = CHAR_SVG;
     card.insertBefore(fig, card.firstChild);
-    if (!owned) {
-      const lock = document.createElement('div');
-      lock.className = 'inv-card-lock';
-      lock.textContent = `🔒 ◆ ${armorSkin.price.toLocaleString()}`;
-      card.appendChild(lock);
-      card.classList.add('locked');
-    }
     return card;
   }
 
