@@ -9,28 +9,60 @@ const TAXI_YELLOW = 0xffcf3d;
 // ---------------------------------------------------------------------------
 
 function makeTechFloorTexture() {
-  // Winter-Bishop snow: soft white with subtle blue-grey drift + sparkle, no grid.
+  // Sci-fi battlefield deck: dark alloy plating with panel seams, scorch marks,
+  // scattered grit and the odd hazard chevron strip.
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#e9eef4';
+  ctx.fillStyle = '#2b2f36';
   ctx.fillRect(0, 0, size, size);
-  // gentle blue-grey drifts (wind-blown snow)
-  for (let i = 0; i < 70; i++) {
-    const x = Math.random() * size, y = Math.random() * size, r = 30 + Math.random() * 90;
+  // large tonal patches so the plating doesn't tile flat
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 40 + Math.random() * 110;
     const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const blue = Math.random() < 0.5;
-    g.addColorStop(0, blue ? 'rgba(176,196,214,0.18)' : 'rgba(255,255,255,0.16)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
+    const dark = Math.random() < 0.5;
+    g.addColorStop(0, dark ? 'rgba(0,0,0,0.16)' : 'rgba(120,140,160,0.10)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
-  // fine speckle (compacted snow / sparkle)
-  for (let i = 0; i < 1800; i++) {
-    const v = 200 + Math.random() * 55;
-    ctx.fillStyle = `rgba(${v},${v + 4},${Math.min(255, v + 10)},0.5)`;
+  // panel seams (offset plate grid)
+  ctx.strokeStyle = 'rgba(0,0,0,0.42)';
+  ctx.lineWidth = 3;
+  const cell = 128;
+  for (let y = 0; y < size; y += cell) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
+    const off = (y / cell) % 2 ? cell / 2 : 0;
+    for (let x = off; x < size + cell; x += cell) {
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + cell); ctx.stroke();
+    }
+  }
+  // seam highlights (top-lit bevel edge)
+  ctx.strokeStyle = 'rgba(160,180,200,0.10)';
+  ctx.lineWidth = 1;
+  for (let y = 2; y < size; y += cell) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke(); }
+  // scorch marks — plasma burns on the plating
+  for (let i = 0; i < 9; i++) {
+    const x = Math.random() * size, y = Math.random() * size, r = 12 + Math.random() * 26;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(8,8,10,0.75)');
+    g.addColorStop(0.55, 'rgba(20,16,12,0.42)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // grit + spark speckle
+  for (let i = 0; i < 1400; i++) {
+    const v = 40 + Math.random() * 50;
+    ctx.fillStyle = `rgba(${v},${v + 4},${v + 10},0.5)`;
     ctx.fillRect(Math.random() * size, Math.random() * size, 1.5, 1.5);
+  }
+  // one hazard chevron strip per tile for that military-base read
+  const hy = Math.floor(Math.random() * 3) * cell + cell - 10;
+  for (let x = 0; x < size; x += 24) {
+    ctx.fillStyle = (x / 24) % 2 ? 'rgba(255,170,40,0.28)' : 'rgba(10,10,12,0.35)';
+    ctx.fillRect(x, hy, 24, 7);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -73,12 +105,14 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  // Winter-Bishop overcast: muted blue-grey zenith melting into a pale warm haze.
-  grad.addColorStop(0.00, '#7d93a8'); // soft overcast blue-grey
-  grad.addColorStop(0.40, '#9fb1c0');
-  grad.addColorStop(0.70, '#c8cdd0');
-  grad.addColorStop(0.88, '#e4dcd6'); // warm pale band near horizon
-  grad.addColorStop(1.00, '#efe7e0'); // hazy warm horizon
+  // Sci-fi battlefield dusk: deep space indigo zenith falling into a smoky
+  // teal band, then a burning ember horizon — a war going on past the walls.
+  grad.addColorStop(0.00, '#0b1024'); // deep space indigo
+  grad.addColorStop(0.35, '#16233f');
+  grad.addColorStop(0.62, '#274a5c'); // smoky teal band
+  grad.addColorStop(0.82, '#8a5a33'); // burnt amber build-up
+  grad.addColorStop(0.93, '#d68a3f'); // ember glow band
+  grad.addColorStop(1.00, '#f0b46a'); // fire on the horizon
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -86,9 +120,9 @@ function makeSkyGradientTexture() {
   return tex;
 }
 
-// Winter-Bishop building wall: base plaster/clay tone with panel wear and a
-// loose grid of dark window insets (a few warmly lit). One texture per palette
-// colour, shared by every building of that colour — zero extra meshes.
+// Sci-fi bunker wall: alloy panel plating with seam lines, vents, and a loose
+// grid of glowing light-slit windows (cyan, with the odd warning-orange one).
+// One texture per palette colour, shared by every building of that colour.
 function makeBuildingWallTexture(baseCss, darkCss) {
   const S = 256;
   const c = document.createElement('canvas');
@@ -102,23 +136,32 @@ function makeBuildingWallTexture(baseCss, darkCss) {
     g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${0.03 + Math.random() * 0.05})`;
     g.fillRect(x, 0, w, S);
   }
-  // storey bands
-  g.fillStyle = 'rgba(0,0,0,0.10)';
+  // alloy panel seams: storey bands + vertical joints
+  g.fillStyle = 'rgba(0,0,0,0.28)';
   for (let y = 84; y < S; y += 84) g.fillRect(0, y, S, 3);
-  // windows: 4 cols x 3 rows, some skipped, some lit warm
+  for (let x = 64; x < S; x += 64) g.fillRect(x, 0, 2, S);
+  // rivet dots along the storey bands
+  g.fillStyle = 'rgba(0,0,0,0.4)';
+  for (let y = 84; y < S; y += 84)
+    for (let x = 10; x < S; x += 32) { g.beginPath(); g.arc(x, y + 1.5, 1.6, 0, Math.PI * 2); g.fill(); }
+  // light-slit windows: 4 cols x 3 rows, some skipped, glowing cool or warning-orange
   for (let r = 0; r < 3; r++) {
     for (let col = 0; col < 4; col++) {
       if (Math.random() < 0.28) continue;               // skip some — irregular look
-      const x = 18 + col * 60, y = 22 + r * 84;
-      const lit = Math.random() < 0.22;
-      g.fillStyle = darkCss;
-      g.fillRect(x, y, 30, 40);
-      g.fillStyle = lit ? 'rgba(255,214,150,0.95)' : 'rgba(120,150,175,0.35)';
-      g.fillRect(x + 3, y + 3, 24, 34);
-      g.fillStyle = 'rgba(255,255,255,0.25)';           // snow on the sill
-      g.fillRect(x - 2, y + 40, 34, 3);
+      const x = 18 + col * 60, y = 26 + r * 84;
+      const warn = Math.random() < 0.14;
+      g.fillStyle = darkCss;                            // recessed frame
+      g.fillRect(x, y, 34, 26);
+      g.fillStyle = warn ? 'rgba(255,150,50,0.95)' : 'rgba(80,220,255,0.85)';
+      g.fillRect(x + 3, y + 9, 28, 8);                  // glowing horizontal slit
+      g.fillStyle = warn ? 'rgba(255,150,50,0.35)' : 'rgba(80,220,255,0.3)';
+      g.fillRect(x + 3, y + 3, 28, 4);                  // dimmer upper vent line
+      g.fillRect(x + 3, y + 19, 28, 4);                 // dimmer lower vent line
     }
   }
+  // intake vent near the base row
+  g.fillStyle = 'rgba(0,0,0,0.5)';
+  for (let i = 0; i < 5; i++) g.fillRect(96, 232 + i * 4, 64, 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -424,10 +467,10 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    // Clean, bright ev.io-style arena: a light cool-grey sky and a soft, far
-    // haze (not a dark moody fog) so distant structure fades cleanly to white.
-    this.scene.background = new THREE.Color(0x9fb1c0);
-    this.scene.fog = new THREE.Fog(0xc9ccce, 120, 420); // cold snow haze
+    // Sci-fi battlefield dusk: dark indigo sky with a smoky teal-grey haze so
+    // distant structures dissolve into battle smoke rather than white mist.
+    this.scene.background = new THREE.Color(0x16233f);
+    this.scene.fog = new THREE.Fog(0x2a3644, 110, 400); // battle-smoke haze
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -539,9 +582,10 @@ export class World {
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildArenaWalls();      // terracotta perimeter (the town's outer edge)
-    this._buildWinterTown();      // building blocks, plaza + pavilion, ramps, bridges, lifts
-    this._buildSnowProps();       // crates + perimeter string lights
+    this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
+    this._buildWinterTown();      // bunker blocks, plaza + pavilion, ramps, bridges, lifts
+    this._buildSnowProps();       // supply crates + perimeter energy lights
+    this._buildOrbitalRing();     // massive ring station overhead — the landmark
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
@@ -565,11 +609,12 @@ export class World {
     // directional key/fill, no point lights, no shadows. Surfaces are lit by this
     // single hemisphere (sky) light plus the scene's environment map (IBL) and
     // emissive accents, which is the cheapest possible lighting to render.
-    // Winter overcast: cool soft sky light + a gentle warm sun for low contrast.
-    const hemi = new THREE.HemisphereLight(0xe3ecf3, 0x6b7480, 1.15);
+    // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
+    // the horizon fires rake warm light across the alloy structures.
+    const hemi = new THREE.HemisphereLight(0x9db8d8, 0x2a2e36, 1.05);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffe9d2, 0.8);
-    key.position.set(50, 110, 30);
+    const key = new THREE.DirectionalLight(0xffb070, 0.9);
+    key.position.set(80, 60, -40); // low ember sun near the burning horizon
     key.castShadow = false;
     this.scene.add(key);
   }
@@ -578,9 +623,9 @@ export class World {
     const floorTex  = makeTechFloorTexture();
     const roadMat = new THREE.MeshStandardMaterial({
       map:          floorTex,
-      roughness:    0.96,
-      metalness:    0.0,
-      color:        0xeef3f8, // snow
+      roughness:    0.82,
+      metalness:    0.28,
+      color:        0xaeb6c2, // tinted alloy (texture carries the plating detail)
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
     ground.rotation.x = -Math.PI / 2;
@@ -648,12 +693,15 @@ export class World {
   }
 
   _neonMat(c) {
-    // Winter-Bishop theme: the map has no neon. Re-purpose every "glowing edge"
-    // as a matte dark-wood trim so platforms/walls get a wooden rim instead.
-    let m = this._neonMats.get('wood');
+    // Battlefield theme: glowing energy trim is back. One cached emissive
+    // material per colour — bloom carries the glow, no point lights needed.
+    let m = this._neonMats.get(c);
     if (!m) {
-      m = new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.92, metalness: 0.05 });
-      this._neonMats.set('wood', m);
+      m = new THREE.MeshStandardMaterial({
+        color: 0x0a0d12, emissive: c, emissiveIntensity: 1.6,
+        roughness: 0.4, metalness: 0.2,
+      });
+      this._neonMats.set(c, m);
     }
     return m;
   }
@@ -2229,9 +2277,9 @@ export class World {
   _buildArenaWalls() {
     const half = ARENA_HALF;
     const H = 24, T = 2.5;
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xa9663f, roughness: 0.92, metalness: 0.03 });  // terracotta
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0x8a5a3a, roughness: 0.9, metalness: 0.04 });  // darker clay
-    const trimMat = this._neonMat(0x4a3320);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.6, metalness: 0.55 });   // gunmetal alloy
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0x262c36, roughness: 0.55, metalness: 0.6 });  // darker inset plating
+    const trimMat = this._neonMat(0x33a8ec);  // energy containment bands
 
     const specs = [
       { w: half * 2 + T * 2, d: T, x: 0, z: -half },
@@ -2592,21 +2640,26 @@ export class World {
   // |coord| in 35..43, a wide outer ring, and a central plaza with the round
   // pavilion. 16 buildings in 3 rings; every roof is walkable.
   _buildWinterTown() {
+    // Sci-fi battlefield palette. Key names kept (roof/trim/snow/stone/cream)
+    // so every downstream reference re-themes for free:
+    //   snow  -> rooftop landing-pad deck (dark alloy)
+    //   stone -> structural composite (ramps/landings)
+    //   cream -> pale ceramic armour plate (pavilion)
     const mats = {
-      roof:  new THREE.MeshStandardMaterial({ color: 0x8a94a0, roughness: 0.9, metalness: 0.05 }),
-      trim:  new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 0.9, metalness: 0.05 }),
-      snow:  new THREE.MeshStandardMaterial({ color: 0xeef3f8, roughness: 0.95, metalness: 0 }),
-      stone: new THREE.MeshStandardMaterial({ color: 0xb79c78, roughness: 0.9, metalness: 0.04 }),
-      cream: new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.85, metalness: 0.04 }),
+      roof:  new THREE.MeshStandardMaterial({ color: 0x30363e, roughness: 0.55, metalness: 0.6 }),
+      trim:  new THREE.MeshStandardMaterial({ color: 0x11151c, roughness: 0.45, metalness: 0.7 }),
+      snow:  new THREE.MeshStandardMaterial({ color: 0x3c444e, roughness: 0.6, metalness: 0.5 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0x59616c, roughness: 0.65, metalness: 0.45 }),
+      cream: new THREE.MeshStandardMaterial({ color: 0xb8c2cc, roughness: 0.5, metalness: 0.4 }),
     };
-    // one shared textured material per palette colour
+    // one shared textured material per palette colour — alloy bunker walls
     const wall = (css, dark) => new THREE.MeshStandardMaterial({
-      map: makeBuildingWallTexture(css, dark), roughness: 0.92, metalness: 0.03,
+      map: makeBuildingWallTexture(css, dark), roughness: 0.6, metalness: 0.45,
     });
-    const CLAY  = wall('#a9663f', '#3a2318');
-    const CLAY2 = wall('#8a5a3a', '#33201a');
-    const SLATE = wall('#5f6d7d', '#22282f');
-    const TAN   = wall('#c9a878', '#4a3a26');
+    const CLAY  = wall('#4a5260', '#14181f');  // steel blue plating
+    const CLAY2 = wall('#3a4048', '#101318');  // gunmetal plating
+    const SLATE = wall('#2c3440', '#0c1016');  // dark hull plating
+    const TAN   = wall('#5c5a52', '#1a1812');  // olive-drab composite
 
     // [cx, cz, w, d, h, mat, hut?]
     const blocks = [
@@ -2656,25 +2709,26 @@ export class World {
     this.platforms.push({ minX: -4.2, maxX: 4.2, minZ: -4.2, maxZ: 4.2, y0: 0.5, y1: 0.5 });
     this.platforms.push({ minX: -3.2, maxX: 3.2, minZ: -3.2, maxZ: 3.2, y0: 1.0, y1: 1.0 });
 
-    // ── snow drifts hugging building bases ──
-    const driftMat = mats.snow;
+    // ── blast rubble hugging building bases (was snow drifts) ──
+    const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x23262c, roughness: 0.95, metalness: 0.15 });
     for (const [cx, cz, w, d] of blocks) {
       for (let i = 0; i < 2; i++) {
         const side = Math.floor(Math.random() * 4);
-        const drift = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), driftMat);
+        const rubble = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 5), rubbleMat);
         const len = 2.5 + Math.random() * 3;
         let dx = 0, dz = 0;
-        if (side === 0)      { dx =  w / 2 + 0.4; drift.scale.set(1.1, 0.55, len); }
-        else if (side === 1) { dx = -w / 2 - 0.4; drift.scale.set(1.1, 0.55, len); }
-        else if (side === 2) { dz =  d / 2 + 0.4; drift.scale.set(len, 0.55, 1.1); }
-        else                 { dz = -d / 2 - 0.4; drift.scale.set(len, 0.55, 1.1); }
-        drift.position.set(cx + dx + (Math.random() - 0.5) * 4, 0.1, cz + dz + (Math.random() - 0.5) * 4);
-        drift.userData.noHit = true;
-        this.scene.add(drift);
+        if (side === 0)      { dx =  w / 2 + 0.4; rubble.scale.set(1.1, 0.55, len); }
+        else if (side === 1) { dx = -w / 2 - 0.4; rubble.scale.set(1.1, 0.55, len); }
+        else if (side === 2) { dz =  d / 2 + 0.4; rubble.scale.set(len, 0.55, 1.1); }
+        else                 { dz = -d / 2 - 0.4; rubble.scale.set(len, 0.55, 1.1); }
+        rubble.position.set(cx + dx + (Math.random() - 0.5) * 4, 0.1, cz + dz + (Math.random() - 0.5) * 4);
+        rubble.rotation.y = Math.random() * Math.PI;      // low-poly debris read
+        rubble.userData.noHit = true;
+        this.scene.add(rubble);
       }
     }
 
-    // ── festive string lights across the avenues between rooflines ──
+    // ── energy conduit lights strung across the avenues between rooflines ──
     this._bulbStrand(-19,  27, 10.5,  19,  27, 10.5);
     this._bulbStrand(-19, -27,  8.5,  19, -27,  8.5);
     this._bulbStrand( 27, -19, 10.0,  27,  19, 10.0);
@@ -2719,9 +2773,9 @@ export class World {
     this.platforms.push({ minX, maxX, minZ, maxZ, y0: y, y1: y });
   }
 
-  // A sagging strand of coloured festive bulbs between two anchor points.
+  // A sagging strand of energy-conduit marker lights between two anchor points.
   _bulbStrand(x0, z0, y0, x1, z1, y1) {
-    const colors = [0xff4040, 0x40c060, 0xffd23b, 0x4090ff, 0xff8a3b, 0xffffff];
+    const colors = [0x33d4ff, 0x1a9fd0, 0xff9a3b, 0x33d4ff, 0x66e8ff, 0xff7a2c];
     const segs = 18;
     for (let i = 0; i <= segs; i++) {
       const t = i / segs;
@@ -2739,25 +2793,25 @@ export class World {
     }
   }
 
-  // Winter-Bishop props: stacked wooden crates for cover + festive string lights
-  // strung between the perimeter wall tops (the colored bulbs from the map).
+  // Battlefield props: stacked military supply crates for cover + energy
+  // marker lights strung along the perimeter wall tops.
   _buildSnowProps() {
-    const wood  = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.95 });
-    const band  = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.8 });
-    const snow  = new THREE.MeshStandardMaterial({ color: 0xeef3f8, roughness: 0.95 });
+    const hull  = new THREE.MeshStandardMaterial({ color: 0x2f3a34, roughness: 0.6, metalness: 0.55 }); // olive alloy
+    const band  = new THREE.MeshStandardMaterial({ color: 0x11151a, roughness: 0.45, metalness: 0.7 });
+    const glow  = this._neonMat(0x33d4ff);   // status light strip on the lid
 
     const crate = (x, z, s, y = 0) => {
       const g = new THREE.Group();
-      const box = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), wood);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), hull);
       box.position.y = s / 2; g.add(box);
-      // edge bands
+      // reinforcing edge bands
       for (const ax of ['x', 'z']) {
         const b = new THREE.Mesh(new THREE.BoxGeometry(ax === 'x' ? s + 0.04 : 0.12, 0.12, ax === 'z' ? s + 0.04 : 0.12), band);
         b.position.set(0, s / 2, 0); g.add(b);
       }
-      // snow cap
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(s + 0.05, 0.12, s + 0.05), snow);
-      cap.position.y = s + 0.02; g.add(cap);
+      // glowing status strip across the lid
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(s * 0.7, 0.06, 0.14), glow);
+      cap.position.y = s + 0.03; g.add(cap);
       g.position.set(x, y, z);
       g.updateMatrixWorld(true);
       this.scene.add(g);
@@ -2779,9 +2833,9 @@ export class World {
       if ((x + z) % 3 === 0) crate(x, z, 1.4, 1.9); // a stacked one
     }
 
-    // Festive string lights along the inner top of the four perimeter walls.
+    // Energy marker lights along the inner top of the four perimeter walls.
     const half = ARENA_HALF;
-    const bulbColors = [0xff4040, 0x40c060, 0xffd23b, 0x4090ff, 0xff8a3b, 0xffffff];
+    const bulbColors = [0x33d4ff, 0x1a9fd0, 0xff9a3b, 0x66e8ff, 0x33d4ff, 0xff7a2c];
     const strand = (x0, z0, x1, z1) => {
       const segs = 26, y0 = 21;
       for (let i = 0; i <= segs; i++) {

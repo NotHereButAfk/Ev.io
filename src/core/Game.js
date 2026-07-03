@@ -217,7 +217,7 @@ export class Game {
     }, 2000);
   }
 
-  // Show the map-loading card (WINTER-BISHOP + map name) over the fly-through,
+  // Show the map-loading card (IRON-BASTION + map name) over the fly-through,
   // then reveal the main menu GUI.
   _runMapIntro() {
     const el = document.getElementById('map-loading');
@@ -226,7 +226,7 @@ export class Game {
       const mode    = document.getElementById('ml-mode');
       const players = document.getElementById('ml-players');
       const tip     = document.getElementById('ml-tip');
-      if (region)  region.textContent  = 'Winter District';
+      if (region)  region.textContent  = 'Bastion Sector';
       if (mode)    mode.textContent     = 'Loading map…';
       if (players) players.textContent  = 'Spectating';
       if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
