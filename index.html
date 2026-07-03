@@ -181,41 +181,31 @@
       <div class="spectate-hint">[ SPECTATE ]</div>
     </div>
 
-    <!-- ===================== PANEL: LOADOUT (INVENTORY v3) ===================== -->
+    <!-- ===================== PANEL: LOADOUT (ev.io-style) ===================== -->
     <div id="panel-loadout" class="nav-panel nav-panel-inv hidden">
+      <button id="inv-close-btn" class="inv-close-btn" title="Close">[X]</button>
 
       <div class="inv-header">
-        <div class="inv-avatar"><canvas id="armor-preview-canvas" width="200" height="240"></canvas></div>
+        <div class="inv-avatar-big"><canvas id="armor-preview-canvas" width="200" height="200"></canvas></div>
         <div class="inv-id">
-          <input id="player-name" class="inv-name-input" maxlength="16" value="Recruit" />
-          <div class="inv-meta">Balance: <span class="inv-coin">&#9678;</span> <span id="inv-balance">500</span></div>
-          <div class="inv-meta inv-meta-dim">Networth: <span class="inv-coin">&#9670;</span> <span id="inv-networth">0</span></div>
-          <div class="inv-meta inv-meta-dim">Collection: <span id="inv-collection">&mdash;</span></div>
-        </div>
-        <div class="inv3-perks" id="inv3-perks"></div>
-        <div class="inv-actions">
-          <button class="inv-btn" id="inv-wallet-btn">&#9783; Connect Wallet</button>
-          <button class="inv-btn inv-btn-ghost" id="inv-account-btn">Account &#8599;</button>
-        </div>
-      </div>
-
-      <div class="inv3-loadoutbar" id="inv3-loadoutbar"></div>
-
-      <div class="inv3-body">
-        <aside class="inv3-side" id="inv3-side"></aside>
-        <section class="inv3-main">
-          <div class="inv3-hero">
-            <div class="inv3-stage" id="inv3-stage">
-              <div id="inv3-weapon-img" class="inv3-stage-img"></div>
-              <canvas id="inv3-char-canvas" width="250" height="300" class="hidden"></canvas>
-            </div>
-            <div class="inv3-hero-info" id="inv3-hero-info"></div>
+          <div class="inv-username" id="inv-username">Recruit</div>
+          <input id="player-name" type="hidden" value="Recruit" />
+          <div class="inv-meta">Balance:
+            <span class="inv-ecoin"></span>
+            <span id="inv-balance">500</span>
           </div>
-          <div class="inv3-toolbar inv-skinbar" id="inv3-toolbar"></div>
-          <div class="inv3-grid" id="inv3-grid"></div>
-        </section>
+          <div class="inv-meta">Networth: <span id="inv-networth">0</span>
+            <span class="inv-tt" title="Total value of the skins you own">?</span>
+          </div>
+        </div>
       </div>
 
+      <div class="inv-section-label">EQUIPPED</div>
+      <div id="inv-equipped" class="inv-card-row"></div>
+
+      <div class="inv-section-label">INVENTORY</div>
+      <div id="inv-tabs" class="inv-tabs"></div>
+      <div id="inv-grid" class="inv-grid"></div>
     </div>
 
     <!-- ===================== PANEL: MODES ===================== -->

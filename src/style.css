@@ -4665,3 +4665,152 @@ html, body { margin: 0; }
 .login-link:hover { text-decoration: underline; }
 .login-sep { color: #3a4756; margin: 0 8px; }
 .login-alt { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: #8a97a2; font-size: 14px; }
+
+/* ============================================================================
+   ================  KYX.IO  INVENTORY (ev.io-EXACT)  =========================
+   Simple ev.io-style loadout: big avatar + username, Balance/Networth, an
+   EQUIPPED row, a horizontal tab strip, and a card grid. Appended last.
+   ============================================================================ */
+/* wider panel so 6+ cards fit per row */
+.nav-panel-inv { width: min(96vw, 1100px) !important; padding-top: 24px !important; }
+
+/* close [X] top-right */
+.inv-close-btn {
+  position: absolute; top: 12px; right: 18px;
+  background: none; border: none; color: #d7dee5;
+  font-family: 'Michroma','Rajdhani',system-ui,sans-serif;
+  font-size: 20px; font-weight: 600; letter-spacing: 1px; cursor: pointer;
+  padding: 4px 10px; opacity: 0.75; transition: opacity .14s;
+}
+.inv-close-btn:hover { opacity: 1; }
+
+/* header: big avatar left, name+meta right */
+.inv-header {
+  display: flex; align-items: center; gap: 22px; margin-bottom: 26px;
+  border-bottom: none !important;
+}
+.inv-avatar-big {
+  width: 130px; height: 130px; border-radius: 8px; overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #16324a, #060b14);
+  border: none; flex: 0 0 auto;
+}
+.inv-avatar-big canvas { width: 100%; height: 100%; display: block; }
+.inv-id { display: flex; flex-direction: column; gap: 8px; }
+.inv-username {
+  color: #fff; font-size: 34px; font-weight: 700; letter-spacing: 0.5px;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+}
+.inv-meta { color: #cfd6dc; font-size: 17px; display: flex; align-items: center; gap: 6px; font-family: 'Rajdhani', system-ui, sans-serif; }
+.inv-ecoin {
+  display: inline-block; width: 20px; height: 20px; border-radius: 50%;
+  background: linear-gradient(180deg,#59d0ff,#2a7ec8);
+  border: 2px solid #a4e8ff; margin: 0 2px;
+  box-shadow: 0 0 8px rgba(90,210,255,0.5);
+  position: relative;
+}
+.inv-ecoin::after {
+  content: 'e'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #04141f; font-weight: 900; font-size: 12px; font-family: 'Michroma', sans-serif;
+}
+.inv-tt {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,255,255,0.14); color: #cfd6dc;
+  font-size: 11px; font-weight: 700; cursor: help;
+}
+
+/* section labels */
+.inv-section-label {
+  color: #cfd6dc !important; font-size: 15px !important;
+  font-weight: 700 !important; letter-spacing: 1.5px !important;
+  margin: 22px 0 12px !important; padding: 0 !important;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  border: none !important;
+}
+.inv-section-label::before { content: none !important; }
+
+/* EQUIPPED row */
+.inv-card-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+
+/* tabs */
+.inv-tabs {
+  display: flex !important; flex-wrap: wrap; gap: 6px !important;
+  grid-template-columns: none !important;   /* undo v3 grid override */
+  margin-bottom: 18px !important;
+  border-bottom: none;
+}
+.inv-tab {
+  background: rgba(10,14,22,0.5) !important;
+  border: 1px solid rgba(120,140,160,0.2) !important;
+  color: #d7dee5 !important;
+  font-family: 'Rajdhani', system-ui, sans-serif !important;
+  font-size: 14px !important; font-weight: 500 !important;
+  padding: 10px 22px !important; border-radius: 4px !important;
+  text-align: center !important; letter-spacing: 0.2px !important;
+  cursor: pointer; transition: all .14s;
+  text-transform: none !important; white-space: nowrap;
+}
+.inv-tab:hover { color: #fff !important; border-color: rgba(120,180,220,0.5) !important; }
+.inv-tab.active {
+  background: rgba(30,70,110,0.6) !important;
+  border-color: rgba(80,160,220,0.6) !important;
+  color: #fff !important;
+}
+
+/* card grid */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+.inv-item {
+  position: relative; aspect-ratio: 1 / 1; border-radius: 8px;
+  overflow: hidden; cursor: pointer;
+  border: 2px solid rgba(120,140,160,0.15);
+  transition: transform .12s, border-color .12s, box-shadow .12s;
+}
+.inv-item:hover { transform: translateY(-2px); border-color: rgba(140,180,220,0.55); }
+.inv-item.equipped {
+  border-color: var(--rar, #4db6ff);
+  box-shadow: 0 0 0 1px var(--rar, #4db6ff), 0 0 18px rgba(77,182,255,0.4);
+}
+.inv-item.locked { opacity: 0.7; filter: grayscale(0.3); }
+.inv-item.locked:hover { opacity: 0.95; filter: none; }
+
+/* card thumb layers */
+.inv-card-img {
+  position: absolute; inset: 8px 8px 28px;
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+}
+.inv-card-fig {
+  position: absolute; inset: 6px 6px 30px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.inv-card-fig svg { width: 55%; height: 90%; }
+
+.inv-item-name {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  text-align: center; color: #fff; font-size: 14px; font-weight: 700;
+  padding: 10px 6px 8px;
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.75));
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv-card-lock {
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  background: rgba(0,0,0,0.65); color: #ffd23b;
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+}
+
+/* rarity tint on the border */
+.inv-item[data-rarity="mythic"]    { border-color: rgba(255,43,208,0.5); }
+.inv-item[data-rarity="legendary"] { border-color: rgba(255,173,0,0.45); }
+.inv-item[data-rarity="epic"]      { border-color: rgba(180,50,255,0.4); }
+.inv-item[data-rarity="rare"]      { border-color: rgba(40,120,255,0.35); }
+.inv-item[data-rarity="uncommon"]  { border-color: rgba(84,214,92,0.35); }
+
+/* EQUIPPED cards a bit larger, single row */
+.inv-card-row .inv-item { width: 170px; }
