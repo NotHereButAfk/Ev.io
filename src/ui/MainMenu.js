@@ -2,9 +2,11 @@ import { SKINS, getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Achievements } from '../core/Achievements.js';
 import { Shop } from '../core/Shop.js';
+import { Armory } from '../core/Armory.js';
 import { describePerk } from '../core/RarityPerks.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings } from '../core/GameSettings.js';
@@ -550,16 +552,23 @@ export class MenuUI {
 
   _renderShopGrid(root) {
     root.innerHTML = '';
-    const equipped  = Shop.getEquipped();
-    const filter    = this._shopFilter || 'all';
+    const equippedArmor = Shop.getEquipped();
+    const filter        = this._shopFilter || 'all';
+
+    // Every rarity has a default price; armor skins override with their own.
+    const RARITY_PRICE = { common: 100, uncommon: 300, rare: 700, epic: 1500, legendary: 3000, mythic: 6000 };
+    const priceOf = (skin) => skin.price ?? RARITY_PRICE[skin.rarity || 'common'] ?? 100;
 
     const _hex6 = n => n.toString(16).padStart(6, '0');
 
-    const makeCard = (skin, isArmor) => {
-      const rarity   = skin.rarity || 'common';
-      const color    = RARITY_COLORS[rarity];
-      const owned    = Shop.isOwned(skin.id);
-      const isEquip  = equipped === skin.id;
+    // kind: 'armor' | 'weapon' | 'sword'
+    const makeCard = (skin, kind) => {
+      const rarity  = skin.rarity || 'common';
+      const color   = RARITY_COLORS[rarity];
+      const price   = priceOf(skin);
+      const isArmor = kind === 'armor';
+      const owned   = isArmor ? Shop.isOwned(skin.id) : Armory.ownsSkin(skin.id);
+      const isEquip = isArmor && equippedArmor === skin.id;
 
       const card = document.createElement('div');
       card.className = 'shop-skin-card' + (isEquip ? ' equipped' : owned ? ' owned' : '');
@@ -570,8 +579,8 @@ export class MenuUI {
       swatch.className = 'shop-swatch';
       const inner = document.createElement('div');
       inner.className = 'shop-swatch-inner';
-      const c1 = isArmor ? _hex6(skin.primary) : _hex6(skin.body ?? skin.primary ?? 0x2a2a2a);
-      const c2 = isArmor ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.secondary ?? 0x111111);
+      const c1 = isArmor ? _hex6(skin.primary) : _hex6(skin.body ?? skin.blade ?? 0x2a2a2a);
+      const c2 = isArmor ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.guard ?? 0x111111);
       inner.style.background = `linear-gradient(145deg,#${c1},#${c2})`;
       if (skin.emissive) {
         const gc = '#' + _hex6(skin.emissive);
@@ -586,6 +595,12 @@ export class MenuUI {
       ribbon.style.borderLeft = `2px solid ${color}`;
       ribbon.textContent = rarity.toUpperCase();
       swatch.appendChild(ribbon);
+
+      // Kind badge (WEAPON / SWORD / ARMOR) top-right
+      const kindBadge = document.createElement('span');
+      kindBadge.className = 'shop-kind-badge';
+      kindBadge.textContent = kind.toUpperCase();
+      swatch.appendChild(kindBadge);
 
       // Status badge
       if (isEquip || owned) {
@@ -620,30 +635,44 @@ export class MenuUI {
         btn.textContent = 'EQUIPPED';
         btn.disabled = true;
       } else if (owned) {
-        btn.classList.add('shop-btn-owned');
-        btn.textContent = 'EQUIP';
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          Shop.equip(skin.id);
-          this.onArmorSkinEquipped?.(skin.id);
-          this._renderShop();
-        });
-      } else {
-        btn.classList.add('shop-btn-buy');
-        btn.innerHTML = `&#9670; ${skin.price.toLocaleString()} E-COINS`;
-        btn.disabled = Shop.getCoins() < skin.price;
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const res = Shop.buy(skin.id, skin.price);
-          if (res.ok) {
+        if (isArmor) {
+          btn.classList.add('shop-btn-owned');
+          btn.textContent = 'EQUIP';
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             Shop.equip(skin.id);
             this.onArmorSkinEquipped?.(skin.id);
+            this._renderShop();
+          });
+        } else {
+          // Weapon/sword skins equip inside the Inventory (they attach to a
+          // specific gun there) — the shop just marks them OWNED.
+          btn.classList.add('shop-btn-owned');
+          btn.textContent = 'IN INVENTORY';
+          btn.disabled = true;
+        }
+      } else {
+        btn.classList.add('shop-btn-buy');
+        btn.innerHTML = `&#9670; ${price.toLocaleString()} E-COINS`;
+        btn.disabled = Shop.getCoins() < price;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const res = Shop.buy(skin.id, price);
+          if (res.ok) {
+            if (isArmor) {
+              Shop.equip(skin.id);
+              this.onArmorSkinEquipped?.(skin.id);
+            } else {
+              // Weapon/sword skin -> grant into the Armory's owned pool so
+              // it appears in the matching inventory tab.
+              Armory.grantSkin(skin.id);
+            }
             this._renderShop();
             this._refreshCoins();
           } else {
             btn.textContent = res.err.toUpperCase();
             setTimeout(() => {
-              btn.innerHTML = `&#9670; ${skin.price.toLocaleString()} E-COINS`;
+              btn.innerHTML = `&#9670; ${price.toLocaleString()} E-COINS`;
             }, 1500);
           }
         });
@@ -654,9 +683,10 @@ export class MenuUI {
     };
 
     // Build combined list based on filter
-    const armorItems  = filter !== 'weapon' ? ARMOR_SKINS.map(s => ({ ...s, _isArmor: true })) : [];
-    const weaponItems = filter !== 'armor'  ? WEAPON_SKINS.map(s => ({ ...s, _isArmor: false })) : [];
-    const allItems = [...armorItems, ...weaponItems];
+    const armorItems  = (filter === 'all' || filter === 'armor')  ? ARMOR_SKINS.map(s => ({ ...s, _kind: 'armor'  })) : [];
+    const weaponItems = (filter === 'all' || filter === 'weapon') ? WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' })) : [];
+    const swordItems  = (filter === 'all' || filter === 'sword')  ? SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  })) : [];
+    const allItems = [...armorItems, ...weaponItems, ...swordItems];
 
     // Render by rarity section, highest first
     [...RARITY_ORDER].reverse().forEach(rarity => {
@@ -671,7 +701,7 @@ export class MenuUI {
       section.appendChild(hdr);
       const grid = document.createElement('div');
       grid.className = 'shop-skin-grid';
-      tier.forEach(s => grid.appendChild(makeCard(s, s._isArmor)));
+      tier.forEach(s => grid.appendChild(makeCard(s, s._kind)));
       section.appendChild(grid);
       root.appendChild(section);
     });

@@ -4814,3 +4814,12 @@ html, body { margin: 0; }
 
 /* EQUIPPED cards a bit larger, single row */
 .inv-card-row .inv-item { width: 170px; }
+
+/* Shop: kind badge (WEAPON / SWORD / ARMOR) on each card */
+.shop-kind-badge {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(6,10,16,0.75); color: #cfd6dc;
+  font-size: 9px; font-weight: 800; letter-spacing: 1px;
+  padding: 3px 7px; border-radius: 4px;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+}
