@@ -115,7 +115,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const _size = _box.getSize(new THREE.Vector3());
   const _ctr  = _box.getCenter(new THREE.Vector3());
 
-  // ── Animation ──
+  // ── Animation: 3 clips (idle/walk/run) + rich procedural motion layers ──
   const mixer   = new THREE.AnimationMixer(root);
   const byName  = {};
   for (const clip of _template.animations) byName[clip.name] = clip;
@@ -130,6 +130,16 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   }
 
   let current = null;
+  // Crossfade time is chosen per transition: quick between neighboring clips,
+  // longer when returning to a rest state, so the blends never look snappy or
+  // overlong. `warp` keeps foot cadence in sync between locomotion clips.
+  const FADE = { idleToWalk: 0.14, walkToRun: 0.18, runToWalk: 0.20, walkToIdle: 0.24, idleToRun: 0.22, runToIdle: 0.26 };
+  const _fadeKey = (from, to) => {
+    if (!from || !to) return 0.2;
+    const f = from === actions.idle ? 'idle' : from === actions.walk ? 'walk' : 'run';
+    const t = to   === actions.idle ? 'idle' : to   === actions.walk ? 'walk' : 'run';
+    return FADE[`${f}To${t.charAt(0).toUpperCase() + t.slice(1)}`] ?? 0.2;
+  };
   const setMotion = (name) => {
     const next = actions[name] || actions.idle;
     if (!next || next === current) return;
@@ -138,10 +148,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     next.setEffectiveWeight(1);
     next.reset().play();
     if (current) {
-      // Warp between walk<->run so foot cadence stays in sync during the blend;
-      // a quick plain fade in/out of idle.
-      const warp = (name === 'run' || current === actions.run);
-      current.crossFadeTo(next, 0.2, warp);
+      const fade = _fadeKey(current, next);
+      const warp = (next !== actions.idle && current !== actions.idle);   // warp between locomotion clips
+      current.crossFadeTo(next, fade, warp);
     }
     current = next;
   };
@@ -152,38 +161,100 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const baseTS = motion.speed;
   mixer.timeScale = baseTS;
 
+  // ── Bone lookup (Mixamo rig) ────────────────────────────────────────────────
+  // Cached once so armorTick doesn't traverse the skeleton every frame. Any
+  // bone that's missing degrades gracefully (procedural offsets just skip it).
+  const B = {
+    hips:  root.getObjectByName('mixamorig:Hips'),
+    spine: root.getObjectByName('mixamorig:Spine'),
+    s1:    root.getObjectByName('mixamorig:Spine1'),
+    s2:    root.getObjectByName('mixamorig:Spine2'),
+    neck:  root.getObjectByName('mixamorig:Neck'),
+    head:  root.getObjectByName('mixamorig:Head'),
+    lArm:  root.getObjectByName('mixamorig:LeftArm'),
+    rArm:  root.getObjectByName('mixamorig:RightArm'),
+    lFore: root.getObjectByName('mixamorig:LeftForeArm'),
+    rFore: root.getObjectByName('mixamorig:RightForeArm'),
+    lLeg:  root.getObjectByName('mixamorig:LeftUpLeg'),
+    rLeg:  root.getObjectByName('mixamorig:RightUpLeg'),
+  };
+
   // Locomotion driver: choose the clip (with hysteresis to stop flicker) and
   // scale playback to the real movement speed so the feet track the ground and
-  // don't slide. speed is in m/s.
+  // don't slide. Extra state (accel, air time, strafe) feeds the procedural
+  // layer for lean, launch/land bounce, etc.
   const _clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  let _locName = 'idle';
-  const setLocomotion = (speed, grounded = true, sprinting = false) => {
-    let name = 'idle', ts = baseTS;
-    if (grounded) {
+  let _locName    = 'idle';
+  let _lastSpeed  = 0;
+  let _accel      = 0;                     // smoothed dSpeed/dt for lean
+  let _grounded   = true;
+  let _airT       = 0;                     // seconds off the ground
+  let _landT      = 0;                     // seconds since landing (landing squish)
+  let _strafeLean = 0;                     // –1 (right) .. +1 (left)
+  let _forwardLean = 0;                    // 0..1 momentum lean forward
+  let _fireRecoil = 0;                     // recoil kick amplitude, decays
+  let _flinch     = { x: 0, y: 0, t: 0 };  // damage flinch, decays
+  let _aimYaw     = 0;                     // desired upper-body yaw offset
+  let _aimPitch   = 0;                     // desired head pitch offset
+  let _sAimYaw    = 0;                     // smoothed
+  let _sAimPitch  = 0;                     // smoothed
+  let _idleGlanceT = 0;
+  let _idleGlanceTarget = 0;               // occasional idle head yaw target
+  let _idleGlanceCooldown = 3 + Math.random() * 4;
+
+  const setLocomotion = (speed, grounded = true, sprinting = false, strafe = 0) => {
+    // Air state overrides everything — bots normally pass grounded=true, but a
+    // player-controlled or scripted character can hop by setting grounded=false.
+    if (!grounded) {
+      _grounded = false; _airT += 0;
+      _locName = 'air';
+      // Slow the walk clip way down as a filler cycle while airborne so the
+      // legs still have some tone; the procedural jump pose takes over.
+      setMotion('walk');
+      mixer.timeScale = baseTS * 0.35;
+    } else {
+      if (!_grounded) { _landT = 0.24; _airT = 0; } // landing bounce
+      _grounded = true;
+      let name = 'idle', ts = baseTS;
       const runOn = _locName === 'run';
       if (sprinting || speed > (runOn ? 4.4 : 5.4)) {
         name = 'run';  ts = baseTS * _clamp(speed / 5.5, 0.7, 1.55);
       } else if (speed > (_locName === 'idle' ? 0.55 : 0.32)) {
         name = 'walk'; ts = baseTS * _clamp(speed / 1.6, 0.55, 1.9);
       }
+      _locName = name;
+      setMotion(name);
+      mixer.timeScale = ts;
     }
-    _locName = name;
-    setMotion(name);
-    mixer.timeScale = ts;
+    _strafeLean = _clamp(strafe, -1, 1);
   };
 
+  // Aim tracking: yaw twists the upper spine, pitch tilts the head.
+  const setAim = (pitch, yaw) => { _aimPitch = pitch; _aimYaw = yaw; };
+  // Impulse hooks: fire recoil, damage flinch, jump launch.
+  const triggerFire = (kick = 1) => { _fireRecoil = Math.max(_fireRecoil, 0.12 * kick); };
+  const triggerHit  = (dx = 0, dy = 0) => { _flinch.x = dx * 0.18; _flinch.y = dy * 0.14; _flinch.t = 0.35; };
+  const triggerJump = () => { _grounded = false; _airT = 0.001; };
+
+  // Stance offsets applied after mixer.update overwrites bones (per armor type).
   const poseOffsets = [];
-  const spineBone = root.getObjectByName('mixamorig:Spine1');
-  const headBone  = root.getObjectByName('mixamorig:Head');
-  if (spineBone && motion.spineLean)
-    poseOffsets.push({ bone: spineBone, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.spineLean) });
-  if (headBone && motion.headPitch)
-    poseOffsets.push({ bone: headBone, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.headPitch) });
+  if (B.s1 && motion.spineLean)
+    poseOffsets.push({ bone: B.s1, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.spineLean) });
+  if (B.head && motion.headPitch)
+    poseOffsets.push({ bone: B.head, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.headPitch) });
+
+  // Scratch quaternion pool — allocating per-frame in armorTick would thrash.
+  const _q = [
+    new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
+    new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
+  ];
 
   let armorT = 0;
   const armorTick = (dt) => {
     armorT += dt;
     const t = armorT;
+
+    // ── Animated armor pieces (visor blink, thruster pulse, plate sway) ──
     for (const a of armor.animated) {
       const an = a.anim;
       if (an.type === 'pulse' || an.type === 'thruster') {
@@ -196,13 +267,108 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
         if (an.axis === 'z') a.mesh.rotateZ(ang); else a.mesh.rotateX(ang);
       }
     }
-    // Stance offsets are re-applied each frame after mixer.update overwrites the pose.
+
+    // ── Per-armor stance offsets (applied first so procedural layers stack on top)
     for (const p of poseOffsets) p.bone.quaternion.multiply(p.q);
-    // Idle breathing + subtle head look-around when standing still, so the
-    // soldier feels alive instead of frozen between the clip's own motion.
+
+    // ── Track state for lean/land/recoil layers ──
+    const speedNow = _locName === 'run' ? 5.5 : _locName === 'walk' ? 1.8 : 0;
+    _accel += ((speedNow - _lastSpeed) / Math.max(dt, 1e-3) - _accel) * Math.min(1, dt * 4);
+    _lastSpeed = speedNow;
+    if (!_grounded) _airT += dt;
+    if (_landT > 0) _landT = Math.max(0, _landT - dt);
+    if (_fireRecoil > 0) _fireRecoil = Math.max(0, _fireRecoil - dt * 1.4);
+    if (_flinch.t > 0) _flinch.t = Math.max(0, _flinch.t - dt);
+
+    // Smooth the aim tracking so quick camera whips don't snap the spine.
+    _sAimYaw   += (_aimYaw   - _sAimYaw)   * Math.min(1, dt * 8);
+    _sAimPitch += (_aimPitch - _sAimPitch) * Math.min(1, dt * 8);
+
+    // Momentum lean: tilt forward when accelerating into a run, back when stopping.
+    const targetFwd = _grounded ? _clamp(_accel * 0.02, -0.06, 0.09) : 0;
+    _forwardLean += (targetFwd - _forwardLean) * Math.min(1, dt * 5);
+
+    // ── Layer 1: aim tracking (spine1 yaw + head pitch) ──
+    if (B.s1)   B.s1.quaternion.multiply(_q[0].setFromAxisAngle(_AX_Y, _sAimYaw * 0.55));
+    if (B.s2)   B.s2.quaternion.multiply(_q[1].setFromAxisAngle(_AX_Y, _sAimYaw * 0.25));
+    if (B.head) B.head.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, _sAimPitch * 0.7));
+    if (B.head) B.head.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Y, _sAimYaw   * 0.35));
+
+    // ── Layer 2: strafe lean (bank Z into direction of movement) ──
+    if (B.spine && _grounded) {
+      const bank = _strafeLean * 0.11;
+      B.spine.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Z, bank));
+    }
+
+    // ── Layer 3: momentum forward lean ──
+    if (B.spine) B.spine.quaternion.multiply(_q[5].setFromAxisAngle(_AX_X, _forwardLean));
+
+    // ── Layer 4: fire recoil (spine kicks back, decays out) ──
+    if (_fireRecoil > 0) {
+      if (B.s1)   B.s1.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, -_fireRecoil));
+      if (B.head) B.head.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, -_fireRecoil * 0.6));
+    }
+
+    // ── Layer 5: damage flinch (torso twists away from hit direction) ──
+    if (_flinch.t > 0) {
+      const w = _flinch.t / 0.35;   // 1 -> 0 over 0.35s
+      const bend = Math.sin(w * Math.PI) * 0.8;  // soft ease-in/out
+      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, -_flinch.y * bend));
+      if (B.s2)    B.s2.quaternion.multiply(_q[1].setFromAxisAngle(_AX_Z,  _flinch.x * bend));
+      if (B.head)  B.head.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Z, _flinch.x * bend * 0.6));
+    }
+
+    // ── Layer 6: airborne pose (knees up, arms flare, spine curl) ──
+    if (!_grounded && _airT > 0.02) {
+      const rise = _clamp(_airT * 6, 0, 1);   // ramps in over ~150ms
+      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.08 * rise));
+      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, -0.45 * rise));
+      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, -0.30 * rise));
+      if (B.lArm)  B.lArm.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Z,  0.18 * rise));
+      if (B.rArm)  B.rArm.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Z, -0.18 * rise));
+    }
+
+    // ── Layer 7: landing squish (brief hip drop, decays) ──
+    if (_landT > 0) {
+      const w = _landT / 0.24;
+      const drop = Math.sin((1 - w) * Math.PI) * 0.09;
+      if (B.hips) {
+        B.hips.position.y -= drop * 3;
+        if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X,  drop * 1.6));
+        if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X,  -drop * 2.2));
+        if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X,  -drop * 2.2));
+      }
+    }
+
+    // ── Layer 8: rich idle life — breathing, weight shift, occasional glance ──
     if (_locName === 'idle') {
-      if (spineBone) spineBone.quaternion.multiply(_bq1.setFromAxisAngle(_AX_X, Math.sin(t * 1.5) * 0.014));
-      if (headBone)  headBone.quaternion.multiply(_bq2.setFromAxisAngle(_AX_Y, Math.sin(t * 0.55) * 0.05));
+      // Two breathing frequencies layered for a natural cycle.
+      const breathe = Math.sin(t * 1.5) * 0.014 + Math.sin(t * 2.7) * 0.005;
+      if (B.s1) B.s1.quaternion.multiply(_bq1.setFromAxisAngle(_AX_X, breathe));
+      // Slow hip weight shift left/right — sells "standing casually".
+      if (B.hips) B.hips.quaternion.multiply(_q[0].setFromAxisAngle(_AX_Z, Math.sin(t * 0.5) * 0.020));
+      // Head sways slowly and occasionally glances toward a target angle.
+      _idleGlanceT += dt;
+      if (_idleGlanceT > _idleGlanceCooldown) {
+        _idleGlanceT = 0;
+        _idleGlanceCooldown = 3 + Math.random() * 4;
+        _idleGlanceTarget = (Math.random() - 0.5) * 0.5;   // ± ~28°
+      }
+      // Decay the glance target back to 0 over its dwell time.
+      _idleGlanceTarget *= Math.max(0, 1 - dt * 0.3);
+      if (B.head) B.head.quaternion.multiply(_bq2.setFromAxisAngle(
+        _AX_Y,
+        Math.sin(t * 0.55) * 0.05 + _idleGlanceTarget * 0.4
+      ));
+      // Subtle finger tap / hand adjust via forearm rotation.
+      if (B.rFore) B.rFore.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, Math.sin(t * 1.8) * 0.010));
+    }
+
+    // ── Layer 9: locomotion accent — a tiny head bob at foot cadence for weight ──
+    if (_grounded && (_locName === 'walk' || _locName === 'run')) {
+      const cadence = _locName === 'run' ? 3.4 : 2.2;
+      const bobY = Math.sin(t * cadence * 2) * (_locName === 'run' ? 0.010 : 0.006);
+      if (B.head) B.head.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, bobY));
     }
   };
 
@@ -212,6 +378,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     actions,
     setMotion,
     setLocomotion,
+    setAim,          // (pitch, yaw) — spine twist + head tilt track camera aim
+    triggerFire,     // (kick=1)     — brief recoil pulse when the character fires
+    triggerHit,      // (dx, dy)     — damage flinch from a hit direction
+    triggerJump,     // ()           — enters airborne state; setLocomotion(_,true,_) lands
     armorTick,
     bodyMats,
     visorMats,

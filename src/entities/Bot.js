@@ -152,6 +152,8 @@ export class Bot {
     this._provokeTimer = PROVOKE_DURATION;
     this.health = Math.max(0, this.health - amount);
     this.flashTimer = 0.12;
+    // Rigged humans flinch away from the hit direction; procedural bots skip.
+    this.mesh?.userData?.triggerHit?.(0, 1);
     this.healthBarFg.scale.x = Math.max(0.001, this.health / this.maxHealth);
     this.healthBarFg.position.x = -((1 - this.healthBarFg.scale.x) * 0.33);
     if (this.health <= 0) {
@@ -199,6 +201,9 @@ export class Bot {
       const wMeshes = world.colliders.map(c => c.mesh).filter(Boolean);
       if (this._raycaster.intersectObjects(wMeshes, true).length) return; // blocked by wall
     }
+
+    // Fire recoil animation on rigged humans (procedural bots skip).
+    this.mesh?.userData?.triggerFire?.(1);
 
     // Hit probability falls off with distance
     const hitP = this._accuracy * Math.max(0.1, 1 - dist / (this._botGun.range * 1.5));
@@ -323,8 +328,35 @@ export class Bot {
       const ud = this.mesh.userData;
       const moving = !!moveTarget;
       const spd = moving ? (this.speed || 3) : 0;
-      if (ud.setLocomotion) ud.setLocomotion(spd, true, this.speed > 3.4);
+      // Strafe input: sign of lateral component of moveTarget in the bot's
+      // local frame — feeds the strafe-lean layer.
+      let strafe = 0;
+      if (moveTarget) {
+        const yaw = this.mesh.rotation.y;
+        const cs = Math.cos(yaw), sn = Math.sin(yaw);
+        strafe = -(moveTarget.x * cs - moveTarget.z * sn);   // local X
+      }
+      if (ud.setLocomotion) ud.setLocomotion(spd, true, this.speed > 3.4, strafe);
       else ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
+
+      // Aim: when engaged with the player, spine + head track them; otherwise
+      // gently return to zero via the smoother inside armorTick.
+      if (ud.setAim && player) {
+        if (this._provoked || engaged) {
+          const dx = player.position.x - this.position.x;
+          const dz = player.position.z - this.position.z;
+          const dy = (player.position.y + 1.0) - (this.position.y + 1.5);
+          const worldAim = Math.atan2(dx, dz);
+          const dyaw = worldAim - this.mesh.rotation.y;
+          // Wrap to [-π, π] so the twist takes the short way round.
+          const wrapped = ((dyaw + Math.PI) % (Math.PI * 2)) - Math.PI;
+          const flat = Math.hypot(dx, dz);
+          const pitch = -Math.atan2(dy, flat);
+          ud.setAim(pitch, wrapped);
+        } else {
+          ud.setAim(0, 0);
+        }
+      }
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
     }
