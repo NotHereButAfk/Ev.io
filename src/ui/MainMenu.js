@@ -588,14 +588,14 @@ export class MenuUI {
     // in progressively (a few per frame) after the initial render.
     const previewJobs = [];
 
-    // kind: 'armor' | 'weapon' | 'sword'
+    // kind: 'character' | 'weapon' | 'sword'
     const makeCard = (skin, kind) => {
       const rarity  = skin.rarity || 'common';
       const color   = RARITY_COLORS[rarity];
       const price   = priceOf(skin);
-      const isArmor = kind === 'armor';
-      const owned   = isArmor ? Shop.isOwned(skin.id) : Armory.ownsSkin(skin.id);
-      const isEquip = isArmor && equippedArmor === skin.id;
+      const isCharacter = kind === 'character';
+      const owned   = isCharacter ? Shop.isOwned(skin.id) : Armory.ownsSkin(skin.id);
+      const isEquip = isCharacter && equippedArmor === skin.id;
 
       const card = document.createElement('div');
       card.className = 'shop-skin-card' + (isEquip ? ' equipped' : owned ? ' owned' : '');
@@ -606,8 +606,8 @@ export class MenuUI {
       swatch.className = 'shop-swatch';
       const inner = document.createElement('div');
       inner.className = 'shop-swatch-inner';
-      const c1 = isArmor ? _hex6(skin.primary) : _hex6(skin.body ?? skin.blade ?? 0x2a2a2a);
-      const c2 = isArmor ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.guard ?? 0x111111);
+      const c1 = isCharacter ? _hex6(skin.primary) : _hex6(skin.body ?? skin.blade ?? 0x2a2a2a);
+      const c2 = isCharacter ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.guard ?? 0x111111);
       inner.style.background = `linear-gradient(145deg,#${c1},#${c2})`;
       if (skin.emissive) {
         const gc = '#' + _hex6(skin.emissive);
@@ -619,7 +619,7 @@ export class MenuUI {
       // real skinned-model render (dropped in progressively — see below).
       const preview = document.createElement('div');
       preview.className = 'shop-preview';
-      if (isArmor) {
+      if (isCharacter) {
         preview.classList.add('shop-preview-char');
         preview.innerHTML = SHOP_CHAR_SVG;
       } else {
@@ -667,7 +667,7 @@ export class MenuUI {
       body.appendChild(nameEl);
       const perkEl = document.createElement('div');
       perkEl.className = 'shop-perk-line';
-      perkEl.textContent = describePerk(rarity, isArmor);
+      perkEl.textContent = describePerk(rarity, isCharacter);
       body.appendChild(perkEl);
       card.appendChild(body);
 
@@ -681,7 +681,7 @@ export class MenuUI {
         btn.textContent = 'EQUIPPED';
         btn.disabled = true;
       } else if (owned) {
-        if (isArmor) {
+        if (isCharacter) {
           btn.classList.add('shop-btn-owned');
           btn.textContent = 'EQUIP';
           btn.addEventListener('click', (e) => {
@@ -705,7 +705,7 @@ export class MenuUI {
           e.stopPropagation();
           const res = Shop.buy(skin.id, price);
           if (res.ok) {
-            if (isArmor) {
+            if (isCharacter) {
               Shop.equip(skin.id);
               this.onArmorSkinEquipped?.(skin.id);
             } else {
@@ -729,10 +729,10 @@ export class MenuUI {
     };
 
     // Build combined list based on filter
-    const armorItems  = (filter === 'all' || filter === 'armor')  ? ARMOR_SKINS.map(s => ({ ...s, _kind: 'armor'  })) : [];
-    const weaponItems = (filter === 'all' || filter === 'weapon') ? WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' })) : [];
-    const swordItems  = (filter === 'all' || filter === 'sword')  ? SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  })) : [];
-    const allItems = [...armorItems, ...weaponItems, ...swordItems];
+    const characterItems = (filter === 'all' || filter === 'character') ? ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' })) : [];
+    const weaponItems    = (filter === 'all' || filter === 'weapon')    ? WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' })) : [];
+    const swordItems     = (filter === 'all' || filter === 'sword')     ? SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  })) : [];
+    const allItems = [...characterItems, ...weaponItems, ...swordItems];
 
     // Render by rarity section, highest first
     [...RARITY_ORDER].reverse().forEach(rarity => {
