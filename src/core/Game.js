@@ -275,7 +275,11 @@ export class Game {
   // ── Wire callbacks ──────────────────────────────────────────────────────────
 
   _wireCallbacks() {
-    this.weaponSystem.applyRecoilToPlayer = (amt) => this.player.applyRecoil(amt);
+    this.weaponSystem.applyRecoilToPlayer = (amt) => {
+      this.player.applyRecoil(amt);
+      // Fire recoil kick on the third-person body model.
+      this._playerBody?.userData?.triggerFire?.(Math.min(2, amt * 20));
+    };
 
     this.grenadeSystem.onExplode = (point, radius, damage) => {
       for (const enemy of this._activeManager.bots) {
@@ -786,6 +790,8 @@ export class Game {
     const died = this.player.takeDamage(dmg);
     this.audio.playHurt();
     this.hud.flashDamage();
+    // Damage flinch on the third-person body model.
+    this._playerBody?.userData?.triggerHit?.(0, 1);
     if (died) this._onPlayerDeath();
   }
 
@@ -907,7 +913,9 @@ export class Game {
       this._playerBody.visible = inTPS;
       if (inTPS) {
         this._playerBody.position.copy(this.player.position);
-        this._playerBody.rotation.y = this.player.yaw + Math.PI; // face same direction as camera
+        // Face the direction the player is aiming/moving, so the camera
+        // (which sits behind the player) sees the character's back.
+        this._playerBody.rotation.y = this.player.yaw;
         this._animatePlayerBody(dt);
       }
     }
@@ -978,8 +986,15 @@ export class Game {
     // Real human soldier: drive its skeletal Idle/Walk/Run clips.
     const ud = this._playerBody?.userData;
     if (ud?.isHuman) {
-      if (ud.setLocomotion) ud.setLocomotion(speed, p.onGround, p.isSprinting);
+      // Strafe input in the body's local frame — feeds the lean layer.
+      const yaw = p.yaw;
+      const cs = Math.cos(yaw), sn = Math.sin(yaw);
+      const strafe = -(p.velocity.x * cs - p.velocity.z * sn) / Math.max(1, speed);
+      if (ud.setLocomotion) ud.setLocomotion(speed, p.onGround, p.isSprinting, strafe);
       else ud.setMotion(speed > 0.6 && p.onGround ? (speed > 6.5 ? 'run' : 'walk') : 'idle');
+      // Head/spine track the player's aim pitch (the whole body already yaws to
+      // face the aim direction, so we only need pitch here).
+      if (ud.setAim) ud.setAim(p.pitch, 0);
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
       return;
