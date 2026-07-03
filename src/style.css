@@ -4823,3 +4823,17 @@ html, body { margin: 0; }
   padding: 3px 7px; border-radius: 4px;
   font-family: 'Rajdhani', system-ui, sans-serif;
 }
+
+/* Shop preview image: rendered weapon or character silhouette over the swatch */
+.shop-preview {
+  position: absolute; inset: 8px 8px 20px; z-index: 1;
+  pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+}
+.shop-preview-char svg { width: 55%; height: 90%; }
+.shop-preview-weapon {}   /* image supplied via background-image */
+
+/* keep the ribbon + badges above the preview */
+.shop-rarity-ribbon, .shop-kind-badge, .shop-status-badge { z-index: 2; }

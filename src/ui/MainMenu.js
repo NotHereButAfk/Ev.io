@@ -13,6 +13,25 @@ import { GameSettings } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { InventoryPanel } from './InventoryPanel.js';
+import { WEAPONS } from '../weapons/weaponDefs.js';
+import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
+
+// Shop card previews use the same weapon-render pipeline as the inventory:
+// pick one showcase gun for all weapon-skin cards, and the sword for melee.
+const _SHOP_GUN = () => WEAPONS.find((w) => w.id === 'm4') || WEAPONS.find((w) => w.kind !== 'melee');
+const _SHOP_SWORD = () => WEAPONS.find((w) => w.id === 'sword');
+const _shopThumbCache = new Map();  // `${weaponId}:${skinId}` -> dataURL
+
+const SHOP_CHAR_SVG = `
+  <svg viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+    <ellipse cx="16" cy="7" rx="5" ry="6" fill="rgba(0,0,0,0.55)"/>
+    <rect x="9" y="14" width="14" height="14" rx="2" fill="rgba(0,0,0,0.45)"/>
+    <rect x="3" y="14" width="5" height="11" rx="2" fill="rgba(0,0,0,0.4)"/>
+    <rect x="24" y="14" width="5" height="11" rx="2" fill="rgba(0,0,0,0.4)"/>
+    <rect x="9" y="29" width="5" height="13" rx="2" fill="rgba(0,0,0,0.45)"/>
+    <rect x="18" y="29" width="5" height="13" rx="2" fill="rgba(0,0,0,0.45)"/>
+    <rect x="10" y="11" width="12" height="4" rx="1" fill="rgba(0,207,255,0.6)"/>
+  </svg>`;
 
 function _rank(k) {
   if (k >= 100) return 'LEGEND';
@@ -84,6 +103,10 @@ export class MenuUI {
     this.onLoginRequest       = null; // () => void — open the login page
 
     this.inventory = new InventoryPanel(this);   // Inventory v3 (loadout hub)
+    // Warm the weapon-render pipeline so shop cards can drop in real skinned
+    // renders (same pipeline the inventory cards use). Re-render the shop
+    // when it's open at warm-up time.
+    warmWeaponThumbs(() => { if (this._activePanel === 'shop') this._renderShop(); });
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -561,6 +584,10 @@ export class MenuUI {
 
     const _hex6 = n => n.toString(16).padStart(6, '0');
 
+    // Skin cards that need real 3D-rendered previews are queued here and drop
+    // in progressively (a few per frame) after the initial render.
+    const previewJobs = [];
+
     // kind: 'armor' | 'weapon' | 'sword'
     const makeCard = (skin, kind) => {
       const rarity  = skin.rarity || 'common';
@@ -587,6 +614,25 @@ export class MenuUI {
         inner.style.boxShadow = `inset 0 0 20px ${gc}55`;
       }
       swatch.appendChild(inner);
+
+      // Preview: for armor a themed character silhouette; for weapon/sword a
+      // real skinned-model render (dropped in progressively — see below).
+      const preview = document.createElement('div');
+      preview.className = 'shop-preview';
+      if (isArmor) {
+        preview.classList.add('shop-preview-char');
+        preview.innerHTML = SHOP_CHAR_SVG;
+      } else {
+        preview.classList.add('shop-preview-weapon');
+        const showcase = kind === 'sword' ? _SHOP_SWORD() : _SHOP_GUN();
+        if (showcase) {
+          const key = `${showcase.id}:${skin.id}`;
+          const cached = _shopThumbCache.get(key);
+          if (cached) preview.style.backgroundImage = `url(${cached})`;
+          else previewJobs.push({ el: preview, gun: showcase, skin, key });
+        }
+      }
+      swatch.appendChild(preview);
 
       // Rarity ribbon
       const ribbon = document.createElement('span');
@@ -705,6 +751,28 @@ export class MenuUI {
       section.appendChild(grid);
       root.appendChild(section);
     });
+
+    // Progressive skinned-render pump: a few real 3D renders per frame so the
+    // shop stays responsive while the previews fill in. Results are cached
+    // so revisits are instant.
+    this._shopRenderToken = (this._shopRenderToken || 0) + 1;
+    const token = this._shopRenderToken;
+    const pump = () => {
+      if (token !== this._shopRenderToken) return;
+      let n = 0;
+      while (previewJobs.length && n < 3) {
+        const j = previewJobs.shift();
+        let src = _shopThumbCache.get(j.key);
+        if (!src) {
+          try { src = renderWeaponSkinned(j.gun, j.skin); } catch { src = null; }
+          if (src) _shopThumbCache.set(j.key, src);
+        }
+        if (src) j.el.style.backgroundImage = `url(${src})`;
+        n++;
+      }
+      if (previewJobs.length) requestAnimationFrame(pump);
+    };
+    if (previewJobs.length) requestAnimationFrame(pump);
   }
 
   // ── Battle Pass ────────────────────────────────────────────────────────────
