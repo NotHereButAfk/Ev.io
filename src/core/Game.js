@@ -73,6 +73,10 @@ export class Game {
       const wasVisible = this.previewCharacter?.visible ?? false;
       this._rebuildPreviewCharacter();
       this.previewCharacter.visible = wasVisible;
+      if (this._menuBotsActive) {
+        this._clearMenuBots();
+        this._spawnMenuBots();
+      }
     };
     preloadHumanSoldier(swapPreview);
     preloadPlayerModel(swapPreview);
@@ -99,6 +103,8 @@ export class Game {
       this.hud.flashTeleport();
     };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
+    // Hide FPS viewmodel during menu — it floats in the scene otherwise.
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     // The first-person viewmodel (gun, arm, muzzle flash, viewmodel lights) is
     // parented to the player camera. Three.js only renders objects reachable
     // from the scene root, so the camera itself must live in the scene.
@@ -656,6 +662,7 @@ export class Game {
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
     const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
 
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state    = 'leaderboard';
     this._lbTimer = 10;
     this.input.exitPointerLock();
@@ -761,7 +768,7 @@ export class Game {
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
-    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'menu';
     this.mobileControls?.hide();
     this.menu.hidePause();
@@ -842,6 +849,7 @@ export class Game {
     this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
