@@ -192,6 +192,48 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     rLeg:  findBone(root, 'RightUpLeg'),
   };
 
+  // ── Weapon-hold references ──────────────────────────────────────────────────
+  // Bake the idle clip's first frame into the bones once, and snapshot the arm
+  // rotations. Holding poses are defined as offsets from this natural
+  // arms-at-side stance (rather than the GLB's T-pose bind), so the same
+  // offsets read correctly no matter which clip is playing underneath.
+  mixer.update(0);
+  const _armRef = {
+    lArm:  B.lArm  ? B.lArm.quaternion.clone()  : null,
+    rArm:  B.rArm  ? B.rArm.quaternion.clone()  : null,
+    lFore: B.lFore ? B.lFore.quaternion.clone() : null,
+    rFore: B.rFore ? B.rFore.quaternion.clone() : null,
+  };
+  const _E = (x, y, z) => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z));
+  // Two-handed rifle carry: weapon arm folds across the chest, support arm
+  // reaches over toward the forend. Sword: blade arm bends to a low guard,
+  // off-hand swings free for balance.
+  // Axis map (probed on the Vanguard rig, right side; left mirrors Z):
+  //   arm  X+ = flex forward/up/in    arm  Z+ = pull across the chest
+  //   fore X+ = elbow flex up         fore Z+ = pull the hand inward
+  const HOLD_POSES = {
+    gun: {   // two-handed low-ready: trigger hand at the chest, support hand on the forend
+      rArm:  _E(0.70, 0, 0.50),  rFore: _E(0.20, 0, 0.60),
+      lArm:  _E(0.45, 0, -0.50), lFore: _E(-0.10, 0, -0.70),
+      w: { idle: 0.85, walk: 0.78, run: 0.60, air: 0.90 },
+    },
+    melee: { // relaxed low guard: blade arm bent forward at the side, off-hand free
+      rArm:  _E(0.35, 0, 0.18),  rFore: _E(0.30, 0, 0.25),
+      lArm:  null, lFore: null,  // free arm counter-swings for balance
+      w: { idle: 0.70, walk: 0.58, run: 0.42, air: 0.80 },
+    },
+  };
+  const _qHold = new THREE.Quaternion();
+  // Blend a clip-posed bone toward ref*offset — damps the walk/run arm swing
+  // into a believable carry without freezing it solid.
+  const _holdBone = (bone, ref, off, w) => {
+    if (!bone || !ref || !off || w <= 0) return;
+    _qHold.copy(ref).multiply(off);
+    bone.quaternion.slerp(_qHold, w);
+  };
+  let _weaponKind = null;   // null | 'gun' | 'melee'
+  let _holdRunT   = 0;      // smoothed 0..1 run blend for the sprint tuck
+
   // Locomotion driver: choose the clip (with hysteresis to stop flicker) and
   // scale playback to the real movement speed so the feet track the ground and
   // don't slide. Extra state (accel, air time, strafe) feeds the procedural
@@ -331,14 +373,21 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
       if (B.head)  B.head.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Z, _flinch.x * bend * 0.6));
     }
 
-    // ── Layer 6: airborne pose (knees up, arms flare, spine curl) ──
+    // ── Layer 6: airborne pose (two-phase jump: tuck at launch, then the legs
+    // extend back down as the fall continues, prepping for the landing) ──
     if (!_grounded && _airT > 0.02) {
-      const rise = _clamp(_airT * 6, 0, 1);   // ramps in over ~150ms
-      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.08 * rise));
-      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, -0.45 * rise));
-      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, -0.30 * rise));
-      if (B.lArm)  B.lArm.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Z,  0.18 * rise));
-      if (B.rArm)  B.rArm.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Z, -0.18 * rise));
+      const rise   = _clamp(_airT * 6, 0, 1);          // tuck ramps in over ~150ms
+      const settle = _clamp((_airT - 0.35) * 3, 0, 0.65); // legs reach for the ground
+      const tuckL  = -0.50 * rise + 0.34 * settle;
+      const tuckR  = -0.34 * rise + 0.22 * settle;
+      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.09 * rise - 0.04 * settle));
+      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, tuckL));
+      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, tuckR));
+      // Free arms flare for balance; armed limbs stay on the weapon (the hold
+      // layer below re-plants them, so only flare what the weapon doesn't own).
+      const flare = 0.20 * rise * (1 - 0.6 * settle);
+      if (B.lArm && _weaponKind !== 'gun') B.lArm.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Z,  flare));
+      if (B.rArm && !_weaponKind)          B.rArm.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Z, -flare));
     }
 
     // ── Layer 7: landing squish (brief hip drop, decays) ──
@@ -383,6 +432,43 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
       const bobY = Math.sin(t * cadence * 2) * (_locName === 'run' ? 0.010 : 0.006);
       if (B.head) B.head.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, bobY));
     }
+
+    // ── Layer 10: weapon hold — damp the clip's free arm swing into a real
+    // carry. Applied last so it wins over the airborne flare/idle sway on the
+    // limbs that own the weapon, while everything below the waist keeps the
+    // full locomotion animation. ──
+    if (_weaponKind) {
+      const pose = HOLD_POSES[_weaponKind];
+      _holdRunT += (((_grounded && _locName === 'run') ? 1 : 0) - _holdRunT) * Math.min(1, dt * 6);
+      const w = !_grounded ? pose.w.air
+              : _locName === 'run'  ? pose.w.run
+              : _locName === 'walk' ? pose.w.walk
+              : pose.w.idle;
+
+      // Cadence sway + breathing keep the carry alive instead of frozen; a
+      // sprint tuck drops the weapon toward the hip when running flat out.
+      const cad     = _locName === 'run' ? 3.4 : 2.2;
+      const alive   = _grounded && _locName !== 'idle'
+                    ? Math.sin(t * cad * 2) * 0.045
+                    : Math.sin(t * 1.5) * 0.015;
+      const tuck    = _holdRunT * 0.22;                       // sprint: muzzle dips
+      const landDip = _landT > 0 ? Math.sin((1 - _landT / 0.24) * Math.PI) * 0.12 : 0;
+
+      _holdBone(B.rArm,  _armRef.rArm,  pose.rArm,  w);
+      _holdBone(B.rFore, _armRef.rFore, pose.rFore, w);
+      _holdBone(B.lArm,  _armRef.lArm,  pose.lArm,  w * 0.9);
+      _holdBone(B.lFore, _armRef.lFore, pose.lFore, w * 0.9);
+      if (B.rFore) B.rFore.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, alive + tuck + landDip));
+      if (B.lFore && _weaponKind === 'gun')
+        B.lFore.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, alive * 0.7 + tuck + landDip));
+
+      // Shooter stance: a rifle squares the torso slightly toward the aim line
+      // and hunches it a touch; a sword stays upright and loose.
+      if (_weaponKind === 'gun') {
+        if (B.s1)    B.s1.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Y, 0.10));
+        if (B.spine) B.spine.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, 0.03));
+      }
+    }
   };
 
   // ── Third-person weapon: parent a held weapon to the right-hand bone so it
@@ -391,19 +477,29 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   let _heldWeapon = null;
   const attachWeapon = (weaponGroup, isMelee = false) => {
     if (_heldWeapon) { _heldWeapon.parent?.remove(_heldWeapon); _heldWeapon = null; }
+    _weaponKind = null;
     if (!weaponGroup) return;
     const hand = B.rHand;
     if (!hand) return; // no hand bone — skip rather than float a gun at the origin
+    _weaponKind = isMelee ? 'melee' : 'gun';
     weaponGroup.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
-    // Grip pose in the RightHand local frame (tuned for the Mixamo Vanguard rig).
+    // Mixamo armatures carry a tiny (~0.01) scale on the bones; a child of the
+    // hand inherits it and a rifle collapses to millimetres. Counter-scale so
+    // the weapon renders at world size, and express the grip offsets in world
+    // units (local = world / boneScale).
+    hand.updateWorldMatrix(true, false);
+    const _ws = new THREE.Vector3();
+    hand.getWorldScale(_ws);
+    const inv = 1 / Math.max(1e-6, _ws.x);
+    // Grip pose relative to the palm (world-unit offsets, tuned on the Vanguard rig).
     if (isMelee) {
-      weaponGroup.position.set(0.02, 0.06, 0.02);
+      weaponGroup.position.set(0.02, 0.06, 0.02).multiplyScalar(inv);
       weaponGroup.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
-      weaponGroup.scale.setScalar(1.15);
+      weaponGroup.scale.setScalar(1.15 * inv);
     } else {
-      weaponGroup.position.set(-0.02, 0.05, 0.03);
-      weaponGroup.rotation.set(Math.PI * 0.5, Math.PI, 0);
-      weaponGroup.scale.setScalar(1.0);
+      weaponGroup.position.set(-0.02, 0.04, 0.02).multiplyScalar(inv);
+      weaponGroup.rotation.set(1.15, Math.PI, 0.15);
+      weaponGroup.scale.setScalar(1.0 * inv);
     }
     hand.add(weaponGroup);
     _heldWeapon = weaponGroup;

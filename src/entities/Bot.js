@@ -124,12 +124,24 @@ export class Bot {
     // animates via its own skeletal mixer).
     this._rig = this._isHuman ? null : rigCharacterLimbs(this.mesh);
 
-    // The human model matches the third-person player, which carries no visible
-    // weapon mesh — so human bots skip the weapon attachment entirely.
-    const weaponId  = this._isSwordBot ? 'sword' : 'm4';
+    const weaponId = this._isSwordBot ? 'sword' : 'm4';
+
+    // Human bots hold their weapon in the rigged right hand — same attach +
+    // hold-pose animation as the player's third-person body. noHit keeps the
+    // weapon meshes out of hitscan raycasts (shooting the gun isn't a hit).
+    if (this._isHuman && this.mesh.userData.attachWeapon) {
+      const def = getWeapon(weaponId);
+      if (def) {
+        const { group: wm } = buildWeaponModel(def, { procedural: true });
+        wm.traverse(o => { if (o.isMesh) o.userData.noHit = true; });
+        this.mesh.userData.attachWeapon(wm, this._isSwordBot);
+        this._weaponMesh = null; // hand-held; no procedural weapon animation
+      }
+    }
+
     const weaponDef = !this._isHuman && getWeapon(weaponId);
     if (weaponDef) {
-      const { group: wm } = buildWeaponModel(weaponDef);
+      const { group: wm } = buildWeaponModel(weaponDef, { procedural: true });
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
       if (this._isSwordBot) {
         // Sword low guard: right hand at mid-chest, blade angled ~40° forward-up

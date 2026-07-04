@@ -1666,9 +1666,13 @@ const BUILDERS = {
   ghammer:      buildGravityHammer,
 };
 
-export function buildWeaponModel(weaponDef) {
-  // Prefer Blender GLB when already loaded
-  const glb = _buildFromGLB(weaponDef);
+export function buildWeaponModel(weaponDef, opts = {}) {
+  // Prefer Blender GLB when already loaded. Character-held (third-person)
+  // weapons force the procedural path: the GLB's meshes carry baked-in scene
+  // offsets that place them metres from the group origin, which is harmless
+  // for the FPS viewmodel (built before the GLB loads, so it's procedural)
+  // but puts a hand-held weapon far outside the character.
+  const glb = !opts.procedural && _buildFromGLB(weaponDef);
   if (glb) return glb;
 
   // Fall back to procedural

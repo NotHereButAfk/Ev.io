@@ -1099,7 +1099,7 @@ export class Game {
     const def = this.weaponSystem.currentDef;
     if (!def || this._tpsWeaponId === def.id) return;
     this._tpsWeaponId = def.id;
-    const built = buildWeaponModel(def);
+    const built = buildWeaponModel(def, { procedural: true });
     ud.attachWeapon(built?.group || null, def.kind === 'melee');
   }
 
