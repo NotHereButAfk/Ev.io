@@ -35,6 +35,7 @@ import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
 import { ServerSim } from './ServerSim.js';
+import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
@@ -129,6 +130,28 @@ export class Game {
     this.damageNumbers  = new DamageNumbers();
     this.nameplates     = new Nameplates();
     this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
+
+    // Optional shared match-state relay (see src/core/NetClient.js and
+    // /server) — when configured (VITE_WS_URL) and reachable, deathmatch's
+    // countdown timer and roster are shared across everyone's browser, so
+    // joining mid-match shows the real elapsed time and real other players.
+    // With no URL, or if it's unreachable, this is a no-op and the game
+    // falls back to ServerSim's local-only simulation.
+    this.net       = new NetClient(import.meta.env.VITE_WS_URL || '');
+    this._netSlots = new Map(); // net player id -> Bot instance representing them
+    this._netDriven = false;    // true for the duration of a match started while net was connected
+    this.net.onState = (matchStart, durationMs, roster) => this._onNetState(matchStart, durationMs, roster);
+    this.net.onKillFeed = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.addKillFeed(`${name} eliminated a target`);
+    };
+    this.net.onJoined = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.showJoinNotification(`▶  ${name}  joined the match`);
+    };
+    this.net.onLeft = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.showJoinNotification(`◀  ${name}  left the match`, true);
+    };
+    this.net.connect();
+
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
@@ -364,6 +387,7 @@ export class Game {
       Shop.addCoins(Math.round(reward));
       BattlePass.addXP(25 * rewardMult);
       this._refreshNavCoins();
+      if (this._netDriven) this.net.sendKill(); // report to the shared 24/7 roster
       this.hud.showCoinEarn(reward);
       if (streak >= 2) {
         this.hud.showStreak(streak, reward.toFixed(1));
@@ -485,16 +509,28 @@ export class Game {
       this._activeManager = this.botManager;
       this.zombieManager.clear();
       this.dmManager.reset();
-      this._modeTimer = 480; // 8 minutes
-      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. The server sim
-      // then swaps bots for simulated remote players as they come and go.
+      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. Either the real
+      // 24/7 relay (net) or the local ServerSim then flags some of those
+      // bot slots as remote players as they come and go.
       this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
-      this.serverSim.start(false, 1);
+      this._netSlots.clear();
+      this._netDriven = this.net.connected;
+      if (this._netDriven) {
+        this.net.sendHello(name);
+        this._modeTimer = (this.net.matchStart != null)
+          ? THREE.MathUtils.clamp(this.net.matchDurationMs / 1000 - (Date.now() - this.net.matchStart) / 1000, 0, this.net.matchDurationMs / 1000)
+          : 480;
+        this._applyNetRoster(this.net.roster);
+      } else {
+        this._modeTimer = 480; // 8 minutes
+        this.serverSim.start(false, 1);
+      }
       this.hud.showServerPop(true);
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
       this.pickupSystem = new PickupSystem(this.world.scene);
-      this.hud.showDMTimer('8:00');
+      const _mm = Math.floor(this._modeTimer / 60), _ss = Math.floor(this._modeTimer % 60);
+      this.hud.showDMTimer(`${_mm}:${String(_ss).padStart(2, '0')}`);
     } else if (this._isSurvival) {
       this._activeManager = this.zombieManager;
       this.botManager.clear();
@@ -608,6 +644,52 @@ export class Game {
     }
   }
 
+  // ── Shared 24/7 match state (see NetClient / server/) ───────────────────────
+
+  // Fired whenever the net relay pushes a state snapshot. Only takes effect
+  // for a deathmatch that was itself started net-driven (see _startGame) —
+  // a match that began offline stays on the local ServerSim simulation for
+  // its whole duration rather than switching authorities mid-match.
+  _onNetState(matchStart, durationMs, roster) {
+    if (!this._isDM || this.state !== 'playing' || !this._netDriven) return;
+    const remaining = durationMs / 1000 - (Date.now() - matchStart) / 1000;
+    this._modeTimer = THREE.MathUtils.clamp(remaining, 0, durationMs / 1000);
+    this._applyNetRoster(roster);
+  }
+
+  // Reconcile which existing bot slots represent real connected players vs
+  // pure AI. Never resizes the roster — always exactly MAX_PLAYERS
+  // combatants; a "net slot" just relabels an existing bot with a real
+  // player's name and real kills/score instead of the usual random ones.
+  _applyNetRoster(roster) {
+    const others = (roster || []).filter((p) => p.id !== this.net.selfId).slice(0, MAX_PLAYERS - 1);
+    const seenIds = new Set(others.map((p) => p.id));
+
+    // Release slots for players who left — back to plain AI.
+    for (const [id, bot] of this._netSlots) {
+      if (!seenIds.has(id)) {
+        bot.isHumanSlot = false;
+        bot._netId = null;
+        this._netSlots.delete(id);
+      }
+    }
+    // Claim/refresh slots for current real players.
+    for (const p of others) {
+      let bot = this._netSlots.get(p.id);
+      if (!bot) {
+        bot = this.botManager.bots.find((b) => !b.isHumanSlot);
+        if (!bot) continue; // no free slot (shouldn't happen at capacity)
+        bot.isHumanSlot = true;
+        bot._netId = p.id;
+        this._netSlots.set(p.id, bot);
+      }
+      bot.displayName = p.name;
+      bot._netKills = p.kills;
+      bot._netScore = p.score;
+    }
+    this.hud.setServerPop(1 + others.length, MAX_PLAYERS);
+  }
+
   // Format seconds as HH:MM:SS (survival best-time display).
   _fmtHMS(secs) {
     secs = Math.max(0, Math.floor(secs));
@@ -617,17 +699,27 @@ export class Game {
   }
 
   // Live scoreboard rows (you + opponents). Bot scores are seeded once per match
-  // so they stay stable while you hold TAB. Survival shows just you (vs. zombies).
+  // so they stay stable while you hold TAB. Net-flagged slots (real connected
+  // players) use their real kills/score from the shared server instead.
+  // Survival shows just you (vs. zombies).
   _buildScoreboardRows() {
     const rows = [{ name: this.player.name || 'You', kills: this.kills, score: this.score, isYou: true }];
     if (!this._isSurvival) {
       for (const bot of (this.botManager?.bots || [])) {
         const key = bot.displayName || 'Spartan';
-        if (this._sbStats[key] == null) {
-          const k = Math.floor(Math.random() * 9);
-          this._sbStats[key] = { kills: k, score: k * 100 };
+        let kills, score;
+        if (bot._netId != null) {
+          kills = bot._netKills || 0;
+          score = bot._netScore || 0;
+        } else {
+          if (this._sbStats[key] == null) {
+            const k = Math.floor(Math.random() * 9);
+            this._sbStats[key] = { kills: k, score: k * 100 };
+          }
+          kills = this._sbStats[key].kills;
+          score = this._sbStats[key].score;
         }
-        rows.push({ name: key, kills: this._sbStats[key].kills, score: this._sbStats[key].score, isYou: false });
+        rows.push({ name: key, kills, score, isYou: false });
       }
     }
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
@@ -655,10 +747,23 @@ export class Game {
       isYou:   true,
     }];
     for (const bot of this.botManager.bots) {
-      const k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
-      const d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
-      const a = Math.floor(Math.random() * 6);
-      rows.push({ name: bot.displayName, score: k * 100, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
+      let k, d, a, score;
+      if (bot._netId != null) {
+        // Real connected player — use their actual reported stats. Deaths
+        // aren't tracked server-side yet (out of scope for the shared-state
+        // relay), so kd falls back to raw kills the same way the formula
+        // already does for anyone with 0 recorded deaths.
+        k = bot._netKills || 0;
+        d = 0;
+        a = 0;
+        score = bot._netScore || 0;
+      } else {
+        k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
+        d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
+        a = Math.floor(Math.random() * 6);
+        score = k * 100;
+      }
+      rows.push({ name: bot.displayName, score, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
     }
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
     const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
@@ -1046,7 +1151,9 @@ export class Game {
     // ─── DEATHMATCH ─────────────────────────────────────────────────────────────
     if (this._isDM) {
       this.dmManager.update(dt);
-      this.serverSim.update(dt); // simulate the live 24/7 server roster
+      // Net-driven matches get their roster/timer resynced from the real
+      // server via _onNetState; otherwise fall back to the local simulation.
+      if (!this._netDriven) this.serverSim.update(dt);
       this._modeTimer = Math.max(0, this._modeTimer - dt);
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);
