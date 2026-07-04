@@ -7,7 +7,7 @@ import { decalTexture } from './WeaponTextures.js';
 // frame via animateWeaponSkin().
 //
 // A skin may also carry:
-//   rarity      — 'common'|'uncommon'|'rare'|'epic'|'legendary'|'mythic'
+//   rarity      — 'common'|'epic'|'legendary'|'mythic'
 //   decal       — a seamless image pattern painted on the body (see WeaponTextures)
 //   decalEmissive — the decal also glows via emissiveMap
 //   shootSound  — overrides the fire SFX ('anime' kawaii pew, 'laser', 'fire')
@@ -19,20 +19,20 @@ export const WEAPON_SKINS = [
   { id: 'desert',   name: 'Desert Tan',     rarity: 'common', body: 0xb29766, accent: 0x6c5a3a, metal: 0x9c8e72, metalness: 0.4,  roughness: 0.6  },
   { id: 'olive',    name: 'Olive Drab',     rarity: 'common', body: 0x59603a, accent: 0x33371f, metal: 0x767a5a, metalness: 0.45, roughness: 0.55 },
 
-  // ── UNCOMMON ───────────────────────────────────────────────────────────────
-  { id: 'woodland', name: 'Woodland Camo',  rarity: 'uncommon', body: 0x47542f, accent: 0x2b2a1b, metal: 0x5c6347, metalness: 0.4, roughness: 0.6, decal: 'digicamo' },
-  { id: 'ranger',   name: 'Forest Ranger',  rarity: 'uncommon', body: 0x2d4228, accent: 0x1a2616, metal: 0x4a5e40, metalness: 0.4, roughness: 0.58 },
-  { id: 'navy',     name: 'Navy Ops',       rarity: 'uncommon', body: 0x1a2440, accent: 0x0e1628, metal: 0x2c3e5c, metalness: 0.55, roughness: 0.4 },
-  { id: 'stealth',  name: 'Stealth',        rarity: 'uncommon', body: 0x111214, accent: 0x191b1e, metal: 0x2a2d33, metalness: 0.68, roughness: 0.28 },
-  { id: 'carbon',   name: 'Carbon Fiber',   rarity: 'uncommon', body: 0x18191d, accent: 0x2c2f35, metal: 0x6a7077, metalness: 0.8, roughness: 0.2, decal: 'carbon' },
+  // ── COMMON (formerly uncommon) ─────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'woodland', name: 'Woodland Camo',  rarity: 'common', body: 0x47542f, accent: 0x2b2a1b, metal: 0x5c6347, metalness: 0.4, roughness: 0.6, decal: 'digicamo' },
+  { id: 'ranger',   name: 'Forest Ranger',  rarity: 'common', body: 0x2d4228, accent: 0x1a2616, metal: 0x4a5e40, metalness: 0.4, roughness: 0.58 },
+  { id: 'navy',     name: 'Navy Ops',       rarity: 'common', body: 0x1a2440, accent: 0x0e1628, metal: 0x2c3e5c, metalness: 0.55, roughness: 0.4 },
+  { id: 'stealth',  name: 'Stealth',        rarity: 'common', body: 0x111214, accent: 0x191b1e, metal: 0x2a2d33, metalness: 0.68, roughness: 0.28 },
+  { id: 'carbon',   name: 'Carbon Fiber',   rarity: 'common', body: 0x18191d, accent: 0x2c2f35, metal: 0x6a7077, metalness: 0.8, roughness: 0.2, decal: 'carbon' },
 
-  // ── RARE ───────────────────────────────────────────────────────────────────
-  { id: 'crimson',  name: 'Crimson',        rarity: 'rare', body: 0x7c1f22, accent: 0x1b1416, metal: 0x9a4a4a, metalness: 0.6, roughness: 0.35 },
-  { id: 'emerald',  name: 'Emerald',        rarity: 'rare', body: 0x1a5c34, accent: 0x0a2e1a, metal: 0x2e8c54, metalness: 0.78, roughness: 0.22 },
-  { id: 'rose',     name: 'Rose Gold',      rarity: 'rare', body: 0xc9786a, accent: 0x7a3a30, metal: 0xdea08c, metalness: 0.9, roughness: 0.18 },
-  { id: 'tiger',    name: 'Tiger Strike',   rarity: 'rare', body: 0xff9a2a, accent: 0x1a1208, metal: 0xc87a1a, metalness: 0.5, roughness: 0.45, decal: 'tiger' },
+  // ── EPIC (formerly rare) ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'crimson',  name: 'Crimson',        rarity: 'epic', body: 0x7c1f22, accent: 0x1b1416, metal: 0x9a4a4a, metalness: 0.6, roughness: 0.35 },
+  { id: 'emerald',  name: 'Emerald',        rarity: 'epic', body: 0x1a5c34, accent: 0x0a2e1a, metal: 0x2e8c54, metalness: 0.78, roughness: 0.22 },
+  { id: 'rose',     name: 'Rose Gold',      rarity: 'epic', body: 0xc9786a, accent: 0x7a3a30, metal: 0xdea08c, metalness: 0.9, roughness: 0.18 },
+  { id: 'tiger',    name: 'Tiger Strike',   rarity: 'epic', body: 0xff9a2a, accent: 0x1a1208, metal: 0xc87a1a, metalness: 0.5, roughness: 0.45, decal: 'tiger' },
   {
-    id: 'arctic', name: 'Arctic Frost', rarity: 'rare',
+    id: 'arctic', name: 'Arctic Frost', rarity: 'epic',
     body: 0xd6dde5, accent: 0x5a7a8a, metal: 0xc2cad3, metalness: 0.6, roughness: 0.3,
     emissive: 0x2a6a9a, emissiveIntensity: 0.6, decal: 'frost', decalEmissive: true,
     animated: true, animType: 'pulse', animSpeed: 1.8, animMin: 0.4, animMax: 1.2
@@ -226,24 +226,24 @@ export const WEAPON_SKINS = [
   { id: 'charcoal', name: 'Charcoal',      rarity: 'common', body: 0x2c2e31, accent: 0x161719, metal: 0x595d62, metalness: 0.6,  roughness: 0.4  },
   { id: 'rust',     name: 'Rustic Iron',   rarity: 'common', body: 0x7a4a32, accent: 0x3a2218, metal: 0x9a6a4a, metalness: 0.55, roughness: 0.52 },
 
-  // ── UNCOMMON (5) ─────────────────────────────────────────────────────────────
-  { id: 'coral',    name: 'Coral Reef',    rarity: 'uncommon', body: 0xe07a6a, accent: 0x6e3028, metal: 0xf0a090, metalness: 0.5, roughness: 0.4 },
-  { id: 'mint',     name: 'Mint Fresh',    rarity: 'uncommon', body: 0x7ad4b0, accent: 0x2c5a48, metal: 0xa8ead4, metalness: 0.55, roughness: 0.35 },
-  { id: 'copper',   name: 'Copper Patina', rarity: 'uncommon', body: 0x4a8a78, accent: 0x6a4a2a, metal: 0xc97a4a, metalness: 0.85, roughness: 0.3 },
-  { id: 'graphite', name: 'Graphite Weave',rarity: 'uncommon', body: 0x202227, accent: 0x35383f, metal: 0x70767e, metalness: 0.82, roughness: 0.22, decal: 'carbon' },
-  { id: 'amethyst', name: 'Amethyst',      rarity: 'uncommon', body: 0x6a4a8c, accent: 0x331f4a, metal: 0x9a6acc, metalness: 0.7, roughness: 0.3 },
+  // ── COMMON, formerly uncommon (5) ──────────────────────────────────────────────────────────────────────────────────────
+  { id: 'coral',    name: 'Coral Reef',    rarity: 'common', body: 0xe07a6a, accent: 0x6e3028, metal: 0xf0a090, metalness: 0.5, roughness: 0.4 },
+  { id: 'mint',     name: 'Mint Fresh',    rarity: 'common', body: 0x7ad4b0, accent: 0x2c5a48, metal: 0xa8ead4, metalness: 0.55, roughness: 0.35 },
+  { id: 'copper',   name: 'Copper Patina', rarity: 'common', body: 0x4a8a78, accent: 0x6a4a2a, metal: 0xc97a4a, metalness: 0.85, roughness: 0.3 },
+  { id: 'graphite', name: 'Graphite Weave',rarity: 'common', body: 0x202227, accent: 0x35383f, metal: 0x70767e, metalness: 0.82, roughness: 0.22, decal: 'carbon' },
+  { id: 'amethyst', name: 'Amethyst',      rarity: 'common', body: 0x6a4a8c, accent: 0x331f4a, metal: 0x9a6acc, metalness: 0.7, roughness: 0.3 },
 
-  // ── RARE (5) ─────────────────────────────────────────────────────────────────
-  { id: 'sapphire', name: 'Sapphire',      rarity: 'rare', body: 0x1a3a8c, accent: 0x0a1a44, metal: 0x3a6ad0, metalness: 0.88, roughness: 0.16 },
+  // ── EPIC, formerly rare (5) ────────────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'sapphire', name: 'Sapphire',      rarity: 'epic', body: 0x1a3a8c, accent: 0x0a1a44, metal: 0x3a6ad0, metalness: 0.88, roughness: 0.16 },
   {
-    id: 'amber', name: 'Amber Glass', rarity: 'rare',
+    id: 'amber', name: 'Amber Glass', rarity: 'epic',
     body: 0xd08a1a, accent: 0x5a3a08, metal: 0xf0b84a, metalness: 0.7, roughness: 0.22,
     emissive: 0xff9a00, emissiveIntensity: 0.5,
     animated: true, animType: 'pulse', animSpeed: 1.5, animMin: 0.3, animMax: 0.9
   },
-  { id: 'jade',     name: 'Jade Dynasty',  rarity: 'rare', body: 0x1f7a5a, accent: 0x0c3328, metal: 0x3aae84, metalness: 0.8, roughness: 0.2, decal: 'dragon' },
-  { id: 'blush',    name: 'Blush Pink',    rarity: 'rare', body: 0xe69ac0, accent: 0x8c3a66, metal: 0xf4bcd8, metalness: 0.75, roughness: 0.22 },
-  { id: 'stormsteel', name: 'Storm Steel', rarity: 'rare', body: 0x586878, accent: 0x2a333c, metal: 0xaebcca, metalness: 0.92, roughness: 0.14 },
+  { id: 'jade',     name: 'Jade Dynasty',  rarity: 'epic', body: 0x1f7a5a, accent: 0x0c3328, metal: 0x3aae84, metalness: 0.8, roughness: 0.2, decal: 'dragon' },
+  { id: 'blush',    name: 'Blush Pink',    rarity: 'epic', body: 0xe69ac0, accent: 0x8c3a66, metal: 0xf4bcd8, metalness: 0.75, roughness: 0.22 },
+  { id: 'stormsteel', name: 'Storm Steel', rarity: 'epic', body: 0x586878, accent: 0x2a333c, metal: 0xaebcca, metalness: 0.92, roughness: 0.14 },
 
   // ── LEGENDARY (5) ────────────────────────────────────────────────────────────
   {

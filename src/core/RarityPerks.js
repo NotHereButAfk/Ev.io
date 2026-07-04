@@ -8,8 +8,6 @@
 // All mythic: 1.0 + 1.33 + 1.33 + 1.33 = 4.99 ≈ 5×
 export const KILL_MULT_BONUS = {
   common:    0,
-  uncommon:  0.25,
-  rare:      0.50,
   epic:      0.75,
   legendary: 1.00,
   mythic:    1.33,

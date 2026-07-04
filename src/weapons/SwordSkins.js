@@ -13,18 +13,18 @@ export const SWORD_SKINS = [
   { id: 'rusted', name: 'Rusted',      rarity: 'common', blade: 0x7a4428, fuller: 0x5a3018, guard: 0x6a3820, metalness: 0.25, roughness: 0.88, emissive: 0x000000, emissiveIntensity: 0 },
   { id: 'shadow', name: 'Shadow Iron', rarity: 'common', blade: 0x1c1820, fuller: 0x0e0c12, guard: 0x2a2432, metalness: 0.72, roughness: 0.32, emissive: 0x060010, emissiveIntensity: 0.1 },
 
-  // ── UNCOMMON ───────────────────────────────────────────────────────────────
-  { id: 'polished',    name: 'Polished Steel', rarity: 'uncommon', blade: 0xc8d0da, fuller: 0x8890a0, guard: 0xa8b4c0, metalness: 0.92, roughness: 0.1, emissive: 0x000000, emissiveIntensity: 0 },
-  { id: 'bronze',      name: 'Ancient Bronze', rarity: 'uncommon', blade: 0x9c6b28, fuller: 0x5a3e18, guard: 0xb88030, metalness: 0.8, roughness: 0.28, emissive: 0x000000, emissiveIntensity: 0 },
-  { id: 'bloodstained',name: 'Bloodstained',   rarity: 'uncommon', blade: 0x4a3030, fuller: 0x6c1a1a, guard: 0x3a2424, metalness: 0.65, roughness: 0.4, emissive: 0x220000, emissiveIntensity: 0.15 },
-  { id: 'carbon_blade',name: 'Carbon Edge',    rarity: 'uncommon', blade: 0xb0b6be, fuller: 0x2c2f35, guard: 0x44484e, metalness: 0.85, roughness: 0.2, emissive: 0x000000, emissiveIntensity: 0, decal: 'carbon' },
+  // ── COMMON (formerly uncommon) ─────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'polished',    name: 'Polished Steel', rarity: 'common', blade: 0xc8d0da, fuller: 0x8890a0, guard: 0xa8b4c0, metalness: 0.92, roughness: 0.1, emissive: 0x000000, emissiveIntensity: 0 },
+  { id: 'bronze',      name: 'Ancient Bronze', rarity: 'common', blade: 0x9c6b28, fuller: 0x5a3e18, guard: 0xb88030, metalness: 0.8, roughness: 0.28, emissive: 0x000000, emissiveIntensity: 0 },
+  { id: 'bloodstained',name: 'Bloodstained',   rarity: 'common', blade: 0x4a3030, fuller: 0x6c1a1a, guard: 0x3a2424, metalness: 0.65, roughness: 0.4, emissive: 0x220000, emissiveIntensity: 0.15 },
+  { id: 'carbon_blade',name: 'Carbon Edge',    rarity: 'common', blade: 0xb0b6be, fuller: 0x2c2f35, guard: 0x44484e, metalness: 0.85, roughness: 0.2, emissive: 0x000000, emissiveIntensity: 0, decal: 'carbon' },
 
-  // ── RARE ───────────────────────────────────────────────────────────────────
-  { id: 'obsidian_blade', name: 'Obsidian',  rarity: 'rare', blade: 0x18141c, fuller: 0x0c0a10, guard: 0x2a2236, metalness: 0.75, roughness: 0.3, emissive: 0x000000, emissiveIntensity: 0 },
-  { id: 'silver',  name: 'Silver Moon',      rarity: 'rare', blade: 0xe8eef4, fuller: 0xa0b0c0, guard: 0xccd8e4, metalness: 0.9, roughness: 0.12, emissive: 0x304050, emissiveIntensity: 0.1 },
-  { id: 'poison',  name: 'Venom',            rarity: 'rare', blade: 0x1e5c28, fuller: 0x487a18, guard: 0x285c1e, metalness: 0.65, roughness: 0.35, emissive: 0x18440a, emissiveIntensity: 0.3 },
-  { id: 'dawn',    name: 'Dawn Light',       rarity: 'rare', blade: 0xe8b060, fuller: 0xd08020, guard: 0xf0c870, metalness: 0.88, roughness: 0.18, emissive: 0x704820, emissiveIntensity: 0.2 },
-  { id: 'frostbite', name: 'Frostbite ❄', rarity: 'rare', blade: 0xddf0ff, fuller: 0x6090b8, guard: 0x7ab0d0, metalness: 0.8, roughness: 0.22, emissive: 0xffffff, emissiveIntensity: 0.3, decal: 'frost', decalEmissive: true },
+  // ── EPIC (formerly rare) ─────────────────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'obsidian_blade', name: 'Obsidian',  rarity: 'epic', blade: 0x18141c, fuller: 0x0c0a10, guard: 0x2a2236, metalness: 0.75, roughness: 0.3, emissive: 0x000000, emissiveIntensity: 0 },
+  { id: 'silver',  name: 'Silver Moon',      rarity: 'epic', blade: 0xe8eef4, fuller: 0xa0b0c0, guard: 0xccd8e4, metalness: 0.9, roughness: 0.12, emissive: 0x304050, emissiveIntensity: 0.1 },
+  { id: 'poison',  name: 'Venom',            rarity: 'epic', blade: 0x1e5c28, fuller: 0x487a18, guard: 0x285c1e, metalness: 0.65, roughness: 0.35, emissive: 0x18440a, emissiveIntensity: 0.3 },
+  { id: 'dawn',    name: 'Dawn Light',       rarity: 'epic', blade: 0xe8b060, fuller: 0xd08020, guard: 0xf0c870, metalness: 0.88, roughness: 0.18, emissive: 0x704820, emissiveIntensity: 0.2 },
+  { id: 'frostbite', name: 'Frostbite ❄', rarity: 'epic', blade: 0xddf0ff, fuller: 0x6090b8, guard: 0x7ab0d0, metalness: 0.8, roughness: 0.22, emissive: 0xffffff, emissiveIntensity: 0.3, decal: 'frost', decalEmissive: true },
 
   // ── EPIC ───────────────────────────────────────────────────────────────────
   { id: 'gilded',  name: 'Gilded',           rarity: 'epic', blade: 0xf0d878, fuller: 0x7a6018, guard: 0xe0be50, metalness: 0.95, roughness: 0.14, emissive: 0x221800, emissiveIntensity: 0.2, decal: 'gold' },
@@ -74,7 +74,7 @@ export const SWORD_SKINS = [
 
   // ── SCI-FI MELEE FINISHES ───────────────────────────────────────────────────
   { id: 'tactical_blk', name: 'Tactical Black', rarity: 'common', blade: 0x23262b, fuller: 0x111316, guard: 0x16181c, metalness: 0.6, roughness: 0.42, emissive: 0x000000, emissiveIntensity: 0 },
-  { id: 'titanium', name: 'Titanium', rarity: 'uncommon', blade: 0xb8bec6, fuller: 0x5a5e66, guard: 0x7a8088, metalness: 0.95, roughness: 0.22, emissive: 0x000000, emissiveIntensity: 0 },
+  { id: 'titanium', name: 'Titanium', rarity: 'common', blade: 0xb8bec6, fuller: 0x5a5e66, guard: 0x7a8088, metalness: 0.95, roughness: 0.22, emissive: 0x000000, emissiveIntensity: 0 },
   {
     id: 'plasma_edge', name: 'Plasma Edge ⚡', rarity: 'epic',
     blade: 0x0a2030, fuller: 0x003a5a, guard: 0x06141e, metalness: 0.85, roughness: 0.16,

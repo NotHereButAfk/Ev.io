@@ -653,7 +653,7 @@ export class MenuUI {
     const equippedArmor = Shop.getEquipped();
 
     // Every rarity has a default price; armor skins override with their own.
-    const RARITY_PRICE = { common: 100, uncommon: 300, rare: 700, epic: 1500, legendary: 3000, mythic: 6000 };
+    const RARITY_PRICE = { common: 100, epic: 1500, legendary: 3000, mythic: 6000 };
     const priceOf = (skin) => skin.price ?? RARITY_PRICE[skin.rarity || 'common'] ?? 100;
 
     const _hex6 = n => n.toString(16).padStart(6, '0');

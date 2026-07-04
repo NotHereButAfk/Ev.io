@@ -1,6 +1,6 @@
 import { RARITY_ORDER, RARITY_COLORS } from '../core/Rarity.js';
 
-export const RARITY_SHIELD = { common: 20, uncommon: 30, rare: 40, epic: 60, legendary: 80, mythic: 100 };
+export const RARITY_SHIELD = { common: 20, epic: 60, legendary: 80, mythic: 100 };
 
 export const ARMOR_SKINS = [
   // ── COMMON ──────────────────────────────────────────────────────────────────
@@ -15,16 +15,16 @@ export const ARMOR_SKINS = [
   { id: 'rust',      name: 'Rust',         rarity: 'common',    price: 200,  shield: 20,
     primary: 0x7a3a2a, secondary: 0x3d1d15, metalness: 0.30, roughness: 0.72 },
 
-  // ── RARE ─────────────────────────────────────────────────────────────────────
-  { id: 'arctic_f',  name: 'Arctic',       rarity: 'rare',      price: 500,  shield: 40,
+  // ── EPIC (formerly rare) ───────────────────────────────────────────────────────────────────────────────────────────────────────
+  { id: 'arctic_f',  name: 'Arctic',       rarity: 'epic',      price: 500,  shield: 40,
     primary: 0xd4e8f0, secondary: 0x8ab0c4, metalness: 0.45, roughness: 0.55 },
-  { id: 'midnight_f',name: 'Midnight',     rarity: 'rare',      price: 500,  shield: 40,
+  { id: 'midnight_f',name: 'Midnight',     rarity: 'epic',      price: 500,  shield: 40,
     primary: 0x1a1f2e, secondary: 0x0d1018, metalness: 0.55, roughness: 0.40 },
-  { id: 'cobalt',    name: 'Cobalt',       rarity: 'rare',      price: 500,  shield: 40,
+  { id: 'cobalt',    name: 'Cobalt',       rarity: 'epic',      price: 500,  shield: 40,
     primary: 0x1a4a9a, secondary: 0x0d2255, metalness: 0.50, roughness: 0.45 },
-  { id: 'crimson_f', name: 'Crimson Rush', rarity: 'rare',      price: 500,  shield: 40,
+  { id: 'crimson_f', name: 'Crimson Rush', rarity: 'epic',      price: 500,  shield: 40,
     primary: 0xd12b2b, secondary: 0x6a1515, metalness: 0.45, roughness: 0.50 },
-  { id: 'venom',     name: 'Venom',        rarity: 'rare',      price: 500,  shield: 40,
+  { id: 'venom',     name: 'Venom',        rarity: 'epic',      price: 500,  shield: 40,
     primary: 0x3ad14a, secondary: 0x1a6a25, metalness: 0.40, roughness: 0.55 },
 
   // ── EPIC ──────────────────────────────────────────────────────────────────────
