@@ -25,6 +25,11 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+        env:
+          # Optional: URL of the shared 24/7 match-state relay (see server/README.md).
+          # Add a repo secret named VITE_WS_URL once that server is deployed;
+          # left unset, the game falls back to its local-only simulation.
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
 
       # Hostinger's FTPS control socket occasionally times out from GitHub's
       # runners, so retry the upload a few times before giving up.

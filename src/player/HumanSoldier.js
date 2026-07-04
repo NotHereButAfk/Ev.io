@@ -69,6 +69,16 @@ function _lookFor(armorTypeId) {
   return ARMOR_LOOKS[armorTypeId] || DEFAULT_LOOK;
 }
 
+// Resolve a Mixamo bone by short name across the naming variants GLTF/THREE can
+// produce: "mixamorig:Head" (raw), "mixamorigHead" (colon sanitized away), or a
+// bare "Head". Returns null if none match.
+function findBone(root, name) {
+  return root.getObjectByName('mixamorig:' + name)
+      || root.getObjectByName('mixamorig' + name)
+      || root.getObjectByName(name)
+      || null;
+}
+
 /**
  * Build an independent, animated human-soldier instance.
  * Returns a THREE.Group whose userData carries { mixer, actions, setMotion, isHuman }.
@@ -164,19 +174,22 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // ── Bone lookup (Mixamo rig) ────────────────────────────────────────────────
   // Cached once so armorTick doesn't traverse the skeleton every frame. Any
   // bone that's missing degrades gracefully (procedural offsets just skip it).
+  // GLTF/THREE sanitizes node names, so "mixamorig:Head" can arrive as
+  // "mixamorigHead" (or bare "Head") — resolve all forms.
   const B = {
-    hips:  root.getObjectByName('mixamorig:Hips'),
-    spine: root.getObjectByName('mixamorig:Spine'),
-    s1:    root.getObjectByName('mixamorig:Spine1'),
-    s2:    root.getObjectByName('mixamorig:Spine2'),
-    neck:  root.getObjectByName('mixamorig:Neck'),
-    head:  root.getObjectByName('mixamorig:Head'),
-    lArm:  root.getObjectByName('mixamorig:LeftArm'),
-    rArm:  root.getObjectByName('mixamorig:RightArm'),
-    lFore: root.getObjectByName('mixamorig:LeftForeArm'),
-    rFore: root.getObjectByName('mixamorig:RightForeArm'),
-    lLeg:  root.getObjectByName('mixamorig:LeftUpLeg'),
-    rLeg:  root.getObjectByName('mixamorig:RightUpLeg'),
+    hips:  findBone(root, 'Hips'),
+    spine: findBone(root, 'Spine'),
+    s1:    findBone(root, 'Spine1'),
+    s2:    findBone(root, 'Spine2'),
+    neck:  findBone(root, 'Neck'),
+    head:  findBone(root, 'Head'),
+    lArm:  findBone(root, 'LeftArm'),
+    rArm:  findBone(root, 'RightArm'),
+    lFore: findBone(root, 'LeftForeArm'),
+    rFore: findBone(root, 'RightForeArm'),
+    rHand: findBone(root, 'RightHand'),
+    lLeg:  findBone(root, 'LeftUpLeg'),
+    rLeg:  findBone(root, 'RightUpLeg'),
   };
 
   // Locomotion driver: choose the clip (with hysteresis to stop flicker) and
@@ -372,6 +385,30 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     }
   };
 
+  // ── Third-person weapon: parent a held weapon to the right-hand bone so it
+  // rides the skeleton (grip in palm, barrel forward). The offsets are in the
+  // hand bone's LOCAL frame, so they hold regardless of animation pose.
+  let _heldWeapon = null;
+  const attachWeapon = (weaponGroup, isMelee = false) => {
+    if (_heldWeapon) { _heldWeapon.parent?.remove(_heldWeapon); _heldWeapon = null; }
+    if (!weaponGroup) return;
+    const hand = B.rHand;
+    if (!hand) return; // no hand bone — skip rather than float a gun at the origin
+    weaponGroup.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+    // Grip pose in the RightHand local frame (tuned for the Mixamo Vanguard rig).
+    if (isMelee) {
+      weaponGroup.position.set(0.02, 0.06, 0.02);
+      weaponGroup.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
+      weaponGroup.scale.setScalar(1.15);
+    } else {
+      weaponGroup.position.set(-0.02, 0.05, 0.03);
+      weaponGroup.rotation.set(Math.PI * 0.5, Math.PI, 0);
+      weaponGroup.scale.setScalar(1.0);
+    }
+    hand.add(weaponGroup);
+    _heldWeapon = weaponGroup;
+  };
+
   group.userData = {
     isHuman: true,
     mixer,
@@ -382,6 +419,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     triggerFire,     // (kick=1)     — brief recoil pulse when the character fires
     triggerHit,      // (dx, dy)     — damage flinch from a hit direction
     triggerJump,     // ()           — enters airborne state; setLocomotion(_,true,_) lands
+    attachWeapon,    // (weaponGroup, isMelee) — hold a weapon in the right hand
     armorTick,
     bodyMats,
     visorMats,
@@ -585,13 +623,14 @@ const ARMOR_MOTION = {
 };
 const _AX_X = new THREE.Vector3(1, 0, 0);
 const _AX_Y = new THREE.Vector3(0, 1, 0);
+const _AX_Z = new THREE.Vector3(0, 0, 1);
 const _bq1  = new THREE.Quaternion();
 const _bq2  = new THREE.Quaternion();
 
 // Returns { animated: [...] } — armour meshes that pulse / blink / sway every
 // frame via the group's armorTick(dt).
 function _buildArmorPieces(root, armorTypeId, look) {
-  const bone = (n) => root.getObjectByName('mixamorig:' + n);
+  const bone = (n) => findBone(root, n);
   const s = look.scale || 1;
 
   const plate = new THREE.MeshStandardMaterial({

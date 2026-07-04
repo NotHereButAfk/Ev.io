@@ -1,0 +1,13 @@
+{
+  "name": "kyx-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared match-state relay for kyx.io — NOT the static game site. Deploy separately to a host that keeps a Node process running (see README.md).",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

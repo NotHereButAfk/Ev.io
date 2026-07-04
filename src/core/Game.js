@@ -35,10 +35,11 @@ import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
 import { ServerSim } from './ServerSim.js';
+import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
@@ -73,6 +74,10 @@ export class Game {
       const wasVisible = this.previewCharacter?.visible ?? false;
       this._rebuildPreviewCharacter();
       this.previewCharacter.visible = wasVisible;
+      if (this._menuBotsActive) {
+        this._clearMenuBots();
+        this._spawnMenuBots();
+      }
     };
     preloadHumanSoldier(swapPreview);
     preloadPlayerModel(swapPreview);
@@ -99,6 +104,8 @@ export class Game {
       this.hud.flashTeleport();
     };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
+    // Hide FPS viewmodel during menu — it floats in the scene otherwise.
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     // The first-person viewmodel (gun, arm, muzzle flash, viewmodel lights) is
     // parented to the player camera. Three.js only renders objects reachable
     // from the scene root, so the camera itself must live in the scene.
@@ -123,6 +130,28 @@ export class Game {
     this.damageNumbers  = new DamageNumbers();
     this.nameplates     = new Nameplates();
     this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
+
+    // Optional shared match-state relay (see src/core/NetClient.js and
+    // /server) — when configured (VITE_WS_URL) and reachable, deathmatch's
+    // countdown timer and roster are shared across everyone's browser, so
+    // joining mid-match shows the real elapsed time and real other players.
+    // With no URL, or if it's unreachable, this is a no-op and the game
+    // falls back to ServerSim's local-only simulation.
+    this.net       = new NetClient(import.meta.env.VITE_WS_URL || '');
+    this._netSlots = new Map(); // net player id -> Bot instance representing them
+    this._netDriven = false;    // true for the duration of a match started while net was connected
+    this.net.onState = (matchStart, durationMs, roster) => this._onNetState(matchStart, durationMs, roster);
+    this.net.onKillFeed = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.addKillFeed(`${name} eliminated a target`);
+    };
+    this.net.onJoined = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.showJoinNotification(`▶  ${name}  joined the match`);
+    };
+    this.net.onLeft = (name) => {
+      if (this._isDM && this.state === 'playing') this.hud.showJoinNotification(`◀  ${name}  left the match`, true);
+    };
+    this.net.connect();
+
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
@@ -358,6 +387,7 @@ export class Game {
       Shop.addCoins(Math.round(reward));
       BattlePass.addXP(25 * rewardMult);
       this._refreshNavCoins();
+      if (this._netDriven) this.net.sendKill(); // report to the shared 24/7 roster
       this.hud.showCoinEarn(reward);
       if (streak >= 2) {
         this.hud.showStreak(streak, reward.toFixed(1));
@@ -479,16 +509,28 @@ export class Game {
       this._activeManager = this.botManager;
       this.zombieManager.clear();
       this.dmManager.reset();
-      this._modeTimer = 480; // 8 minutes
-      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. The server sim
-      // then swaps bots for simulated remote players as they come and go.
+      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. Either the real
+      // 24/7 relay (net) or the local ServerSim then flags some of those
+      // bot slots as remote players as they come and go.
       this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
-      this.serverSim.start(false, 1);
+      this._netSlots.clear();
+      this._netDriven = this.net.connected;
+      if (this._netDriven) {
+        this.net.sendHello(name);
+        this._modeTimer = (this.net.matchStart != null)
+          ? THREE.MathUtils.clamp(this.net.matchDurationMs / 1000 - (Date.now() - this.net.matchStart) / 1000, 0, this.net.matchDurationMs / 1000)
+          : 480;
+        this._applyNetRoster(this.net.roster);
+      } else {
+        this._modeTimer = 480; // 8 minutes
+        this.serverSim.start(false, 1);
+      }
       this.hud.showServerPop(true);
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
       this.pickupSystem = new PickupSystem(this.world.scene);
-      this.hud.showDMTimer('8:00');
+      const _mm = Math.floor(this._modeTimer / 60), _ss = Math.floor(this._modeTimer % 60);
+      this.hud.showDMTimer(`${_mm}:${String(_ss).padStart(2, '0')}`);
     } else if (this._isSurvival) {
       this._activeManager = this.zombieManager;
       this.botManager.clear();
@@ -534,6 +576,7 @@ export class Game {
     // block character needs the limb-pivot rig.
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
     this._playerBody.visible = false;
+    this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
     this.world.scene.add(this._playerBody);
 
     this.state = 'playing';
@@ -601,6 +644,52 @@ export class Game {
     }
   }
 
+  // ── Shared 24/7 match state (see NetClient / server/) ───────────────────────
+
+  // Fired whenever the net relay pushes a state snapshot. Only takes effect
+  // for a deathmatch that was itself started net-driven (see _startGame) —
+  // a match that began offline stays on the local ServerSim simulation for
+  // its whole duration rather than switching authorities mid-match.
+  _onNetState(matchStart, durationMs, roster) {
+    if (!this._isDM || this.state !== 'playing' || !this._netDriven) return;
+    const remaining = durationMs / 1000 - (Date.now() - matchStart) / 1000;
+    this._modeTimer = THREE.MathUtils.clamp(remaining, 0, durationMs / 1000);
+    this._applyNetRoster(roster);
+  }
+
+  // Reconcile which existing bot slots represent real connected players vs
+  // pure AI. Never resizes the roster — always exactly MAX_PLAYERS
+  // combatants; a "net slot" just relabels an existing bot with a real
+  // player's name and real kills/score instead of the usual random ones.
+  _applyNetRoster(roster) {
+    const others = (roster || []).filter((p) => p.id !== this.net.selfId).slice(0, MAX_PLAYERS - 1);
+    const seenIds = new Set(others.map((p) => p.id));
+
+    // Release slots for players who left — back to plain AI.
+    for (const [id, bot] of this._netSlots) {
+      if (!seenIds.has(id)) {
+        bot.isHumanSlot = false;
+        bot._netId = null;
+        this._netSlots.delete(id);
+      }
+    }
+    // Claim/refresh slots for current real players.
+    for (const p of others) {
+      let bot = this._netSlots.get(p.id);
+      if (!bot) {
+        bot = this.botManager.bots.find((b) => !b.isHumanSlot);
+        if (!bot) continue; // no free slot (shouldn't happen at capacity)
+        bot.isHumanSlot = true;
+        bot._netId = p.id;
+        this._netSlots.set(p.id, bot);
+      }
+      bot.displayName = p.name;
+      bot._netKills = p.kills;
+      bot._netScore = p.score;
+    }
+    this.hud.setServerPop(1 + others.length, MAX_PLAYERS);
+  }
+
   // Format seconds as HH:MM:SS (survival best-time display).
   _fmtHMS(secs) {
     secs = Math.max(0, Math.floor(secs));
@@ -610,17 +699,27 @@ export class Game {
   }
 
   // Live scoreboard rows (you + opponents). Bot scores are seeded once per match
-  // so they stay stable while you hold TAB. Survival shows just you (vs. zombies).
+  // so they stay stable while you hold TAB. Net-flagged slots (real connected
+  // players) use their real kills/score from the shared server instead.
+  // Survival shows just you (vs. zombies).
   _buildScoreboardRows() {
     const rows = [{ name: this.player.name || 'You', kills: this.kills, score: this.score, isYou: true }];
     if (!this._isSurvival) {
       for (const bot of (this.botManager?.bots || [])) {
         const key = bot.displayName || 'Spartan';
-        if (this._sbStats[key] == null) {
-          const k = Math.floor(Math.random() * 9);
-          this._sbStats[key] = { kills: k, score: k * 100 };
+        let kills, score;
+        if (bot._netId != null) {
+          kills = bot._netKills || 0;
+          score = bot._netScore || 0;
+        } else {
+          if (this._sbStats[key] == null) {
+            const k = Math.floor(Math.random() * 9);
+            this._sbStats[key] = { kills: k, score: k * 100 };
+          }
+          kills = this._sbStats[key].kills;
+          score = this._sbStats[key].score;
         }
-        rows.push({ name: key, kills: this._sbStats[key].kills, score: this._sbStats[key].score, isYou: false });
+        rows.push({ name: key, kills, score, isYou: false });
       }
     }
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
@@ -648,14 +747,28 @@ export class Game {
       isYou:   true,
     }];
     for (const bot of this.botManager.bots) {
-      const k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
-      const d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
-      const a = Math.floor(Math.random() * 6);
-      rows.push({ name: bot.displayName, score: k * 100, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
+      let k, d, a, score;
+      if (bot._netId != null) {
+        // Real connected player — use their actual reported stats. Deaths
+        // aren't tracked server-side yet (out of scope for the shared-state
+        // relay), so kd falls back to raw kills the same way the formula
+        // already does for anyone with 0 recorded deaths.
+        k = bot._netKills || 0;
+        d = 0;
+        a = 0;
+        score = bot._netScore || 0;
+      } else {
+        k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
+        d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
+        a = Math.floor(Math.random() * 6);
+        score = k * 100;
+      }
+      rows.push({ name: bot.displayName, score, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
     }
     rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
     const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
 
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state    = 'leaderboard';
     this._lbTimer = 10;
     this.input.exitPointerLock();
@@ -696,10 +809,6 @@ export class Game {
   _resume() {
     this.menu.hidePause();
     this._menuOpen = false;
-    if (this._frozenVelocity) {
-      this.player.velocity.copy(this._frozenVelocity);
-      this._frozenVelocity = null;
-    }
     this.input.requestPointerLock();
     this.mobileControls?.show();
   }
@@ -743,8 +852,6 @@ export class Game {
 
   _openMenu() {
     this._menuOpen = true;
-    this._frozenVelocity = this.player.velocity.clone();
-    this.player.velocity.set(0, 0, 0);
     this.mobileControls?.hide();
     this.menu.showPause();
   }
@@ -761,7 +868,7 @@ export class Game {
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
-    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = true;
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'menu';
     this.mobileControls?.hide();
     this.menu.hidePause();
@@ -842,6 +949,7 @@ export class Game {
     this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'gameover';
     this.input.exitPointerLock();
     this.hud.hide();
@@ -901,16 +1009,11 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
 
-    // ESC freezes everything: player, bots, timers, physics. The player
-    // stays mid-air exactly where they were when they pressed Esc.
     const menuOpen = this._menuOpen;
-    if (menuOpen) {
-      this.player.camera.updateMatrixWorld(true);
-      this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
-      return;
-    }
 
-    this.player.update(dt, this.input, this.world);
+    // Player input is blocked while the menu overlay is open (no pointer lock),
+    // but the match keeps running — this is a multiplayer game.
+    if (!menuOpen) this.player.update(dt, this.input, this.world);
     this.player.camera.updateMatrixWorld(true);
 
     // Animate the living sci-fi city (flying traffic, pulsing energy).
@@ -925,13 +1028,14 @@ export class Game {
         // Face the direction the player is aiming/moving, so the camera
         // (which sits behind the player) sees the character's back.
         this._playerBody.rotation.y = this.player.yaw;
+        this._syncTpsWeapon();
         this._animatePlayerBody(dt);
       }
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
-    // While downed in survival, block weapon use.
-    if (!this._playerDowned) {
+    // While menu is open or downed, block weapon/grenade input — match still runs.
+    if (!menuOpen && !this._playerDowned) {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
@@ -939,11 +1043,11 @@ export class Game {
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // grenade input  F = frag  E = smoke
-    if (this.input.consumeJustPressed('KeyF')) {
+    if (!menuOpen && this.input.consumeJustPressed('KeyF')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
-    if (this.input.consumeJustPressed('KeyE')) {
+    if (!menuOpen && this.input.consumeJustPressed('KeyE')) {
       this.grenadeSystem.throwSmoke(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
@@ -984,6 +1088,19 @@ export class Game {
     }
 
     this._updateModeLogic(dt);
+  }
+
+  // Put the currently-held weapon into the third-person body's hand, rebuilding
+  // only when the active weapon changes (gun ↔ melee switch). Human model only —
+  // the procedural fallback body carries no weapon.
+  _syncTpsWeapon() {
+    const ud = this._playerBody?.userData;
+    if (!ud?.isHuman || !ud.attachWeapon) return;
+    const def = this.weaponSystem.currentDef;
+    if (!def || this._tpsWeaponId === def.id) return;
+    this._tpsWeaponId = def.id;
+    const built = buildWeaponModel(def);
+    ud.attachWeapon(built?.group || null, def.kind === 'melee');
   }
 
   // Drive the third-person body's walk cycle: swing the rigged arm/leg pivots
@@ -1034,7 +1151,9 @@ export class Game {
     // ─── DEATHMATCH ─────────────────────────────────────────────────────────────
     if (this._isDM) {
       this.dmManager.update(dt);
-      this.serverSim.update(dt); // simulate the live 24/7 server roster
+      // Net-driven matches get their roster/timer resynced from the real
+      // server via _onNetState; otherwise fall back to the local simulation.
+      if (!this._netDriven) this.serverSim.update(dt);
       this._modeTimer = Math.max(0, this._modeTimer - dt);
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);
