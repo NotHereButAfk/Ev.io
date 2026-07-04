@@ -228,6 +228,7 @@ export class MenuUI {
     }
     if (id === 'profile')     this._renderProfile();
     if (id === 'achievements') this._renderAchievements();
+    if (id === 'rankings')    this._renderRankings();
     if (id === 'settings')    this._loadSettings();
     if (id === 'shop')        this._renderShop();
     if (id === 'battlepass')  this._renderBattlePass();
@@ -480,6 +481,43 @@ export class MenuUI {
     }
   }
 
+  // ── Rankings (all players by kills) ────────────────────────────────────────
+  _renderRankings() {
+    const tbody = document.getElementById('rnk-rows');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const db = JSON.parse(localStorage.getItem('sio_accounts') || '{"accounts":{}}');
+    const players = Object.values(db.accounts || {}).map(a => ({
+      name: a.displayName || '???',
+      kills: a.stats?.kills || 0,
+      deaths: a.stats?.deaths || 0,
+      score: a.stats?.score || 0,
+      games: a.stats?.games || 0,
+    }));
+    players.sort((a, b) => b.kills - a.kills || b.score - a.score);
+    const currentUser = this._currentUser;
+    players.forEach((p, i) => {
+      const tr = document.createElement('tr');
+      const isYou = currentUser && p.name.toLowerCase() === currentUser.toLowerCase();
+      if (isYou) tr.classList.add('rnk-you');
+      const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
+      tr.innerHTML =
+        `<td class="rnk-rank">${i + 1}</td>` +
+        `<td class="rnk-name">${p.name}${isYou ? ' <span class="rnk-you-tag">YOU</span>' : ''}</td>` +
+        `<td>${p.kills}</td>` +
+        `<td>${p.deaths}</td>` +
+        `<td>${kd}</td>` +
+        `<td>${p.score.toLocaleString()}</td>` +
+        `<td>${p.games}</td>`;
+      tbody.appendChild(tr);
+    });
+    if (!players.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="7" style="text-align:center;color:#5a6a80;padding:24px">No players yet</td>';
+      tbody.appendChild(tr);
+    }
+  }
+
   // Dedicated full-body character render on the profile (the equipped soldier).
   _startProfilePreview() {
     const canvas = document.getElementById('profile-char-canvas');
@@ -538,6 +576,45 @@ export class MenuUI {
 
   // ── Shop ───────────────────────────────────────────────────────────────────
 
+  // Seeded PRNG for daily Night Market rotation (deterministic per day).
+  _nightMarketSeed() {
+    const d = new Date();
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  }
+
+  _nightMarketPick(allItems, count) {
+    let seed = this._nightMarketSeed();
+    const mulberry32 = (s) => { s |= 0; s = Math.imul(s ^ (s >>> 16), 0x45d9f3b); s = Math.imul(s ^ (s >>> 13), 0x45d9f3b); return ((s ^ (s >>> 16)) >>> 0) / 4294967296; };
+    const shuffled = allItems.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      const j = Math.floor(mulberry32(seed) * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, count);
+  }
+
+  _nightMarketTimeLeft() {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    return Math.max(0, Math.floor((tomorrow - now) / 1000));
+  }
+
+  _startNightMarketTimer() {
+    if (this._nmInterval) return;
+    const update = () => {
+      const el = document.getElementById('nm-timer');
+      if (!el) return;
+      const secs = this._nightMarketTimeLeft();
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      el.textContent = `Refreshes in ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    };
+    update();
+    this._nmInterval = setInterval(update, 1000);
+  }
+
   _renderShop() {
     this._refreshCoins();
     const bal = document.getElementById('shop-coin-balance');
@@ -557,26 +634,13 @@ export class MenuUI {
     authWall?.classList.add('hidden');
     content?.classList.remove('hidden');
 
-    // Wire filter buttons (once)
-    if (!this._shopFilterWired) {
-      this._shopFilterWired = true;
-      this._shopFilter = 'all';
-      document.querySelectorAll('.stp-filter').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.stp-filter').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          this._shopFilter = btn.dataset.filter;
-          this._renderShopGrid(root);
-        });
-      });
-    }
+    this._startNightMarketTimer();
     this._renderShopGrid(root);
   }
 
   _renderShopGrid(root) {
     root.innerHTML = '';
     const equippedArmor = Shop.getEquipped();
-    const filter        = this._shopFilter || 'all';
 
     // Every rarity has a default price; armor skins override with their own.
     const RARITY_PRICE = { common: 100, uncommon: 300, rare: 700, epic: 1500, legendary: 3000, mythic: 6000 };
@@ -728,29 +792,17 @@ export class MenuUI {
       return card;
     };
 
-    // Build combined list based on filter
-    const characterItems = (filter === 'all' || filter === 'character') ? ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' })) : [];
-    const weaponItems    = (filter === 'all' || filter === 'weapon')    ? WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' })) : [];
-    const swordItems     = (filter === 'all' || filter === 'sword')     ? SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  })) : [];
+    // Night Market: pick 5 random items from the full catalog, seeded by today's date.
+    const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
+    const weaponItems    = WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' }));
+    const swordItems     = SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  }));
     const allItems = [...characterItems, ...weaponItems, ...swordItems];
+    const nightMarket = this._nightMarketPick(allItems, 5);
 
-    // Render by rarity section, highest first
-    [...RARITY_ORDER].reverse().forEach(rarity => {
-      const tier = allItems.filter(s => (s.rarity || 'common') === rarity);
-      if (!tier.length) return;
-      const color = RARITY_COLORS[rarity];
-      const section = document.createElement('div');
-      section.className = 'shop-section';
-      const hdr = document.createElement('div');
-      hdr.className = 'shop-rarity-header';
-      hdr.innerHTML = `<span class="shop-rarity-dot" style="background:${color}"></span>${rarity.toUpperCase()} <span style="color:#2a3a50;margin-left:4px">${tier.length} ITEMS</span>`;
-      section.appendChild(hdr);
-      const grid = document.createElement('div');
-      grid.className = 'shop-skin-grid';
-      tier.forEach(s => grid.appendChild(makeCard(s, s._kind)));
-      section.appendChild(grid);
-      root.appendChild(section);
-    });
+    const grid = document.createElement('div');
+    grid.className = 'shop-skin-grid nm-grid';
+    nightMarket.forEach(s => grid.appendChild(makeCard(s, s._kind)));
+    root.appendChild(grid);
 
     // Progressive skinned-render pump: a few real 3D renders per frame so the
     // shop stays responsive while the previews fill in. Results are cached

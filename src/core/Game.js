@@ -433,6 +433,7 @@ export class Game {
   }
 
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
+    this._clearMenuBots();
     this.audio.resume();
     this.selectedSkin      = getSkin(skinId);
     this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
@@ -695,6 +696,10 @@ export class Game {
   _resume() {
     this.menu.hidePause();
     this._menuOpen = false;
+    if (this._frozenVelocity) {
+      this.player.velocity.copy(this._frozenVelocity);
+      this._frozenVelocity = null;
+    }
     this.input.requestPointerLock();
     this.mobileControls?.show();
   }
@@ -738,6 +743,8 @@ export class Game {
 
   _openMenu() {
     this._menuOpen = true;
+    this._frozenVelocity = this.player.velocity.clone();
+    this.player.velocity.set(0, 0, 0);
     this.mobileControls?.hide();
     this.menu.showPause();
   }
@@ -894,14 +901,16 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
 
-    // While the in-match menu is open the local player stops responding to
-    // input, but the world (zombies, bots, timers) keeps simulating — there is
-    // no pausing in a multiplayer match.
+    // ESC freezes everything: player, bots, timers, physics. The player
+    // stays mid-air exactly where they were when they pressed Esc.
     const menuOpen = this._menuOpen;
-
-    if (!menuOpen) {
-      this.player.update(dt, this.input, this.world);
+    if (menuOpen) {
+      this.player.camera.updateMatrixWorld(true);
+      this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
+      return;
     }
+
+    this.player.update(dt, this.input, this.world);
     this.player.camera.updateMatrixWorld(true);
 
     // Animate the living sci-fi city (flying traffic, pulsing energy).
@@ -921,20 +930,20 @@ export class Game {
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
-    // While downed in survival, or while the menu is open, block weapon use.
-    if (!this._playerDowned && !menuOpen) {
+    // While downed in survival, block weapon use.
+    if (!this._playerDowned) {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
     this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg), this.world);
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
-    // grenade input  F = frag  E = smoke (ignored while the menu is open)
-    if (!menuOpen && this.input.consumeJustPressed('KeyF')) {
+    // grenade input  F = frag  E = smoke
+    if (this.input.consumeJustPressed('KeyF')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
-    if (!menuOpen && this.input.consumeJustPressed('KeyE')) {
+    if (this.input.consumeJustPressed('KeyE')) {
       this.grenadeSystem.throwSmoke(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
@@ -945,7 +954,7 @@ export class Game {
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
 
     // Enemy nameplates (name + health bar) over living opponents.
-    if (!menuOpen && this.botManager?.bots?.length) {
+    if (this.botManager?.bots?.length) {
       this.nameplates.container.style.display = '';
       this.nameplates.update(this.player.camera, this.botManager.bots);
     } else {
@@ -953,7 +962,7 @@ export class Game {
     }
 
     // In-game scoreboard — hold TAB to view live scores
-    const sbDown = !menuOpen && this.input.isDown('Tab');
+    const sbDown = this.input.isDown('Tab');
     if (sbDown) {
       this._sbRefreshT -= dt;
       if (!this._sbShown || this._sbRefreshT <= 0) {
@@ -967,9 +976,9 @@ export class Game {
     }
     this.hud.updateTeleport(1 - this.player.teleportCooldown / this.player.teleportMaxCooldown);
 
-    // Scope overlay — shown when ADS on a scoped weapon (hidden while menu open)
+    // Scope overlay — shown when ADS on a scoped weapon
     if (this._scopeOverlay) {
-      const showScope = !menuOpen && !!this.weaponSystem.currentDef.scoped && this.weaponSystem.scopeT > 0.5;
+      const showScope = !!this.weaponSystem.currentDef.scoped && this.weaponSystem.scopeT > 0.5;
       this._scopeOverlay.classList.toggle('active', showScope);
       if (this._hudCrosshair) this._hudCrosshair.classList.toggle('hidden', showScope);
     }
@@ -1093,6 +1102,22 @@ export class Game {
     }
   }
 
+  _spawnMenuBots() {
+    if (this._menuBotsActive) return;
+    this._menuBotsActive = true;
+    this.botManager.spawnAll(6, true, 1);
+    for (const bot of this.botManager.bots) {
+      bot._provoked = false;
+      bot._provokeTimer = 0;
+    }
+  }
+
+  _clearMenuBots() {
+    if (!this._menuBotsActive) return;
+    this._menuBotsActive = false;
+    this.botManager.clear();
+  }
+
   _updateMenuScene(dt) {
     // Slowly rotate the preview character (only shown on PLAY tab)
     if (this.previewCharacter.visible) {
@@ -1104,6 +1129,13 @@ export class Game {
 
     // Keep the city alive behind the menu fly-through (flying traffic, pulse).
     this.world.update(dt);
+
+    // Spectator bots — visible running around the map during the home screen.
+    if (this.state === 'menu' && !this._menuBotsActive) this._spawnMenuBots();
+    if (this._menuBotsActive) {
+      const dummyPlayer = { position: new THREE.Vector3(9999, 9999, 9999), isDead: true };
+      this.botManager.update(dt, dummyPlayer, this.menuCamera, () => {}, this.world);
+    }
 
     // Cinematic spectator fly-through
     this._camSegTime += dt;
