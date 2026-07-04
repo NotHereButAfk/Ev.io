@@ -38,7 +38,7 @@ import { ServerSim } from './ServerSim.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 8);
@@ -540,6 +540,7 @@ export class Game {
     // block character needs the limb-pivot rig.
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
     this._playerBody.visible = false;
+    this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
     this.world.scene.add(this._playerBody);
 
     this.state = 'playing';
@@ -922,6 +923,7 @@ export class Game {
         // Face the direction the player is aiming/moving, so the camera
         // (which sits behind the player) sees the character's back.
         this._playerBody.rotation.y = this.player.yaw;
+        this._syncTpsWeapon();
         this._animatePlayerBody(dt);
       }
     }
@@ -981,6 +983,19 @@ export class Game {
     }
 
     this._updateModeLogic(dt);
+  }
+
+  // Put the currently-held weapon into the third-person body's hand, rebuilding
+  // only when the active weapon changes (gun ↔ melee switch). Human model only —
+  // the procedural fallback body carries no weapon.
+  _syncTpsWeapon() {
+    const ud = this._playerBody?.userData;
+    if (!ud?.isHuman || !ud.attachWeapon) return;
+    const def = this.weaponSystem.currentDef;
+    if (!def || this._tpsWeaponId === def.id) return;
+    this._tpsWeaponId = def.id;
+    const built = buildWeaponModel(def);
+    ud.attachWeapon(built?.group || null, def.kind === 'melee');
   }
 
   // Drive the third-person body's walk cycle: swing the rigged arm/leg pivots
