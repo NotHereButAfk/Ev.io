@@ -703,10 +703,6 @@ export class Game {
   _resume() {
     this.menu.hidePause();
     this._menuOpen = false;
-    if (this._frozenVelocity) {
-      this.player.velocity.copy(this._frozenVelocity);
-      this._frozenVelocity = null;
-    }
     this.input.requestPointerLock();
     this.mobileControls?.show();
   }
@@ -750,8 +746,6 @@ export class Game {
 
   _openMenu() {
     this._menuOpen = true;
-    this._frozenVelocity = this.player.velocity.clone();
-    this.player.velocity.set(0, 0, 0);
     this.mobileControls?.hide();
     this.menu.showPause();
   }
@@ -909,16 +903,11 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
 
-    // ESC freezes everything: player, bots, timers, physics. The player
-    // stays mid-air exactly where they were when they pressed Esc.
     const menuOpen = this._menuOpen;
-    if (menuOpen) {
-      this.player.camera.updateMatrixWorld(true);
-      this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
-      return;
-    }
 
-    this.player.update(dt, this.input, this.world);
+    // Player input is blocked while the menu overlay is open (no pointer lock),
+    // but the match keeps running — this is a multiplayer game.
+    if (!menuOpen) this.player.update(dt, this.input, this.world);
     this.player.camera.updateMatrixWorld(true);
 
     // Animate the living sci-fi city (flying traffic, pulsing energy).
@@ -938,8 +927,8 @@ export class Game {
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
-    // While downed in survival, block weapon use.
-    if (!this._playerDowned) {
+    // While menu is open or downed, block weapon/grenade input — match still runs.
+    if (!menuOpen && !this._playerDowned) {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
@@ -947,11 +936,11 @@ export class Game {
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // grenade input  F = frag  E = smoke
-    if (this.input.consumeJustPressed('KeyF')) {
+    if (!menuOpen && this.input.consumeJustPressed('KeyF')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
-    if (this.input.consumeJustPressed('KeyE')) {
+    if (!menuOpen && this.input.consumeJustPressed('KeyE')) {
       this.grenadeSystem.throwSmoke(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
