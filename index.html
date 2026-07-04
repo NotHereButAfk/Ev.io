@@ -73,13 +73,13 @@
           </div>
         </div>
 
-        <!-- STORE dropdown — Store + Battle Pass (gated) -->
+        <!-- NIGHT MARKET dropdown — Night Market + Battle Pass (gated) -->
         <div class="nav-dd-wrap">
-          <button class="nav-item nav-dd-btn" data-dd="store">STORE &#9660;</button>
+          <button class="nav-item nav-dd-btn" data-dd="store">NIGHT MARKET &#9660;</button>
           <div class="nav-dd profile-dropdown hidden" id="dd-store">
             <button class="profile-menu-item" data-panel="shop" data-gated="1">
-              <span class="pm-icon">&#128722;</span>
-              <div class="pm-body"><div class="pm-name">STORE</div><div class="pm-sub">Armor &amp; weapon skins</div></div>
+              <span class="pm-icon">&#127769;</span>
+              <div class="pm-body"><div class="pm-name">NIGHT MARKET</div><div class="pm-sub">5 daily exclusive deals</div></div>
             </button>
             <button class="profile-menu-item" data-panel="battlepass" data-gated="1">
               <span class="pm-icon">&#127903;</span>
@@ -345,14 +345,11 @@
       </table>
     </div>
 
-    <!-- ===================== PANEL: SHOP ===================== -->
+    <!-- ===================== PANEL: NIGHT MARKET ===================== -->
     <div id="panel-shop" class="nav-panel nav-panel-shop hidden">
-      <!-- Top bar: title + currency -->
-      <div class="stp-topbar">
-        <div class="stp-branding">
-          <span class="stp-logo-word">KYX</span><span class="stp-logo-accent">.IO</span>
-          <span class="stp-store-label">STORE</span>
-        </div>
+      <!-- Top bar -->
+      <div class="nm-topbar">
+        <div class="nm-brand">&#127769; NIGHT MARKET</div>
         <div class="stp-currency">
           <span class="stp-coin-icon">&#9670;</span>
           <span id="shop-coin-balance">0</span>
@@ -363,11 +360,11 @@
       <!-- Guest / not-logged-in wall -->
       <div id="shop-auth-wall" class="shop-auth-wall hidden">
         <div class="saw-lock">&#128274;</div>
-        <div class="saw-title">SIGN IN TO ACCESS THE STORE</div>
-        <div class="saw-sub">Create a free account to browse and purchase exclusive skins.</div>
+        <div class="saw-title">SIGN IN TO ACCESS THE NIGHT MARKET</div>
+        <div class="saw-sub">Create a free account to browse today's exclusive deals.</div>
       </div>
 
-      <!-- Main store content (shown when logged in) -->
+      <!-- Main Night Market content (shown when logged in) -->
       <div id="shop-content" class="hidden">
         <div class="nm-header">
           <div class="nm-title">NIGHT MARKET</div>
