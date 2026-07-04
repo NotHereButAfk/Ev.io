@@ -12,7 +12,7 @@ import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
-import { InventoryPanel } from './InventoryPanel.js';
+import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
 
@@ -594,6 +594,16 @@ export class MenuUI {
     return shuffled.slice(0, count);
   }
 
+  // Deterministic per-skin, per-day showcase gun: a weapon skin is a generic
+  // finish usable on any of the 5 main guns, but the Night Market card should
+  // still show *one* real gun wearing it (stable for the day, so it doesn't
+  // flicker between renders) rather than always the Auto Rifle.
+  _nightMarketGunFor(skinId) {
+    let h = this._nightMarketSeed();
+    for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
+    return MAIN_GUNS[Math.abs(h) % MAIN_GUNS.length];
+  }
+
   _nightMarketTimeLeft() {
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -681,6 +691,9 @@ export class MenuUI {
 
       // Preview: for armor a themed character silhouette; for weapon/sword a
       // real skinned-model render (dropped in progressively — see below).
+      // `showcase` is hoisted so the name section below can label the card
+      // with the actual gun it's shown on.
+      let showcase = null;
       const preview = document.createElement('div');
       preview.className = 'shop-preview';
       if (isCharacter) {
@@ -688,7 +701,10 @@ export class MenuUI {
         preview.innerHTML = SHOP_CHAR_SVG;
       } else {
         preview.classList.add('shop-preview-weapon');
-        const showcase = kind === 'sword' ? _SHOP_SWORD() : _SHOP_GUN();
+        // Gun skins are a shared finish usable on any main gun — show a real,
+        // stable-for-the-day gun wearing it rather than always the Auto Rifle.
+        const gunInfo = kind === 'weapon' ? this._nightMarketGunFor(skin.id) : null;
+        showcase = kind === 'sword' ? _SHOP_SWORD() : (WEAPONS.find((w) => w.id === gunInfo.id) || _SHOP_GUN());
         if (showcase) {
           const key = `${showcase.id}:${skin.id}`;
           const cached = _shopThumbCache.get(key);
@@ -727,11 +743,11 @@ export class MenuUI {
       body.className = 'shop-card-body';
       const nameEl = document.createElement('div');
       nameEl.className = 'shop-skin-name';
-      nameEl.textContent = skin.name;
+      nameEl.textContent = isCharacter ? skin.name : `${showcase?.name ?? 'Weapon'} — ${skin.name}`;
       body.appendChild(nameEl);
       const perkEl = document.createElement('div');
       perkEl.className = 'shop-perk-line';
-      perkEl.textContent = describePerk(rarity, isCharacter);
+      perkEl.textContent = describePerk(rarity);
       body.appendChild(perkEl);
       card.appendChild(body);
 

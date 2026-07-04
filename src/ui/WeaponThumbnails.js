@@ -52,13 +52,23 @@ export function renderWeaponSkinned(weaponDef, skin) {
     else                            applyWeaponSkin(g, skin);
   }
   scene.add(g);
-  const box = new THREE.Box3().setFromObject(g);
-  const c = box.getCenter(new THREE.Vector3());
-  const sz = box.getSize(new THREE.Vector3());
-  g.position.sub(c);
+  // Some Blender-exported weapon models keep their mesh nodes positioned far
+  // from the group's own origin (a leftover scene layout offset — e.g. props
+  // laid out side-by-side in the source scene). Rotation must be applied
+  // BEFORE measuring the centering box: rotating a large baked offset by even
+  // a small angle displaces it by an amount proportional to its magnitude, so
+  // centering computed pre-rotation leaves a large residual error once the
+  // rotation is applied on top. Scale is likewise applied before the final
+  // center measurement, for the same reason. This order keeps recentring
+  // correct regardless of how far the model's authored offset sits — doing
+  // it in the wrong order is negligible for guns (tiny baked offset) but
+  // threw far-offset models like the sword completely out of frame.
+  g.rotation.set(0.12, -0.5, 0.04);
+  const sz = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
   const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
   g.scale.setScalar(0.95 / maxDim);
-  g.rotation.set(0.12, -0.5, 0.04);
+  const c = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+  g.position.sub(c);
   camera.position.set(0.55, 0.28, 0.9);
   camera.lookAt(0, 0, 0);
   renderer.render(scene, camera);
