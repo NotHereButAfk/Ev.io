@@ -224,114 +224,41 @@ function animeDecal() {
   return c;
 }
 
-// ANIME GIRL — a chibi anime girl face (twin-tails, huge sparkly eyes, blush,
-// little "ah~" mouth) on a pastel gradient, ringed with hearts and sparkles.
+// ANIME GIRL — a "kawaii force" sticker-bomb wrap: a dense collage of cute
+// anime-idol face stickers, cloud mascots, sakura blossoms, Japanese-style
+// text stamps, hearts and sparkles over a holographic pastel base.
 function animeGirlDecal() {
-  const size = 256;
+  const size = 512;
   const c = makeCanvas(size);
   const ctx = c.getContext('2d');
 
-  // pastel gradient base
+  // ── holographic base: diagonal pastel gradient + soft nebula blobs ──
   const bg = ctx.createLinearGradient(0, 0, size, size);
-  bg.addColorStop(0, '#ffb3dd');
-  bg.addColorStop(0.55, '#d9aaff');
-  bg.addColorStop(1, '#a8d8ff');
+  bg.addColorStop(0.0, '#ff9ed6');
+  bg.addColorStop(0.35, '#c79bff');
+  bg.addColorStop(0.65, '#8fb8ff');
+  bg.addColorStop(1.0, '#8ff0e0');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, size, size);
+  const nebula = [['#ff5fb8', 90, 90], ['#5fd0ff', 400, 140], ['#b56aff', 150, 380], ['#ffd76a', 410, 400]];
+  for (const [col, x, y] of nebula) {
+    const g = ctx.createRadialGradient(x, y, 4, x, y, 150);
+    g.addColorStop(0, col + 'aa'); g.addColorStop(1, col + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, 150, 0, Math.PI * 2); ctx.fill();
+  }
 
-  const cx = 128, cy = 122;
-
-  // twin-tail lobes behind the head
-  ctx.fillStyle = '#ff5fb8';
-  for (const s of [-1, 1]) {
+  // ── reusable shapes ──────────────────────────────────────────────────────
+  const roundRect = (x, y, w, h, r) => {
     ctx.beginPath();
-    ctx.ellipse(cx + s * 84, cy + 6, 26, 58, s * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath(); // tail tip curl
-    ctx.ellipse(cx + s * 96, cy + 62, 14, 26, s * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // hair scrunchies
-  ctx.fillStyle = '#ffe066';
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.arc(cx + s * 74, cy - 34, 9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // back hair + head silhouette
-  ctx.fillStyle = '#ff6fc2';
-  ctx.beginPath();
-  ctx.arc(cx, cy - 14, 76, Math.PI * 0.95, Math.PI * 2.05);
-  ctx.quadraticCurveTo(cx + 78, cy + 40, cx + 52, cy + 52);
-  ctx.quadraticCurveTo(cx, cy + 66, cx - 52, cy + 52);
-  ctx.quadraticCurveTo(cx - 78, cy + 40, cx - 76, cy - 10);
-  ctx.closePath();
-  ctx.fill();
-
-  // face
-  ctx.fillStyle = '#ffe8d6';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 10, 54, 50, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // bangs — three swooping arcs over the forehead
-  ctx.fillStyle = '#ff6fc2';
-  ctx.beginPath();
-  ctx.moveTo(cx - 58, cy - 4);
-  ctx.quadraticCurveTo(cx - 46, cy - 52, cx, cy - 56);
-  ctx.quadraticCurveTo(cx + 46, cy - 52, cx + 58, cy - 4);
-  ctx.quadraticCurveTo(cx + 42, cy - 20, cx + 30, cy - 2);
-  ctx.quadraticCurveTo(cx + 18, cy - 26, cx, cy - 6);
-  ctx.quadraticCurveTo(cx - 18, cy - 26, cx - 30, cy - 2);
-  ctx.quadraticCurveTo(cx - 42, cy - 20, cx - 58, cy - 4);
-  ctx.closePath();
-  ctx.fill();
-  // ahoge (the little hair sprig on top)
-  ctx.strokeStyle = '#ff6fc2';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 56);
-  ctx.quadraticCurveTo(cx + 10, cy - 82, cx - 8, cy - 88);
-  ctx.stroke();
-
-  // eyes — huge vertical ellipses with layered highlights
-  for (const s of [-1, 1]) {
-    const ex = cx + s * 24, ey = cy + 14;
-    ctx.fillStyle = '#3a1a4a';                       // outline/iris base
-    ctx.beginPath(); ctx.ellipse(ex, ey, 13, 18, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#7a3aff';                       // iris glow
-    ctx.beginPath(); ctx.ellipse(ex, ey + 3, 9, 12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffffff';                       // big sparkle
-    ctx.beginPath(); ctx.arc(ex - 4, ey - 6, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(ex + 4, ey + 8, 2.4, 0, Math.PI * 2); ctx.fill();
-    // upper lash line
-    ctx.strokeStyle = '#3a1a4a';
-    ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(ex, ey - 4, 14, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-  }
-
-  // blush
-  ctx.fillStyle = 'rgba(255,110,150,0.55)';
-  for (const s of [-1, 1]) {
-    ctx.beginPath();
-    ctx.ellipse(cx + s * 38, cy + 30, 9, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // little open "ah~" mouth
-  ctx.fillStyle = '#c2325a';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 40, 7, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#ff8aa0'; // tongue
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 44, 4.5, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // hearts + sparkles around her
-  const heart2 = (x, y, s, col) => {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+  const heart = (x, y, s, col) => {
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.moveTo(x, y + s * 0.3);
@@ -341,14 +268,172 @@ function animeGirlDecal() {
     ctx.bezierCurveTo(x + s, y, x, y, x, y + s * 0.3);
     ctx.fill();
   };
-  heart2(34, 44, 13, 'rgba(255,80,150,0.95)');
-  heart2(222, 58, 10, 'rgba(255,120,180,0.9)');
-  heart2(40, 210, 9, 'rgba(255,120,180,0.9)');
-  heart2(214, 200, 12, 'rgba(255,80,150,0.95)');
-  for (let i = 0; i < 34; i++) {
+  const star = (x, y, r, col) => {
+    ctx.fillStyle = col; ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2, a2 = a + Math.PI / 5;
+      ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      ctx.lineTo(x + Math.cos(a2) * r * 0.45, y + Math.sin(a2) * r * 0.45);
+    }
+    ctx.closePath(); ctx.fill();
+  };
+  const sakura = (x, y, r, col) => {
+    ctx.fillStyle = col;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(x + Math.cos(a) * r * 0.7, y + Math.sin(a) * r * 0.7, r * 0.5, r * 0.3, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffe680';
+    ctx.beginPath(); ctx.arc(x, y, r * 0.22, 0, Math.PI * 2); ctx.fill();
+  };
+
+  // Cute cloud mascot: white blob with dot eyes, blush and a tiny smile.
+  const cloud = (x, y, s) => {
+    ctx.fillStyle = '#ffffff';
+    for (const [dx, dy, r] of [[-s * 0.6, 0, s * 0.6], [0, -s * 0.25, s * 0.75], [s * 0.65, 0, s * 0.55], [0, s * 0.2, s * 0.7]]) {
+      ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#3a2a44';
+    ctx.beginPath(); ctx.arc(x - s * 0.28, y, s * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + s * 0.28, y, s * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,140,170,0.7)';
+    ctx.beginPath(); ctx.ellipse(x - s * 0.42, y + s * 0.15, s * 0.12, s * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x + s * 0.42, y + s * 0.15, s * 0.12, s * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#3a2a44'; ctx.lineWidth = s * 0.05; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y + s * 0.1, s * 0.12, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+  };
+
+  // Cute idol face on a rounded white "sticker" card. `hair`/`eye` vary the
+  // girl; `cat` adds kitty ears. All SFW chibi idol style.
+  const girlSticker = (x, y, s, hair, eye, cat) => {
+    ctx.save();
+    ctx.translate(x, y);
+    // sticker card + border + drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = '#ffffff';
+    roundRect(-s, -s, s * 2, s * 2, s * 0.35); ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // card inner tint
+    const cg = ctx.createLinearGradient(-s, -s, s, s);
+    cg.addColorStop(0, '#ffe6f4'); cg.addColorStop(1, '#e6f0ff');
+    ctx.fillStyle = cg;
+    roundRect(-s * 0.86, -s * 0.86, s * 1.72, s * 1.72, s * 0.28); ctx.fill();
+
+    const fy = s * 0.12; // face offset within card
+    // cat ears (behind hair)
+    if (cat) {
+      ctx.fillStyle = hair;
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(sx * s * 0.5, -s * 0.5);
+        ctx.lineTo(sx * s * 0.28, -s * 0.9);
+        ctx.lineTo(sx * s * 0.72, -s * 0.66);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    // back hair
+    ctx.fillStyle = hair;
+    ctx.beginPath(); ctx.arc(0, fy - s * 0.1, s * 0.72, Math.PI, 0); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, fy + s * 0.2, s * 0.72, s * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    // twin tails
+    ctx.beginPath(); ctx.ellipse(-s * 0.72, fy + s * 0.1, s * 0.22, s * 0.42, 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.72, fy + s * 0.1, s * 0.22, s * 0.42, -0.3, 0, Math.PI * 2); ctx.fill();
+    // face
+    ctx.fillStyle = '#ffe6d2';
+    ctx.beginPath(); ctx.ellipse(0, fy + s * 0.05, s * 0.5, s * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    // bangs
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.52, fy - s * 0.08);
+    ctx.quadraticCurveTo(-s * 0.4, fy - s * 0.6, 0, fy - s * 0.62);
+    ctx.quadraticCurveTo(s * 0.4, fy - s * 0.6, s * 0.52, fy - s * 0.08);
+    ctx.quadraticCurveTo(s * 0.3, fy - s * 0.28, s * 0.2, fy - s * 0.04);
+    ctx.quadraticCurveTo(s * 0.08, fy - s * 0.34, 0, fy - s * 0.1);
+    ctx.quadraticCurveTo(-s * 0.08, fy - s * 0.34, -s * 0.2, fy - s * 0.04);
+    ctx.quadraticCurveTo(-s * 0.3, fy - s * 0.28, -s * 0.52, fy - s * 0.08);
+    ctx.closePath(); ctx.fill();
+    // eyes
+    for (const sx of [-1, 1]) {
+      const ex = sx * s * 0.22, ey = fy + s * 0.12;
+      ctx.fillStyle = '#2c1830';
+      ctx.beginPath(); ctx.ellipse(ex, ey, s * 0.13, s * 0.19, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = eye;
+      ctx.beginPath(); ctx.ellipse(ex, ey + s * 0.03, s * 0.09, s * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(ex - s * 0.04, ey - s * 0.06, s * 0.05, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + s * 0.04, ey + s * 0.08, s * 0.025, 0, Math.PI * 2); ctx.fill();
+    }
+    // blush + smile
+    ctx.fillStyle = 'rgba(255,120,150,0.6)';
+    ctx.beginPath(); ctx.ellipse(-s * 0.34, fy + s * 0.3, s * 0.1, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.34, fy + s * 0.3, s * 0.1, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#b83a5a'; ctx.lineWidth = s * 0.05; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(0, fy + s * 0.34, s * 0.1, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    ctx.restore();
+  };
+
+  // Japanese-style vertical text stamp: a coloured tag with procedural
+  // kana/kanji-like strokes (font-independent so it renders anywhere).
+  const textStamp = (x, y, w, h, col) => {
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = col; roundRect(-w / 2, -h / 2, w, h, 4); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; roundRect(-w / 2, -h / 2, w, h, 4); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const glyphs = Math.max(1, Math.floor(h / 22));
+    for (let g = 0; g < glyphs; g++) {
+      const gy = -h / 2 + 14 + g * 22;
+      const strokes = 2 + (Math.random() * 3 | 0);
+      for (let sidx = 0; sidx < strokes; sidx++) {
+        ctx.beginPath();
+        const ox = (Math.random() - 0.5) * (w * 0.5);
+        ctx.moveTo(-w * 0.28 + Math.random() * w * 0.1, gy - 7 + Math.random() * 3);
+        ctx.lineTo(w * 0.28 + ox * 0.2, gy - 6 + Math.random() * 3);        // horizontal
+        if (Math.random() < 0.7) { ctx.moveTo(ox, gy - 8); ctx.lineTo(ox * 0.6, gy + 8); } // vertical
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  };
+
+  // ── compose the sticker bomb (positions chosen to read densely at tile 2×) ──
+  // Hair/eye palettes for varied idols.
+  const P = [
+    ['#ff77c2', '#7a3aff', false], // pink twin-tail
+    ['#5aa8ff', '#2e6ad0', false], // blue
+    ['#ffd24a', '#c98a1a', false], // blonde
+    ['#3a2f4a', '#00c2b0', true],  // black cat-girl
+    ['#b56aff', '#ff3aa0', false], // purple
+    ['#7affc2', '#1a9c74', true],  // mint cat-girl
+  ];
+  const girls = [
+    [96, 104, 62, 0], [372, 96, 58, 1], [150, 300, 60, 3],
+    [400, 320, 56, 2], [256, 200, 66, 4], [70, 430, 52, 5],
+    [430, 456, 50, 1],
+  ];
+  for (const [x, y, s, pi] of girls) girlSticker(x, y, s, P[pi][0], P[pi][1], P[pi][2]);
+
+  // cloud mascots in the gaps
+  for (const [x, y, s] of [[300, 60, 34], [40, 220, 30], [470, 210, 28], [230, 400, 32], [355, 250, 26]]) cloud(x, y, s);
+
+  // text stamps ("夢の力 / 萌え / 愛"-style vertical tags)
+  textStamp(210, 90, 26, 86, '#ff4f8b');
+  textStamp(486, 120, 22, 70, '#7a4fff');
+  textStamp(300, 470, 24, 60, '#ff4f8b');
+  textStamp(18, 330, 22, 64, '#2eb8c9');
+
+  // sakura blossoms drifting through
+  for (let i = 0; i < 16; i++) {
+    sakura(Math.random() * size, Math.random() * size, 9 + Math.random() * 9,
+      Math.random() < 0.5 ? '#ff9ec8' : '#ffc3de');
+  }
+  // hearts + stars + sparkle dust filling remaining space
+  for (let i = 0; i < 12; i++) heart(Math.random() * size, Math.random() * size, 7 + Math.random() * 8, 'rgba(255,70,140,0.9)');
+  for (let i = 0; i < 12; i++) star(Math.random() * size, Math.random() * size, 6 + Math.random() * 7, 'rgba(255,240,150,0.95)');
+  for (let i = 0; i < 90; i++) {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.fillRect(x, y, 2, 2);
+    ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
   }
   return c;
 }
