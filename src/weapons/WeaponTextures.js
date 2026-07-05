@@ -1295,10 +1295,14 @@ const DECALS = {
 };
 
 // Returns a seamless color CanvasTexture for the given decal type (cached).
+// The anime-girl wrap is a designed composition (idol faces, KAWAII FORCE
+// banner) rather than a fine repeating pattern, so it maps at repeat 1 to keep
+// the art large and legible; everything else tiles at 2 for surface density.
 export function decalTexture(type) {
   return cached('decal_' + type, () => {
     const make = DECALS[type];
     if (!make) return null;
-    return finalize(make(), { color: true, repeat: 2 });
+    const repeat = type === 'animegirl' ? 1 : 2;
+    return finalize(make(), { color: true, repeat });
   });
 }

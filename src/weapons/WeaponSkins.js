@@ -120,15 +120,16 @@ export const WEAPON_SKINS = [
     emissive: 0xffffff, emissiveIntensity: 1.6, animated: true, animType: 'cycle'
   },
   {
-    // Kawaii-force waifu wrap: a holographic sticker-bomb of cute anime-idol
-    // portraits, cloud mascots, sakura and Japanese text stamps painted across
-    // the whole body (light base so the collage reads true), with an anime-girl
+    // Waifu-force wrap (Elevate-style): a white body carrying a painted anime
+    // hero girl + magenta lightning / kanji graphics, black furniture and
+    // silver hardware for the clean esports-skin contrast, with an anime-girl
     // "ah~♪" vocal on every shot. shootSound is in CUTE_SOUNDS, so firing also
-    // gets the pink muzzle flash + sparkle-heart burst.
+    // gets the pink muzzle flash + sparkle-heart burst. White body = the decal
+    // art reads true; subtle pink emissive glow only (matte, not neon).
     id: 'sakura', name: 'Sakura Waifu 🌸', rarity: 'mythic',
-    body: 0xf4eefb, accent: 0xcaa6ff, metal: 0xe6dcff, metalness: 0.5, roughness: 0.34,
-    emissive: 0xff7ad0, emissiveIntensity: 0.5, decal: 'animegirl', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 2.6, animMin: 0.3, animMax: 0.9,
+    body: 0xffffff, accent: 0x18181e, metal: 0xd6d6dc, metalness: 0.55, roughness: 0.36,
+    emissive: 0xff2e88, emissiveIntensity: 0.35, decal: 'animegirl', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.15, animMax: 0.5,
     shootSound: 'waifu'
   },
   {

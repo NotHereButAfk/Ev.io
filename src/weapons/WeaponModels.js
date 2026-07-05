@@ -46,6 +46,13 @@ function _buildFromGLB(weaponDef) {
     obj.castShadow = true;
   });
 
+  // GLB weapon meshes ship without UVs, so painted skin decals (the color map)
+  // had nowhere to land and every decal skin showed as flat colour. Generate a
+  // continuous box projection across the whole assembled gun so decals map onto
+  // it as one wrap (faces stay a consistent size regardless of how the mesh is
+  // split). Idempotent — geometries are shared across clones, so it runs once.
+  _applyBoxUVs(cloned);
+
   // Find muzzle point (Blender auto-renames duplicates to muzzle_point.001 etc.)
   let muzzle = null;
   cloned.traverse(obj => { if (!muzzle && /^muzzle_point/.test(obj.name)) muzzle = obj; });
@@ -59,6 +66,43 @@ function _buildFromGLB(weaponDef) {
   const group = new THREE.Group();
   group.add(cloned);
   return { group, muzzle };
+}
+
+// Box-project UVs across the whole gun (in the assembled root's local space) so
+// a tiling decal reads as one continuous wrap. TILES = how many texture repeats
+// span the gun's longest axis. Only fills meshes that lack UVs; safe to re-run.
+const _boxUV = {
+  box: new THREE.Box3(), size: new THREE.Vector3(), v: new THREE.Vector3(),
+  n: new THREE.Vector3(), m: new THREE.Matrix4(), nm: new THREE.Matrix3(),
+};
+function _applyBoxUVs(root, TILES = 1.7) {
+  root.updateWorldMatrix(true, true);
+  const box = _boxUV.box.setFromObject(root);
+  const size = box.getSize(_boxUV.size);
+  const span = Math.max(size.x, size.y, size.z) || 1;
+  const scale = TILES / span;
+  root.traverse((o) => {
+    if (!o.isMesh || !o.geometry) return;
+    const g = o.geometry;
+    if (g.attributes.uv) return;                 // keep authored UVs
+    if (!g.attributes.normal) g.computeVertexNormals();
+    const pos = g.attributes.position, nor = g.attributes.normal;
+    const uv = new Float32Array(pos.count * 2);
+    o.updateWorldMatrix(true, false);
+    const m = _boxUV.m.copy(root.matrixWorld).invert().multiply(o.matrixWorld);
+    const nm = _boxUV.nm.getNormalMatrix(m);
+    for (let i = 0; i < pos.count; i++) {
+      const v = _boxUV.v.fromBufferAttribute(pos, i).applyMatrix4(m);
+      const n = _boxUV.n.fromBufferAttribute(nor, i).applyMatrix3(nm);
+      const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+      let u, w;
+      if (ax >= ay && ax >= az)      { u = v.z - box.min.z; w = v.y - box.min.y; }
+      else if (ay >= ax && ay >= az) { u = v.x - box.min.x; w = v.z - box.min.z; }
+      else                           { u = v.x - box.min.x; w = v.y - box.min.y; }
+      uv[i * 2] = u * scale; uv[i * 2 + 1] = w * scale;
+    }
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  });
 }
 
 // ---------------------------------------------------------------------------
