@@ -127,8 +127,9 @@ export const WEAPON_SKINS = [
     // gets the pink muzzle flash + sparkle-heart burst. White body = the decal
     // art reads true; subtle pink emissive glow only (matte, not neon).
     id: 'sakura', name: 'Sakura Waifu 🌸', rarity: 'mythic',
-    body: 0xffffff, accent: 0x18181e, metal: 0xd6d6dc, metalness: 0.55, roughness: 0.36,
+    body: 0xffffff, accent: 0x18181e, metal: 0xffffff, metalness: 0.35, roughness: 0.4,
     emissive: 0xff2e88, emissiveIntensity: 0.35, decal: 'animegirl', decalEmissive: true,
+    decalOnMetal: true,
     animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.15, animMax: 0.5,
     shootSound: 'waifu'
   },
@@ -182,6 +183,13 @@ export function applyWeaponSkin(group, skin) {
       m.color.setHex(skin.metal);
       m.emissive.setHex(skin.emissive ?? 0x000000);
       m.emissiveIntensity = skin.emissiveIntensity ?? 0;
+      // Full-coverage wraps (decalOnMetal) paint the receiver/barrel too, so
+      // the artwork flows across the whole gun instead of only body panels.
+      if (skin.decalOnMetal && decal) {
+        m.map = decal;
+        if (skin.decalEmissive) { m.emissiveMap = decal; m.emissive.setHex(0xffffff); }
+        m.needsUpdate = true;
+      }
     }
     // 'wood' and 'special' roles intentionally left as-is.
   });
