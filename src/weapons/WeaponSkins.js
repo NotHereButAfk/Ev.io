@@ -120,10 +120,14 @@ export const WEAPON_SKINS = [
     emissive: 0xffffff, emissiveIntensity: 1.6, animated: true, animType: 'cycle'
   },
   {
-    id: 'void', name: 'Void ◈', rarity: 'mythic',
-    body: 0x080608, accent: 0x12001a, metal: 0x3a0055, metalness: 0.88, roughness: 0.1,
-    emissive: 0x6600cc, emissiveIntensity: 1.3,
-    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.5, animMax: 2.1
+    // Anime waifu finish: pastel sakura decal (stars/hearts/petals), hot-pink
+    // glow, and the kawaii "pew~!" shoot sound. shootSound is in CUTE_SOUNDS,
+    // so firing also gets the pink muzzle flash + sparkle-heart burst.
+    id: 'sakura', name: 'Sakura Waifu 🌸', rarity: 'mythic',
+    body: 0xff8fce, accent: 0x6a2a8c, metal: 0xe0a0ff, metalness: 0.55, roughness: 0.3,
+    emissive: 0xff3aa0, emissiveIntensity: 1.5, decal: 'anime', decalEmissive: true,
+    animated: true, animType: 'pulse', animSpeed: 2.8, animMin: 0.8, animMax: 2.3,
+    shootSound: 'anime'
   },
   {
     id: 'pyroclasm', name: 'Pyroclasm 🔥', rarity: 'mythic',
