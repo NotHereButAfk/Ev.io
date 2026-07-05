@@ -9,7 +9,7 @@ const FLASH_LIFE = 0.05;
 
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
 // get the pink muzzle flash + sparkle-heart burst treatment.
-const CUTE_SOUNDS = new Set(['anime', 'meow', 'uwu', 'bark', 'sparkle']);
+const CUTE_SOUNDS = new Set(['anime', 'waifu', 'meow', 'uwu', 'bark', 'sparkle']);
 // Fire-sound skins get an orange/red muzzle flash + ember burst.
 const FIRE_SOUNDS = new Set(['fire']);
 

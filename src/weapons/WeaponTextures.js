@@ -224,6 +224,135 @@ function animeDecal() {
   return c;
 }
 
+// ANIME GIRL — a chibi anime girl face (twin-tails, huge sparkly eyes, blush,
+// little "ah~" mouth) on a pastel gradient, ringed with hearts and sparkles.
+function animeGirlDecal() {
+  const size = 256;
+  const c = makeCanvas(size);
+  const ctx = c.getContext('2d');
+
+  // pastel gradient base
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#ffb3dd');
+  bg.addColorStop(0.55, '#d9aaff');
+  bg.addColorStop(1, '#a8d8ff');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  const cx = 128, cy = 122;
+
+  // twin-tail lobes behind the head
+  ctx.fillStyle = '#ff5fb8';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 84, cy + 6, 26, 58, s * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath(); // tail tip curl
+    ctx.ellipse(cx + s * 96, cy + 62, 14, 26, s * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // hair scrunchies
+  ctx.fillStyle = '#ffe066';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(cx + s * 74, cy - 34, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // back hair + head silhouette
+  ctx.fillStyle = '#ff6fc2';
+  ctx.beginPath();
+  ctx.arc(cx, cy - 14, 76, Math.PI * 0.95, Math.PI * 2.05);
+  ctx.quadraticCurveTo(cx + 78, cy + 40, cx + 52, cy + 52);
+  ctx.quadraticCurveTo(cx, cy + 66, cx - 52, cy + 52);
+  ctx.quadraticCurveTo(cx - 78, cy + 40, cx - 76, cy - 10);
+  ctx.closePath();
+  ctx.fill();
+
+  // face
+  ctx.fillStyle = '#ffe8d6';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 10, 54, 50, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // bangs — three swooping arcs over the forehead
+  ctx.fillStyle = '#ff6fc2';
+  ctx.beginPath();
+  ctx.moveTo(cx - 58, cy - 4);
+  ctx.quadraticCurveTo(cx - 46, cy - 52, cx, cy - 56);
+  ctx.quadraticCurveTo(cx + 46, cy - 52, cx + 58, cy - 4);
+  ctx.quadraticCurveTo(cx + 42, cy - 20, cx + 30, cy - 2);
+  ctx.quadraticCurveTo(cx + 18, cy - 26, cx, cy - 6);
+  ctx.quadraticCurveTo(cx - 18, cy - 26, cx - 30, cy - 2);
+  ctx.quadraticCurveTo(cx - 42, cy - 20, cx - 58, cy - 4);
+  ctx.closePath();
+  ctx.fill();
+  // ahoge (the little hair sprig on top)
+  ctx.strokeStyle = '#ff6fc2';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 56);
+  ctx.quadraticCurveTo(cx + 10, cy - 82, cx - 8, cy - 88);
+  ctx.stroke();
+
+  // eyes — huge vertical ellipses with layered highlights
+  for (const s of [-1, 1]) {
+    const ex = cx + s * 24, ey = cy + 14;
+    ctx.fillStyle = '#3a1a4a';                       // outline/iris base
+    ctx.beginPath(); ctx.ellipse(ex, ey, 13, 18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#7a3aff';                       // iris glow
+    ctx.beginPath(); ctx.ellipse(ex, ey + 3, 9, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';                       // big sparkle
+    ctx.beginPath(); ctx.arc(ex - 4, ey - 6, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex + 4, ey + 8, 2.4, 0, Math.PI * 2); ctx.fill();
+    // upper lash line
+    ctx.strokeStyle = '#3a1a4a';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(ex, ey - 4, 14, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  }
+
+  // blush
+  ctx.fillStyle = 'rgba(255,110,150,0.55)';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 38, cy + 30, 9, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // little open "ah~" mouth
+  ctx.fillStyle = '#c2325a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 40, 7, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff8aa0'; // tongue
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 44, 4.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // hearts + sparkles around her
+  const heart2 = (x, y, s, col) => {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x, y + s * 0.3);
+    ctx.bezierCurveTo(x, y, x - s, y, x - s, y + s * 0.4);
+    ctx.bezierCurveTo(x - s, y + s * 0.8, x, y + s, x, y + s * 1.2);
+    ctx.bezierCurveTo(x, y + s, x + s, y + s * 0.8, x + s, y + s * 0.4);
+    ctx.bezierCurveTo(x + s, y, x, y, x, y + s * 0.3);
+    ctx.fill();
+  };
+  heart2(34, 44, 13, 'rgba(255,80,150,0.95)');
+  heart2(222, 58, 10, 'rgba(255,120,180,0.9)');
+  heart2(40, 210, 9, 'rgba(255,120,180,0.9)');
+  heart2(214, 200, 12, 'rgba(255,80,150,0.95)');
+  for (let i = 0; i < 34; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    const x = Math.random() * size, y = Math.random() * size;
+    ctx.fillRect(x, y, 2, 2);
+  }
+  return c;
+}
+
 // DRAGON — overlapping scales with a jade-green sheen.
 function dragonDecal() {
   const size = 256;
@@ -779,6 +908,7 @@ function camoUrbanDecal() {
 const DECALS = {
   fire:        fireDecal,
   anime:       animeDecal,
+  animegirl:   animeGirlDecal,
   dragon:      dragonDecal,
   cyber:       cyberDecal,
   carbon:      carbonDecal,

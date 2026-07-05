@@ -245,6 +245,56 @@ export class AudioManager {
     lfo.stop(t + 0.24); osc.stop(t + 0.24); sub.stop(t + 0.24); spark.stop(t + 0.18);
   }
 
+  // Anime-girl "ah~♪" — a soft feminine vocal chirp: slow vocal vibrato,
+  // rising-then-falling intonation, and two parallel formant filters so it
+  // reads as a voice rather than a synth beep. Kept cute, not sultry.
+  playWaifuShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Slow voice-like vibrato (a human wobble, not the fast kawaii shimmer).
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 6.5;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 14;
+    lfo.connect(lfoGain);
+
+    // The "ah~": quick lift then a gentle falling sigh contour.
+    const osc = this.ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(720, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(470, t + 0.32);
+    lfoGain.connect(osc.frequency);
+
+    // Two vocal formants in parallel ("a" vowel-ish), mixed back together.
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 950;  f1.Q.value = 2.0;
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 2500; f2.Q.value = 3.0;
+    const mix = this.ctx.createGain();
+    mix.gain.value = 1;
+    const gain = this._envGain(0.32, 0.03, 0.3, t); // soft attack — breathy, not clicky
+    osc.connect(f1).connect(mix);
+    osc.connect(f2).connect(mix);
+    mix.connect(gain).connect(this.master);
+
+    // Faint breath layer under the voice.
+    const dur = 0.2;
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const breath = this.ctx.createBufferSource();
+    breath.buffer = buf;
+    const bf = this.ctx.createBiquadFilter();
+    bf.type = 'bandpass'; bf.frequency.value = 1800; bf.Q.value = 0.8;
+    const bGain = this._envGain(0.05, 0.02, 0.16, t);
+    breath.connect(bf).connect(bGain).connect(this.master);
+
+    lfo.start(t); osc.start(t); breath.start(t);
+    lfo.stop(t + 0.36); osc.stop(t + 0.36);
+  }
+
   // Sci-fi laser zap — descending saw with a metallic ring.
   playLaserShot() {
     if (!this.ctx) return;
@@ -289,6 +339,7 @@ export class AudioManager {
   playSkinShot(soundId) {
     switch (soundId) {
       case 'anime': this.playAnimeShot(); return true;
+      case 'waifu': this.playWaifuShot(); return true;
       case 'laser': this.playLaserShot(); return true;
       case 'fire':  this.playFireShot();  return true;
       case 'meow':  this.playMeowShot();  return true;
