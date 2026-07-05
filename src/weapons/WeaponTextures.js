@@ -224,13 +224,84 @@ function animeDecal() {
   return c;
 }
 
-// ANIME GIRL — dense "KAWAII FORCE" sticker-bomb wrap: overlapping cute idol
-// stickers with manga-style details, screentone, speed lines, bold outlines,
-// katakana tags, and every gap filled with hearts/stars/sparkles.
+// ── Async image loader for the Sakura Waifu skin ──────────────────────────
+// Tries to load real images to replace the procedural fallback:
+//   Option A: textures/sakura/wrap.png — a single full sticker-bomb texture
+//   Option B: textures/sakura/sticker_1.png … sticker_8.png — individual stickers
+//             composited over the pastel gradient
+// If nothing loads (404s), the procedural canvas stays as-is.
+function _loadSakuraImages(canvas, ctx, size) {
+  const base = import.meta.env?.BASE_URL || './';
+  const wrapUrl = `${base}textures/sakura/wrap.png`;
+
+  const tryWrap = new Image();
+  tryWrap.onload = () => {
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(tryWrap, 0, 0, size, size);
+    const tex = _cache.get('decal_animegirl');
+    if (tex) tex.needsUpdate = true;
+  };
+  tryWrap.onerror = () => {
+    // No wrap.png — try individual sticker files
+    const stickers = [];
+    let pending = 0;
+    for (let i = 1; i <= 8; i++) {
+      const img = new Image();
+      pending++;
+      img.onload = () => { stickers.push(img); if (--pending === 0) _compositeStickers(canvas, ctx, size, stickers); };
+      img.onerror = () => { if (--pending === 0 && stickers.length) _compositeStickers(canvas, ctx, size, stickers); };
+      img.src = `${base}textures/sakura/sticker_${i}.png`;
+    }
+  };
+  tryWrap.src = wrapUrl;
+}
+
+function _compositeStickers(canvas, ctx, size, stickers) {
+  // Redraw gradient base
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0.0,  '#ff6eb4');
+  bg.addColorStop(0.18, '#ff9a5c');
+  bg.addColorStop(0.35, '#ffe14d');
+  bg.addColorStop(0.52, '#8aff7a');
+  bg.addColorStop(0.68, '#5ccfff');
+  bg.addColorStop(0.85, '#b56aff');
+  bg.addColorStop(1.0,  '#ff6eb4');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  // Place stickers in a dense overlapping layout
+  const positions = [
+    [0.15, 0.15, 0.35], [0.65, 0.12, 0.32], [0.35, 0.4, 0.38],
+    [0.8, 0.45, 0.3],   [0.1, 0.6, 0.33],   [0.55, 0.7, 0.35],
+    [0.85, 0.8, 0.28],  [0.3, 0.85, 0.3],
+  ];
+  for (let i = 0; i < stickers.length; i++) {
+    const [fx, fy, fs] = positions[i % positions.length];
+    const img = stickers[i];
+    const w = size * fs;
+    const h = w * (img.height / img.width);
+    const x = size * fx - w / 2;
+    const y = size * fy - h / 2;
+    ctx.save();
+    ctx.translate(x + w/2, y + h/2);
+    ctx.rotate((Math.random() - 0.5) * 0.3);
+    ctx.drawImage(img, -w/2, -h/2, w, h);
+    ctx.restore();
+  }
+  const tex = _cache.get('decal_animegirl');
+  if (tex) tex.needsUpdate = true;
+}
+
+// ANIME GIRL — tries to load a real image from public/textures/sakura/wrap.png.
+// Falls back to a dense procedural "KAWAII FORCE" sticker-bomb if no image found.
+// Also accepts individual sticker_1..sticker_8.png composited on the gradient.
 function animeGirlDecal() {
   const size = 512;
   const c = makeCanvas(size);
   const ctx = c.getContext('2d');
+
+  // Kick off async image loading — will redraw canvas + update cached texture
+  _loadSakuraImages(c, ctx, size);
 
   // ── saturated candy base: multi-stop rainbow gradient + nebula splotches ──
   const bg = ctx.createLinearGradient(0, 0, size, size);
