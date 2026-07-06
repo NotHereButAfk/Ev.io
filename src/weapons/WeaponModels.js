@@ -32,11 +32,17 @@ function _buildFromGLB(weaponDef) {
                                         clearcoat: 0.8, clearcoatRoughness: 0.08 });
   const scope = M('special', 0x060a10, { roughness: 0.08, metalness: 0.2,
                                          clearcoat: 0.9, clearcoatRoughness: 0.05 });
+  // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
+  // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
+  const eCol = weaponDef.energyColor ?? 0x2ee6ff;
+  const energy = M('energy', eCol, { roughness: 0.25, metalness: 0.1,
+                                     emissive: eCol, emissiveIntensity: 2.4 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
     const n = (obj.material?.name || '').toLowerCase();
     if      (n.includes('dark_metal'))  obj.material = dark;
+    else if (n.includes('energy'))      obj.material = energy;
     else if (n.includes('wood'))        obj.material = wood;
     else if (n.includes('blade'))       obj.material = blade;
     else if (n.includes('scope_glass')) obj.material = scope;
