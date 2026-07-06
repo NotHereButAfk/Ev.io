@@ -141,10 +141,12 @@ export const WEAPON_SKINS = [
     // gets the pink muzzle flash + sparkle-heart burst. White body = the decal
     // art reads true; subtle pink emissive glow only (matte, not neon).
     id: 'sakura', name: 'Sakura Waifu 🌸', rarity: 'mythic',
-    body: 0xffffff, accent: 0x18181e, metal: 0xffffff, metalness: 0.35, roughness: 0.4,
+    body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.35, roughness: 0.4,
     emissive: 0xff2e88, emissiveIntensity: 0.35, decal: 'animegirl', decalEmissive: true,
-    decalOnMetal: true,
-    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.15, animMax: 0.5,
+    // Total coverage: the black wrap paints body + metal + trim, and the
+    // sci-fi energy strips are rethemed hot pink so no cyan fights the art.
+    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff2e88,
+    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.2, animMax: 0.6,
     shootSound: 'waifu'
   },
   {
@@ -199,6 +201,19 @@ export function applyWeaponSkin(group, skin) {
       m.roughness = Math.min(0.85, skin.roughness + 0.15);
       m.emissive.setHex(0x000000);
       m.emissiveIntensity = 0;
+      // Total-coverage wraps also paint the trim/furniture parts.
+      if (skin.decalOnAccent && decal) {
+        m.map = decal;
+        m.needsUpdate = true;
+      }
+    } else if (role === 'energy') {
+      // Sci-fi glow strips normally stay their build-time colour; a skin may
+      // retheme them so they don't clash with its wrap (e.g. sakura -> pink).
+      if (skin.energyColor !== undefined) {
+        m.color.setHex(skin.energyColor);
+        m.emissive.setHex(skin.energyColor);
+        m.needsUpdate = true;
+      }
     } else if (role === 'metal') {
       m.color.setHex(skin.metal);
       m.emissive.setHex(skin.emissive ?? 0x000000);
