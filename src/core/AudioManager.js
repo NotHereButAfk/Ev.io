@@ -335,6 +335,85 @@ export class AudioManager {
     noise.stop(t + 0.32); osc.stop(t + 0.26);
   }
 
+  // Prism mythic — crystalline refraction zap: three harmonic pings cascading
+  // down like light splitting through glass, over a bright laser body and an
+  // airy shimmer so it reads "energy through a crystal", not a plain pew.
+  playPrismShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // cascading refraction pings
+    for (const [freq, dt] of [[2600, 0.0], [1950, 0.035], [1470, 0.07]]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t + dt);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.82, t + dt + 0.09);
+      const g = this._envGain(0.16, 0.002, 0.09, t + dt);
+      o.connect(g).connect(this.master);
+      o.start(t + dt); o.stop(t + dt + 0.11);
+    }
+    // laser body for punch
+    const body = this.ctx.createOscillator();
+    body.type = 'triangle';
+    body.frequency.setValueAtTime(980, t);
+    body.frequency.exponentialRampToValueAtTime(220, t + 0.13);
+    const bGain = this._envGain(0.3, 0.002, 0.13, t);
+    body.connect(bGain).connect(this.master);
+    body.start(t); body.stop(t + 0.15);
+    // airy shimmer
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.14);
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 5200;
+    const nGain = this._envGain(0.12, 0.004, 0.13, t);
+    noise.connect(hp).connect(nGain).connect(this.master);
+    noise.start(t); noise.stop(t + 0.16);
+  }
+
+  // Pyroclasm mythic — volcanic blast: a sub-bass eruption drop, a wide slow
+  // whoosh and trailing lava crackles. Deeper, longer and heavier than the
+  // legendary 'fire' sound so the mythic reads bigger.
+  playPyroShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // sub eruption
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(120, t);
+    sub.frequency.exponentialRampToValueAtTime(28, t + 0.32);
+    const sGain = this._envGain(0.85, 0.003, 0.34, t);
+    sub.connect(sGain).connect(this.master);
+    // gritty mid layer
+    const mid = this.ctx.createOscillator();
+    mid.type = 'square';
+    mid.frequency.setValueAtTime(72, t);
+    mid.frequency.exponentialRampToValueAtTime(36, t + 0.24);
+    const mGain = this._envGain(0.22, 0.004, 0.24, t);
+    mid.connect(mGain).connect(this.master);
+    // big slow whoosh
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.42);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(3400, t);
+    lp.frequency.exponentialRampToValueAtTime(240, t + 0.38);
+    const nGain = this._envGain(0.8, 0.003, 0.4, t);
+    noise.connect(lp).connect(nGain).connect(this.master);
+    // trailing lava crackles
+    for (const dt of [0.08, 0.15, 0.23]) {
+      const c = this.ctx.createBufferSource();
+      c.buffer = this._noiseBuffer(0.04);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1400 + Math.random() * 1400;
+      bp.Q.value = 8;
+      const cGain = this._envGain(0.18, 0.002, 0.035, t + dt);
+      c.connect(bp).connect(cGain).connect(this.master);
+      c.start(t + dt); c.stop(t + dt + 0.05);
+    }
+    sub.start(t); mid.start(t); noise.start(t);
+    sub.stop(t + 0.38); mid.stop(t + 0.28); noise.stop(t + 0.44);
+  }
+
   // Dispatch a skin's custom shoot sound; returns false if there's no override.
   playSkinShot(soundId) {
     switch (soundId) {
@@ -342,6 +421,8 @@ export class AudioManager {
       case 'waifu': this.playWaifuShot(); return true;
       case 'laser': this.playLaserShot(); return true;
       case 'fire':  this.playFireShot();  return true;
+      case 'prism': this.playPrismShot(); return true;
+      case 'pyro':  this.playPyroShot();  return true;
       case 'meow':  this.playMeowShot();  return true;
       case 'uwu':   this.playUwuShot();   return true;
       case 'bark':  this.playBarkShot();  return true;

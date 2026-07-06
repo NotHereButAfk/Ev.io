@@ -89,22 +89,30 @@ export const WEAPON_SKINS = [
     shootSound: 'fire'
   },
   {
+    // Full-coverage wrap: circuit traces flow across the receiver/barrel too
+    // (light metal tint so the glowing PCB pattern reads true on metal).
     id: 'cybernet', name: 'Cybernet 🤖', rarity: 'legendary',
-    body: 0x0a1014, accent: 0x04080c, metal: 0x0aa0c0, metalness: 0.85, roughness: 0.18,
+    body: 0xf0fbff, accent: 0x04080c, metal: 0xd0f2ff, metalness: 0.85, roughness: 0.18,
     emissive: 0x00e5ff, emissiveIntensity: 1.3, decal: 'cyber', decalEmissive: true,
+    decalOnMetal: true,
     animated: true, animType: 'pulse', animSpeed: 4.0, animMin: 0.7, animMax: 2.0,
     shootSound: 'laser'
   },
   {
+    // Full-coverage wrap: the nebula spans the whole gun as one starfield.
     id: 'galaxy', name: 'Galaxy ✦', rarity: 'legendary',
-    body: 0x06030f, accent: 0x030208, metal: 0x5a3a9c, metalness: 0.8, roughness: 0.2,
+    body: 0xf4eeff, accent: 0x030208, metal: 0xe0d4ff, metalness: 0.8, roughness: 0.2,
     emissive: 0x9c4aff, emissiveIntensity: 1.2, decal: 'galaxy', decalEmissive: true,
+    decalOnMetal: true,
     animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.6, animMax: 2.0
   },
   {
+    // Full-coverage wrap: gold-veined dark marble across the whole gun, warm
+    // gilded tint on the hardware.
     id: 'crimsonmoon', name: 'Crimson Moon 🌑', rarity: 'legendary',
-    body: 0x2c0608, accent: 0x120203, metal: 0xf0c24a, metalness: 0.85, roughness: 0.2,
+    body: 0xfff4ec, accent: 0x120203, metal: 0xf5e2c0, metalness: 0.85, roughness: 0.2,
     emissive: 0xff2a3a, emissiveIntensity: 1.0, decal: 'bloodmoon', decalEmissive: true,
+    decalOnMetal: true,
     animated: true, animType: 'pulse', animSpeed: 1.4, animMin: 0.5, animMax: 1.6
   },
   {
@@ -115,9 +123,15 @@ export const WEAPON_SKINS = [
 
   // ── MYTHIC (3) ───────────────────────────────────────────────────────────────
   {
+    // Full iridescent-foil wrap: the holographic rainbow decal covers body AND
+    // metal (white base so the foil reads true), while the 'cycle' animation
+    // sweeps a hue-shifting glow through it — the whole gun shimmers through
+    // the spectrum. Crystalline refraction zap on every shot.
     id: 'prism', name: 'Prism 🌈', rarity: 'mythic',
-    body: 0x1a1a1a, accent: 0x0f0f0f, metal: 0x808080, metalness: 0.85, roughness: 0.12,
-    emissive: 0xffffff, emissiveIntensity: 1.6, animated: true, animType: 'cycle'
+    body: 0xffffff, accent: 0x14141a, metal: 0xffffff, metalness: 0.9, roughness: 0.1,
+    emissive: 0xffffff, emissiveIntensity: 1.6, decal: 'holographic', decalEmissive: true,
+    decalOnMetal: true, animated: true, animType: 'cycle',
+    shootSound: 'prism'
   },
   {
     // Waifu-force wrap (Elevate-style): a white body carrying a painted anime
@@ -134,11 +148,17 @@ export const WEAPON_SKINS = [
     shootSound: 'waifu'
   },
   {
-    id: 'pyroclasm', name: 'Pyroclasm 🔥', rarity: 'mythic',
-    body: 0x0c0400, accent: 0x1a0600, metal: 0xff6a00, metalness: 0.52, roughness: 0.38,
-    emissive: 0xff2200, emissiveIntensity: 2.2, decal: 'fire', decalEmissive: true,
-    animated: true, animType: 'flicker', animSpeed: 10.0, animMin: 0.8, animMax: 3.0,
-    shootSound: 'fire', fireEmbers: true
+    // Molten full wrap: the lava decal (cracked basalt with glowing magma
+    // veins) covers body AND metal — the whole gun looks like cooling rock
+    // with fire running through the cracks, flickering like a live eruption.
+    // White base so the rock texture reads true; its own volcanic blast SFX
+    // (deeper and bigger than the legendary 'fire' sound) + ember bursts.
+    id: 'pyroclasm', name: 'Pyroclasm 🌋', rarity: 'mythic',
+    body: 0xffffff, accent: 0x0d0503, metal: 0xffffff, metalness: 0.45, roughness: 0.5,
+    emissive: 0xff3a00, emissiveIntensity: 2.2, decal: 'lava', decalEmissive: true,
+    decalOnMetal: true,
+    animated: true, animType: 'flicker', animSpeed: 9.0, animMin: 0.9, animMax: 2.6,
+    shootSound: 'pyro', fireEmbers: true
   }
 ];
 
