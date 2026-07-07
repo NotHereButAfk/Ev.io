@@ -147,7 +147,7 @@ export const WEAPON_SKINS = [
     // sci-fi energy strips are rethemed hot pink so no cyan fights the art.
     decalOnMetal: true, decalOnAccent: true, energyColor: 0xff2e88,
     animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.2, animMax: 0.6,
-    shootSound: 'waifu'
+    shootSound: 'meow'
   },
   {
     // Molten full wrap: the lava decal (cracked basalt with glowing magma
