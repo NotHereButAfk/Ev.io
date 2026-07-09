@@ -134,19 +134,17 @@ export const WEAPON_SKINS = [
     shootSound: 'prism'
   },
   {
-    // Waifu-force wrap (Elevate-style): a white body carrying a painted anime
-    // hero girl + magenta lightning / kanji graphics, black furniture and
-    // silver hardware for the clean esports-skin contrast, with an anime-girl
-    // "ah~♪" vocal on every shot. shootSound is in CUTE_SOUNDS, so firing also
-    // gets the pink muzzle flash + sparkle-heart burst. White body = the decal
-    // art reads true; subtle pink emissive glow only (matte, not neon).
-    id: 'sakura', name: 'Sakura Waifu 🌸', rarity: 'mythic',
-    body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.35, roughness: 0.4,
-    emissive: 0xff2e88, emissiveIntensity: 0.35, decal: 'animegirl', decalEmissive: true,
+    // Baddie "koakuma" wrap: a black + crimson + gold full-coverage anime
+    // skin — a confident little-devil girl (winged eyeliner, smirk, horns),
+    // roses, gold chains, 小悪魔 / BADDIE branding, neon-red glow. White base
+    // so the dark art reads true; energy strips + emissive rethemed crimson.
+    id: 'sakura', name: 'Koakuma Baddie 😈', rarity: 'mythic',
+    body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.4, roughness: 0.36,
+    emissive: 0xff1030, emissiveIntensity: 0.4, decal: 'animegirl', decalEmissive: true,
     // Total coverage: the black wrap paints body + metal + trim, and the
-    // sci-fi energy strips are rethemed hot pink so no cyan fights the art.
-    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff2e88,
-    animated: true, animType: 'pulse', animSpeed: 2.4, animMin: 0.2, animMax: 0.6,
+    // sci-fi energy strips glow crimson to match the baddie art.
+    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff1030,
+    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.75,
     shootSound: 'meow'
   },
   {
