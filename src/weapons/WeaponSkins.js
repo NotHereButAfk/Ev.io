@@ -15,7 +15,17 @@ import { decalTexture } from './WeaponTextures.js';
 // Curated to 15 common / 12 epic / 5 legendary / 3 mythic — one clear pick
 // per visual theme rather than several near-duplicate recolors.
 
-export const WEAPON_SKINS = [];
+// Five free common finishes, usable on any gun (commons are auto-owned — see
+// Armory.ownsSkin). Each just recolours the shell or retints the energy glow.
+// The light-tint skins keep the guns' shared gunmetal body and only change
+// energyColor; the others recolour the shell (Desert keeps the cyan glow).
+export const WEAPON_SKINS = [
+  { id: 'ember',   name: 'Ember',   rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xff7a1e },
+  { id: 'venom',   name: 'Venom',   rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0x54ff45 },
+  { id: 'crimson', name: 'Crimson', rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xff2e3a },
+  { id: 'desert',  name: 'Desert',  rarity: 'common', body: 0xb29766, accent: 0x4a3b24, metal: 0xa89878, metalness: 0.40, roughness: 0.55 },
+  { id: 'arctic',  name: 'Arctic',  rarity: 'common', body: 0xcdd6dd, accent: 0x5f6a74, metal: 0xb8c2cc, metalness: 0.50, roughness: 0.40, energyColor: 0x8fd8ff },
+];
 
 const _hsl = new THREE.Color();
 
@@ -63,18 +73,22 @@ export function applyWeaponSkin(group, skin) {
       m.map = (skin.decalOnAccent && decal) ? decal : null;
       m.needsUpdate = true;
     } else if (role === 'energy') {
-      // Sci-fi glow strips normally stay their build-time colour; a skin may
-      // retheme them so they don't clash with its wrap (e.g. sakura -> pink).
-      // Record the build-time colour once so a retheme is reversible when the
-      // next skin doesn't specify energyColor.
+      // Sci-fi glow strips. A skin may retint the hue (e.g. a "make the light
+      // a different colour" finish). Keep a near-black base so the part doesn't
+      // wash out under the game's ACES tone mapping — the glow rides on the
+      // emissive, exactly as the model build does. Record the build-time colours
+      // once so a retint is reversible when the next skin omits energyColor.
       if (m.userData.baseEnergyColor === undefined) {
         m.userData.baseEnergyColor = m.color.getHex();
         m.userData.baseEnergyEmissive = m.emissive.getHex();
       }
-      const eColor = skin.energyColor !== undefined ? skin.energyColor : m.userData.baseEnergyColor;
-      const eEmis  = skin.energyColor !== undefined ? skin.energyColor : m.userData.baseEnergyEmissive;
-      m.color.setHex(eColor);
-      m.emissive.setHex(eEmis);
+      if (skin.energyColor !== undefined) {
+        m.color.setHex(_hsl.setHex(skin.energyColor).multiplyScalar(0.12).getHex());
+        m.emissive.setHex(skin.energyColor);
+      } else {
+        m.color.setHex(m.userData.baseEnergyColor);
+        m.emissive.setHex(m.userData.baseEnergyEmissive);
+      }
       m.needsUpdate = true;
     } else if (role === 'metal') {
       m.color.setHex(skin.metal);

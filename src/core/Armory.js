@@ -33,7 +33,10 @@ export const Armory = {
     return Array.isArray(d.__owned) ? d.__owned : [];
   },
   ownsSkin(skinId) {
-    return this.ownedSkins().includes(skinId);
+    if (this.ownedSkins().includes(skinId)) return true;
+    // Common finishes are free — always available on every gun.
+    const s = getWeaponSkin(skinId) || getSwordSkin(skinId);
+    return s?.rarity === 'common';
   },
   grantSkin(skinId) {
     const d = _load();
