@@ -24,9 +24,21 @@ function _buildFromGLB(weaponDef) {
   cloned.position.set(0, 0, 0);
 
   const color = weaponDef.color ?? 0x2a2a2a;
-  const body  = M('body',   color,    { roughness: 0.55, metalness: 0.35 });
-  const metal = M('metal',  0x808890, { metalness: 0.92, roughness: 0.18 });
-  const dark  = M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
+  // Sci-fi glow hue for this weapon's energy parts (default cyan). Main guns
+  // opt into a stronger "energised tech" finish via weaponDef.sciFi: glossier
+  // metallic body faintly lit by the energy hue and brighter conduits.
+  const eCol = weaponDef.energyColor ?? 0x2ee6ff;
+  const sci  = weaponDef.sciFi === true;
+
+  const body  = sci
+    ? M('body',  color, { roughness: 0.30, metalness: 0.66, emissive: eCol, emissiveIntensity: 0.12 })
+    : M('body',  color, { roughness: 0.55, metalness: 0.35 });
+  const metal = sci
+    ? M('metal', 0x9aa6b6, { metalness: 0.95, roughness: 0.14 })
+    : M('metal', 0x808890, { metalness: 0.92, roughness: 0.18 });
+  const dark  = sci
+    ? M('accent', 0x090c12, { roughness: 0.34, metalness: 0.72, emissive: eCol, emissiveIntensity: 0.08 })
+    : M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
   const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
   const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
                                         clearcoat: 0.8, clearcoatRoughness: 0.08 });
@@ -34,9 +46,8 @@ function _buildFromGLB(weaponDef) {
                                          clearcoat: 0.9, clearcoatRoughness: 0.05 });
   // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
   // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
-  const eCol = weaponDef.energyColor ?? 0x2ee6ff;
-  const energy = M('energy', eCol, { roughness: 0.25, metalness: 0.1,
-                                     emissive: eCol, emissiveIntensity: 2.4 });
+  const energy = M('energy', eCol, { roughness: 0.22, metalness: 0.1,
+                                     emissive: eCol, emissiveIntensity: sci ? 3.3 : 2.4 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
@@ -1647,6 +1658,73 @@ function buildKnife(color) {
 // Energy / Halo-style weapon builder (shared by all new Spartan weapons)
 // ===========================================================================
 
+// Detailed parametric sci-fi energy rifle — the shared look for every main
+// gun. Roles: body / accent / metal / energy (the energy parts glow in the
+// weapon's signature `energyColor`). def.sciFiOpts tunes the silhouette:
+//   len      length multiplier (barrel/handguard/receiver reach)
+//   emitters number of muzzle emitters (1 = rifle, 3 = scatter/shotgun)
+//   wide     lateral bulk multiplier
+function buildSciFiRifle(color, def = {}) {
+  const eCol = def.energyColor ?? 0x2ee6ff;
+  const o = { len: 1.0, emitters: 1, wide: 1.0, ...(def.sciFiOpts || {}) };
+  const L = o.len, WD = o.wide;
+  const g = new THREE.Group();
+
+  const body   = M('body',   color,    { roughness: 0.32, metalness: 0.62,
+                                         emissive: eCol, emissiveIntensity: 0.10 });
+  const dark   = M('accent', 0x0a0d13, { roughness: 0.34, metalness: 0.72 });
+  const metal  = M('metal',  0x9aa6b6, { metalness: 0.95, roughness: 0.14 });
+  const energy = M('energy', eCol,     { roughness: 0.20, metalness: 0.10,
+                                         emissive: eCol, emissiveIntensity: 3.2 });
+
+  // Receiver — angular upper shell over a lower housing
+  const lower = box(0.070 * WD, 0.075, 0.30 * L, body);  lower.position.set(0, 0.012, 0.06);  g.add(lower);
+  const upper = box(0.078 * WD, 0.072, 0.34 * L, dark);  upper.position.set(0, 0.088, 0.02);  g.add(upper);
+  const spine = box(0.030, 0.020, 0.40 * L, metal);      spine.position.set(0, 0.128, -0.02); g.add(spine);
+
+  // Barrel shroud / handguard with glowing side vents
+  const shroud = box(0.066 * WD, 0.080, 0.30 * L, dark); shroud.position.set(0, 0.082, -0.30 * L); g.add(shroud);
+  for (const sx of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const vent = box(0.006, 0.032, 0.05, energy);
+      vent.position.set(sx * 0.036 * WD, 0.086, -0.20 * L - i * 0.072 * L);
+      g.add(vent);
+    }
+  }
+  const topVent = box(0.022, 0.008, 0.22 * L, energy); topVent.position.set(0, 0.124, -0.30 * L); g.add(topVent);
+
+  // Barrel + muzzle emitter(s)
+  const nE = Math.max(1, o.emitters | 0);
+  for (let i = 0; i < nE; i++) {
+    const yo = 0.082 + (i - (nE - 1) / 2) * 0.052;
+    const brl = cyl(0.016, 0.016, 0.20 * L, metal, 12); brl.position.set(0, yo, -0.50 * L); g.add(brl);
+    const ring = cyl(0.028, 0.030, 0.03, dark, 12);     ring.position.set(0, yo, -0.605 * L); g.add(ring);
+    const emit = cyl(0.018, 0.024, 0.02, energy, 12);   emit.position.set(0, yo, -0.622 * L); g.add(emit);
+  }
+
+  // Energy-cell magazine (angled) with a glowing core
+  const mag = box(0.050 * WD, 0.205, 0.078, dark); mag.position.set(0, -0.128, 0.05); mag.rotation.x = -0.10; g.add(mag);
+  const magCore = box(0.020, 0.150, 0.030, energy); magCore.position.set(0, -0.118, 0.090); magCore.rotation.x = -0.10; g.add(magCore);
+
+  // Pistol grip + trigger guard
+  const grip = box(0.050, 0.130, 0.060, body); grip.position.set(0, -0.070, 0.145); grip.rotation.x = 0.30; g.add(grip);
+  const tg   = box(0.038, 0.034, 0.090, dark); tg.position.set(0, -0.028, 0.105); g.add(tg);
+
+  // Holo optic
+  const optBase  = box(0.050, 0.030, 0.070, dark);  optBase.position.set(0, 0.150, 0.055); g.add(optBase);
+  const optGlass = box(0.046, 0.046, 0.008, metal); optGlass.position.set(0, 0.186, 0.028); g.add(optGlass);
+  const optDot   = box(0.009, 0.009, 0.006, energy); optDot.position.set(0, 0.186, 0.024); g.add(optDot);
+
+  // Stock with twin energy conduits
+  const stock = box(0.050, 0.090, 0.160, body); stock.position.set(0, 0.030, 0.260); g.add(stock);
+  for (const sx of [-1, 1]) {
+    const cond = box(0.010, 0.052, 0.100, energy); cond.position.set(sx * 0.030, 0.030, 0.260); g.add(cond);
+  }
+
+  const muzzle = addMuzzle(g, 0, 0.082, -0.66 * L);
+  return { group: g, muzzle };
+}
+
 function buildEnergyWeapon(color) {
   const g    = new THREE.Group();
   const body = M('body', color,    { roughness: 0.35, metalness: 0.75 });
@@ -1696,7 +1774,7 @@ const BUILDERS = {
   sidearm:      buildSidearm,
   uzi:          buildUzi,
   levershotgun: buildLeverShotgun,
-  m4:           buildM4,
+  m4:           (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.0,  emitters: 1 } }),
   m16:          buildM16,
   rifle:        buildRifle,
   lmg:          buildLMG,
@@ -1705,14 +1783,14 @@ const BUILDERS = {
   sword:        buildSword,
   knife:        buildKnife,
   // Halo/Destiny expanded arsenal
-  magnum:       buildEnergyWeapon,
-  battlerifle:  buildEnergyWeapon,
+  magnum:       (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 0.72, emitters: 1, wide: 1.15 } }),
+  battlerifle:  (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.08, emitters: 1 } }),
   needler:      buildEnergyWeapon,
-  plasmarifle:  buildEnergyWeapon,
+  plasmarifle:  (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.22, emitters: 1 } }),
   dmr:          buildEnergyWeapon,
   fuelrod:      buildEnergyWeapon,
   concussion:   buildEnergyWeapon,
-  energyshotgun: buildEnergyWeapon,
+  energyshotgun: (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 0.85, emitters: 3, wide: 1.3 } }),
   ghammer:      buildGravityHammer,
 };
 
@@ -1722,12 +1800,15 @@ export function buildWeaponModel(weaponDef, opts = {}) {
   // offsets that place them metres from the group origin, which is harmless
   // for the FPS viewmodel (built before the GLB loads, so it's procedural)
   // but puts a hand-held weapon far outside the character.
-  const glb = !opts.procedural && _buildFromGLB(weaponDef);
+  // weaponDef.proceduralModel forces the procedural builder even when the GLB
+  // is loaded — used by the main guns, whose GLB entries are low-detail
+  // placeholders and whose detailed sci-fi look lives in buildSciFiRifle.
+  const glb = !opts.procedural && !weaponDef.proceduralModel && _buildFromGLB(weaponDef);
   if (glb) return glb;
 
   // Fall back to procedural
   const builder = BUILDERS[weaponDef.id] ?? buildEnergyWeapon;
-  const { group, muzzle } = builder(weaponDef.color);
+  const { group, muzzle } = builder(weaponDef.color, weaponDef);
   group.traverse((obj) => {
     if (obj.isMesh) obj.castShadow = true;
   });
