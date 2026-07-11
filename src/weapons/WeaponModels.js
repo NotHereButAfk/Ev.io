@@ -38,20 +38,20 @@ function _buildFromGLB(weaponDef) {
   cloned.position.set(0, 0, 0);
 
   const color = weaponDef.color ?? 0x2a2a2a;
-  // Sci-fi glow hue for this weapon's energy parts (default cyan). Main guns
-  // opt into a stronger "energised tech" finish via weaponDef.sciFi: glossier
-  // metallic body faintly lit by the energy hue and brighter conduits.
+  // Glow hue for the energy parts (default cyan). Main guns share one finish
+  // (weaponDef.sciFi): realistic graphite polymer + steel — no colour tint on
+  // the body, only the conduits/emitters glow, slightly brighter than usual.
   const eCol = weaponDef.energyColor ?? 0x2ee6ff;
   const sci  = weaponDef.sciFi === true;
 
   const body  = sci
-    ? M('body',  color, { roughness: 0.30, metalness: 0.66, emissive: eCol, emissiveIntensity: 0.12 })
+    ? M('body',  color, { roughness: 0.48, metalness: 0.42 })
     : M('body',  color, { roughness: 0.55, metalness: 0.35 });
   const metal = sci
-    ? M('metal', 0x9aa6b6, { metalness: 0.95, roughness: 0.14 })
+    ? M('metal', 0x8a929c, { metalness: 0.94, roughness: 0.20 })
     : M('metal', 0x808890, { metalness: 0.92, roughness: 0.18 });
   const dark  = sci
-    ? M('accent', 0x090c12, { roughness: 0.34, metalness: 0.72, emissive: eCol, emissiveIntensity: 0.08 })
+    ? M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 })
     : M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
   const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
   const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
@@ -61,7 +61,7 @@ function _buildFromGLB(weaponDef) {
   // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
   // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
   const energy = M('energy', eCol, { roughness: 0.22, metalness: 0.1,
-                                     emissive: eCol, emissiveIntensity: sci ? 3.3 : 2.4 });
+                                     emissive: eCol, emissiveIntensity: sci ? 2.6 : 2.4 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
@@ -1676,9 +1676,9 @@ function buildKnife(color) {
 // energy; the energy parts glow in the weapon's signature `energyColor`.
 function _sciFiMats(color, eCol) {
   return {
-    body:   M('body',   color,    { roughness: 0.32, metalness: 0.62, emissive: eCol, emissiveIntensity: 0.10 }),
-    dark:   M('accent', 0x0a0d13, { roughness: 0.34, metalness: 0.72 }),
-    metal:  M('metal',  0x9aa6b6, { metalness: 0.95, roughness: 0.14 }),
+    body:   M('body',   color,    { roughness: 0.48, metalness: 0.42 }),
+    dark:   M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 }),
+    metal:  M('metal',  0x8a929c, { metalness: 0.94, roughness: 0.20 }),
     energy: M('energy', eCol,     { roughness: 0.20, metalness: 0.10, emissive: eCol, emissiveIntensity: 3.2 }),
   };
 }

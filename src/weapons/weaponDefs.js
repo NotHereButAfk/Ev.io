@@ -74,7 +74,7 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 150,
     recoil: 0.02,
-    color: 0x12202b,
+    color: 0x394049,
     energyColor: 0x2ee6ff,
     sciFi: true
   },
@@ -217,8 +217,8 @@ export const WEAPONS = [
     reloadTime: 1.2,
     range: 120,
     recoil: 0.028,
-    color: 0x241a10,
-    energyColor: 0xffb03a,
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
     sciFi: true
   },
   {
@@ -238,8 +238,8 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 170,
     recoil: 0.022,
-    color: 0x122019,
-    energyColor: 0x39ff9d,
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
     sciFi: true
   },
   {
@@ -276,8 +276,8 @@ export const WEAPONS = [
     reloadTime: 1.6,
     range: 90,
     recoil: 0.014,
-    color: 0x1c1233,
-    energyColor: 0xb44bff,
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
     sciFi: true
   },
   {
@@ -357,8 +357,8 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 28,
     recoil: 0.055,
-    color: 0x101a2e,
-    energyColor: 0x3a86ff,
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
     sciFi: true
   },
   {
