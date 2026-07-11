@@ -60,8 +60,13 @@ function _buildFromGLB(weaponDef) {
                                          clearcoat: 0.9, clearcoatRoughness: 0.05 });
   // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
   // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
-  const energy = M('energy', eCol, { roughness: 0.22, metalness: 0.1,
-                                     emissive: eCol, emissiveIntensity: sci ? 2.6 : 2.4 });
+  // Near-black base kills the lit (diffuse/env) contribution and the emissive
+  // stays under the ACES clip point, so the glow reads as saturated colour
+  // instead of washing out to white.
+  const eBase = new THREE.Color(eCol).multiplyScalar(0.12).getHex();
+  const energy = M('energy', sci ? eBase : eCol,
+                   { roughness: 0.22, metalness: 0.1,
+                     emissive: eCol, emissiveIntensity: sci ? 1.6 : 2.4 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
