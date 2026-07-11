@@ -1658,70 +1658,139 @@ function buildKnife(color) {
 // Energy / Halo-style weapon builder (shared by all new Spartan weapons)
 // ===========================================================================
 
-// Detailed parametric sci-fi energy rifle — the shared look for every main
-// gun. Roles: body / accent / metal / energy (the energy parts glow in the
-// weapon's signature `energyColor`). def.sciFiOpts tunes the silhouette:
-//   len      length multiplier (barrel/handguard/receiver reach)
-//   emitters number of muzzle emitters (1 = rifle, 3 = scatter/shotgun)
-//   wide     lateral bulk multiplier
-function buildSciFiRifle(color, def = {}) {
+// Shared sci-fi material set for the main guns. Roles body / accent / metal /
+// energy; the energy parts glow in the weapon's signature `energyColor`.
+function _sciFiMats(color, eCol) {
+  return {
+    body:   M('body',   color,    { roughness: 0.32, metalness: 0.62, emissive: eCol, emissiveIntensity: 0.10 }),
+    dark:   M('accent', 0x0a0d13, { roughness: 0.34, metalness: 0.72 }),
+    metal:  M('metal',  0x9aa6b6, { metalness: 0.95, roughness: 0.14 }),
+    energy: M('energy', eCol,     { roughness: 0.20, metalness: 0.10, emissive: eCol, emissiveIntensity: 3.2 }),
+  };
+}
+
+// m4 — sci-fi assault carbine: railed receiver, vented handguard, red-dot
+// optic, curved energy magazine, collapsible stock.
+function buildSciFiAR(color, def = {}) {
   const eCol = def.energyColor ?? 0x2ee6ff;
-  const o = { len: 1.0, emitters: 1, wide: 1.0, ...(def.sciFiOpts || {}) };
-  const L = o.len, WD = o.wide;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-
-  const body   = M('body',   color,    { roughness: 0.32, metalness: 0.62,
-                                         emissive: eCol, emissiveIntensity: 0.10 });
-  const dark   = M('accent', 0x0a0d13, { roughness: 0.34, metalness: 0.72 });
-  const metal  = M('metal',  0x9aa6b6, { metalness: 0.95, roughness: 0.14 });
-  const energy = M('energy', eCol,     { roughness: 0.20, metalness: 0.10,
-                                         emissive: eCol, emissiveIntensity: 3.2 });
-
-  // Receiver — angular upper shell over a lower housing
-  const lower = box(0.070 * WD, 0.075, 0.30 * L, body);  lower.position.set(0, 0.012, 0.06);  g.add(lower);
-  const upper = box(0.078 * WD, 0.072, 0.34 * L, dark);  upper.position.set(0, 0.088, 0.02);  g.add(upper);
-  const spine = box(0.030, 0.020, 0.40 * L, metal);      spine.position.set(0, 0.128, -0.02); g.add(spine);
-
-  // Barrel shroud / handguard with glowing side vents
-  const shroud = box(0.066 * WD, 0.080, 0.30 * L, dark); shroud.position.set(0, 0.082, -0.30 * L); g.add(shroud);
-  for (const sx of [-1, 1]) {
-    for (let i = 0; i < 3; i++) {
-      const vent = box(0.006, 0.032, 0.05, energy);
-      vent.position.set(sx * 0.036 * WD, 0.086, -0.20 * L - i * 0.072 * L);
-      g.add(vent);
-    }
-  }
-  const topVent = box(0.022, 0.008, 0.22 * L, energy); topVent.position.set(0, 0.124, -0.30 * L); g.add(topVent);
-
-  // Barrel + muzzle emitter(s)
-  const nE = Math.max(1, o.emitters | 0);
-  for (let i = 0; i < nE; i++) {
-    const yo = 0.082 + (i - (nE - 1) / 2) * 0.052;
-    const brl = cyl(0.016, 0.016, 0.20 * L, metal, 12); brl.position.set(0, yo, -0.50 * L); g.add(brl);
-    const ring = cyl(0.028, 0.030, 0.03, dark, 12);     ring.position.set(0, yo, -0.605 * L); g.add(ring);
-    const emit = cyl(0.018, 0.024, 0.02, energy, 12);   emit.position.set(0, yo, -0.622 * L); g.add(emit);
-  }
-
-  // Energy-cell magazine (angled) with a glowing core
-  const mag = box(0.050 * WD, 0.205, 0.078, dark); mag.position.set(0, -0.128, 0.05); mag.rotation.x = -0.10; g.add(mag);
+  const lower = box(0.070, 0.075, 0.30, body); lower.position.set(0, 0.012, 0.06); g.add(lower);
+  const upper = box(0.078, 0.072, 0.34, dark); upper.position.set(0, 0.088, 0.02); g.add(upper);
+  const rail  = box(0.030, 0.020, 0.44, metal); rail.position.set(0, 0.128, -0.04); g.add(rail);
+  picRail(g, dark, 0, 0.140, 0.14, 0.42);
+  const hg = box(0.062, 0.078, 0.34, dark); hg.position.set(0, 0.082, -0.32); g.add(hg);
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const v = box(0.006, 0.032, 0.05, energy); v.position.set(sx * 0.034, 0.086, -0.22 - i * 0.08); g.add(v); }
+  const brl = cyl(0.016, 0.016, 0.22, metal, 12); brl.position.set(0, 0.082, -0.52); g.add(brl);
+  const ring = cyl(0.028, 0.030, 0.03, dark, 12); ring.position.set(0, 0.082, -0.63); g.add(ring);
+  const emit = cyl(0.018, 0.024, 0.02, energy, 12); emit.position.set(0, 0.082, -0.648); g.add(emit);
+  const mag = box(0.050, 0.205, 0.078, dark); mag.position.set(0, -0.128, 0.05); mag.rotation.x = -0.10; g.add(mag);
   const magCore = box(0.020, 0.150, 0.030, energy); magCore.position.set(0, -0.118, 0.090); magCore.rotation.x = -0.10; g.add(magCore);
-
-  // Pistol grip + trigger guard
   const grip = box(0.050, 0.130, 0.060, body); grip.position.set(0, -0.070, 0.145); grip.rotation.x = 0.30; g.add(grip);
-  const tg   = box(0.038, 0.034, 0.090, dark); tg.position.set(0, -0.028, 0.105); g.add(tg);
+  const tg = box(0.038, 0.034, 0.090, dark); tg.position.set(0, -0.028, 0.105); g.add(tg);
+  const ob = box(0.050, 0.030, 0.070, dark); ob.position.set(0, 0.150, 0.055); g.add(ob);
+  const og = box(0.046, 0.046, 0.008, metal); og.position.set(0, 0.186, 0.028); g.add(og);
+  const od = box(0.009, 0.009, 0.006, energy); od.position.set(0, 0.186, 0.024); g.add(od);
+  const st = box(0.050, 0.090, 0.150, body); st.position.set(0, 0.030, 0.255); g.add(st);
+  for (const sx of [-1, 1]) { const c = box(0.010, 0.052, 0.10, energy); c.position.set(sx * 0.030, 0.030, 0.255); g.add(c); }
+  const muzzle = addMuzzle(g, 0, 0.082, -0.68);
+  return { group: g, muzzle };
+}
 
-  // Holo optic
-  const optBase  = box(0.050, 0.030, 0.070, dark);  optBase.position.set(0, 0.150, 0.055); g.add(optBase);
-  const optGlass = box(0.046, 0.046, 0.008, metal); optGlass.position.set(0, 0.186, 0.028); g.add(optGlass);
-  const optDot   = box(0.009, 0.009, 0.006, energy); optDot.position.set(0, 0.186, 0.024); g.add(optDot);
+// magnum — compact energy hand cannon: short slide, steep grip, and a glowing
+// revolver-style power cylinder. No stock; pistol proportions.
+function buildSciFiHandCannon(color, def = {}) {
+  const eCol = def.energyColor ?? 0xffb03a;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+  const slide = box(0.052, 0.075, 0.28, dark); slide.position.set(0, 0.075, -0.06); g.add(slide);
+  const frame = box(0.050, 0.055, 0.20, body); frame.position.set(0, 0.028, -0.02); g.add(frame);
+  const rib = box(0.016, 0.012, 0.24, metal); rib.position.set(0, 0.116, -0.06); g.add(rib);
+  const rs = box(0.030, 0.020, 0.020, dark); rs.position.set(0, 0.122, 0.05); g.add(rs);
+  const fs = box(0.012, 0.020, 0.012, metal); fs.position.set(0, 0.122, -0.17); g.add(fs);
+  const cylC = cyl(0.032, 0.032, 0.10, dark, 12); cylC.position.set(0, 0.045, 0.02); g.add(cylC);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const ch = cyl(0.006, 0.006, 0.10, energy, 6); ch.position.set(Math.cos(a) * 0.022, 0.045 + Math.sin(a) * 0.022, 0.02); g.add(ch); }
+  const brl = cyl(0.018, 0.018, 0.14, metal, 12); brl.position.set(0, 0.075, -0.20); g.add(brl);
+  const ring = cyl(0.030, 0.030, 0.02, dark, 12); ring.position.set(0, 0.075, -0.265); g.add(ring);
+  const emit = cyl(0.020, 0.026, 0.02, energy, 12); emit.position.set(0, 0.075, -0.28); g.add(emit);
+  const grip = box(0.050, 0.150, 0.062, body); grip.position.set(0, -0.055, 0.09); grip.rotation.x = 0.42; g.add(grip);
+  const cell = box(0.020, 0.090, 0.026, energy); cell.position.set(0, -0.050, 0.116); cell.rotation.x = 0.42; g.add(cell);
+  const tg = box(0.036, 0.032, 0.060, dark); tg.position.set(0, -0.006, 0.03); g.add(tg);
+  const muzzle = addMuzzle(g, 0, 0.075, -0.30);
+  return { group: g, muzzle };
+}
 
-  // Stock with twin energy conduits
-  const stock = box(0.050, 0.090, 0.160, body); stock.position.set(0, 0.030, 0.260); g.add(stock);
-  for (const sx of [-1, 1]) {
-    const cond = box(0.010, 0.052, 0.100, energy); cond.position.set(sx * 0.030, 0.030, 0.260); g.add(cond);
+// battlerifle — long scoped marksman rifle: boxy receiver, big scope on rings,
+// ported barrel, straight box magazine.
+function buildSciFiBattleRifle(color, def = {}) {
+  const eCol = def.energyColor ?? 0x39ff9d;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+  const lower = box(0.066, 0.080, 0.36, body); lower.position.set(0, 0.012, 0.04); g.add(lower);
+  const upper = box(0.072, 0.060, 0.40, dark); upper.position.set(0, 0.086, 0.00); g.add(upper);
+  const hg = box(0.060, 0.070, 0.30, dark); hg.position.set(0, 0.078, -0.36); g.add(hg);
+  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) { const v = box(0.006, 0.028, 0.06, energy); v.position.set(sx * 0.032, 0.082, -0.30 - i * 0.10); g.add(v); }
+  const brl = cyl(0.015, 0.015, 0.28, metal, 12); brl.position.set(0, 0.080, -0.56); g.add(brl);
+  const brake = box(0.036, 0.036, 0.06, dark); brake.position.set(0, 0.080, -0.70); g.add(brake);
+  const emit = cyl(0.016, 0.022, 0.02, energy, 12); emit.position.set(0, 0.080, -0.73); g.add(emit);
+  for (const z of [-0.02, 0.14]) { const rr = box(0.020, 0.030, 0.020, dark); rr.position.set(0, 0.118, z); g.add(rr); }
+  const scope = cyl(0.026, 0.026, 0.30, dark, 14); scope.position.set(0, 0.150, 0.06); g.add(scope);
+  const lensF = cyl(0.024, 0.024, 0.010, metal, 14); lensF.position.set(0, 0.150, -0.09); g.add(lensF);
+  const lensR = cyl(0.022, 0.022, 0.010, energy, 14); lensR.position.set(0, 0.150, 0.21); g.add(lensR);
+  const mag = box(0.046, 0.190, 0.070, dark); mag.position.set(0, -0.120, 0.02); g.add(mag);
+  const magCore = box(0.018, 0.140, 0.028, energy); magCore.position.set(0, -0.110, 0.058); g.add(magCore);
+  const grip = box(0.048, 0.130, 0.058, body); grip.position.set(0, -0.066, 0.135); grip.rotation.x = 0.28; g.add(grip);
+  const tg = box(0.036, 0.032, 0.085, dark); tg.position.set(0, -0.026, 0.10); g.add(tg);
+  const st = box(0.052, 0.100, 0.170, body); st.position.set(0, 0.020, 0.27); g.add(st);
+  const stGlow = box(0.014, 0.060, 0.11, energy); stGlow.position.set(0, 0.055, 0.27); g.add(stGlow);
+  const muzzle = addMuzzle(g, 0, 0.080, -0.74);
+  return { group: g, muzzle };
+}
+
+// energyshotgun — wide scattergun: 2x2 emitter cluster, pump foregrip, wide
+// shell drum. Short and bulky.
+function buildSciFiScattergun(color, def = {}) {
+  const eCol = def.energyColor ?? 0x3a86ff;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+  const rec = box(0.100, 0.095, 0.30, body); rec.position.set(0, 0.05, 0.02); g.add(rec);
+  const top = box(0.090, 0.030, 0.26, dark); top.position.set(0, 0.108, -0.02); g.add(top);
+  for (const [x, y] of [[-0.030, 0.030], [0.030, 0.030], [-0.030, 0.075], [0.030, 0.075]]) {
+    const b = cyl(0.020, 0.020, 0.20, metal, 10); b.position.set(x, y, -0.34); g.add(b);
+    const r = cyl(0.026, 0.028, 0.02, dark, 10); r.position.set(x, y, -0.435); g.add(r);
+    const e = cyl(0.018, 0.024, 0.02, energy, 10); e.position.set(x, y, -0.45); g.add(e);
   }
+  const pump = box(0.085, 0.045, 0.10, dark); pump.position.set(0, -0.02, -0.26); g.add(pump);
+  const pumpGlow = box(0.060, 0.008, 0.08, energy); pumpGlow.position.set(0, -0.044, -0.26); g.add(pumpGlow);
+  const drum = box(0.070, 0.140, 0.10, dark); drum.position.set(0, -0.09, 0.06); g.add(drum);
+  const drumGlow = box(0.030, 0.100, 0.03, energy); drumGlow.position.set(0, -0.08, 0.115); g.add(drumGlow);
+  const tv = box(0.030, 0.008, 0.16, energy); tv.position.set(0, 0.124, -0.02); g.add(tv);
+  const grip = box(0.052, 0.120, 0.062, body); grip.position.set(0, -0.055, 0.16); grip.rotation.x = 0.30; g.add(grip);
+  const tg = box(0.040, 0.030, 0.08, dark); tg.position.set(0, -0.02, 0.12); g.add(tg);
+  const st = box(0.055, 0.100, 0.14, body); st.position.set(0, 0.02, 0.27); g.add(st);
+  const muzzle = addMuzzle(g, 0, 0.052, -0.48);
+  return { group: g, muzzle };
+}
 
-  const muzzle = addMuzzle(g, 0, 0.082, -0.66 * L);
+// plasmarifle — sleek alien plasma rifle: shells over an exposed glowing core,
+// forked emitter prongs with an arc, rear energy chamber (no boxy magazine).
+function buildSciFiPlasma(color, def = {}) {
+  const eCol = def.energyColor ?? 0xb44bff;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+  const topShell = box(0.058, 0.045, 0.62, dark); topShell.position.set(0, 0.11, -0.10); g.add(topShell);
+  const botShell = box(0.058, 0.045, 0.50, body); botShell.position.set(0, 0.03, -0.06); g.add(botShell);
+  const core = cyl(0.028, 0.028, 0.34, energy, 14); core.position.set(0, 0.072, -0.10); g.add(core);
+  for (let i = 0; i < 4; i++) { const rib = cyl(0.033, 0.033, 0.02, dark, 14); rib.position.set(0, 0.072, -0.24 + i * 0.09); g.add(rib); }
+  for (const sx of [-1, 1]) { const pr = box(0.014, 0.050, 0.14, metal); pr.position.set(sx * 0.028, 0.09, -0.44); g.add(pr); }
+  const arc = box(0.050, 0.020, 0.03, energy); arc.position.set(0, 0.09, -0.50); g.add(arc);
+  const tip = cyl(0.020, 0.026, 0.02, energy, 12); tip.position.set(0, 0.072, -0.46); g.add(tip);
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const v = box(0.005, 0.026, 0.05, energy); v.position.set(sx * 0.031, 0.09, -0.20 - i * 0.09); g.add(v); }
+  const grip = box(0.048, 0.130, 0.06, body); grip.position.set(0, -0.055, 0.10); grip.rotation.x = 0.32; g.add(grip);
+  const tg = box(0.036, 0.030, 0.07, dark); tg.position.set(0, -0.016, 0.06); g.add(tg);
+  const chamber = cyl(0.030, 0.030, 0.10, dark, 12); chamber.position.set(0, 0.05, 0.20); g.add(chamber);
+  const chGlow = cyl(0.022, 0.022, 0.11, energy, 12); chGlow.position.set(0, 0.05, 0.20); g.add(chGlow);
+  const muzzle = addMuzzle(g, 0, 0.072, -0.52);
   return { group: g, muzzle };
 }
 
@@ -1774,7 +1843,7 @@ const BUILDERS = {
   sidearm:      buildSidearm,
   uzi:          buildUzi,
   levershotgun: buildLeverShotgun,
-  m4:           (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.0,  emitters: 1 } }),
+  m4:           buildSciFiAR,
   m16:          buildM16,
   rifle:        buildRifle,
   lmg:          buildLMG,
@@ -1783,14 +1852,14 @@ const BUILDERS = {
   sword:        buildSword,
   knife:        buildKnife,
   // Halo/Destiny expanded arsenal
-  magnum:       (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 0.72, emitters: 1, wide: 1.15 } }),
-  battlerifle:  (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.08, emitters: 1 } }),
+  magnum:       buildSciFiHandCannon,
+  battlerifle:  buildSciFiBattleRifle,
   needler:      buildEnergyWeapon,
-  plasmarifle:  (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 1.22, emitters: 1 } }),
+  plasmarifle:  buildSciFiPlasma,
   dmr:          buildEnergyWeapon,
   fuelrod:      buildEnergyWeapon,
   concussion:   buildEnergyWeapon,
-  energyshotgun: (c, d) => buildSciFiRifle(c, { ...d, sciFiOpts: { len: 0.85, emitters: 3, wide: 1.3 } }),
+  energyshotgun: buildSciFiScattergun,
   ghammer:      buildGravityHammer,
 };
 
