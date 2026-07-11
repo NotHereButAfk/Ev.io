@@ -15,162 +15,19 @@ import { decalTexture } from './WeaponTextures.js';
 // Curated to 15 common / 12 epic / 5 legendary / 3 mythic — one clear pick
 // per visual theme rather than several near-duplicate recolors.
 
-export const WEAPON_SKINS = [
-  // ── COMMON (15) ──────────────────────────────────────────────────────────────
-  { id: 'midnight', name: 'Midnight Black', rarity: 'common', body: 0x23262b, accent: 0x121317, metal: 0x6f757c, metalness: 0.55, roughness: 0.45 },
-  { id: 'urban',    name: 'Urban Gray',     rarity: 'common', body: 0x6b727a, accent: 0x3a3e44, metal: 0x9aa1a9, metalness: 0.5,  roughness: 0.45 },
-  { id: 'desert',   name: 'Desert Tan',     rarity: 'common', body: 0xb29766, accent: 0x6c5a3a, metal: 0x9c8e72, metalness: 0.4,  roughness: 0.6  },
-  { id: 'olive',    name: 'Olive Drab',     rarity: 'common', body: 0x59603a, accent: 0x33371f, metal: 0x767a5a, metalness: 0.45, roughness: 0.55 },
-  { id: 'woodland', name: 'Woodland Camo',  rarity: 'common', body: 0x47542f, accent: 0x2b2a1b, metal: 0x5c6347, metalness: 0.4, roughness: 0.6, decal: 'digicamo' },
-  { id: 'ranger',   name: 'Forest Ranger',  rarity: 'common', body: 0x2d4228, accent: 0x1a2616, metal: 0x4a5e40, metalness: 0.4, roughness: 0.58 },
-  { id: 'stealth',  name: 'Stealth',        rarity: 'common', body: 0x111214, accent: 0x191b1e, metal: 0x2a2d33, metalness: 0.68, roughness: 0.28 },
-  { id: 'carbon',   name: 'Carbon Fiber',   rarity: 'common', body: 0x18191d, accent: 0x2c2f35, metal: 0x6a7077, metalness: 0.8, roughness: 0.2, decal: 'carbon' },
-  { id: 'slate',    name: 'Slate Blue',    rarity: 'common', body: 0x4a5663, accent: 0x262d35, metal: 0x7e8a98, metalness: 0.5,  roughness: 0.5  },
-  { id: 'charcoal', name: 'Charcoal',      rarity: 'common', body: 0x2c2e31, accent: 0x161719, metal: 0x595d62, metalness: 0.6,  roughness: 0.4  },
-  { id: 'rust',     name: 'Rustic Iron',   rarity: 'common', body: 0x7a4a32, accent: 0x3a2218, metal: 0x9a6a4a, metalness: 0.55, roughness: 0.52 },
-  { id: 'coral',    name: 'Coral Reef',    rarity: 'common', body: 0xe07a6a, accent: 0x6e3028, metal: 0xf0a090, metalness: 0.5, roughness: 0.4 },
-  { id: 'mint',     name: 'Mint Fresh',    rarity: 'common', body: 0x7ad4b0, accent: 0x2c5a48, metal: 0xa8ead4, metalness: 0.55, roughness: 0.35 },
-  { id: 'copper',   name: 'Copper Patina', rarity: 'common', body: 0x4a8a78, accent: 0x6a4a2a, metal: 0xc97a4a, metalness: 0.85, roughness: 0.3 },
-  { id: 'amethyst', name: 'Amethyst',      rarity: 'common', body: 0x6a4a8c, accent: 0x331f4a, metal: 0x9a6acc, metalness: 0.7, roughness: 0.3 },
-
-  // ── EPIC (12) ────────────────────────────────────────────────────────────────
-  { id: 'crimson',  name: 'Crimson',        rarity: 'epic', body: 0x7c1f22, accent: 0x1b1416, metal: 0x9a4a4a, metalness: 0.6, roughness: 0.35 },
-  { id: 'tiger',    name: 'Tiger Strike',   rarity: 'epic', body: 0xff9a2a, accent: 0x1a1208, metal: 0xc87a1a, metalness: 0.5, roughness: 0.45, decal: 'tiger' },
-  {
-    id: 'arctic', name: 'Arctic Frost', rarity: 'epic',
-    body: 0xd6dde5, accent: 0x5a7a8a, metal: 0xc2cad3, metalness: 0.6, roughness: 0.3,
-    emissive: 0x2a6a9a, emissiveIntensity: 0.6, decal: 'frost', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 1.8, animMin: 0.4, animMax: 1.2
-  },
-  { id: 'gold',     name: 'Gold Plated',    rarity: 'epic', body: 0xc7a23a, accent: 0x4a3a12, metal: 0xe0c25a, metalness: 0.95, roughness: 0.16, decal: 'gold' },
-  { id: 'skull',    name: 'Bonecrusher',    rarity: 'epic', body: 0x14151a, accent: 0x0a0a0e, metal: 0x9a9a90, metalness: 0.6, roughness: 0.45, decal: 'skull' },
-  {
-    id: 'dragonscale', name: 'Dragonscale 🐉', rarity: 'epic',
-    body: 0x1a7a44, accent: 0x06160d, metal: 0x2fae6a, metalness: 0.7, roughness: 0.28,
-    emissive: 0x0a3a1c, emissiveIntensity: 0.2, decal: 'dragon'
-  },
-  {
-    id: 'plasma', name: 'Plasma ⚡', rarity: 'epic',
-    body: 0x0a0f1a, accent: 0x001066, metal: 0x0055cc, metalness: 0.8, roughness: 0.15,
-    emissive: 0x00aaff, emissiveIntensity: 1.2,
-    animated: true, animType: 'pulse', animSpeed: 3.2, animMin: 0.6, animMax: 2.2
-  },
-  {
-    id: 'toxic', name: 'Toxic Waste ☣', rarity: 'epic',
-    body: 0x0a1206, accent: 0x05100a, metal: 0x3a9c1a, metalness: 0.6, roughness: 0.35,
-    emissive: 0x66ff22, emissiveIntensity: 1.2, decal: 'toxic', decalEmissive: true,
-    animated: true, animType: 'pulse', animSpeed: 3.5, animMin: 0.6, animMax: 1.8
-  },
-  {
-    id: 'inferno', name: 'Inferno', rarity: 'epic',
-    body: 0x1a0800, accent: 0x5c1400, metal: 0xcc3300, metalness: 0.6, roughness: 0.3,
-    emissive: 0xff4400, emissiveIntensity: 1.3,
-    animated: true, animType: 'flicker', animSpeed: 6.0, animMin: 0.6, animMax: 2.3
-  },
-  {
-    id: 'urbanedge', name: 'Urban Edge', rarity: 'epic',
-    body: 0x8a9099, accent: 0x23262b, metal: 0xc8ccd2, metalness: 0.7, roughness: 0.3,
-    decal: 'camo_urban'
-  },
-  {
-    id: 'amber', name: 'Amber Glass', rarity: 'epic',
-    body: 0xd08a1a, accent: 0x5a3a08, metal: 0xf0b84a, metalness: 0.7, roughness: 0.22,
-    emissive: 0xff9a00, emissiveIntensity: 0.5,
-    animated: true, animType: 'pulse', animSpeed: 1.5, animMin: 0.3, animMax: 0.9
-  },
-  { id: 'stormsteel', name: 'Storm Steel', rarity: 'epic', body: 0x586878, accent: 0x2a333c, metal: 0xaebcca, metalness: 0.92, roughness: 0.14 },
-
-  // ── LEGENDARY (5) ──────────────────────────────────────────────────────────────
-  {
-    id: 'wildfire', name: 'Wildfire 🔥', rarity: 'legendary',
-    body: 0xff5a00, accent: 0x2a0a00, metal: 0xff7a1a, metalness: 0.5, roughness: 0.4,
-    emissive: 0xff3300, emissiveIntensity: 1.4, decal: 'fire', decalEmissive: true,
-    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 0.7, animMax: 2.4,
-    shootSound: 'fire'
-  },
-  {
-    // Full-coverage wrap: circuit traces flow across the receiver/barrel too
-    // (light metal tint so the glowing PCB pattern reads true on metal).
-    id: 'cybernet', name: 'Cybernet 🤖', rarity: 'legendary',
-    body: 0xf0fbff, accent: 0x04080c, metal: 0xd0f2ff, metalness: 0.85, roughness: 0.18,
-    emissive: 0x00e5ff, emissiveIntensity: 1.3, decal: 'cyber', decalEmissive: true,
-    decalOnMetal: true,
-    animated: true, animType: 'pulse', animSpeed: 4.0, animMin: 0.7, animMax: 2.0,
-    shootSound: 'laser'
-  },
-  {
-    // Full-coverage wrap: the nebula spans the whole gun as one starfield.
-    id: 'galaxy', name: 'Galaxy ✦', rarity: 'legendary',
-    body: 0xf4eeff, accent: 0x030208, metal: 0xe0d4ff, metalness: 0.8, roughness: 0.2,
-    emissive: 0x9c4aff, emissiveIntensity: 1.2, decal: 'galaxy', decalEmissive: true,
-    decalOnMetal: true,
-    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.6, animMax: 2.0
-  },
-  {
-    // Full-coverage wrap: gold-veined dark marble across the whole gun, warm
-    // gilded tint on the hardware.
-    id: 'crimsonmoon', name: 'Crimson Moon 🌑', rarity: 'legendary',
-    body: 0xfff4ec, accent: 0x120203, metal: 0xf5e2c0, metalness: 0.85, roughness: 0.2,
-    emissive: 0xff2a3a, emissiveIntensity: 1.0, decal: 'bloodmoon', decalEmissive: true,
-    decalOnMetal: true,
-    animated: true, animType: 'pulse', animSpeed: 1.4, animMin: 0.5, animMax: 1.6
-  },
-  {
-    id: 'royalgold', name: 'Royal Gold 👑', rarity: 'legendary',
-    body: 0x3a2c08, accent: 0x1a1404, metal: 0xffd24a, metalness: 0.97, roughness: 0.1,
-    emissive: 0xffc800, emissiveIntensity: 0.7, decal: 'gold', decalEmissive: true
-  },
-
-  // ── MYTHIC (3) ───────────────────────────────────────────────────────────────
-  {
-    // Full iridescent-foil wrap: the holographic rainbow decal covers body AND
-    // metal (white base so the foil reads true), while the 'cycle' animation
-    // sweeps a hue-shifting glow through it — the whole gun shimmers through
-    // the spectrum. Crystalline refraction zap on every shot.
-    id: 'prism', name: 'Prism 🌈', rarity: 'mythic',
-    body: 0xffffff, accent: 0x14141a, metal: 0xffffff, metalness: 0.9, roughness: 0.1,
-    emissive: 0xffffff, emissiveIntensity: 1.6, decal: 'holographic', decalEmissive: true,
-    decalOnMetal: true, animated: true, animType: 'cycle',
-    shootSound: 'prism'
-  },
-  {
-    // Neko Neon wrap: a full-coverage anime skin set in a dusk Japanese
-    // neon street — a cat-girl (purple twin-tails, white ears + bell, paw
-    // hoodie, red skirt, peace sign) against sunset sky, glowing ゲーム /
-    // アニメ / 喫茶店 signs and paper lanterns. White base so the art reads
-    // true; energy strips + emissive glow warm neon pink.
-    id: 'sakura', name: 'Neko Neon 😺', rarity: 'mythic',
-    body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.4, roughness: 0.36,
-    emissive: 0xff5ea0, emissiveIntensity: 0.4, decal: 'animegirl', decalEmissive: true,
-    // Total coverage: the wrap paints body + metal + trim, and the sci-fi
-    // energy strips glow warm neon pink to match the street lights.
-    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff5ea0,
-    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.7,
-    shootSound: 'meow'
-  },
-  {
-    // Molten full wrap: the lava decal (cracked basalt with glowing magma
-    // veins) covers body AND metal — the whole gun looks like cooling rock
-    // with fire running through the cracks, flickering like a live eruption.
-    // White base so the rock texture reads true; its own volcanic blast SFX
-    // (deeper and bigger than the legendary 'fire' sound) + ember bursts.
-    id: 'pyroclasm', name: 'Pyroclasm 🌋', rarity: 'mythic',
-    body: 0xffffff, accent: 0x0d0503, metal: 0xffffff, metalness: 0.45, roughness: 0.5,
-    emissive: 0xff3a00, emissiveIntensity: 2.2, decal: 'lava', decalEmissive: true,
-    decalOnMetal: true,
-    animated: true, animType: 'flicker', animSpeed: 9.0, animMin: 0.9, animMax: 2.6,
-    shootSound: 'pyro', fireEmbers: true
-  }
-];
+export const WEAPON_SKINS = [];
 
 const _hsl = new THREE.Color();
 
 export function getWeaponSkin(id) {
-  return WEAPON_SKINS.find((s) => s.id === id) || WEAPON_SKINS[0];
+  // Catalog is empty — no gun skins exist, so there is no default fallback.
+  return WEAPON_SKINS.find((s) => s.id === id) || null;
 }
 
 /** Recolor a built gun model group using the skin's material role tags. */
 export function applyWeaponSkin(group, skin) {
+  // No skin (empty catalog / cleared finish) → leave the model's build-time look.
+  if (!skin) return;
   const decal = skin.decal ? decalTexture(skin.decal) : null;
   const seen = new Set();
   group.traverse((obj) => {

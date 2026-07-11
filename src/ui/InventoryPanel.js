@@ -7,7 +7,7 @@
  * as main and applies its skin. The EQUIPPED row shows the current character
  * skin + main weapon card.
  */
-import { SKINS, getSkin } from '../player/skins.js';
+import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';

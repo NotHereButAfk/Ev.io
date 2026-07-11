@@ -1,4 +1,4 @@
-import { SKINS, getSkin } from '../player/skins.js';
+import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
@@ -74,7 +74,7 @@ export class MenuUI {
     this.menuBtn       = document.getElementById('menu-btn');
     this.gameoverStats = document.getElementById('gameover-stats');
 
-    this.selectedSkinId   = SKINS[0].id;
+    this.selectedSkinId   = getSkin().id;   // catalog is empty; falls back to the built-in default
     this.selectedArmorId  = loadArmorType();
     this.selectedModeId   = GAME_MODES[0].id;
     this._currentUser     = null;
