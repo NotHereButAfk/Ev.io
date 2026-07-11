@@ -6,11 +6,25 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ── Blender GLB weapon loader ─────────────────────────────────────────────────
 let _weaponTemplate = null, _weaponLoading = false;
 
+// Callbacks waiting on the GLB template (e.g. WeaponSystem swaps its
+// procedural viewmodels for the detailed Blender guns once it arrives).
+let _readyCallbacks = [];
+
+export function onWeaponModelsReady(cb) {
+  if (_weaponTemplate) { cb(); return; }
+  _readyCallbacks.push(cb);
+}
+
 export function preloadWeaponModels() {
   if (_weaponTemplate || _weaponLoading) return;
   _weaponLoading = true;
   new GLTFLoader().load('/weapons.glb',
-    (gltf) => { _weaponTemplate = gltf.scene; _weaponLoading = false; },
+    (gltf) => {
+      _weaponTemplate = gltf.scene;
+      _weaponLoading = false;
+      const cbs = _readyCallbacks; _readyCallbacks = [];
+      for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[WeaponGLB] ready cb failed:', e); } }
+    },
     undefined,
     (err) => { console.warn('[WeaponGLB] load failed:', err.message); _weaponLoading = false; }
   );

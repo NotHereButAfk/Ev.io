@@ -76,8 +76,7 @@ export const WEAPONS = [
     recoil: 0.02,
     color: 0x12202b,
     energyColor: 0x2ee6ff,
-    sciFi: true,
-    proceduralModel: true
+    sciFi: true
   },
   {
     id: 'm16',
@@ -220,8 +219,7 @@ export const WEAPONS = [
     recoil: 0.028,
     color: 0x241a10,
     energyColor: 0xffb03a,
-    sciFi: true,
-    proceduralModel: true
+    sciFi: true
   },
   {
     id: 'battlerifle',
@@ -242,8 +240,7 @@ export const WEAPONS = [
     recoil: 0.022,
     color: 0x122019,
     energyColor: 0x39ff9d,
-    sciFi: true,
-    proceduralModel: true
+    sciFi: true
   },
   {
     id: 'needler',
@@ -281,8 +278,7 @@ export const WEAPONS = [
     recoil: 0.014,
     color: 0x1c1233,
     energyColor: 0xb44bff,
-    sciFi: true,
-    proceduralModel: true
+    sciFi: true
   },
   {
     id: 'dmr',
@@ -363,8 +359,7 @@ export const WEAPONS = [
     recoil: 0.055,
     color: 0x101a2e,
     energyColor: 0x3a86ff,
-    sciFi: true,
-    proceduralModel: true
+    sciFi: true
   },
   {
     id: 'ghammer',
