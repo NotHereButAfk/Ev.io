@@ -134,17 +134,18 @@ export const WEAPON_SKINS = [
     shootSound: 'prism'
   },
   {
-    // Baddie "koakuma" wrap: a black + crimson + gold full-coverage anime
-    // skin — a confident little-devil girl (winged eyeliner, smirk, horns),
-    // roses, gold chains, 小悪魔 / BADDIE branding, neon-red glow. White base
-    // so the dark art reads true; energy strips + emissive rethemed crimson.
-    id: 'sakura', name: 'Koakuma Baddie 😈', rarity: 'mythic',
+    // Neko Neon wrap: a full-coverage anime skin set in a dusk Japanese
+    // neon street — a cat-girl (purple twin-tails, white ears + bell, paw
+    // hoodie, red skirt, peace sign) against sunset sky, glowing ゲーム /
+    // アニメ / 喫茶店 signs and paper lanterns. White base so the art reads
+    // true; energy strips + emissive glow warm neon pink.
+    id: 'sakura', name: 'Neko Neon 😺', rarity: 'mythic',
     body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.4, roughness: 0.36,
-    emissive: 0xff1030, emissiveIntensity: 0.4, decal: 'animegirl', decalEmissive: true,
-    // Total coverage: the black wrap paints body + metal + trim, and the
-    // sci-fi energy strips glow crimson to match the baddie art.
-    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff1030,
-    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.75,
+    emissive: 0xff5ea0, emissiveIntensity: 0.4, decal: 'animegirl', decalEmissive: true,
+    // Total coverage: the wrap paints body + metal + trim, and the sci-fi
+    // energy strips glow warm neon pink to match the street lights.
+    decalOnMetal: true, decalOnAccent: true, energyColor: 0xff5ea0,
+    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.7,
     shootSound: 'meow'
   },
   {
