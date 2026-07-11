@@ -200,30 +200,41 @@ export function applyWeaponSkin(group, skin) {
       m.roughness = Math.min(0.85, skin.roughness + 0.15);
       m.emissive.setHex(0x000000);
       m.emissiveIntensity = 0;
-      // Total-coverage wraps also paint the trim/furniture parts.
-      if (skin.decalOnAccent && decal) {
-        m.map = decal;
-        m.needsUpdate = true;
-      }
+      // Total-coverage wraps also paint the trim/furniture parts. Clear the map
+      // otherwise, so switching back from a full wrap to a normal skin doesn't
+      // leave the old artwork on the trim (materials are reused across skins).
+      m.map = (skin.decalOnAccent && decal) ? decal : null;
+      m.needsUpdate = true;
     } else if (role === 'energy') {
       // Sci-fi glow strips normally stay their build-time colour; a skin may
       // retheme them so they don't clash with its wrap (e.g. sakura -> pink).
-      if (skin.energyColor !== undefined) {
-        m.color.setHex(skin.energyColor);
-        m.emissive.setHex(skin.energyColor);
-        m.needsUpdate = true;
+      // Record the build-time colour once so a retheme is reversible when the
+      // next skin doesn't specify energyColor.
+      if (m.userData.baseEnergyColor === undefined) {
+        m.userData.baseEnergyColor = m.color.getHex();
+        m.userData.baseEnergyEmissive = m.emissive.getHex();
       }
+      const eColor = skin.energyColor !== undefined ? skin.energyColor : m.userData.baseEnergyColor;
+      const eEmis  = skin.energyColor !== undefined ? skin.energyColor : m.userData.baseEnergyEmissive;
+      m.color.setHex(eColor);
+      m.emissive.setHex(eEmis);
+      m.needsUpdate = true;
     } else if (role === 'metal') {
       m.color.setHex(skin.metal);
       m.emissive.setHex(skin.emissive ?? 0x000000);
       m.emissiveIntensity = skin.emissiveIntensity ?? 0;
       // Full-coverage wraps (decalOnMetal) paint the receiver/barrel too, so
       // the artwork flows across the whole gun instead of only body panels.
+      // Otherwise clear the maps so a normal skin fully reverses a prior wrap.
       if (skin.decalOnMetal && decal) {
         m.map = decal;
         if (skin.decalEmissive) { m.emissiveMap = decal; m.emissive.setHex(0xffffff); }
-        m.needsUpdate = true;
+        else m.emissiveMap = null;
+      } else {
+        m.map = null;
+        m.emissiveMap = null;
       }
+      m.needsUpdate = true;
     }
     // 'wood' and 'special' roles intentionally left as-is.
   });
