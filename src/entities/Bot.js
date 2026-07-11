@@ -293,7 +293,12 @@ export class Bot {
 
     let moveTarget = null;
     if (engaged) {
-      this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
+      // Face the player. The rig's forward is +Z — the aim and strafe layers
+      // both assume rotation.y == atan2(dx, dz). Object3D.lookAt aims the -Z
+      // axis instead, which faced the model backwards and played the walk
+      // cycle in reverse (moonwalk).
+      this.mesh.rotation.y = Math.atan2(player.position.x - this.position.x,
+                                        player.position.z - this.position.z);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
         // AR bots shoot while closing in; sword bots only melee
@@ -319,7 +324,8 @@ export class Bot {
       this._wanderDir.subVectors(this.wanderTarget, this.position);
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
-        this.mesh.lookAt(this.wanderTarget.x, this.position.y + 1.08, this.wanderTarget.z);
+        this.mesh.rotation.y = Math.atan2(this.wanderTarget.x - this.position.x,
+                                          this.wanderTarget.z - this.position.z);
       }
     }
 
