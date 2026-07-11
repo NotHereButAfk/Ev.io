@@ -279,13 +279,11 @@ export class AudioManager {
     osc.connect(f2).connect(mix);
     mix.connect(gain).connect(this.master);
 
-    // Faint breath layer under the voice.
-    const dur = 0.2;
-    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    // Faint breath layer under the voice. The noise buffer is identical every
+    // shot, so generate it once and reuse it — one AudioBuffer can back many
+    // source nodes, avoiding a fresh alloc + fill on every rapid-fire call.
     const breath = this.ctx.createBufferSource();
-    breath.buffer = buf;
+    breath.buffer = this._breathNoise();
     const bf = this.ctx.createBiquadFilter();
     bf.type = 'bandpass'; bf.frequency.value = 1800; bf.Q.value = 0.8;
     const bGain = this._envGain(0.05, 0.02, 0.16, t);
@@ -293,6 +291,17 @@ export class AudioManager {
 
     lfo.start(t); osc.start(t); breath.start(t);
     lfo.stop(t + 0.36); osc.stop(t + 0.36);
+  }
+
+  // Cached 0.2s decaying-noise buffer for the breath layer, built on first use.
+  _breathNoise() {
+    if (this._breathBuf) return this._breathBuf;
+    const dur = 0.2;
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    this._breathBuf = buf;
+    return buf;
   }
 
   // Sci-fi laser zap — descending saw with a metallic ring.

@@ -704,7 +704,8 @@ export class MenuUI {
         // Gun skins are a shared finish usable on any main gun — show a real,
         // stable-for-the-day gun wearing it rather than always the Auto Rifle.
         const gunInfo = kind === 'weapon' ? this._nightMarketGunFor(skin.id) : null;
-        showcase = kind === 'sword' ? _SHOP_SWORD() : (WEAPONS.find((w) => w.id === gunInfo.id) || _SHOP_GUN());
+        const gun = gunInfo ? WEAPONS.find((w) => w.id === gunInfo.id) : null;
+        showcase = kind === 'sword' ? _SHOP_SWORD() : (gun || _SHOP_GUN());
         if (showcase) {
           const key = `${showcase.id}:${skin.id}`;
           const cached = _shopThumbCache.get(key);
