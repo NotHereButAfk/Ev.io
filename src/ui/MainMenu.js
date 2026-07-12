@@ -809,17 +809,37 @@ export class MenuUI {
       return card;
     };
 
-    // Night Market: pick 5 random items from the full catalog, seeded by today's date.
+    // Night Market: 5 daily items seeded by today's date. Unowned skins get
+    // priority so the rotation stays worth checking; owned ones only pad out
+    // the row when the collection is nearly complete.
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
     const weaponItems    = WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' }));
     const swordItems     = SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  }));
     const allItems = [...characterItems, ...weaponItems, ...swordItems];
-    const nightMarket = this._nightMarketPick(allItems, 5);
+    const isOwnedItem = (s) => s._kind === 'character' ? Shop.isOwned(s.id) : Armory.ownsSkin(s.id);
+    const unowned = allItems.filter(s => !isOwnedItem(s));
 
-    const grid = document.createElement('div');
-    grid.className = 'shop-skin-grid nm-grid';
-    nightMarket.forEach(s => grid.appendChild(makeCard(s, s._kind)));
-    root.appendChild(grid);
+    if (allItems.length && unowned.length === 0) {
+      // Collection complete — the market bows to a completionist.
+      const done = document.createElement('div');
+      done.className = 'nm-complete';
+      done.innerHTML = `
+        <div class="nm-complete-crown">👑</div>
+        <div class="nm-complete-title">COLLECTION COMPLETE</div>
+        <div class="nm-complete-sub">You own every finish in the armory. The Night Market has
+        nothing left to sell you, legend — new drops will land here first.</div>`;
+      root.appendChild(done);
+    } else {
+      const picks = this._nightMarketPick(unowned, 5);
+      if (picks.length < 5) {
+        const owned = allItems.filter(isOwnedItem);
+        picks.push(...this._nightMarketPick(owned, 5 - picks.length));
+      }
+      const grid = document.createElement('div');
+      grid.className = 'shop-skin-grid nm-grid';
+      picks.forEach(s => grid.appendChild(makeCard(s, s._kind)));
+      root.appendChild(grid);
+    }
 
     // Progressive skinned-render pump: a few real 3D renders per frame so the
     // shop stays responsive while the previews fill in. Results are cached
