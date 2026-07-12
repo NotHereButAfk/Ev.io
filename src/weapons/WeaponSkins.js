@@ -43,6 +43,22 @@ export const WEAPON_SKINS = [
   { id: 'prismatic', name: 'Prismatic', rarity: 'epic', body: 0x101018, accent: 0x08080c, metal: 0x9aa0ac, metalness: 0.60, roughness: 0.30,
     emissive: 0xffffff, emissiveIntensity: 1.4, decal: 'holographic', decalEmissive: true,
     animated: true, animType: 'rainbow', animSpeed: 0.3, animMin: 1.0,  animMax: 2.0 },
+
+  // ── LEGENDARY (3): total-coverage wraps — the artwork flows over the
+  // receiver, barrel and trim too (decalOnMetal/decalOnAccent), with a themed
+  // energy retint. Auto-owned like the rest (see Armory.ownsSkin).
+  { id: 'royalgold', name: 'Royal Gold 👑', rarity: 'legendary', body: 0xc7a23a, accent: 0x4a3a12, metal: 0xe0c25a, metalness: 0.95, roughness: 0.18,
+    emissive: 0xffc83a, emissiveIntensity: 0.7, energyColor: 0xffc83a,
+    decal: 'gold', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 1.6, animMin: 0.45, animMax: 1.1 },
+  { id: 'bloodmoon', name: 'Blood Moon 🌑', rarity: 'legendary', body: 0x1a0a0e, accent: 0x0e0508, metal: 0x6a3a42, metalness: 0.60, roughness: 0.40,
+    emissive: 0xff2030, emissiveIntensity: 0.8, energyColor: 0xff2030,
+    decal: 'bloodmoon', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 1.2, animMin: 0.50, animMax: 1.3 },
+  { id: 'bonecrusher', name: 'Bonecrusher 💀', rarity: 'legendary', body: 0x14151a, accent: 0x0a0a0e, metal: 0x9a9a90, metalness: 0.60, roughness: 0.45,
+    emissive: 0xcfe8ff, emissiveIntensity: 0.8, energyColor: 0xcfe8ff,
+    decal: 'skull', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'flicker', animSpeed: 4.5, animMin: 0.45, animMax: 1.2 },
 ];
 
 const _hsl = new THREE.Color();
