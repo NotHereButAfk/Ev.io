@@ -69,7 +69,7 @@ function buildZombieRigFromGLB(mat) {
 
   // Eye glow light attached to the glowing eye mesh
   const eyeGlowMesh = glbScene.getObjectByName('ZEyeGlow');
-  const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x14ffb0, 0.85, 1.9, 2);
   // (sky-only lighting) eyeGlow not added to scene
 
   const get = (name) => glbScene.getObjectByName(name) || spineGroup;
@@ -195,10 +195,14 @@ function makeMats() {
     emissive: new THREE.Color(0x050400), emissiveIntensity: 0.05,
   });
 
-  // Glowing eye — high emissive intensity
+  // Glowing eye / infection — cold toxic bio-reactor cyan-green (the sci-fi
+  // tell). Shared by the cyber-eye, chest reactor shard and the crack veins.
+  // Near-black base so the emissive reads as a saturated green under the ACES
+  // tone mapping instead of clipping out to white (same as the gun energy
+  // parts). Large panels bloom worse than tiny eye dots, so keep the base low.
   const eye = new THREE.MeshStandardMaterial({
-    color: 0xffee44, emissive: new THREE.Color(0xffcc00), emissiveIntensity: 2.2,
-    roughness: 0.04, metalness: 0.0,
+    color: 0x0a2018, emissive: new THREE.Color(0x1effb4), emissiveIntensity: 2.0,
+    roughness: 0.30, metalness: 0.0,
   });
 
   // Deep socket / interior shadow
@@ -384,7 +388,7 @@ function buildZombieRig() {
   });
 
   // Eye glow PointLight
-  const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x14ffb0, 0.85, 1.9, 2);
   eyeGlow.position.set(0, 0.264, -0.26); /* (sky-only) not added */
 
   // Temple hollows (sunken areas)
