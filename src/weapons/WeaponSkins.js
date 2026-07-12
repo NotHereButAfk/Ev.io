@@ -25,6 +25,24 @@ export const WEAPON_SKINS = [
   { id: 'crimson', name: 'Crimson', rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xff2e3a },
   { id: 'desert',  name: 'Desert',  rarity: 'common', body: 0xb29766, accent: 0x4a3b24, metal: 0xa89878, metalness: 0.40, roughness: 0.55 },
   { id: 'arctic',  name: 'Arctic',  rarity: 'common', body: 0xcdd6dd, accent: 0x5f6a74, metal: 0xb8c2cc, metalness: 0.50, roughness: 0.40, energyColor: 0x8fd8ff },
+
+  // ── EPIC (5): animated finishes — a glowing pattern on the shell plus a
+  // pulsing / cycling emissive. Also auto-owned (see Armory.ownsSkin).
+  { id: 'voltage',   name: 'Voltage',   rarity: 'epic', body: 0x1b2733, accent: 0x0a0f14, metal: 0x8a929c, metalness: 0.50, roughness: 0.40,
+    emissive: 0x2ee6ff, emissiveIntensity: 0.9, energyColor: 0x2ee6ff, decal: 'hextech', decalEmissive: true,
+    animated: true, animType: 'pulse',   animSpeed: 3.4, animMin: 0.45, animMax: 1.5 },
+  { id: 'inferno',   name: 'Inferno',   rarity: 'epic', body: 0x2a1206, accent: 0x160800, metal: 0x8a7a70, metalness: 0.50, roughness: 0.45,
+    emissive: 0xff4400, emissiveIntensity: 0.9, energyColor: 0xff5a1e, decal: 'lava', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 6.0, animMin: 0.40, animMax: 1.5 },
+  { id: 'biohazard', name: 'Biohazard', rarity: 'epic', body: 0x16260c, accent: 0x0a1206, metal: 0x7a8a68, metalness: 0.50, roughness: 0.45,
+    emissive: 0x4aff00, emissiveIntensity: 0.9, energyColor: 0x66ff2e, decal: 'toxic', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 7.0, animMin: 0.40, animMax: 1.4 },
+  { id: 'cosmos',    name: 'Cosmos',    rarity: 'epic', body: 0x120c22, accent: 0x080610, metal: 0x8a86a0, metalness: 0.55, roughness: 0.35,
+    emissive: 0x8a3aff, emissiveIntensity: 0.9, energyColor: 0x9a50ff, decal: 'galaxy', decalEmissive: true,
+    animated: true, animType: 'pulse',   animSpeed: 2.2, animMin: 0.40, animMax: 1.4 },
+  { id: 'prismatic', name: 'Prismatic', rarity: 'epic', body: 0x101018, accent: 0x08080c, metal: 0x9aa0ac, metalness: 0.60, roughness: 0.30,
+    emissive: 0xffffff, emissiveIntensity: 1.4, decal: 'holographic', decalEmissive: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.3, animMin: 1.0,  animMax: 2.0 },
 ];
 
 const _hsl = new THREE.Color();
