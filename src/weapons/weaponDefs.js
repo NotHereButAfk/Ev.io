@@ -74,7 +74,9 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 150,
     recoil: 0.02,
-    color: 0x0a1520
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
+    sciFi: true
   },
   {
     id: 'm16',
@@ -215,7 +217,9 @@ export const WEAPONS = [
     reloadTime: 1.2,
     range: 120,
     recoil: 0.028,
-    color: 0x0a1830
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
+    sciFi: true
   },
   {
     id: 'battlerifle',
@@ -234,7 +238,9 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 170,
     recoil: 0.022,
-    color: 0x0a1a28
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
+    sciFi: true
   },
   {
     id: 'needler',
@@ -270,7 +276,9 @@ export const WEAPONS = [
     reloadTime: 1.6,
     range: 90,
     recoil: 0.014,
-    color: 0x002244
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
+    sciFi: true
   },
   {
     id: 'dmr',
@@ -349,7 +357,9 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 28,
     recoil: 0.055,
-    color: 0x001a44
+    color: 0x394049,
+    energyColor: 0x2ee6ff,
+    sciFi: true
   },
   {
     id: 'ghammer',

@@ -1,4 +1,4 @@
-import { SKINS, getSkin } from '../player/skins.js';
+import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
@@ -12,7 +12,7 @@ import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
 import { GameSettings } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
-import { InventoryPanel } from './InventoryPanel.js';
+import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
 
@@ -74,7 +74,7 @@ export class MenuUI {
     this.menuBtn       = document.getElementById('menu-btn');
     this.gameoverStats = document.getElementById('gameover-stats');
 
-    this.selectedSkinId   = SKINS[0].id;
+    this.selectedSkinId   = getSkin().id;   // catalog is empty; falls back to the built-in default
     this.selectedArmorId  = loadArmorType();
     this.selectedModeId   = GAME_MODES[0].id;
     this._currentUser     = null;
@@ -594,6 +594,16 @@ export class MenuUI {
     return shuffled.slice(0, count);
   }
 
+  // Deterministic per-skin, per-day showcase gun: a weapon skin is a generic
+  // finish usable on any of the 5 main guns, but the Night Market card should
+  // still show *one* real gun wearing it (stable for the day, so it doesn't
+  // flicker between renders) rather than always the Auto Rifle.
+  _nightMarketGunFor(skinId) {
+    let h = this._nightMarketSeed();
+    for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
+    return MAIN_GUNS[Math.abs(h) % MAIN_GUNS.length];
+  }
+
   _nightMarketTimeLeft() {
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -643,7 +653,7 @@ export class MenuUI {
     const equippedArmor = Shop.getEquipped();
 
     // Every rarity has a default price; armor skins override with their own.
-    const RARITY_PRICE = { common: 100, uncommon: 300, rare: 700, epic: 1500, legendary: 3000, mythic: 6000 };
+    const RARITY_PRICE = { common: 100, epic: 1500, legendary: 3000, mythic: 6000 };
     const priceOf = (skin) => skin.price ?? RARITY_PRICE[skin.rarity || 'common'] ?? 100;
 
     const _hex6 = n => n.toString(16).padStart(6, '0');
@@ -681,6 +691,9 @@ export class MenuUI {
 
       // Preview: for armor a themed character silhouette; for weapon/sword a
       // real skinned-model render (dropped in progressively — see below).
+      // `showcase` is hoisted so the name section below can label the card
+      // with the actual gun it's shown on.
+      let showcase = null;
       const preview = document.createElement('div');
       preview.className = 'shop-preview';
       if (isCharacter) {
@@ -688,7 +701,11 @@ export class MenuUI {
         preview.innerHTML = SHOP_CHAR_SVG;
       } else {
         preview.classList.add('shop-preview-weapon');
-        const showcase = kind === 'sword' ? _SHOP_SWORD() : _SHOP_GUN();
+        // Gun skins are a shared finish usable on any main gun — show a real,
+        // stable-for-the-day gun wearing it rather than always the Auto Rifle.
+        const gunInfo = kind === 'weapon' ? this._nightMarketGunFor(skin.id) : null;
+        const gun = gunInfo ? WEAPONS.find((w) => w.id === gunInfo.id) : null;
+        showcase = kind === 'sword' ? _SHOP_SWORD() : (gun || _SHOP_GUN());
         if (showcase) {
           const key = `${showcase.id}:${skin.id}`;
           const cached = _shopThumbCache.get(key);
@@ -727,11 +744,11 @@ export class MenuUI {
       body.className = 'shop-card-body';
       const nameEl = document.createElement('div');
       nameEl.className = 'shop-skin-name';
-      nameEl.textContent = skin.name;
+      nameEl.textContent = isCharacter ? skin.name : `${showcase?.name ?? 'Weapon'} — ${skin.name}`;
       body.appendChild(nameEl);
       const perkEl = document.createElement('div');
       perkEl.className = 'shop-perk-line';
-      perkEl.textContent = describePerk(rarity, isCharacter);
+      perkEl.textContent = describePerk(rarity);
       body.appendChild(perkEl);
       card.appendChild(body);
 

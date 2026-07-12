@@ -224,6 +224,498 @@ function animeDecal() {
   return c;
 }
 
+// ── Async image loader for the Sakura Waifu skin ──────────────────────────
+// Tries to load real images to replace the procedural fallback:
+//   Option A: textures/sakura/wrap.png — a single full sticker-bomb texture
+//   Option B: textures/sakura/sticker_1.png … sticker_8.png — individual stickers
+//             composited over the pastel gradient
+// If nothing loads (404s), the procedural canvas stays as-is.
+function _loadSakuraImages(canvas, ctx, size) {
+  const base = import.meta.env?.BASE_URL || './';
+  const wrapUrl = `${base}textures/sakura/wrap.png`;
+
+  const tryWrap = new Image();
+  tryWrap.onload = () => {
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(tryWrap, 0, 0, size, size);
+    const tex = _cache.get('decal_animegirl');
+    if (tex) tex.needsUpdate = true;
+  };
+  tryWrap.onerror = () => {
+    // No wrap.png — try individual sticker files
+    const stickers = [];
+    let pending = 0;
+    for (let i = 1; i <= 8; i++) {
+      const img = new Image();
+      pending++;
+      img.onload = () => { stickers.push(img); if (--pending === 0) _compositeStickers(canvas, ctx, size, stickers); };
+      img.onerror = () => { if (--pending === 0 && stickers.length) _compositeStickers(canvas, ctx, size, stickers); };
+      img.src = `${base}textures/sakura/sticker_${i}.png`;
+    }
+  };
+  tryWrap.src = wrapUrl;
+}
+
+function _compositeStickers(canvas, ctx, size, stickers) {
+  // Redraw gradient base
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0.0,  '#ff6eb4');
+  bg.addColorStop(0.18, '#ff9a5c');
+  bg.addColorStop(0.35, '#ffe14d');
+  bg.addColorStop(0.52, '#8aff7a');
+  bg.addColorStop(0.68, '#5ccfff');
+  bg.addColorStop(0.85, '#b56aff');
+  bg.addColorStop(1.0,  '#ff6eb4');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  // Place stickers in a dense overlapping layout
+  const positions = [
+    [0.15, 0.15, 0.35], [0.65, 0.12, 0.32], [0.35, 0.4, 0.38],
+    [0.8, 0.45, 0.3],   [0.1, 0.6, 0.33],   [0.55, 0.7, 0.35],
+    [0.85, 0.8, 0.28],  [0.3, 0.85, 0.3],
+  ];
+  for (let i = 0; i < stickers.length; i++) {
+    const [fx, fy, fs] = positions[i % positions.length];
+    const img = stickers[i];
+    const w = size * fs;
+    const h = w * (img.height / img.width);
+    const x = size * fx - w / 2;
+    const y = size * fy - h / 2;
+    ctx.save();
+    ctx.translate(x + w/2, y + h/2);
+    ctx.rotate((Math.random() - 0.5) * 0.3);
+    ctx.drawImage(img, -w/2, -h/2, w, h);
+    ctx.restore();
+  }
+  const tex = _cache.get('decal_animegirl');
+  if (tex) tex.needsUpdate = true;
+}
+
+// ANIME GIRL — dense neko cat-girl sticker bomb. Every girl is a cat-girl with
+// whiskers, varied expressions (wink, tongue, peace-sign), maneki-neko mascots,
+// fish stickers, bells, paw prints — maximum kawaii Japanese cat-girl energy.
+function animeGirlDecal() {
+  const size = 512;
+  const c = makeCanvas(size);
+  const ctx = c.getContext('2d');
+
+  _loadSakuraImages(c, ctx, size);
+
+  // ── pink-dominant candy base ──
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0.0, '#ffb0d8'); bg.addColorStop(0.2, '#ffc8e8');
+  bg.addColorStop(0.4, '#e0c0ff'); bg.addColorStop(0.6, '#b0d8ff');
+  bg.addColorStop(0.8, '#ffc0e0'); bg.addColorStop(1.0, '#ffe0f0');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+  for (const [col, x, y] of [['#ff60b0',90,70],['#c060ff',400,100],['#60c0ff',150,380],['#ff80c0',380,400],['#ffa0d0',256,240]]) {
+    const g = ctx.createRadialGradient(x, y, 4, x, y, 130);
+    g.addColorStop(0, col + 'aa'); g.addColorStop(1, col + '00');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 130, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ── subtle diagonal stripe pattern ──
+  ctx.save(); ctx.globalAlpha = 0.06;
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 4;
+  for (let i = -size; i < size * 2; i += 18) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + size, size); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── reusable shapes ──
+  const roundRect = (x, y, w, h, r) => {
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  };
+  const heart = (x, y, s, col) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y+s*0.3);
+    ctx.bezierCurveTo(x,y,x-s,y,x-s,y+s*0.4); ctx.bezierCurveTo(x-s,y+s*0.8,x,y+s,x,y+s*1.2);
+    ctx.bezierCurveTo(x,y+s,x+s,y+s*0.8,x+s,y+s*0.4); ctx.bezierCurveTo(x+s,y,x,y,x,y+s*0.3); ctx.fill();
+  };
+  const star5 = (x, y, r, col) => {
+    ctx.fillStyle = col; ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const a=(i/5)*Math.PI*2-Math.PI/2,a2=a+Math.PI/5; ctx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); ctx.lineTo(x+Math.cos(a2)*r*0.45,y+Math.sin(a2)*r*0.45); }
+    ctx.closePath(); ctx.fill();
+  };
+  const star4 = (x, y, r, col) => {
+    ctx.fillStyle = col; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { const a=(i/4)*Math.PI*2-Math.PI/4,a2=a+Math.PI/4; ctx.lineTo(x+Math.cos(a)*r,y+Math.sin(a)*r); ctx.lineTo(x+Math.cos(a2)*r*0.28,y+Math.sin(a2)*r*0.28); }
+    ctx.closePath(); ctx.fill();
+  };
+  const sakura = (x, y, r, col) => {
+    ctx.fillStyle = col;
+    for (let i = 0; i < 5; i++) { const a=(i/5)*Math.PI*2; ctx.beginPath(); ctx.ellipse(x+Math.cos(a)*r*0.7,y+Math.sin(a)*r*0.7,r*0.5,r*0.3,a,0,Math.PI*2); ctx.fill(); }
+    ctx.fillStyle = '#ffe680'; ctx.beginPath(); ctx.arc(x,y,r*0.22,0,Math.PI*2); ctx.fill();
+  };
+  const bow = (x, y, s, col) => {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(x-s*0.6,y,s*0.6,s*0.35,-0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x+s*0.6,y,s*0.6,s*0.35,0.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,s*0.22,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x-s*0.06,y-s*0.06,s*0.08,0,Math.PI*2); ctx.fill();
+  };
+  const pawPrint = (x, y, s, col) => {
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(x,y+s*0.2,s*0.4,s*0.3,0,0,Math.PI*2); ctx.fill();
+    for (const [dx,dy] of [[-s*0.32,-s*0.15],[s*0.32,-s*0.15],[-s*0.14,-s*0.4],[s*0.14,-s*0.4]]) { ctx.beginPath(); ctx.arc(x+dx,y+dy,s*0.15,0,Math.PI*2); ctx.fill(); }
+  };
+
+  // Maneki-neko (beckoning cat) mascot
+  const manekiNeko = (x, y, s) => {
+    ctx.save(); ctx.translate(x, y);
+    // body
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#d06090'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, s*0.15, s*0.55, s*0.6, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // head
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(0, -s*0.35, s*0.45, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // ears
+    for (const sx of [-1,1]) {
+      ctx.fillStyle = '#fff'; ctx.beginPath();
+      ctx.moveTo(sx*s*0.3,-s*0.55); ctx.lineTo(sx*s*0.2,-s*0.85); ctx.lineTo(sx*s*0.48,-s*0.6);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffb0c0'; ctx.beginPath();
+      ctx.moveTo(sx*s*0.3,-s*0.58); ctx.lineTo(sx*s*0.24,-s*0.76); ctx.lineTo(sx*s*0.42,-s*0.6);
+      ctx.closePath(); ctx.fill();
+    }
+    // raised paw
+    ctx.fillStyle = '#fff'; ctx.beginPath();
+    ctx.ellipse(s*0.42, -s*0.1, s*0.14, s*0.22, -0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // eyes (happy closed)
+    ctx.strokeStyle = '#2a1830'; ctx.lineWidth = s*0.06; ctx.lineCap = 'round';
+    for (const sx of [-1,1]) { ctx.beginPath(); ctx.arc(sx*s*0.18,-s*0.35,s*0.1,Math.PI*0.15,Math.PI*0.85); ctx.stroke(); }
+    // blush
+    ctx.fillStyle = 'rgba(255,130,160,0.6)';
+    ctx.beginPath(); ctx.ellipse(-s*0.3,-s*0.22,s*0.08,s*0.04,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s*0.3,-s*0.22,s*0.08,s*0.04,0,0,Math.PI*2); ctx.fill();
+    // nose + mouth
+    ctx.fillStyle = '#ff7090'; ctx.beginPath(); ctx.arc(0,-s*0.28,s*0.04,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#c05070'; ctx.lineWidth = s*0.03;
+    ctx.beginPath(); ctx.moveTo(-s*0.06,-s*0.22); ctx.lineTo(0,-s*0.18); ctx.lineTo(s*0.06,-s*0.22); ctx.stroke();
+    // collar + bell
+    ctx.strokeStyle = '#ff3060'; ctx.lineWidth = s*0.06;
+    ctx.beginPath(); ctx.arc(0,-s*0.05,s*0.35,Math.PI*0.2,Math.PI*0.8); ctx.stroke();
+    ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(0,s*0.2,s*0.1,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#c0a000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0,s*0.2,s*0.1,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#c0a000'; ctx.fillRect(-s*0.015,s*0.2,s*0.03,s*0.08);
+    // koban coin
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath(); ctx.ellipse(s*0.42,-s*0.32,s*0.1,s*0.07,0.3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  };
+
+  // Cute fish sticker
+  const fishSticker = (x, y, s, col) => {
+    ctx.save(); ctx.translate(x, y); ctx.rotate((Math.random()-0.5)*0.4);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(0,0,s*0.7,s*0.35,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(s*0.55,0); ctx.lineTo(s*0.9,-s*0.3); ctx.lineTo(s*0.9,s*0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#1a0a20'; ctx.beginPath(); ctx.arc(-s*0.25,-s*0.05,s*0.08,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-s*0.27,-s*0.08,s*0.035,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-s*0.15,s*0.08,s*0.06,Math.PI*0.1,Math.PI*0.9); ctx.stroke();
+    ctx.restore();
+  };
+
+  // Cat-girl neko sticker — realistic anime style with face shading, detailed
+  // eyes, hair gradients, neck/shoulders, and proper skin tone transitions.
+  // expr: 0=normal, 1=wink, 2=tongue out, 3=>_< happy squint
+  const catGirl = (x, y, s, hair, hairDark, eye, eyeDark, hairHL, shape, acc, expr) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((Math.random()-0.5)*0.15);
+
+    // sticker background
+    ctx.shadowColor = 'rgba(60,0,30,0.4)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#fff';
+    if (shape === 1) { ctx.beginPath(); ctx.arc(0,0,s*1.1,0,Math.PI*2); ctx.fill(); }
+    else { roundRect(-s*1.05,-s*1.05,s*2.1,s*2.1,s*0.25); ctx.fill(); }
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = hair; ctx.lineWidth = 2.5;
+    if (shape === 1) { ctx.beginPath(); ctx.arc(0,0,s*1.1,0,Math.PI*2); ctx.stroke(); }
+    else { roundRect(-s*1.05,-s*1.05,s*2.1,s*2.1,s*0.25); ctx.stroke(); }
+
+    // inner warm fill
+    const cg = ctx.createRadialGradient(0,-s*0.2,2,0,s*0.1,s*1.1);
+    cg.addColorStop(0,'#fff8fc'); cg.addColorStop(1,'#ffe4f0');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(0,0,s*0.98,0,Math.PI*2); ctx.fill();
+
+    const fy = -s*0.02;
+
+    // ── neck + shoulders (visible bust-up) ──
+    ctx.fillStyle = '#ffdcc8';
+    ctx.beginPath(); ctx.moveTo(-s*0.14,fy+s*0.5); ctx.lineTo(-s*0.1,fy+s*0.7);
+    ctx.quadraticCurveTo(-s*0.5,fy+s*0.72,-s*0.7,fy+s*0.85);
+    ctx.lineTo(s*0.7,fy+s*0.85);
+    ctx.quadraticCurveTo(s*0.5,fy+s*0.72,s*0.1,fy+s*0.7);
+    ctx.lineTo(s*0.14,fy+s*0.5); ctx.closePath(); ctx.fill();
+    // neck shadow
+    const neckSh = ctx.createLinearGradient(0,fy+s*0.5,0,fy+s*0.65);
+    neckSh.addColorStop(0,'rgba(200,140,120,0.25)'); neckSh.addColorStop(1,'rgba(200,140,120,0)');
+    ctx.fillStyle = neckSh;
+    ctx.beginPath(); ctx.moveTo(-s*0.14,fy+s*0.5); ctx.lineTo(-s*0.1,fy+s*0.65);
+    ctx.lineTo(s*0.1,fy+s*0.65); ctx.lineTo(s*0.14,fy+s*0.5); ctx.closePath(); ctx.fill();
+    // collar / top edge
+    ctx.strokeStyle = hair; ctx.lineWidth = s*0.04; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-s*0.55,fy+s*0.82);
+    ctx.quadraticCurveTo(-s*0.3,fy+s*0.68,0,fy+s*0.72);
+    ctx.quadraticCurveTo(s*0.3,fy+s*0.68,s*0.55,fy+s*0.82); ctx.stroke();
+
+    // ── cat ears ──
+    for (const sx of [-1,1]) {
+      // outer ear with gradient
+      const earG = ctx.createLinearGradient(sx*s*0.3,-s*0.95,sx*s*0.5,-s*0.5);
+      earG.addColorStop(0,hair); earG.addColorStop(1,hairDark);
+      ctx.fillStyle = earG;
+      ctx.beginPath(); ctx.moveTo(sx*s*0.44,-s*0.44); ctx.lineTo(sx*s*0.2,-s*0.95); ctx.lineTo(sx*s*0.74,-s*0.6); ctx.closePath(); ctx.fill();
+      // inner ear
+      ctx.fillStyle = '#ffb0c8';
+      ctx.beginPath(); ctx.moveTo(sx*s*0.42,-s*0.48); ctx.lineTo(sx*s*0.26,-s*0.82); ctx.lineTo(sx*s*0.62,-s*0.58); ctx.closePath(); ctx.fill();
+      // inner ear highlight
+      ctx.fillStyle = 'rgba(255,200,220,0.5)';
+      ctx.beginPath(); ctx.moveTo(sx*s*0.4,-s*0.52); ctx.lineTo(sx*s*0.3,-s*0.72); ctx.lineTo(sx*s*0.5,-s*0.56); ctx.closePath(); ctx.fill();
+    }
+
+    // ── back hair with gradient shading ──
+    const hairG = ctx.createLinearGradient(0,fy-s*0.6,0,fy+s*0.5);
+    hairG.addColorStop(0,hair); hairG.addColorStop(0.5,hairDark); hairG.addColorStop(1,hair);
+    ctx.fillStyle = hairG;
+    ctx.beginPath(); ctx.arc(0,fy-s*0.06,s*0.74,Math.PI,0); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,fy+s*0.2,s*0.74,s*0.6,0,0,Math.PI*2); ctx.fill();
+    // flowing side locks with taper
+    for (const sx of [-1,1]) {
+      ctx.fillStyle = hairG;
+      ctx.beginPath();
+      ctx.moveTo(sx*s*0.52,fy-s*0.2);
+      ctx.quadraticCurveTo(sx*s*0.85,fy+s*0.05,sx*s*0.78,fy+s*0.5);
+      ctx.quadraticCurveTo(sx*s*0.72,fy+s*0.7,sx*s*0.58,fy+s*0.55);
+      ctx.quadraticCurveTo(sx*s*0.62,fy+s*0.1,sx*s*0.52,fy-s*0.2);
+      ctx.closePath(); ctx.fill();
+    }
+    // side-lock shine (stays low on the outer hair, away from the face)
+    ctx.strokeStyle = hairHL; ctx.lineCap = 'round'; ctx.globalAlpha = 0.4;
+    ctx.lineWidth = s*0.022;
+    ctx.beginPath(); ctx.moveTo(-s*0.6,fy); ctx.quadraticCurveTo(-s*0.64,fy+s*0.2,-s*0.58,fy+s*0.42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s*0.6,fy); ctx.quadraticCurveTo(s*0.64,fy+s*0.2,s*0.58,fy+s*0.42); ctx.stroke();
+    // glossy shine band across the crown (above the forehead)
+    ctx.globalAlpha = 0.32;
+    ctx.lineWidth = s*0.055;
+    ctx.beginPath(); ctx.moveTo(-s*0.42,fy-s*0.32); ctx.quadraticCurveTo(0,fy-s*0.5,s*0.42,fy-s*0.32); ctx.stroke();
+    // short crown strands
+    ctx.globalAlpha = 0.35; ctx.lineWidth = s*0.025;
+    for (const hx of [-0.28,-0.08,0.14,0.32]) {
+      ctx.beginPath(); ctx.moveTo(hx*s,fy-s*0.5); ctx.quadraticCurveTo((hx+0.03)*s,fy-s*0.42,(hx+0.01)*s,fy-s*0.3); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // ── face with skin tone gradient ──
+    const skinG = ctx.createRadialGradient(-s*0.05,fy-s*0.1,s*0.1,0,fy+s*0.15,s*0.5);
+    skinG.addColorStop(0,'#ffe8d8'); skinG.addColorStop(0.6,'#ffdcc8'); skinG.addColorStop(1,'#f0c8b0');
+    ctx.fillStyle = skinG;
+    ctx.beginPath(); ctx.ellipse(0,fy+s*0.06,s*0.47,s*0.48,0,0,Math.PI*2); ctx.fill();
+    // chin shadow
+    const chinSh = ctx.createRadialGradient(0,fy+s*0.42,s*0.05,0,fy+s*0.42,s*0.25);
+    chinSh.addColorStop(0,'rgba(190,130,110,0.2)'); chinSh.addColorStop(1,'rgba(190,130,110,0)');
+    ctx.fillStyle = chinSh; ctx.beginPath(); ctx.ellipse(0,fy+s*0.42,s*0.3,s*0.15,0,0,Math.PI*2); ctx.fill();
+    // forehead shadow from bangs
+    const bangSh = ctx.createLinearGradient(0,fy-s*0.1,0,fy+s*0.1);
+    bangSh.addColorStop(0,'rgba(160,100,80,0.18)'); bangSh.addColorStop(1,'rgba(160,100,80,0)');
+    ctx.fillStyle = bangSh; ctx.fillRect(-s*0.4,fy-s*0.08,s*0.8,s*0.18);
+
+    // ── bangs (chunky manga) ──
+    ctx.fillStyle = hairG; ctx.beginPath();
+    ctx.moveTo(-s*0.5,fy-s*0.02);
+    ctx.quadraticCurveTo(-s*0.42,fy-s*0.56,-s*0.1,fy-s*0.6);
+    ctx.quadraticCurveTo(-s*0.04,fy-s*0.24,s*0.04,fy-s*0.6);
+    ctx.quadraticCurveTo(s*0.42,fy-s*0.56,s*0.5,fy-s*0.02);
+    ctx.quadraticCurveTo(s*0.34,fy-s*0.18,s*0.24,fy+s*0.06);
+    ctx.quadraticCurveTo(s*0.15,fy-s*0.22,s*0.05,fy);
+    ctx.quadraticCurveTo(0,fy-s*0.26,-s*0.05,fy);
+    ctx.quadraticCurveTo(-s*0.15,fy-s*0.22,-s*0.24,fy+s*0.06);
+    ctx.quadraticCurveTo(-s*0.34,fy-s*0.18,-s*0.5,fy-s*0.02);
+    ctx.closePath(); ctx.fill();
+    // bang highlights — short shine near the hairline only (above the eyes)
+    ctx.strokeStyle = hairHL; ctx.lineWidth = s*0.022; ctx.globalAlpha = 0.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-s*0.24,fy-s*0.46); ctx.quadraticCurveTo(-s*0.2,fy-s*0.34,-s*0.24,fy-s*0.22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s*0.16,fy-s*0.48); ctx.quadraticCurveTo(s*0.13,fy-s*0.36,s*0.16,fy-s*0.24); ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // ── EYES ──
+    for (const sx of [-1,1]) {
+      const ex = sx*s*0.2, ey = fy+s*0.08;
+      const isWink = (expr === 1 && sx === 1);
+      const isSquint = (expr === 3);
+
+      if (isWink) {
+        ctx.strokeStyle = '#1a0a20'; ctx.lineWidth = s*0.045; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(ex,ey,s*0.1,Math.PI*0.1,Math.PI*0.9); ctx.stroke();
+        ctx.lineWidth = s*0.025;
+        ctx.beginPath(); ctx.moveTo(ex+s*0.1,ey-s*0.02); ctx.lineTo(ex+s*0.15,ey-s*0.1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex+s*0.07,ey-s*0.06); ctx.lineTo(ex+s*0.12,ey-s*0.13); ctx.stroke();
+      } else if (isSquint) {
+        ctx.strokeStyle = '#1a0a20'; ctx.lineWidth = s*0.04; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(ex-s*0.08,ey-s*0.05); ctx.lineTo(ex,ey+s*0.03); ctx.lineTo(ex+s*0.08,ey-s*0.05); ctx.stroke();
+      } else {
+        // upper lid (thick, shaped)
+        ctx.fillStyle = '#1a0a20';
+        ctx.beginPath();
+        ctx.moveTo(ex-s*0.14,ey-s*0.04);
+        ctx.quadraticCurveTo(ex,ey-s*0.2,ex+s*0.14,ey-s*0.02);
+        ctx.quadraticCurveTo(ex,ey-s*0.12,ex-s*0.14,ey-s*0.04);
+        ctx.closePath(); ctx.fill();
+        // individual lashes (3 per eye)
+        ctx.strokeStyle = '#1a0a20'; ctx.lineWidth = s*0.02; ctx.lineCap = 'round';
+        const lashDir = sx;
+        ctx.beginPath(); ctx.moveTo(ex+lashDir*s*0.12,ey-s*0.08); ctx.lineTo(ex+lashDir*s*0.18,ey-s*0.18); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex+lashDir*s*0.08,ey-s*0.12); ctx.lineTo(ex+lashDir*s*0.13,ey-s*0.2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex+lashDir*s*0.04,ey-s*0.14); ctx.lineTo(ex+lashDir*s*0.07,ey-s*0.21); ctx.stroke();
+        // lower lashes
+        ctx.lineWidth = s*0.012;
+        ctx.beginPath(); ctx.moveTo(ex+lashDir*s*0.08,ey+s*0.14); ctx.lineTo(ex+lashDir*s*0.11,ey+s*0.18); ctx.stroke();
+        // white of eye
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex,ey+s*0.02,s*0.12,s*0.16,0,0,Math.PI*2); ctx.fill();
+        // iris with multi-layer gradient
+        const ig1 = ctx.createRadialGradient(ex,ey-s*0.01,s*0.01,ex,ey+s*0.04,s*0.11);
+        ig1.addColorStop(0,eye); ig1.addColorStop(0.5,eyeDark); ig1.addColorStop(1,'#0a0015');
+        ctx.fillStyle = ig1; ctx.beginPath(); ctx.ellipse(ex,ey+s*0.03,s*0.095,s*0.13,0,0,Math.PI*2); ctx.fill();
+        // iris ring highlight
+        ctx.strokeStyle = eye; ctx.lineWidth = s*0.01; ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.ellipse(ex,ey+s*0.03,s*0.07,s*0.1,0,0,Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        // pupil (vertical cat slit)
+        ctx.fillStyle = '#050010'; ctx.beginPath(); ctx.ellipse(ex,ey+s*0.04,s*0.02,s*0.075,0,0,Math.PI*2); ctx.fill();
+        // large highlight (upper left)
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex-s*0.04,ey-s*0.04,s*0.045,0,Math.PI*2); ctx.fill();
+        // medium highlight (lower right)
+        ctx.beginPath(); ctx.arc(ex+s*0.03,ey+s*0.08,s*0.022,0,Math.PI*2); ctx.fill();
+        // tiny sparkle highlights
+        ctx.beginPath(); ctx.arc(ex+sx*s*0.01,ey-s*0.01,s*0.012,0,Math.PI*2); ctx.fill();
+        star4(ex-sx*s*0.03,ey+s*0.02,s*0.015,'rgba(255,255,255,0.8)');
+        // lower lid line
+        ctx.strokeStyle = '#1a0a20'; ctx.lineWidth = s*0.012;
+        ctx.beginPath(); ctx.moveTo(ex-s*0.1,ey+s*0.13); ctx.quadraticCurveTo(ex,ey+s*0.17,ex+s*0.1,ey+s*0.13); ctx.stroke();
+      }
+    }
+
+    // whiskers (delicate, curved, out toward the cheeks)
+    ctx.strokeStyle = 'rgba(90,55,70,0.22)'; ctx.lineWidth = s*0.01; ctx.lineCap = 'round';
+    for (const sx of [-1,1]) {
+      for (let w = 0; w < 3; w++) {
+        const wy = fy+s*(0.22+w*0.055);
+        ctx.beginPath(); ctx.moveTo(sx*s*0.26,wy);
+        ctx.quadraticCurveTo(sx*s*0.42,wy+(w-1)*s*0.02,sx*s*0.56,wy+(w-1)*s*0.05); ctx.stroke();
+      }
+    }
+
+    // blush (soft gradient circles)
+    for (const sx of [-1,1]) {
+      const bg2 = ctx.createRadialGradient(sx*s*0.3,fy+s*0.24,s*0.01,sx*s*0.3,fy+s*0.24,s*0.08);
+      bg2.addColorStop(0,'rgba(255,90,130,0.4)'); bg2.addColorStop(1,'rgba(255,90,130,0)');
+      ctx.fillStyle = bg2; ctx.beginPath(); ctx.arc(sx*s*0.3,fy+s*0.24,s*0.08,0,Math.PI*2); ctx.fill();
+    }
+
+    // nose (subtle shadow + tiny dot)
+    const noseSh = ctx.createRadialGradient(0,fy+s*0.2,0,0,fy+s*0.2,s*0.06);
+    noseSh.addColorStop(0,'rgba(200,130,110,0.3)'); noseSh.addColorStop(1,'rgba(200,130,110,0)');
+    ctx.fillStyle = noseSh; ctx.beginPath(); ctx.arc(0,fy+s*0.2,s*0.06,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#f0a0a0'; ctx.beginPath(); ctx.arc(0,fy+s*0.22,s*0.015,0,Math.PI*2); ctx.fill();
+
+    // mouth
+    ctx.strokeStyle = '#c03060'; ctx.lineWidth = s*0.03; ctx.lineCap = 'round';
+    if (expr === 2) {
+      ctx.beginPath(); ctx.moveTo(-s*0.06,fy+s*0.3); ctx.lineTo(0,fy+s*0.33); ctx.lineTo(s*0.06,fy+s*0.3); ctx.stroke();
+      ctx.fillStyle = '#ff8090'; ctx.beginPath(); ctx.ellipse(0,fy+s*0.36,s*0.035,s*0.04,0,0,Math.PI*2); ctx.fill();
+    } else if (expr === 3) {
+      ctx.beginPath(); ctx.moveTo(-s*0.08,fy+s*0.28);
+      ctx.lineTo(-s*0.025,fy+s*0.33); ctx.lineTo(0,fy+s*0.3);
+      ctx.lineTo(s*0.025,fy+s*0.33); ctx.lineTo(s*0.08,fy+s*0.28); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(-s*0.06,fy+s*0.3); ctx.lineTo(0,fy+s*0.33); ctx.lineTo(s*0.06,fy+s*0.3); ctx.stroke();
+    }
+    // subtle lip color
+    ctx.fillStyle = 'rgba(240,140,160,0.25)';
+    ctx.beginPath(); ctx.ellipse(0,fy+s*0.31,s*0.05,s*0.02,0,0,Math.PI*2); ctx.fill();
+
+    // accessory
+    if (acc === 'bow') bow(s*0.36,fy-s*0.52,s*0.18,'#ff4090');
+    else if (acc === 'bell') {
+      ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(0,fy+s*0.58,s*0.07,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#c0a000'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0,fy+s*0.58,s*0.07,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = '#ff3060'; ctx.lineWidth = s*0.035;
+      ctx.beginPath(); ctx.arc(0,fy+s*0.52,s*0.2,Math.PI*0.25,Math.PI*0.75); ctx.stroke();
+    }
+    else if (acc === 'star') star5(s*0.34,fy-s*0.5,s*0.13,'#ffd740');
+    else if (acc === 'heart') heart(-s*0.34,fy-s*0.52,s*0.11,'#ff4080');
+    else if (acc === 'fish') fishSticker(s*0.4,fy+s*0.6,s*0.18,'#80c0ff');
+    ctx.restore();
+  };
+
+  // ── compose: fewer but LARGER stickers for more visible detail ──
+  // [hair, hairDark, eye, eyeDark, hairHL, shape, accessory, expression]
+  const P = [
+    ['#ff60b8','#c03080','#7a3aff','#4a1ab0','#ffb0e0', 0,'bow',  0],
+    ['#4aa0ff','#2060b0','#20a0ff','#1060a0','#a0d8ff', 1,'bell', 1],
+    ['#ffc840','#c09020','#c08020','#806010','#fff0a0', 0,'star', 2],
+    ['#2a2040','#18102a','#00c8b0','#008070','#6a5080', 1,'heart',3],
+    ['#b860ff','#7030c0','#ff30a0','#c01070','#e0b0ff', 0,'fish', 0],
+    ['#ff7080','#c04050','#d04060','#901030','#ffb0b8', 1,'bow',  1],
+    ['#60ffc0','#30b080','#10a070','#087050','#b0ffe0', 0,'bell', 2],
+    ['#e0a0ff','#a060c0','#9040d0','#602090','#f0d0ff', 1,'star', 3],
+  ];
+  const girls = [
+    [90,  85,  72, 0], [350, 75,  66, 1], [200, 220, 78, 2],
+    [430, 240, 60, 3], [80,  370, 68, 4], [320, 370, 74, 5],
+    [460, 430, 56, 6], [180, 470, 62, 7],
+  ];
+  for (const [gx,gy,gs,pi] of girls) {
+    const p = P[pi]; catGirl(gx,gy,gs,p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
+  }
+
+  // maneki-neko mascots in gaps
+  for (const [mx,my,ms] of [[256,38,22],[18,180,20],[490,240,18],[220,330,20],[440,460,18],[120,140,16]]) manekiNeko(mx,my,ms);
+
+  // fish stickers
+  for (const [fx,fy,fs,fc] of [[300,180,14,'#ffa0c0'],[50,360,12,'#a0d0ff'],[480,120,10,'#ffc080'],[200,480,12,'#c0a0ff']]) fishSticker(fx,fy,fs,fc);
+
+  // paw prints (lots — it's a cat theme)
+  for (let i = 0; i < 14; i++) pawPrint(Math.random()*size,Math.random()*size,6+Math.random()*6,['#ff80b0','#ffb0d0','#b070ff','#ffa0c0'][i%4]);
+
+  // bows
+  for (let i = 0; i < 8; i++) bow(Math.random()*size,Math.random()*size,5+Math.random()*5,['#ff4090','#ff70c0','#e060ff'][i%3]);
+
+  // sakura blossoms
+  for (let i = 0; i < 24; i++) sakura(Math.random()*size,Math.random()*size,6+Math.random()*10,['#ffb0d0','#ffc8e0','#ff90c0','#ffd0e8'][i%4]);
+
+  // hearts everywhere
+  for (let i = 0; i < 22; i++) heart(Math.random()*size,Math.random()*size,4+Math.random()*8,['rgba(255,50,120,0.9)','rgba(255,120,180,0.9)','rgba(200,60,255,0.8)','rgba(255,80,100,0.9)'][i%4]);
+
+  // stars
+  for (let i = 0; i < 16; i++) star5(Math.random()*size,Math.random()*size,4+Math.random()*7,'rgba(255,230,100,0.95)');
+
+  // sparkle stars
+  for (let i = 0; i < 24; i++) star4(Math.random()*size,Math.random()*size,3+Math.random()*6,['rgba(255,255,255,0.95)','rgba(255,200,255,0.9)','rgba(255,220,240,0.9)'][i%3]);
+
+  // sparkle dust
+  for (let i = 0; i < 160; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.5+Math.random()*0.5})`;
+    ctx.fillRect(Math.random()*size,Math.random()*size,1.5+Math.random(),1.5+Math.random());
+  }
+
+  // Japanese text symbols + cat sounds
+  ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const stamps = [['NYA~',100,50,'#ff3080'],['NEKO',400,150,'#b050ff'],['KAWAII',60,380,'#ff6090'],['LOVE',480,440,'#e050a0'],['MEOW',270,470,'#c060ff'],['UWU',380,340,'#ff80b0']];
+  for (const [txt,sx,sy,col] of stamps) {
+    ctx.save(); ctx.translate(sx,sy); ctx.rotate((Math.random()-0.5)*0.4);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeText(txt,0,0);
+    ctx.fillStyle = col; ctx.fillText(txt,0,0);
+    ctx.restore();
+  }
+
+  return c;
+}
+
 // DRAGON — overlapping scales with a jade-green sheen.
 function dragonDecal() {
   const size = 256;
@@ -779,6 +1271,7 @@ function camoUrbanDecal() {
 const DECALS = {
   fire:        fireDecal,
   anime:       animeDecal,
+  animegirl:   animeGirlDecal,
   dragon:      dragonDecal,
   cyber:       cyberDecal,
   carbon:      carbonDecal,
@@ -802,10 +1295,14 @@ const DECALS = {
 };
 
 // Returns a seamless color CanvasTexture for the given decal type (cached).
+// The anime-girl wrap is a designed composition (idol faces, KAWAII FORCE
+// banner) rather than a fine repeating pattern, so it maps at repeat 1 to keep
+// the art large and legible; everything else tiles at 2 for surface density.
 export function decalTexture(type) {
   return cached('decal_' + type, () => {
     const make = DECALS[type];
     if (!make) return null;
-    return finalize(make(), { color: true, repeat: 2 });
+    const repeat = type === 'animegirl' ? 1 : 2;
+    return finalize(make(), { color: true, repeat });
   });
 }

@@ -30,7 +30,7 @@ import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { MobileControls } from '../ui/MobileControls.js';
-import { KILL_MULT_BONUS, GUN_PERKS, ARMOR_PERKS } from './RarityPerks.js';
+import { KILL_MULT_BONUS } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
@@ -646,12 +646,24 @@ export class Game {
 
   // ── Shared 24/7 match state (see NetClient / server/) ───────────────────────
 
-  // Fired whenever the net relay pushes a state snapshot. Only takes effect
-  // for a deathmatch that was itself started net-driven (see _startGame) —
-  // a match that began offline stays on the local ServerSim simulation for
-  // its whole duration rather than switching authorities mid-match.
+  // Fired whenever the net relay pushes a state snapshot. If the current
+  // deathmatch started OFFLINE (the WebSocket races page load, so clicking
+  // PLAY quickly lands before it connects — the timer shows a private 8:00),
+  // adopt the shared server state as soon as it arrives: snap the countdown
+  // to the real match time and swap the roster to real players. Better a
+  // one-time timer jump than a whole match on a private clock.
   _onNetState(matchStart, durationMs, roster) {
-    if (!this._isDM || this.state !== 'playing' || !this._netDriven) return;
+    if (!this._isDM || this.state !== 'playing') return;
+    if (!this._netDriven) {
+      this._netDriven = true;
+      this.serverSim.stop();           // hand the roster over to the real server
+      // Release any slots the local sim had flagged as fake remote players so
+      // the real roster below can claim them.
+      for (const b of this.botManager.bots) { b.isHumanSlot = false; b._netId = null; }
+      this._netSlots.clear();
+      this.net.sendHello(this.player.name);
+      console.info('[net] match server state adopted mid-match — timer synced to the shared 24/7 match');
+    }
     const remaining = durationMs / 1000 - (Date.now() - matchStart) / 1000;
     this._modeTimer = THREE.MathUtils.clamp(remaining, 0, durationMs / 1000);
     this._applyNetRoster(roster);
@@ -1099,7 +1111,7 @@ export class Game {
     const def = this.weaponSystem.currentDef;
     if (!def || this._tpsWeaponId === def.id) return;
     this._tpsWeaponId = def.id;
-    const built = buildWeaponModel(def);
+    const built = buildWeaponModel(def, { procedural: true });
     ud.attachWeapon(built?.group || null, def.kind === 'melee');
   }
 

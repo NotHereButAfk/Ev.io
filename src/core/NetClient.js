@@ -26,21 +26,26 @@ export class NetClient {
   }
 
   connect() {
-    if (!this.enabled || this.ws) return;
+    if (!this.enabled) { console.info('[net] no VITE_WS_URL configured — using local-only match simulation'); return; }
+    if (this.ws) return;
     this._open();
   }
 
   _open() {
     let ws;
-    try { ws = new WebSocket(this.url); } catch { this._scheduleReconnect(); return; }
+    try { ws = new WebSocket(this.url); } catch (e) { console.warn('[net] connect failed:', e?.message); this._scheduleReconnect(); return; }
     this.ws = ws;
     ws.onopen = () => {
       this.connected = true;
       this._reconnectDelay = RECONNECT_BASE_MS;
+      console.info(`[net] connected to match server ${this.url}`);
       this.sendHello(this._name);
     };
     ws.onmessage = (ev) => this._onMessage(ev);
-    ws.onclose = () => { this.connected = false; this.ws = null; this._scheduleReconnect(); };
+    ws.onclose = () => {
+      if (this.connected) console.warn('[net] match server connection lost — retrying in background');
+      this.connected = false; this.ws = null; this._scheduleReconnect();
+    };
     ws.onerror = () => { try { ws.close(); } catch { /* onclose handles reconnect */ } };
   }
 

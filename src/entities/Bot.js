@@ -124,12 +124,24 @@ export class Bot {
     // animates via its own skeletal mixer).
     this._rig = this._isHuman ? null : rigCharacterLimbs(this.mesh);
 
-    // The human model matches the third-person player, which carries no visible
-    // weapon mesh — so human bots skip the weapon attachment entirely.
-    const weaponId  = this._isSwordBot ? 'sword' : 'm4';
+    const weaponId = this._isSwordBot ? 'sword' : 'm4';
+
+    // Human bots hold their weapon in the rigged right hand — same attach +
+    // hold-pose animation as the player's third-person body. noHit keeps the
+    // weapon meshes out of hitscan raycasts (shooting the gun isn't a hit).
+    if (this._isHuman && this.mesh.userData.attachWeapon) {
+      const def = getWeapon(weaponId);
+      if (def) {
+        const { group: wm } = buildWeaponModel(def, { procedural: true });
+        wm.traverse(o => { if (o.isMesh) o.userData.noHit = true; });
+        this.mesh.userData.attachWeapon(wm, this._isSwordBot);
+        this._weaponMesh = null; // hand-held; no procedural weapon animation
+      }
+    }
+
     const weaponDef = !this._isHuman && getWeapon(weaponId);
     if (weaponDef) {
-      const { group: wm } = buildWeaponModel(weaponDef);
+      const { group: wm } = buildWeaponModel(weaponDef, { procedural: true });
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
       if (this._isSwordBot) {
         // Sword low guard: right hand at mid-chest, blade angled ~40° forward-up
@@ -281,7 +293,12 @@ export class Bot {
 
     let moveTarget = null;
     if (engaged) {
-      this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
+      // Face the player. The rig's forward is +Z — the aim and strafe layers
+      // both assume rotation.y == atan2(dx, dz). Object3D.lookAt aims the -Z
+      // axis instead, which faced the model backwards and played the walk
+      // cycle in reverse (moonwalk).
+      this.mesh.rotation.y = Math.atan2(player.position.x - this.position.x,
+                                        player.position.z - this.position.z);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
         // AR bots shoot while closing in; sword bots only melee
@@ -307,7 +324,8 @@ export class Bot {
       this._wanderDir.subVectors(this.wanderTarget, this.position);
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
-        this.mesh.lookAt(this.wanderTarget.x, this.position.y + 1.08, this.wanderTarget.z);
+        this.mesh.rotation.y = Math.atan2(this.wanderTarget.x - this.position.x,
+                                          this.wanderTarget.z - this.position.z);
       }
     }
 

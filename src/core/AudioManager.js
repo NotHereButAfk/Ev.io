@@ -245,6 +245,139 @@ export class AudioManager {
     lfo.stop(t + 0.24); osc.stop(t + 0.24); sub.stop(t + 0.24); spark.stop(t + 0.18);
   }
 
+  // Anime-girl "ah~♪" — a soft feminine vocal chirp: slow vocal vibrato,
+  // rising-then-falling intonation, and two parallel formant filters so it
+  // reads as a voice rather than a synth beep. Kept cute, not sultry.
+  playWaifuShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Slow voice-like vibrato (a human wobble, not the fast kawaii shimmer).
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 6.5;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 14;
+    lfo.connect(lfoGain);
+
+    // The "ah~": quick lift then a gentle falling sigh contour.
+    const osc = this.ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(720, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(470, t + 0.32);
+    lfoGain.connect(osc.frequency);
+
+    // Two vocal formants in parallel ("a" vowel-ish), mixed back together.
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.frequency.value = 950;  f1.Q.value = 2.0;
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.frequency.value = 2500; f2.Q.value = 3.0;
+    const mix = this.ctx.createGain();
+    mix.gain.value = 1;
+    const gain = this._envGain(0.32, 0.03, 0.3, t); // soft attack — breathy, not clicky
+    osc.connect(f1).connect(mix);
+    osc.connect(f2).connect(mix);
+    mix.connect(gain).connect(this.master);
+
+    // Faint breath layer under the voice. The noise buffer is identical every
+    // shot, so generate it once and reuse it — one AudioBuffer can back many
+    // source nodes, avoiding a fresh alloc + fill on every rapid-fire call.
+    const breath = this.ctx.createBufferSource();
+    breath.buffer = this._breathNoise();
+    const bf = this.ctx.createBiquadFilter();
+    bf.type = 'bandpass'; bf.frequency.value = 1800; bf.Q.value = 0.8;
+    const bGain = this._envGain(0.05, 0.02, 0.16, t);
+    breath.connect(bf).connect(bGain).connect(this.master);
+
+    lfo.start(t); osc.start(t); breath.start(t);
+    lfo.stop(t + 0.36); osc.stop(t + 0.36);
+  }
+
+  // Shouted "FIRE-BALL!" incantation — a formant-synth caricature of the word
+  // (two vowel segments with moving formants over a sawtooth voice) with a
+  // fricative "F" burst up front and a fireball whoosh + sub thump underneath.
+  playFireballShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Voice source — shout pitch contour: rises on "FI-", drops on "-BALL".
+    const voice = this.ctx.createOscillator();
+    voice.type = 'sawtooth';
+    voice.frequency.setValueAtTime(240, t);
+    voice.frequency.linearRampToValueAtTime(300, t + 0.10);   // FI (rising)
+    voice.frequency.linearRampToValueAtTime(210, t + 0.24);   // BALL (falling)
+    voice.frequency.linearRampToValueAtTime(170, t + 0.42);
+
+    // Two moving formants: /aɪ/ ("fire") then /ɔː/ ("ball").
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.Q.value = 4.0;
+    f1.frequency.setValueAtTime(760, t);
+    f1.frequency.linearRampToValueAtTime(880, t + 0.14);      // ai
+    f1.frequency.setValueAtTime(600, t + 0.20);               // b→aw
+    f1.frequency.linearRampToValueAtTime(460, t + 0.42);
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.Q.value = 5.0;
+    f2.frequency.setValueAtTime(1500, t);
+    f2.frequency.linearRampToValueAtTime(1950, t + 0.14);
+    f2.frequency.setValueAtTime(950, t + 0.20);
+    f2.frequency.linearRampToValueAtTime(720, t + 0.42);
+
+    // Word envelope with a plosive dip for the "B".
+    const vGain = this.ctx.createGain();
+    vGain.gain.setValueAtTime(0, t);
+    vGain.gain.linearRampToValueAtTime(0.34, t + 0.02);       // FI attack
+    vGain.gain.setValueAtTime(0.30, t + 0.15);
+    vGain.gain.linearRampToValueAtTime(0.02, t + 0.185);      // b closure
+    vGain.gain.linearRampToValueAtTime(0.36, t + 0.215);      // BALL burst
+    vGain.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+    const vMix = this.ctx.createGain(); vMix.gain.value = 1;
+    voice.connect(f1).connect(vMix);
+    voice.connect(f2).connect(vMix);
+    vMix.connect(vGain).connect(this.master);
+
+    // "F" fricative — a short high-passed noise hiss right at the front.
+    const fric = this.ctx.createBufferSource();
+    fric.buffer = this._breathNoise();
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 3200;
+    const fGain = this._envGain(0.16, 0.005, 0.07, t);
+    fric.connect(hp).connect(fGain).connect(this.master);
+
+    // Fireball launch under the word: sub thump + rising whoosh.
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(120, t + 0.20);
+    sub.frequency.exponentialRampToValueAtTime(45, t + 0.55);
+    const sGain = this._envGain(0.5, 0.01, 0.4, t + 0.20);
+    sub.connect(sGain).connect(this.master);
+
+    const whoosh = this.ctx.createBufferSource();
+    whoosh.buffer = this._breathNoise();
+    whoosh.playbackRate.value = 0.45;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(500, t + 0.20);
+    lp.frequency.exponentialRampToValueAtTime(3200, t + 0.50);
+    const wGain = this._envGain(0.32, 0.03, 0.33, t + 0.20);
+    whoosh.connect(lp).connect(wGain).connect(this.master);
+
+    voice.start(t); voice.stop(t + 0.50);
+    fric.start(t);
+    sub.start(t + 0.20); sub.stop(t + 0.60);
+    whoosh.start(t + 0.20);
+  }
+
+  // Cached 0.2s decaying-noise buffer for the breath layer, built on first use.
+  _breathNoise() {
+    if (this._breathBuf) return this._breathBuf;
+    const dur = 0.2;
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    this._breathBuf = buf;
+    return buf;
+  }
+
   // Sci-fi laser zap — descending saw with a metallic ring.
   playLaserShot() {
     if (!this.ctx) return;
@@ -285,12 +418,95 @@ export class AudioManager {
     noise.stop(t + 0.32); osc.stop(t + 0.26);
   }
 
+  // Prism mythic — crystalline refraction zap: three harmonic pings cascading
+  // down like light splitting through glass, over a bright laser body and an
+  // airy shimmer so it reads "energy through a crystal", not a plain pew.
+  playPrismShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // cascading refraction pings
+    for (const [freq, dt] of [[2600, 0.0], [1950, 0.035], [1470, 0.07]]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t + dt);
+      o.frequency.exponentialRampToValueAtTime(freq * 0.82, t + dt + 0.09);
+      const g = this._envGain(0.16, 0.002, 0.09, t + dt);
+      o.connect(g).connect(this.master);
+      o.start(t + dt); o.stop(t + dt + 0.11);
+    }
+    // laser body for punch
+    const body = this.ctx.createOscillator();
+    body.type = 'triangle';
+    body.frequency.setValueAtTime(980, t);
+    body.frequency.exponentialRampToValueAtTime(220, t + 0.13);
+    const bGain = this._envGain(0.3, 0.002, 0.13, t);
+    body.connect(bGain).connect(this.master);
+    body.start(t); body.stop(t + 0.15);
+    // airy shimmer
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.14);
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 5200;
+    const nGain = this._envGain(0.12, 0.004, 0.13, t);
+    noise.connect(hp).connect(nGain).connect(this.master);
+    noise.start(t); noise.stop(t + 0.16);
+  }
+
+  // Pyroclasm mythic — volcanic blast: a sub-bass eruption drop, a wide slow
+  // whoosh and trailing lava crackles. Deeper, longer and heavier than the
+  // legendary 'fire' sound so the mythic reads bigger.
+  playPyroShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // sub eruption
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(120, t);
+    sub.frequency.exponentialRampToValueAtTime(28, t + 0.32);
+    const sGain = this._envGain(0.85, 0.003, 0.34, t);
+    sub.connect(sGain).connect(this.master);
+    // gritty mid layer
+    const mid = this.ctx.createOscillator();
+    mid.type = 'square';
+    mid.frequency.setValueAtTime(72, t);
+    mid.frequency.exponentialRampToValueAtTime(36, t + 0.24);
+    const mGain = this._envGain(0.22, 0.004, 0.24, t);
+    mid.connect(mGain).connect(this.master);
+    // big slow whoosh
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this._noiseBuffer(0.42);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(3400, t);
+    lp.frequency.exponentialRampToValueAtTime(240, t + 0.38);
+    const nGain = this._envGain(0.8, 0.003, 0.4, t);
+    noise.connect(lp).connect(nGain).connect(this.master);
+    // trailing lava crackles
+    for (const dt of [0.08, 0.15, 0.23]) {
+      const c = this.ctx.createBufferSource();
+      c.buffer = this._noiseBuffer(0.04);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1400 + Math.random() * 1400;
+      bp.Q.value = 8;
+      const cGain = this._envGain(0.18, 0.002, 0.035, t + dt);
+      c.connect(bp).connect(cGain).connect(this.master);
+      c.start(t + dt); c.stop(t + dt + 0.05);
+    }
+    sub.start(t); mid.start(t); noise.start(t);
+    sub.stop(t + 0.38); mid.stop(t + 0.28); noise.stop(t + 0.44);
+  }
+
   // Dispatch a skin's custom shoot sound; returns false if there's no override.
   playSkinShot(soundId) {
     switch (soundId) {
       case 'anime': this.playAnimeShot(); return true;
+      case 'waifu': this.playWaifuShot(); return true;
       case 'laser': this.playLaserShot(); return true;
       case 'fire':  this.playFireShot();  return true;
+      case 'fireball': this.playFireballShot(); return true;
+      case 'prism': this.playPrismShot(); return true;
+      case 'pyro':  this.playPyroShot();  return true;
       case 'meow':  this.playMeowShot();  return true;
       case 'uwu':   this.playUwuShot();   return true;
       case 'bark':  this.playBarkShot();  return true;

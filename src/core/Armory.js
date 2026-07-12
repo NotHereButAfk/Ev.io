@@ -1,8 +1,8 @@
 // Per-weapon cosmetic skin storage, backed by localStorage.
 // Each weapon has an independently equipped skin.
 
-import { WEAPON_SKINS, getWeaponSkin } from '../weapons/WeaponSkins.js';
-import { SWORD_SKINS, getSwordSkin } from '../weapons/SwordSkins.js';
+import { getWeaponSkin } from '../weapons/WeaponSkins.js';
+import { getSwordSkin } from '../weapons/SwordSkins.js';
 
 const _KEY = 'sio_armory';
 
@@ -14,7 +14,8 @@ function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 
 export const Armory = {
   getSkinId(weaponId, isSword = false) {
-    return _load()[weaponId] || (isSword ? SWORD_SKINS[0].id : WEAPON_SKINS[0].id);
+    // No catalog default any more — an unset weapon simply has no skin (null).
+    return _load()[weaponId] || null;
   },
 
   // True only if the player has explicitly equipped a skin for this weapon
@@ -32,7 +33,9 @@ export const Armory = {
     return Array.isArray(d.__owned) ? d.__owned : [];
   },
   ownsSkin(skinId) {
-    return this.ownedSkins().includes(skinId);
+    if (this.ownedSkins().includes(skinId)) return true;
+    // Every catalog finish is free — available on every gun.
+    return !!(getWeaponSkin(skinId) || getSwordSkin(skinId));
   },
   grantSkin(skinId) {
     const d = _load();
@@ -59,8 +62,8 @@ export const Armory = {
     const map = new Map();
     for (const w of weapons) {
       const isSword = w.kind === 'melee';
-      const skinId  = d[w.id] || (isSword ? SWORD_SKINS[0].id : WEAPON_SKINS[0].id);
-      map.set(w.id, { skin: isSword ? getSwordSkin(skinId) : getWeaponSkin(skinId), isSword });
+      const skinId  = d[w.id] || null;
+      map.set(w.id, { skin: skinId ? (isSword ? getSwordSkin(skinId) : getWeaponSkin(skinId)) : null, isSword });
     }
     return map;
   },

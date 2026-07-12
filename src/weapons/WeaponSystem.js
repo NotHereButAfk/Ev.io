@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WEAPONS } from './weaponDefs.js';
-import { buildWeaponModel } from './WeaponModels.js';
+import { buildWeaponModel, onWeaponModelsReady } from './WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 
@@ -9,7 +9,7 @@ const FLASH_LIFE = 0.05;
 
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
 // get the pink muzzle flash + sparkle-heart burst treatment.
-const CUTE_SOUNDS = new Set(['anime', 'meow', 'uwu', 'bark', 'sparkle']);
+const CUTE_SOUNDS = new Set(['anime', 'waifu', 'meow', 'uwu', 'bark', 'sparkle']);
 // Fire-sound skins get an orange/red muzzle flash + ember burst.
 const FIRE_SOUNDS = new Set(['fire']);
 
@@ -138,6 +138,26 @@ export class WeaponSystem {
     }
     this._setActiveModel(0);
     this._buildArm();
+
+    // The viewmodels above are procedural (the GLB loads async and is rarely
+    // ready this early). Swap in the detailed Blender models once it arrives.
+    onWeaponModelsReady(() => this._refreshModels());
+  }
+
+  // Rebuild every viewmodel (e.g. after the weapon GLB finishes loading),
+  // preserving visibility and any applied cosmetic state.
+  _refreshModels() {
+    for (const w of this.allWeapons) {
+      const old = this.models.get(w.id);
+      const { group, muzzle } = buildWeaponModel(w);
+      group.visible = old ? old.group.visible : false;
+      if (old) this.kickGroup.remove(old.group);
+      this.kickGroup.add(group);
+      this.models.set(w.id, { group, muzzle });
+    }
+    if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
+    if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
+    if (this.swordSkin) this.setSwordSkin(this.swordSkin);
   }
 
   _buildArm() {
