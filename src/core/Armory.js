@@ -34,9 +34,8 @@ export const Armory = {
   },
   ownsSkin(skinId) {
     if (this.ownedSkins().includes(skinId)) return true;
-    // Common, epic and legendary finishes are free — available on every gun.
-    const s = getWeaponSkin(skinId) || getSwordSkin(skinId);
-    return s?.rarity === 'common' || s?.rarity === 'epic' || s?.rarity === 'legendary';
+    // Every catalog finish is free — available on every gun.
+    return !!(getWeaponSkin(skinId) || getSwordSkin(skinId));
   },
   grantSkin(skinId) {
     const d = _load();

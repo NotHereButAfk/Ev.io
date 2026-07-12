@@ -293,6 +293,80 @@ export class AudioManager {
     lfo.stop(t + 0.36); osc.stop(t + 0.36);
   }
 
+  // Shouted "FIRE-BALL!" incantation — a formant-synth caricature of the word
+  // (two vowel segments with moving formants over a sawtooth voice) with a
+  // fricative "F" burst up front and a fireball whoosh + sub thump underneath.
+  playFireballShot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Voice source — shout pitch contour: rises on "FI-", drops on "-BALL".
+    const voice = this.ctx.createOscillator();
+    voice.type = 'sawtooth';
+    voice.frequency.setValueAtTime(240, t);
+    voice.frequency.linearRampToValueAtTime(300, t + 0.10);   // FI (rising)
+    voice.frequency.linearRampToValueAtTime(210, t + 0.24);   // BALL (falling)
+    voice.frequency.linearRampToValueAtTime(170, t + 0.42);
+
+    // Two moving formants: /aɪ/ ("fire") then /ɔː/ ("ball").
+    const f1 = this.ctx.createBiquadFilter();
+    f1.type = 'bandpass'; f1.Q.value = 4.0;
+    f1.frequency.setValueAtTime(760, t);
+    f1.frequency.linearRampToValueAtTime(880, t + 0.14);      // ai
+    f1.frequency.setValueAtTime(600, t + 0.20);               // b→aw
+    f1.frequency.linearRampToValueAtTime(460, t + 0.42);
+    const f2 = this.ctx.createBiquadFilter();
+    f2.type = 'bandpass'; f2.Q.value = 5.0;
+    f2.frequency.setValueAtTime(1500, t);
+    f2.frequency.linearRampToValueAtTime(1950, t + 0.14);
+    f2.frequency.setValueAtTime(950, t + 0.20);
+    f2.frequency.linearRampToValueAtTime(720, t + 0.42);
+
+    // Word envelope with a plosive dip for the "B".
+    const vGain = this.ctx.createGain();
+    vGain.gain.setValueAtTime(0, t);
+    vGain.gain.linearRampToValueAtTime(0.34, t + 0.02);       // FI attack
+    vGain.gain.setValueAtTime(0.30, t + 0.15);
+    vGain.gain.linearRampToValueAtTime(0.02, t + 0.185);      // b closure
+    vGain.gain.linearRampToValueAtTime(0.36, t + 0.215);      // BALL burst
+    vGain.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+    const vMix = this.ctx.createGain(); vMix.gain.value = 1;
+    voice.connect(f1).connect(vMix);
+    voice.connect(f2).connect(vMix);
+    vMix.connect(vGain).connect(this.master);
+
+    // "F" fricative — a short high-passed noise hiss right at the front.
+    const fric = this.ctx.createBufferSource();
+    fric.buffer = this._breathNoise();
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 3200;
+    const fGain = this._envGain(0.16, 0.005, 0.07, t);
+    fric.connect(hp).connect(fGain).connect(this.master);
+
+    // Fireball launch under the word: sub thump + rising whoosh.
+    const sub = this.ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(120, t + 0.20);
+    sub.frequency.exponentialRampToValueAtTime(45, t + 0.55);
+    const sGain = this._envGain(0.5, 0.01, 0.4, t + 0.20);
+    sub.connect(sGain).connect(this.master);
+
+    const whoosh = this.ctx.createBufferSource();
+    whoosh.buffer = this._breathNoise();
+    whoosh.playbackRate.value = 0.45;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(500, t + 0.20);
+    lp.frequency.exponentialRampToValueAtTime(3200, t + 0.50);
+    const wGain = this._envGain(0.32, 0.03, 0.33, t + 0.20);
+    whoosh.connect(lp).connect(wGain).connect(this.master);
+
+    voice.start(t); voice.stop(t + 0.50);
+    fric.start(t);
+    sub.start(t + 0.20); sub.stop(t + 0.60);
+    whoosh.start(t + 0.20);
+  }
+
   // Cached 0.2s decaying-noise buffer for the breath layer, built on first use.
   _breathNoise() {
     if (this._breathBuf) return this._breathBuf;
@@ -430,6 +504,7 @@ export class AudioManager {
       case 'waifu': this.playWaifuShot(); return true;
       case 'laser': this.playLaserShot(); return true;
       case 'fire':  this.playFireShot();  return true;
+      case 'fireball': this.playFireballShot(); return true;
       case 'prism': this.playPrismShot(); return true;
       case 'pyro':  this.playPyroShot();  return true;
       case 'meow':  this.playMeowShot();  return true;

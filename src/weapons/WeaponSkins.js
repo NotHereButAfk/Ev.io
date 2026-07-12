@@ -59,6 +59,23 @@ export const WEAPON_SKINS = [
     emissive: 0xcfe8ff, emissiveIntensity: 0.8, energyColor: 0xcfe8ff,
     decal: 'skull', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
     animated: true, animType: 'flicker', animSpeed: 4.5, animMin: 0.45, animMax: 1.2 },
+
+  // ── MYTHIC (2): showpieces — total-coverage wraps plus a custom synthesized
+  // shoot sound (see AudioManager.playSkinShot).
+  { id: 'fireball', name: 'Fireball 🔥', rarity: 'mythic', body: 0x1c0a04, accent: 0x0e0502, metal: 0x8a5a40, metalness: 0.55, roughness: 0.40,
+    emissive: 0xff4400, emissiveIntensity: 1.0, energyColor: 0xff5a1e,
+    decal: 'fire', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'flicker', animSpeed: 8.0, animMin: 0.55, animMax: 1.6,
+    shootSound: 'fireball' },   // every shot shouts "FIREBALL!"
+  { // Japanese anime showpiece: the hand-drawn Neko Neon street wrap (cat-girl,
+    // neon kanji signs, lanterns — textures/sakura/wrap.png) over a white base,
+    // warm neon-pink glow, and the cute anime-girl "ah~♪" vocal per shot.
+    id: 'sakura', name: 'Neko Neon 😺', rarity: 'mythic',
+    body: 0xffffff, accent: 0xffffff, metal: 0xffffff, metalness: 0.4, roughness: 0.36,
+    emissive: 0xff5ea0, emissiveIntensity: 0.4, energyColor: 0xff5ea0,
+    decal: 'animegirl', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.7,
+    shootSound: 'waifu' },
 ];
 
 const _hsl = new THREE.Color();
