@@ -1,0 +1,51 @@
+name: Deploy to VPS
+
+# Build the Vite site and rsync dist/ to the kyrx.live VPS over SSH on every
+# push to main. Set these repo secrets (Settings → Secrets and variables →
+# Actions):
+#   VPS_HOST     the VPS IP or hostname (e.g. kyrx.live or 203.0.113.7)
+#   VPS_USER     SSH user (e.g. root or deploy)
+#   VPS_SSH_KEY  PRIVATE key whose public half is in that user's
+#                ~/.ssh/authorized_keys on the VPS
+#                (generate with: ssh-keygen -t ed25519 -f deploy_key -N "")
+#   VPS_PATH     web root the site is served from (e.g. /var/www/kyrx.live/html)
+#   VPS_PORT     optional — SSH port if not 22
+#
+# Optional: VITE_WS_URL — URL of the 24/7 match relay (see server/README.md).
+# The VPS can host it too (it keeps a Node process alive, unlike shared
+# hosting): run server/ under systemd or pm2 and set this to wss://kyrx.live/ws
+# (or ws://HOST:PORT) so clients share one live match.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Rsync dist/ to VPS
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }}" \
+            dist/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH }}/"
