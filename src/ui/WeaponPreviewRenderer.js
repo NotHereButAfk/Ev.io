@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from '../weapons/SwordSkins.js';
@@ -24,8 +25,13 @@ export class WeaponPreviewRenderer {
     this._camera.position.set(0.38, 0.16, 0.58);
     this._camera.lookAt(0, 0, 0);
 
-    // Lighting
-    this._scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    // Lighting — the room environment is what makes the metallic gun finishes
+    // read; punctual lights alone leave them near-black.
+    const pmrem = new THREE.PMREMGenerator(this._renderer);
+    this._scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this._renderer.toneMappingExposure = 1.15;
+    this._scene.add(new THREE.AmbientLight(0xffffff, 0.35));
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
     key.position.set(2, 3, 3);
     this._scene.add(key);

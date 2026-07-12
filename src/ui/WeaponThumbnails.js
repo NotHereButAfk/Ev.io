@@ -8,10 +8,33 @@
  *   const src = getWeaponThumb(weaponId);     // data-URL or null (use icon fallback)
  */
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { buildWeaponModel, preloadWeaponModels } from '../weapons/WeaponModels.js';
 import { applyWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin } from '../weapons/SwordSkins.js';
+
+// Studio-style scene shared by both thumbnail paths. The guns are largely
+// metallic, and metals lit only by punctual lights render near-black — the
+// PMREM room environment is what makes the finishes actually read.
+function _studio(renderer, scene) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(2.5, 3, 4); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.5); fill.position.set(-3, 1, 2); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffe0b0, 0.45); rim.position.set(0, -2, -3); scene.add(rim);
+}
+
+
+// Place the camera along the standard three-quarter direction at a distance
+// where the frustum comfortably contains a unit-normalised model.
+const _camDir = new THREE.Vector3(0.55, 0.28, 0.9).normalize();
+function _fitCamera(camera) {
+  const dist = (0.5 * 0.88) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.35;
+  camera.position.copy(_camDir).multiplyScalar(dist);
+  camera.lookAt(0, 0, 0);
+}
 
 const _cache = new Map();
 let _warmed = false;
@@ -29,12 +52,9 @@ function _ensureLive() {
   renderer.setSize(SIZE, SIZE);
   renderer.setPixelRatio(1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.15;
   const scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(2.5, 3, 4); scene.add(key);
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.5); fill.position.set(-3, 1, 2); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffe0b0, 0.4); rim.position.set(0, -2, -3); scene.add(rim);
+  _studio(renderer, scene);
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
   _live = { renderer, scene, camera };
   return _live;
@@ -66,11 +86,12 @@ export function renderWeaponSkinned(weaponDef, skin) {
   g.rotation.set(0.12, -0.5, 0.04);
   const sz = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
   const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
-  g.scale.setScalar(0.95 / maxDim);
+  g.scale.setScalar(0.88 / maxDim);
   const c = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
   g.position.sub(c);
-  camera.position.set(0.55, 0.28, 0.9);
-  camera.lookAt(0, 0, 0);
+  // Camera distance derived from the FOV so a 0.88-unit model always fits
+  // with margin, whatever its aspect (pistols used to clip the frame).
+  _fitCamera(camera);
   renderer.render(scene, camera);
   const url = renderer.domElement.toDataURL('image/png');
   scene.remove(g);
@@ -107,16 +128,12 @@ function _generate() {
   renderer.setSize(SIZE, SIZE);
   renderer.setPixelRatio(1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25;
+  renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(2.5, 3, 4); scene.add(key);
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.5); fill.position.set(-3, 1, 2); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffe0b0, 0.4); rim.position.set(0, -2, -3); scene.add(rim);
+  _studio(renderer, scene);
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
-  const _v = new THREE.Vector3();
 
   for (const w of WEAPONS) {
     let built;
@@ -126,16 +143,17 @@ function _generate() {
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     scene.add(g);
 
-    const box = new THREE.Box3().setFromObject(g);
-    const c = box.getCenter(_v.clone());
-    const sz = box.getSize(_v.clone());
-    g.position.sub(c);
-    const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
-    g.scale.setScalar(0.95 / maxDim);
+    // Rotate and scale BEFORE the final centering measurement (see the note in
+    // renderWeaponSkinned — centering computed pre-rotation leaves a residual
+    // offset once the rotation lands on top).
     g.rotation.set(0.12, -0.5, 0.04);
+    const sz = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    const maxDim = Math.max(sz.x, sz.y, sz.z) || 1;
+    g.scale.setScalar(0.88 / maxDim);
+    const c = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+    g.position.sub(c);
 
-    camera.position.set(0.55, 0.28, 0.9);
-    camera.lookAt(0, 0, 0);
+    _fitCamera(camera);
     renderer.render(scene, camera);
     _cache.set(w.id, renderer.domElement.toDataURL('image/png'));
 
