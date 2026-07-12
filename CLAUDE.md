@@ -10,11 +10,14 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   ~30s to load. Log in via `#auth-guest-btn`, start a match via `#play-btn`.
 
 ## Deploy (Hostinger)
+- Live site: **kyrx.live** (as of Jul 2026; the old kyx.io Hostinger site is
+  superseded). The deploy workflow's FTP secrets must point at kyrx.live's
+  hosting — a `530 Login incorrect` failure means they're stale.
 - `.github/workflows/deploy-hostinger.yml` builds + uploads `dist/` over **FTPS**
   (plain FTP times out on Hostinger). Needs repo secrets `FTP_SERVER`,
   `FTP_USERNAME`, `FTP_PASSWORD`; `server-dir: /public_html/`.
 - Every push to `main` auto-deploys. (Old host was Netlify — abandoned; ran out
-  of credits.)
+  of credits. Netlify PR previews still post bot comments — ignore them.)
 - Hostinger here is **static file hosting only** — it cannot run a persistent
   process. See "24/7 match server" below for the one piece that needs a
   different host.
