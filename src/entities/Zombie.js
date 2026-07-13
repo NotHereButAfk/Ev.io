@@ -40,16 +40,18 @@ function buildZombieRigFromGLB(mat) {
   glbScene.traverse(obj => {
     if (!obj.isMesh) return;
     const n = obj.name;
-    if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
+    if (/EyeGlow/.test(n))
+      obj.material = mat.eye;                                         // glow (checked first)
+    else if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
       obj.material = mat.bone;
     else if (/Wound|Blood/.test(n))
       obj.material = mat.blood;
+    else if (/Plate|Armor|Helm|Visor|Guard|Greave|Pauldron|Gaunt|Boot/.test(n))
+      obj.material = mat.armor;                                       // sci-fi combat plate
+    else if (/Suit|Vest|Pant/.test(n))
+      obj.material = mat.suit;                                        // dark undersuit
     else if (/Claw|Thumb/.test(n))
       obj.material = mat.dark;
-    else if (/Vest|Pant/.test(n))
-      obj.material = mat.rag;
-    else if (/EyeGlow/.test(n))
-      obj.material = mat.eye;
     else if (/EyeDark|Socket/.test(n))
       obj.material = mat.dark;
     else
@@ -208,6 +210,22 @@ function makeMats() {
   // Deep socket / interior shadow
   const dark = new THREE.MeshStandardMaterial({ color: 0x030201, roughness: 1.0, metalness: 0.0 });
 
+  // Sci-fi combat armor plate — scuffed dark gunmetal. This is a trooper who
+  // turned, so his kit is still on: helmet, chest/ab plates, pauldrons,
+  // greaves, boots. Weathered but clearly manufactured, not bone.
+  const armor = new THREE.MeshPhysicalMaterial({
+    color: 0x3c444e, roughness: 0.42, metalness: 0.85,
+    clearcoat: 0.4, clearcoatRoughness: 0.35,
+    emissive: new THREE.Color(0x03060c), emissiveIntensity: 0.25,
+  });
+
+  // Undersuit — dark sci-fi bodysuit weave under the armor (a step below the
+  // plates so the trooper's kit reads as layered, not one black mass).
+  const suit = new THREE.MeshStandardMaterial({
+    color: 0x1b2027, roughness: 0.8, metalness: 0.15,
+    normalMap: cN, normalScale: new THREE.Vector2(0.5, 0.5),
+  });
+
   // Fresh wet blood — clearcoat 1.0 for genuine wet sheen
   const blood = new THREE.MeshPhysicalMaterial({
     color: 0x8b0000, roughness: 0.09, metalness: 0.0,
@@ -226,7 +244,7 @@ function makeMats() {
     clearcoat: 0.55, clearcoatRoughness: 0.28,
   });
 
-  return { flesh, skin2, faceSkin, rag, bone, eye, dark, blood, bloodDry, deadFlesh };
+  return { flesh, skin2, faceSkin, rag, bone, eye, dark, blood, bloodDry, deadFlesh, armor, suit };
 }
 
 // ─── Rig builder ──────────────────────────────────────────────────────────────
