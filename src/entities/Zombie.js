@@ -54,9 +54,15 @@ function buildZombieRigFromGLB(mat) {
       obj.material = mat.armor;                                       // sci-fi combat plate
     else if (/Suit|Vest|Pant|Belt|Pouch/.test(n))
       obj.material = mat.suit;                                        // olive fatigues
+    else if (/HairL/.test(n))
+      obj.material = mat.hairL;
     else if (/Hair/.test(n))
       obj.material = mat.hair;
-    else if (/Claw|Thumb/.test(n))
+    else if (/Strap/.test(n))
+      obj.material = mat.strap;
+    else if (/Rot/.test(n))
+      obj.material = mat.deadFlesh;                                   // reddish decay patches
+    else if (/Claw|Thumb|Bolt/.test(n))
       obj.material = mat.dark;
     else if (/EyeDark|Socket/.test(n))
       obj.material = mat.dark;
@@ -220,8 +226,15 @@ function makeMats() {
   // Deep socket / interior shadow
   const dark = new THREE.MeshStandardMaterial({ color: 0x030201, roughness: 1.0, metalness: 0.0 });
 
-  // Matted brown hair
-  const hair = new THREE.MeshStandardMaterial({ color: 0x4a3a26, roughness: 0.95, metalness: 0.0 });
+  // Matted brown hair + lighter streaks
+  const hair  = new THREE.MeshStandardMaterial({ color: 0x4a3a26, roughness: 0.95, metalness: 0.0 });
+  const hairL = new THREE.MeshStandardMaterial({ color: 0x77593a, roughness: 0.92, metalness: 0.0 });
+
+  // Worn leather straps / webbing — warm tan, adds colour against the olive
+  const strap = new THREE.MeshStandardMaterial({
+    color: 0x9a713f, roughness: 0.75, metalness: 0.05,
+    normalMap: cN, normalScale: new THREE.Vector2(0.4, 0.4),
+  });
 
   // Sci-fi combat armor plate — scuffed dark gunmetal. This is a trooper who
   // turned, so his kit is still on: helmet, chest/ab plates, pauldrons,
@@ -263,7 +276,7 @@ function makeMats() {
     clearcoat: 0.55, clearcoatRoughness: 0.28,
   });
 
-  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, hair, blood, bloodDry, deadFlesh, armor, trim, suit };
+  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, hair, hairL, strap, blood, bloodDry, deadFlesh, armor, trim, suit };
 }
 
 // ─── Rig builder ──────────────────────────────────────────────────────────────
