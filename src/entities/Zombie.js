@@ -15,6 +15,17 @@ const ARMED_CFG = {
 
 let _nextId = 5000;
 
+// ─── Visual/stat variants — so waves aren't clone armies ──────────────────────
+// shambler: the base UNIT-73 trooper. runner: armor torn away, toxic-green
+// glow, fast and frail. brute: scaled up, blood-red glow, slow and tanky.
+// Armed zombies always use the shambler look (they need the full kit).
+const VARIANTS = {
+  shambler: { speed: 1.0,  hp: 1.0, dmg: 1.0, scale: 1.0,  anim: 1.0 },
+  runner:   { speed: 1.65, hp: 0.6, dmg: 0.8, scale: 0.94, anim: 1.7, glow: 0x3aff5e,
+              hide: /PlateChest|PlateCollar|PlateBack|PlatePack|PlateAb|PlateBelt|PlateName|PlateAntenna|Pauldron|GreaveThigh|GreaveShin|GuardKnee|PouchCanteen|TrimChest|TrimAb|TrimRail|TrimPauld|TrimBuckle|SocketSeam|SocketNameBand/ },
+  brute:    { speed: 0.72, hp: 2.4, dmg: 1.8, scale: 1.22, anim: 0.75, glow: 0xff2e18 },
+};
+
 // ─── GLB model loader (preloaded once, shared across all zombie instances) ────
 
 let _glbTemplate = null;   // THREE.Group — the raw loaded GLB scene
@@ -98,6 +109,7 @@ function buildZombieRigFromGLB(mat) {
       left:  { hip: get('L_hip'), knee: get('L_knee'), ankle: get('L_ankle') },
       right: { hip: get('R_hip'), knee: get('R_knee'), ankle: get('R_ankle') },
     },
+    jaw: glbScene.getObjectByName('ZJawBone') || null,   // hanging mandible (chatter anim)
     mat, eyeGlow,
   };
 }
@@ -638,10 +650,13 @@ export class Zombie {
    * @param {number}        wave
    * @param {string|null}   armedType  — null | 'pistol' | 'rifle' | 'shotgun'
    */
-  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null) {
+  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null, variant = 'shambler') {
+    const V = VARIANTS[armedType ? 'shambler' : variant] ?? VARIANTS.shambler;
+    this.variant      = armedType ? 'shambler' : variant;
+    this._animMul     = V.anim;
     this.id           = _nextId++;
     this.world        = world;
-    this.maxHealth    = Math.round(80 * hpMult);
+    this.maxHealth    = Math.round(80 * hpMult * V.hp);
     this.health       = this.maxHealth;
     this.alive        = true;
     this.noRespawn    = true;
@@ -649,8 +664,8 @@ export class Zombie {
     this.flashTimer      = 0;
     this.wanderTarget    = spawnPoint.clone();
     this.wanderCooldown  = 0;
-    this.speed           = (1.6 + Math.random() * 0.7) * speedMult;
-    this.attackDamage    = Math.round(14 * (1 + (wave - 1) * 0.12));
+    this.speed           = (1.6 + Math.random() * 0.7) * speedMult * V.speed;
+    this.attackDamage    = Math.round(14 * (1 + (wave - 1) * 0.12) * V.dmg);
     this.lungeTimer      = 0;
     this._dying          = false;
     this._deathT         = 0;
@@ -672,7 +687,20 @@ export class Zombie {
 
     // Build rig — prefer the Blender GLB if already loaded
     const mat = makeMats();
+    // Per-instance skin/cloth tint jitter so even same-variant zombies differ.
+    const hueJit = (Math.random() - 0.5) * 0.05;
+    mat.flesh.color.offsetHSL(hueJit, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.05);
+    mat.suit.color.offsetHSL(hueJit * 0.6, 0, (Math.random() - 0.5) * 0.04);
+    // Variant glow retint (eyes / nodes / veins + the eye point light).
+    if (V.glow) {
+      mat.eye.emissive.setHex(V.glow);
+      mat.eye.color.copy(new THREE.Color(V.glow)).multiplyScalar(0.12);
+    }
     const rig = buildZombieRigFromGLB(mat) ?? buildZombieRig();
+    // Runner: tear the armor off (hide the heavy kit meshes).
+    if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
+    if (V.glow) rig.eyeGlow?.color.setHex(V.glow);
+    if (V.scale !== 1) rig.root.scale.setScalar(V.scale);
     this._rig       = rig;
     this._fleshMat  = rig.mat.flesh;
 
@@ -721,11 +749,12 @@ export class Zombie {
 
   _animate(dt, isMoving) {
     const rig = this._rig;
-    this._animPhase += dt * (isMoving ? 3.2 : 1.0);
+    // Variant gait speed: runners scurry (1.7x), brutes trudge (0.75x).
+    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1);
     const t = this._animPhase;
 
     if (isMoving) {
-      // Walk cycle — legs
+      // Walk cycle — legs (asymmetric shamble: weak left, driving right)
       rig.legs.left.hip.rotation.x   = -Math.sin(t) * 0.18;  // limp
       rig.legs.right.hip.rotation.x  =  Math.sin(t) * 0.30;  // strong stride
       rig.legs.left.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28;
@@ -739,10 +768,12 @@ export class Zombie {
       // Torso sway
       rig.spineGroup.rotation.z = Math.sin(t * 1.3) * 0.065;
 
-      // Arms sway opposite legs (only when unarmed)
+      // Arms sway opposite legs (only when unarmed), elbows dragging behind
       if (!this.armedType) {
         rig.arms.left.shoulder.rotation.x  = -0.65 + Math.sin(t) * 0.18;
         rig.arms.right.shoulder.rotation.x = -0.65 - Math.sin(t) * 0.18;
+        rig.arms.left.elbow.rotation.x     = -0.30 - Math.max(0,  Math.sin(t + 0.5)) * 0.22;
+        rig.arms.right.elbow.rotation.x    = -0.30 - Math.max(0, -Math.sin(t + 0.5)) * 0.22;
       }
     } else {
       // Idle — zero leg rotations
@@ -767,6 +798,13 @@ export class Zombie {
     // Head loll
     rig.headGroup.rotation.z = Math.sin(t * 0.9 + 0.4) * 0.14;
     rig.headGroup.rotation.x = -0.06 + Math.sin(t * 1.1) * 0.05;
+
+    // Jaw chatter — the hanging mandible works while it shambles, snaps wide
+    // during a lunge.
+    if (rig.jaw) {
+      const snap = this.lungeTimer > 0 ? Math.sin((this.lungeTimer / 0.20) * Math.PI) * 0.45 : 0;
+      rig.jaw.rotation.x = 0.10 + Math.abs(Math.sin(t * 1.9)) * 0.28 + snap;
+    }
 
     // Armed zombie — override right arm to aiming pose
     if (this.armedType) {
