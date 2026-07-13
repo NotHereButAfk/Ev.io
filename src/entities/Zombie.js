@@ -650,7 +650,7 @@ export class Zombie {
    * @param {number}        wave
    * @param {string|null}   armedType  — null | 'pistol' | 'rifle' | 'shotgun'
    */
-  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null, variant = 'shambler') {
+  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null, variant = 'shambler', dmgMult = 1) {
     const V = VARIANTS[armedType ? 'shambler' : variant] ?? VARIANTS.shambler;
     this.variant      = armedType ? 'shambler' : variant;
     this._animMul     = V.anim;
@@ -665,7 +665,9 @@ export class Zombie {
     this.wanderTarget    = spawnPoint.clone();
     this.wanderCooldown  = 0;
     this.speed           = (1.6 + Math.random() * 0.7) * speedMult * V.speed;
-    this.attackDamage    = Math.round(14 * (1 + (wave - 1) * 0.12) * V.dmg);
+    // Damage: the survival curve owns wave-based scaling now (dmgMult),
+    // variant applies its own multiplier on top.
+    this.attackDamage    = Math.round(14 * dmgMult * V.dmg);
     this.lungeTimer      = 0;
     this._dying          = false;
     this._deathT         = 0;

@@ -30,11 +30,12 @@ export class ZombieManager {
    * @param {number} wave
    * @param {number} armedRatio  0..1 — fraction of zombies that carry guns
    */
-  spawnWave(count, hpMult, speedMult, wave, armedRatio = 0) {
+  spawnWave(count, hpMult, speedMult, wave, armedRatio = 0, dmgMult = 1) {
     this.clear();
-    // Wave composition: runners join from wave 2, brutes from wave 4 (capped
-    // so a wave is never all tanks). Armed zombies keep the base look.
-    const bruteCap = wave >= 4 ? Math.min(3, 1 + Math.floor((wave - 4) / 3)) : 0;
+    // Wave composition: runners join from wave 2, brutes from wave 4 and scale
+    // up. Roughly ~20% of the wave is brute-eligible by wave 10. Armed zombies
+    // keep the base shambler look.
+    const bruteCap = wave >= 4 ? Math.min(Math.ceil(count * 0.20), 1 + Math.floor((wave - 4) / 2)) : 0;
     let brutes = 0;
     for (let i = 0; i < count; i++) {
       const base = this.world.spawnPoints[i % this.world.spawnPoints.length].clone();
@@ -51,7 +52,7 @@ export class ZombieManager {
         else if (wave >= 2 && r < 0.55) variant = 'runner';
       }
 
-      const z = new Zombie(this.world, base, hpMult, speedMult, wave, armedType, variant);
+      const z = new Zombie(this.world, base, hpMult, speedMult, wave, armedType, variant, dmgMult);
       z.audio = this.audio;
       this.scene.add(z.mesh);
       this.zombies.push(z);
