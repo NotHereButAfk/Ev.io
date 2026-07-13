@@ -41,16 +41,20 @@ function buildZombieRigFromGLB(mat) {
     if (!obj.isMesh) return;
     const n = obj.name;
     if (/EyeGlow/.test(n))
-      obj.material = mat.eye;                                         // glow (checked first)
+      obj.material = mat.eye;                                         // cyan glow (checked first)
+    else if (/Plasma/.test(n))
+      obj.material = mat.glowB;                                       // magenta glow
+    else if (/Trim/.test(n))
+      obj.material = mat.trim;                                        // orange hazard trim
     else if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
       obj.material = mat.bone;
     else if (/Wound|Blood/.test(n))
       obj.material = mat.blood;
-    else if (/Plate|Armor|Helm|Visor|Guard|Greave|Pauldron|Gaunt|Boot/.test(n))
+    else if (/Plate|Armor|Helm|Guard|Greave|Pauldron|Gaunt|Boot/.test(n))
       obj.material = mat.armor;                                       // sci-fi combat plate
-    else if (/Suit|Vest|Pant/.test(n))
-      obj.material = mat.suit;                                        // dark undersuit
-    else if (/Claw|Thumb/.test(n))
+    else if (/Suit|Vest|Pant|Belt|Pouch/.test(n))
+      obj.material = mat.suit;                                        // olive fatigues
+    else if (/Claw|Thumb|Hair/.test(n))
       obj.material = mat.dark;
     else if (/EyeDark|Socket/.test(n))
       obj.material = mat.dark;
@@ -71,7 +75,7 @@ function buildZombieRigFromGLB(mat) {
 
   // Eye glow light attached to the glowing eye mesh
   const eyeGlowMesh = glbScene.getObjectByName('ZEyeGlow');
-  const eyeGlow = new THREE.PointLight(0x14ffb0, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x1ce0ff, 0.85, 1.9, 2);
   // (sky-only lighting) eyeGlow not added to scene
 
   const get = (name) => glbScene.getObjectByName(name) || spineGroup;
@@ -197,13 +201,17 @@ function makeMats() {
     emissive: new THREE.Color(0x050400), emissiveIntensity: 0.05,
   });
 
-  // Glowing eye / infection — cold toxic bio-reactor cyan-green (the sci-fi
-  // tell). Shared by the cyber-eye, chest reactor shard and the crack veins.
-  // Near-black base so the emissive reads as a saturated green under the ACES
-  // tone mapping instead of clipping out to white (same as the gun energy
-  // parts). Large panels bloom worse than tiny eye dots, so keep the base low.
+  // Primary glow — bright cyan reactor light (eyes + chest energy nodes).
+  // Near-black base so the emissive reads as saturated cyan under the ACES
+  // tone mapping instead of clipping to white (same as the gun energy parts).
   const eye = new THREE.MeshStandardMaterial({
-    color: 0x0a2018, emissive: new THREE.Color(0x1effb4), emissiveIntensity: 2.0,
+    color: 0x061a24, emissive: new THREE.Color(0x1ce0ff), emissiveIntensity: 2.0,
+    roughness: 0.30, metalness: 0.0,
+  });
+
+  // Secondary glow — magenta plasma (the power gauntlet + one chest node).
+  const glowB = new THREE.MeshStandardMaterial({
+    color: 0x1a0622, emissive: new THREE.Color(0xc040ff), emissiveIntensity: 2.0,
     roughness: 0.30, metalness: 0.0,
   });
 
@@ -214,16 +222,22 @@ function makeMats() {
   // turned, so his kit is still on: helmet, chest/ab plates, pauldrons,
   // greaves, boots. Weathered but clearly manufactured, not bone.
   const armor = new THREE.MeshPhysicalMaterial({
-    color: 0x3c444e, roughness: 0.42, metalness: 0.85,
+    color: 0x9198a0, roughness: 0.44, metalness: 0.72,
     clearcoat: 0.4, clearcoatRoughness: 0.35,
-    emissive: new THREE.Color(0x03060c), emissiveIntensity: 0.25,
+    emissive: new THREE.Color(0x03060c), emissiveIntensity: 0.15,
   });
 
-  // Undersuit — dark sci-fi bodysuit weave under the armor (a step below the
-  // plates so the trooper's kit reads as layered, not one black mass).
+  // Painted hazard trim — bright unit-orange on the armor edges. Faint glow so
+  // it stays vivid in low light without blooming to white.
+  const trim = new THREE.MeshStandardMaterial({
+    color: 0xff7a1e, roughness: 0.5, metalness: 0.3,
+    emissive: new THREE.Color(0x3a1400), emissiveIntensity: 0.35,
+  });
+
+  // Undersuit — olive-green military fatigues under the armor, torn and dirty.
   const suit = new THREE.MeshStandardMaterial({
-    color: 0x1b2027, roughness: 0.8, metalness: 0.15,
-    normalMap: cN, normalScale: new THREE.Vector2(0.5, 0.5),
+    color: 0x4c5334, roughness: 0.86, metalness: 0.05,
+    normalMap: cN, normalScale: new THREE.Vector2(0.6, 0.6),
   });
 
   // Fresh wet blood — clearcoat 1.0 for genuine wet sheen
@@ -244,7 +258,7 @@ function makeMats() {
     clearcoat: 0.55, clearcoatRoughness: 0.28,
   });
 
-  return { flesh, skin2, faceSkin, rag, bone, eye, dark, blood, bloodDry, deadFlesh, armor, suit };
+  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, blood, bloodDry, deadFlesh, armor, trim, suit };
 }
 
 // ─── Rig builder ──────────────────────────────────────────────────────────────
@@ -406,7 +420,7 @@ function buildZombieRig() {
   });
 
   // Eye glow PointLight
-  const eyeGlow = new THREE.PointLight(0x14ffb0, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x1ce0ff, 0.85, 1.9, 2);
   eyeGlow.position.set(0, 0.264, -0.26); /* (sky-only) not added */
 
   // Temple hollows (sunken areas)
