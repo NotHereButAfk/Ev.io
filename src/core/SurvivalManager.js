@@ -70,19 +70,20 @@ export class SurvivalManager {
     this.betweenWave = false;
     this.waveTimer   = WAVE_TIME_LIMIT;
 
-    // Escalation curve — the zombies get harder every wave: more of them,
-    // more HP, faster gait, more damage per hit, and by mid-game they start
-    // pulling guns. Numbers are steep enough that a run can end; speed is
-    // capped so late waves stay reactable and count is capped so the arena
-    // doesn't stall.
+    // Escalation curve — the zombies get harder every single wave forever:
+    // more of them, more HP, faster (softly capped so runs stay reactable),
+    // more damage, and by mid-game they pull guns. Waves are unlimited; the
+    // only end condition is the player running out of revives.
     const w = this.wave;
-    const count     = Math.min(40, Math.round(4 + (w - 1) * 2.5));
-    const hpMult    = 1 + (w - 1) * 0.35;                     // wave 10 ≈ 4.15x
-    const speedMult = Math.min(2.2, 1 + (w - 1) * 0.10);      // caps at wave 13
+    const count     = Math.min(60, Math.round(4 + (w - 1) * 2.5));
+    const hpMult    = 1 + (w - 1) * 0.35;                     // wave 10 ≈ 4.15x, wave 30 ≈ 11.15x
+    // Soft cap on speed — asymptotically approaches 3.0 so wave 50 is still
+    // faster than wave 20, but not physically impossible to react to.
+    const speedMult = 1 + 2 * (1 - Math.exp(-(w - 1) * 0.10));
     const dmgMult   = 1 + (w - 1) * 0.15;                     // wave 10 ≈ 2.35x
 
-    // Armed escalation — guns start earlier and ramp harder. By wave 15 the
-    // whole arena is armed troopers.
+    // Armed escalation — guns start earlier and ramp harder. From wave 15 the
+    // whole arena is armed troopers, and it never comes back down.
     let armedRatio = 0;
     if      (w >= 15) armedRatio = 0.95;
     else if (w >= 12) armedRatio = 0.80;
