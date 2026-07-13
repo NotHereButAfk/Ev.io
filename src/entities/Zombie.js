@@ -54,7 +54,9 @@ function buildZombieRigFromGLB(mat) {
       obj.material = mat.armor;                                       // sci-fi combat plate
     else if (/Suit|Vest|Pant|Belt|Pouch/.test(n))
       obj.material = mat.suit;                                        // olive fatigues
-    else if (/Claw|Thumb|Hair/.test(n))
+    else if (/Hair/.test(n))
+      obj.material = mat.hair;
+    else if (/Claw|Thumb/.test(n))
       obj.material = mat.dark;
     else if (/EyeDark|Socket/.test(n))
       obj.material = mat.dark;
@@ -164,7 +166,7 @@ function makeMats() {
 
   // Rotting flesh — desaturated gray-olive, like the reference
   const flesh = new THREE.MeshPhysicalMaterial({
-    color: 0x5a6045, roughness: 0.72, metalness: 0.0,
+    color: 0x8a9478, roughness: 0.72, metalness: 0.0,
     clearcoat: 0.14, clearcoatRoughness: 0.65,
     sheen: 0.38, sheenRoughness: 0.65, sheenColor: new THREE.Color(0x1a1f10),
     emissive: new THREE.Color(0x050800), emissiveIntensity: 0.08,
@@ -182,7 +184,7 @@ function makeMats() {
 
   // Face — gaunt skull-like, slightly paler with lividity
   const faceSkin = new THREE.MeshPhysicalMaterial({
-    color: 0x4e5540, roughness: 0.70, metalness: 0.0,
+    color: 0x97a284, roughness: 0.70, metalness: 0.0,
     clearcoat: 0.18, clearcoatRoughness: 0.60,
     sheen: 0.30, sheenRoughness: 0.68, sheenColor: new THREE.Color(0x141810),
     normalMap: sN, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: sR,
@@ -218,6 +220,9 @@ function makeMats() {
   // Deep socket / interior shadow
   const dark = new THREE.MeshStandardMaterial({ color: 0x030201, roughness: 1.0, metalness: 0.0 });
 
+  // Matted brown hair
+  const hair = new THREE.MeshStandardMaterial({ color: 0x4a3a26, roughness: 0.95, metalness: 0.0 });
+
   // Sci-fi combat armor plate — scuffed dark gunmetal. This is a trooper who
   // turned, so his kit is still on: helmet, chest/ab plates, pauldrons,
   // greaves, boots. Weathered but clearly manufactured, not bone.
@@ -236,7 +241,7 @@ function makeMats() {
 
   // Undersuit — olive-green military fatigues under the armor, torn and dirty.
   const suit = new THREE.MeshStandardMaterial({
-    color: 0x4c5334, roughness: 0.86, metalness: 0.05,
+    color: 0x3d442c, roughness: 0.86, metalness: 0.05,
     normalMap: cN, normalScale: new THREE.Vector2(0.6, 0.6),
   });
 
@@ -258,7 +263,7 @@ function makeMats() {
     clearcoat: 0.55, clearcoatRoughness: 0.28,
   });
 
-  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, blood, bloodDry, deadFlesh, armor, trim, suit };
+  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, hair, blood, bloodDry, deadFlesh, armor, trim, suit };
 }
 
 // ─── Rig builder ──────────────────────────────────────────────────────────────
