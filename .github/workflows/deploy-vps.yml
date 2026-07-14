@@ -37,6 +37,18 @@ jobs:
         env:
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
 
+      - name: Debug secret lengths (never prints values, just character counts)
+        env:
+          H: ${{ secrets.VPS_HOST }}
+          U: ${{ secrets.VPS_USER }}
+          K: ${{ secrets.VPS_SSH_KEY }}
+          P: ${{ secrets.VPS_PATH }}
+        run: |
+          echo "VPS_HOST length:    ${#H}"
+          echo "VPS_USER length:    ${#U}"
+          echo "VPS_SSH_KEY length: ${#K}"
+          echo "VPS_PATH length:    ${#P}"
+
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
