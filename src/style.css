@@ -4906,3 +4906,17 @@ html, body { margin: 0; }
 }
 .rnk-rank { color: #5fe9ff !important; font-weight: 700; width: 40px; }
 .rnk-name { font-weight: 600; }
+
+/* ── Night Market: collection-complete panel ──────────────────────────────── */
+.nm-complete {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 48px 32px; margin-top: 12px; text-align: center;
+  background: rgba(10, 14, 20, 0.55);
+  border: 1px solid rgba(95, 233, 255, 0.25); border-radius: 10px;
+}
+.nm-complete-crown { font-size: 44px; filter: drop-shadow(0 0 14px rgba(255, 200, 58, 0.6)); }
+.nm-complete-title {
+  font-size: 20px; font-weight: 800; letter-spacing: 3px; color: #5fe9ff;
+  text-shadow: 0 0 18px rgba(95, 233, 255, 0.45);
+}
+.nm-complete-sub { max-width: 460px; color: #9fb2c8; font-size: 13px; line-height: 1.6; }

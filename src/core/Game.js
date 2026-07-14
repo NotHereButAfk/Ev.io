@@ -593,8 +593,8 @@ export class Game {
       this.hud.addKillFeed('⚠ GRACE PERIOD OVER — FIRST WAVE INCOMING!');
     };
 
-    sm.onWaveStart = (wave, count, hpMult, speedMult, armedRatio = 0) => {
-      this.zombieManager.spawnWave(count, hpMult, speedMult, wave, armedRatio);
+    sm.onWaveStart = (wave, count, hpMult, speedMult, armedRatio = 0, dmgMult = 1) => {
+      this.zombieManager.spawnWave(count, hpMult, speedMult, wave, armedRatio, dmgMult);
       const bonus      = Math.round((hpMult - 1) * 100);
       const armedCount = Math.round(count * armedRatio);
       let   threat     = '';

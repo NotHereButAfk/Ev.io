@@ -9,15 +9,16 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - Headless screenshots for verification: Playwright + swiftshader; GLBs take
   ~30s to load. Log in via `#auth-guest-btn`, start a match via `#play-btn`.
 
-## Deploy (Hostinger)
-- `.github/workflows/deploy-hostinger.yml` builds + uploads `dist/` over **FTPS**
-  (plain FTP times out on Hostinger). Needs repo secrets `FTP_SERVER`,
-  `FTP_USERNAME`, `FTP_PASSWORD`; `server-dir: /public_html/`.
-- Every push to `main` auto-deploys. (Old host was Netlify — abandoned; ran out
-  of credits.)
-- Hostinger here is **static file hosting only** — it cannot run a persistent
-  process. See "24/7 match server" below for the one piece that needs a
-  different host.
+## Deploy (VPS — kyrx.live)
+- Live site: **kyrx.live**, hosted on a **VPS** (as of Jul 2026; supersedes the
+  old kyx.io Hostinger shared hosting, which superseded Netlify — Netlify PR
+  previews still post bot comments; ignore them).
+- `.github/workflows/deploy-vps.yml` builds and **rsyncs `dist/` over SSH** on
+  every push to `main`. Repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+  (private key), `VPS_PATH` (web root), optional `VPS_PORT`.
+- Being a VPS, it can ALSO run the 24/7 match relay (`server/`) under
+  systemd/pm2 — set the `VITE_WS_URL` secret to its ws(s):// URL and clients
+  share one live match. See "24/7 match server" below.
 
 ## 24/7 match server (optional, separate from the static site)
 - `server/` is a standalone Node/WebSocket relay (see `server/README.md`) that

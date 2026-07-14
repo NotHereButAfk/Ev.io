@@ -15,6 +15,17 @@ const ARMED_CFG = {
 
 let _nextId = 5000;
 
+// ─── Visual/stat variants — so waves aren't clone armies ──────────────────────
+// shambler: the base UNIT-73 trooper. runner: armor torn away, toxic-green
+// glow, fast and frail. brute: scaled up, blood-red glow, slow and tanky.
+// Armed zombies always use the shambler look (they need the full kit).
+const VARIANTS = {
+  shambler: { speed: 1.0,  hp: 1.0, dmg: 1.0, scale: 1.0,  anim: 1.0 },
+  runner:   { speed: 1.65, hp: 0.6, dmg: 0.8, scale: 0.94, anim: 1.7, glow: 0x3aff5e,
+              hide: /PlateChest|PlateCollar|PlateBack|PlatePack|PlateAb|PlateBelt|PlateName|PlateAntenna|Pauldron|GreaveThigh|GreaveShin|GuardKnee|PouchCanteen|TrimChest|TrimAb|TrimRail|TrimPauld|TrimBuckle|SocketSeam|SocketNameBand/ },
+  brute:    { speed: 0.72, hp: 2.4, dmg: 1.8, scale: 1.22, anim: 0.75, glow: 0xff2e18 },
+};
+
 // ─── GLB model loader (preloaded once, shared across all zombie instances) ────
 
 let _glbTemplate = null;   // THREE.Group — the raw loaded GLB scene
@@ -40,16 +51,30 @@ function buildZombieRigFromGLB(mat) {
   glbScene.traverse(obj => {
     if (!obj.isMesh) return;
     const n = obj.name;
-    if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
+    if (/EyeGlow/.test(n))
+      obj.material = mat.eye;                                         // cyan glow (checked first)
+    else if (/Plasma/.test(n))
+      obj.material = mat.glowB;                                       // magenta glow
+    else if (/Trim/.test(n))
+      obj.material = mat.trim;                                        // orange hazard trim
+    else if (/Bone|Tooth|Sternum|Vert\d|Rib|Kneecap|AnkleBall|WristBall|ElbowBall|ShoulderBall/.test(n))
       obj.material = mat.bone;
     else if (/Wound|Blood/.test(n))
       obj.material = mat.blood;
-    else if (/Claw|Thumb/.test(n))
+    else if (/Plate|Armor|Helm|Guard|Greave|Pauldron|Gaunt|Boot/.test(n))
+      obj.material = mat.armor;                                       // sci-fi combat plate
+    else if (/Suit|Vest|Pant|Belt|Pouch/.test(n))
+      obj.material = mat.suit;                                        // olive fatigues
+    else if (/HairL/.test(n))
+      obj.material = mat.hairL;
+    else if (/Hair/.test(n))
+      obj.material = mat.hair;
+    else if (/Strap/.test(n))
+      obj.material = mat.strap;
+    else if (/Rot/.test(n))
+      obj.material = mat.deadFlesh;                                   // reddish decay patches
+    else if (/Claw|Thumb|Bolt/.test(n))
       obj.material = mat.dark;
-    else if (/Vest|Pant/.test(n))
-      obj.material = mat.rag;
-    else if (/EyeGlow/.test(n))
-      obj.material = mat.eye;
     else if (/EyeDark|Socket/.test(n))
       obj.material = mat.dark;
     else
@@ -69,7 +94,7 @@ function buildZombieRigFromGLB(mat) {
 
   // Eye glow light attached to the glowing eye mesh
   const eyeGlowMesh = glbScene.getObjectByName('ZEyeGlow');
-  const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x1ce0ff, 0.85, 1.9, 2);
   // (sky-only lighting) eyeGlow not added to scene
 
   const get = (name) => glbScene.getObjectByName(name) || spineGroup;
@@ -84,6 +109,7 @@ function buildZombieRigFromGLB(mat) {
       left:  { hip: get('L_hip'), knee: get('L_knee'), ankle: get('L_ankle') },
       right: { hip: get('R_hip'), knee: get('R_knee'), ankle: get('R_ankle') },
     },
+    jaw: glbScene.getObjectByName('ZJawBone') || null,   // hanging mandible (chatter anim)
     mat, eyeGlow,
   };
 }
@@ -158,7 +184,7 @@ function makeMats() {
 
   // Rotting flesh — desaturated gray-olive, like the reference
   const flesh = new THREE.MeshPhysicalMaterial({
-    color: 0x5a6045, roughness: 0.72, metalness: 0.0,
+    color: 0x8a9478, roughness: 0.72, metalness: 0.0,
     clearcoat: 0.14, clearcoatRoughness: 0.65,
     sheen: 0.38, sheenRoughness: 0.65, sheenColor: new THREE.Color(0x1a1f10),
     emissive: new THREE.Color(0x050800), emissiveIntensity: 0.08,
@@ -176,7 +202,7 @@ function makeMats() {
 
   // Face — gaunt skull-like, slightly paler with lividity
   const faceSkin = new THREE.MeshPhysicalMaterial({
-    color: 0x4e5540, roughness: 0.70, metalness: 0.0,
+    color: 0x97a284, roughness: 0.70, metalness: 0.0,
     clearcoat: 0.18, clearcoatRoughness: 0.60,
     sheen: 0.30, sheenRoughness: 0.68, sheenColor: new THREE.Color(0x141810),
     normalMap: sN, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: sR,
@@ -195,14 +221,54 @@ function makeMats() {
     emissive: new THREE.Color(0x050400), emissiveIntensity: 0.05,
   });
 
-  // Glowing eye — high emissive intensity
+  // Primary glow — bright cyan reactor light (eyes + chest energy nodes).
+  // Near-black base so the emissive reads as saturated cyan under the ACES
+  // tone mapping instead of clipping to white (same as the gun energy parts).
   const eye = new THREE.MeshStandardMaterial({
-    color: 0xffee44, emissive: new THREE.Color(0xffcc00), emissiveIntensity: 2.2,
-    roughness: 0.04, metalness: 0.0,
+    color: 0x061a24, emissive: new THREE.Color(0x1ce0ff), emissiveIntensity: 2.0,
+    roughness: 0.30, metalness: 0.0,
+  });
+
+  // Secondary glow — magenta plasma (the power gauntlet + one chest node).
+  const glowB = new THREE.MeshStandardMaterial({
+    color: 0x1a0622, emissive: new THREE.Color(0xc040ff), emissiveIntensity: 2.0,
+    roughness: 0.30, metalness: 0.0,
   });
 
   // Deep socket / interior shadow
   const dark = new THREE.MeshStandardMaterial({ color: 0x030201, roughness: 1.0, metalness: 0.0 });
+
+  // Matted brown hair + lighter streaks
+  const hair  = new THREE.MeshStandardMaterial({ color: 0x4a3a26, roughness: 0.95, metalness: 0.0 });
+  const hairL = new THREE.MeshStandardMaterial({ color: 0x77593a, roughness: 0.92, metalness: 0.0 });
+
+  // Worn leather straps / webbing — warm tan, adds colour against the olive
+  const strap = new THREE.MeshStandardMaterial({
+    color: 0x9a713f, roughness: 0.75, metalness: 0.05,
+    normalMap: cN, normalScale: new THREE.Vector2(0.4, 0.4),
+  });
+
+  // Sci-fi combat armor plate — scuffed dark gunmetal. This is a trooper who
+  // turned, so his kit is still on: helmet, chest/ab plates, pauldrons,
+  // greaves, boots. Weathered but clearly manufactured, not bone.
+  const armor = new THREE.MeshPhysicalMaterial({
+    color: 0x9198a0, roughness: 0.44, metalness: 0.72,
+    clearcoat: 0.4, clearcoatRoughness: 0.35,
+    emissive: new THREE.Color(0x03060c), emissiveIntensity: 0.15,
+  });
+
+  // Painted hazard trim — bright unit-orange on the armor edges. Faint glow so
+  // it stays vivid in low light without blooming to white.
+  const trim = new THREE.MeshStandardMaterial({
+    color: 0xff7a1e, roughness: 0.5, metalness: 0.3,
+    emissive: new THREE.Color(0x3a1400), emissiveIntensity: 0.35,
+  });
+
+  // Undersuit — olive-green military fatigues under the armor, torn and dirty.
+  const suit = new THREE.MeshStandardMaterial({
+    color: 0x3d442c, roughness: 0.86, metalness: 0.05,
+    normalMap: cN, normalScale: new THREE.Vector2(0.6, 0.6),
+  });
 
   // Fresh wet blood — clearcoat 1.0 for genuine wet sheen
   const blood = new THREE.MeshPhysicalMaterial({
@@ -222,7 +288,7 @@ function makeMats() {
     clearcoat: 0.55, clearcoatRoughness: 0.28,
   });
 
-  return { flesh, skin2, faceSkin, rag, bone, eye, dark, blood, bloodDry, deadFlesh };
+  return { flesh, skin2, faceSkin, rag, bone, eye, glowB, dark, hair, hairL, strap, blood, bloodDry, deadFlesh, armor, trim, suit };
 }
 
 // ─── Rig builder ──────────────────────────────────────────────────────────────
@@ -384,7 +450,7 @@ function buildZombieRig() {
   });
 
   // Eye glow PointLight
-  const eyeGlow = new THREE.PointLight(0xffcc00, 0.85, 1.9, 2);
+  const eyeGlow = new THREE.PointLight(0x1ce0ff, 0.85, 1.9, 2);
   eyeGlow.position.set(0, 0.264, -0.26); /* (sky-only) not added */
 
   // Temple hollows (sunken areas)
@@ -584,10 +650,13 @@ export class Zombie {
    * @param {number}        wave
    * @param {string|null}   armedType  — null | 'pistol' | 'rifle' | 'shotgun'
    */
-  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null) {
+  constructor(world, spawnPoint, hpMult = 1, speedMult = 1, wave = 1, armedType = null, variant = 'shambler', dmgMult = 1) {
+    const V = VARIANTS[armedType ? 'shambler' : variant] ?? VARIANTS.shambler;
+    this.variant      = armedType ? 'shambler' : variant;
+    this._animMul     = V.anim;
     this.id           = _nextId++;
     this.world        = world;
-    this.maxHealth    = Math.round(80 * hpMult);
+    this.maxHealth    = Math.round(80 * hpMult * V.hp);
     this.health       = this.maxHealth;
     this.alive        = true;
     this.noRespawn    = true;
@@ -595,8 +664,10 @@ export class Zombie {
     this.flashTimer      = 0;
     this.wanderTarget    = spawnPoint.clone();
     this.wanderCooldown  = 0;
-    this.speed           = (1.6 + Math.random() * 0.7) * speedMult;
-    this.attackDamage    = Math.round(14 * (1 + (wave - 1) * 0.12));
+    this.speed           = (1.6 + Math.random() * 0.7) * speedMult * V.speed;
+    // Damage: the survival curve owns wave-based scaling now (dmgMult),
+    // variant applies its own multiplier on top.
+    this.attackDamage    = Math.round(14 * dmgMult * V.dmg);
     this.lungeTimer      = 0;
     this._dying          = false;
     this._deathT         = 0;
@@ -618,7 +689,20 @@ export class Zombie {
 
     // Build rig — prefer the Blender GLB if already loaded
     const mat = makeMats();
+    // Per-instance skin/cloth tint jitter so even same-variant zombies differ.
+    const hueJit = (Math.random() - 0.5) * 0.05;
+    mat.flesh.color.offsetHSL(hueJit, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.05);
+    mat.suit.color.offsetHSL(hueJit * 0.6, 0, (Math.random() - 0.5) * 0.04);
+    // Variant glow retint (eyes / nodes / veins + the eye point light).
+    if (V.glow) {
+      mat.eye.emissive.setHex(V.glow);
+      mat.eye.color.copy(new THREE.Color(V.glow)).multiplyScalar(0.12);
+    }
     const rig = buildZombieRigFromGLB(mat) ?? buildZombieRig();
+    // Runner: tear the armor off (hide the heavy kit meshes).
+    if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
+    if (V.glow) rig.eyeGlow?.color.setHex(V.glow);
+    if (V.scale !== 1) rig.root.scale.setScalar(V.scale);
     this._rig       = rig;
     this._fleshMat  = rig.mat.flesh;
 
@@ -667,11 +751,12 @@ export class Zombie {
 
   _animate(dt, isMoving) {
     const rig = this._rig;
-    this._animPhase += dt * (isMoving ? 3.2 : 1.0);
+    // Variant gait speed: runners scurry (1.7x), brutes trudge (0.75x).
+    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1);
     const t = this._animPhase;
 
     if (isMoving) {
-      // Walk cycle — legs
+      // Walk cycle — legs (asymmetric shamble: weak left, driving right)
       rig.legs.left.hip.rotation.x   = -Math.sin(t) * 0.18;  // limp
       rig.legs.right.hip.rotation.x  =  Math.sin(t) * 0.30;  // strong stride
       rig.legs.left.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28;
@@ -685,10 +770,12 @@ export class Zombie {
       // Torso sway
       rig.spineGroup.rotation.z = Math.sin(t * 1.3) * 0.065;
 
-      // Arms sway opposite legs (only when unarmed)
+      // Arms sway opposite legs (only when unarmed), elbows dragging behind
       if (!this.armedType) {
         rig.arms.left.shoulder.rotation.x  = -0.65 + Math.sin(t) * 0.18;
         rig.arms.right.shoulder.rotation.x = -0.65 - Math.sin(t) * 0.18;
+        rig.arms.left.elbow.rotation.x     = -0.30 - Math.max(0,  Math.sin(t + 0.5)) * 0.22;
+        rig.arms.right.elbow.rotation.x    = -0.30 - Math.max(0, -Math.sin(t + 0.5)) * 0.22;
       }
     } else {
       // Idle — zero leg rotations
@@ -713,6 +800,13 @@ export class Zombie {
     // Head loll
     rig.headGroup.rotation.z = Math.sin(t * 0.9 + 0.4) * 0.14;
     rig.headGroup.rotation.x = -0.06 + Math.sin(t * 1.1) * 0.05;
+
+    // Jaw chatter — the hanging mandible works while it shambles, snaps wide
+    // during a lunge.
+    if (rig.jaw) {
+      const snap = this.lungeTimer > 0 ? Math.sin((this.lungeTimer / 0.20) * Math.PI) * 0.45 : 0;
+      rig.jaw.rotation.x = 0.10 + Math.abs(Math.sin(t * 1.9)) * 0.28 + snap;
+    }
 
     // Armed zombie — override right arm to aiming pose
     if (this.armedType) {

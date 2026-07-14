@@ -25,7 +25,7 @@ export class SurvivalManager {
     this.elapsed       = 0;    // seconds survived this run (for best-time)
 
     // Callbacks — set by Game.js before calling update()
-    this.onWaveStart  = null; // (wave, count, hpMult, speedMult, armedRatio) => void
+    this.onWaveStart  = null; // (wave, count, hpMult, speedMult, armedRatio, dmgMult) => void
     this.onWaveClear  = null; // (wave) => void
     this.onRevive     = null; // () => void
     this.onGameOver   = null; // () => void
@@ -70,19 +70,29 @@ export class SurvivalManager {
     this.betweenWave = false;
     this.waveTimer   = WAVE_TIME_LIMIT;
 
-    const count     = 4 + (this.wave - 1) * 2;          // wave1=4, wave2=6, …
-    const hpMult    = 1 + (this.wave - 1) * 0.25;        // +25 % HP per wave
-    const speedMult = 1 + (this.wave - 1) * 0.07;        // +7 % speed per wave
+    // Escalation curve — the zombies get harder every single wave forever:
+    // more of them, more HP, faster (softly capped so runs stay reactable),
+    // more damage, and by mid-game they pull guns. Waves are unlimited; the
+    // only end condition is the player running out of revives.
+    const w = this.wave;
+    const count     = Math.min(60, Math.round(4 + (w - 1) * 2.5));
+    const hpMult    = 1 + (w - 1) * 0.35;                     // wave 10 ≈ 4.15x, wave 30 ≈ 11.15x
+    // Soft cap on speed — asymptotically approaches 3.0 so wave 50 is still
+    // faster than wave 20, but not physically impossible to react to.
+    const speedMult = 1 + 2 * (1 - Math.exp(-(w - 1) * 0.10));
+    const dmgMult   = 1 + (w - 1) * 0.15;                     // wave 10 ≈ 2.35x
 
-    // Armed escalation: waves 1-5 = melee only, 6-8 = 20% pistols,
-    // 9-11 = 40%, 12-14 = 60% rifle mix, 15+ = 80% heavy mix
+    // Armed escalation — guns start earlier and ramp harder. From wave 15 the
+    // whole arena is armed troopers, and it never comes back down.
     let armedRatio = 0;
-    if      (this.wave >= 15) armedRatio = 0.80;
-    else if (this.wave >= 12) armedRatio = 0.60;
-    else if (this.wave >=  9) armedRatio = 0.40;
-    else if (this.wave >=  6) armedRatio = 0.20;
+    if      (w >= 15) armedRatio = 0.95;
+    else if (w >= 12) armedRatio = 0.80;
+    else if (w >= 10) armedRatio = 0.65;
+    else if (w >=  8) armedRatio = 0.50;
+    else if (w >=  6) armedRatio = 0.30;
+    else if (w >=  4) armedRatio = 0.15;
 
-    this.onWaveStart?.(this.wave, count, hpMult, speedMult, armedRatio);
+    this.onWaveStart?.(w, count, hpMult, speedMult, armedRatio, dmgMult);
   }
 
   _waveClear() {
