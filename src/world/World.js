@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSettings } from '../core/GameSettings.js';
 
-const ARENA_HALF = 85;
+const ARENA_HALF = 120;
 const TAXI_YELLOW = 0xffcf3d;
 
 // ---------------------------------------------------------------------------
@@ -575,20 +575,20 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // Winter-Bishop-style TOWN (ev.io): dense blocks of multi-storey buildings
-    // forming streets, alleys and a central plaza — not an open pillar arena.
-    // Walkable rooftops, ramps + a rooftop bridge, grav-lifts for verticality,
-    // a round pavilion landmark, snow drifts and string lights.
+    // THE MONUMENT (ev.io arena): a colossal seated guardian ("The Warden") on a
+    // climbable stepped ziggurat, crowned by a glowing obelisk and a halo. Tiered
+    // plazas linked by ramps + grav-lifts, walkable lap/shoulder perches, four
+    // corner shrines linked by teleporters, and a ruined-pillar cover ring — on a
+    // much larger battlefield-dusk plaza than the old town.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
     this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
-    this._buildWinterTown();      // bunker blocks, plaza + pavilion, ramps, bridges, lifts
-    this._buildSnowProps();       // supply crates + perimeter energy lights
+    this._buildMonument();        // THE MONUMENT: colossus guardian + ziggurat + shrines
     this._buildOrbitalRing();     // massive ring station overhead — the landmark
     this._buildSpawnPoints();
 
-    this.previewPedestalPos = new THREE.Vector3(0, 0, -6);
+    this.previewPedestalPos = new THREE.Vector3(0, 0, 46);
 
     // Lock world matrix on every static mesh built above so Three.js skips
     // recomputing it on every frame. Dynamic objects (bots, player, pickups)
@@ -2523,12 +2523,210 @@ export class World {
     });
   }
 
+  // ═════════════════════════════════════════════════════════════════════════
+  // THE MONUMENT — "The Warden": a colossal seated guardian on a stepped
+  // ziggurat, crowned by a glowing obelisk. A climbable central landmark with
+  // tiered plazas (ramps + grav-lifts), a walkable lap and shoulders for perches,
+  // corner shrines linked by teleporters, and ruined-pillar cover.
+  // ═════════════════════════════════════════════════════════════════════════
+  _buildMonument() {
+    const BLUE = 0x33a8ec, ORANGE = 0xff8a2c, TEAL = 0x37c4d4;
+    const mats = {
+      stone:  new THREE.MeshStandardMaterial({ color: 0xd6c398, roughness: 0.92, metalness: 0.04 }),
+      stone2: new THREE.MeshStandardMaterial({ color: 0xc2ad80, roughness: 0.94, metalness: 0.03 }),
+      dark:   new THREE.MeshStandardMaterial({ color: 0x33353c, roughness: 0.6,  metalness: 0.45 }),
+      bronze: new THREE.MeshStandardMaterial({ color: 0xa38a55, roughness: 0.6,  metalness: 0.35, emissive: 0x2a1d09, emissiveIntensity: 0.5 }),
+      bronzeD:new THREE.MeshStandardMaterial({ color: 0x74613c, roughness: 0.64, metalness: 0.32, emissive: 0x1e1507, emissiveIntensity: 0.5 }),
+      visor:  new THREE.MeshStandardMaterial({ color: 0x0a0e14, roughness: 0.12, metalness: 0.92 }),
+    };
+
+    // ── Stepped ziggurat: four solid stone tiers you climb via ramps ──────────
+    this._tier(0, 0, 64, 64,  3.5, mats.stone,  BLUE);
+    this._tier(0, 0, 48, 48,  7.0, mats.stone2, TEAL);
+    this._tier(0, 0, 34, 34, 10.5, mats.stone,  BLUE);
+    this._tier(0, 0, 22, 22, 14.0, mats.stone2, ORANGE);   // pedestal for the colossus
+
+    // Tier tops sit a hair above the solid box so the ramp lips read clean.
+    const A = 3.58, B = 7.08, C = 10.58, D = 14.08;
+
+    // ── Climbing ramps (mirrored pairs so both flanks have access) ────────────
+    this._rampBox(-3, 3,  32, 39,  A, 0, 'z', mats.stone, BLUE);   // ground → A (+Z)
+    this._rampBox(-3, 3, -39,-32,  0, A, 'z', mats.stone, BLUE);   // ground → A (−Z)
+    this._rampBox( 24, 31, -3, 3,  B, A, 'x', mats.stone, TEAL);   // A → B (+X)
+    this._rampBox(-31,-24, -3, 3,  A, B, 'x', mats.stone, TEAL);   // A → B (−X)
+    this._rampBox(-3, 3,  17, 24,  C, B, 'z', mats.stone, BLUE);   // B → C (+Z)
+    this._rampBox(-3, 3, -24,-17,  B, C, 'z', mats.stone, BLUE);   // B → C (−Z)
+    this._rampBox( 11, 17, -3, 3,  D, C, 'x', mats.stone, ORANGE); // C → D (+X)
+    this._rampBox(-17,-11, -3, 3,  C, D, 'x', mats.stone, ORANGE); // C → D (−X)
+
+    // ── The colossus on the pedestal ──────────────────────────────────────────
+    this._colossus(14, mats, { BLUE, ORANGE, TEAL });
+
+    // ── Verticality: grav-lifts (corners onto the tiers; two to the shoulders) ─
+    this._gravLift( 44,  44, 7.5, 14);
+    this._gravLift(-44,  44, 7.5, 14);
+    this._gravLift( 44, -44, 7.5, 14);
+    this._gravLift(-44, -44, 7.5, 14);
+    this._gravLift( 13,  0, 36.6, 26);   // ride up onto the colossus' shoulders
+    this._gravLift(-13,  0, 36.6, 26);
+
+    // ── Corner shrines linked by teleporters (cross-map jumps) ────────────────
+    this._shrine( 86,  86, TEAL);
+    this._shrine(-86,  86, BLUE);
+    this._shrine( 86, -86, BLUE);
+    this._shrine(-86, -86, TEAL);
+    this._teleporterPair( 82,  82, -82, -82, TEAL);
+    this._teleporterPair(-82,  82,  82, -82, BLUE);
+
+    // ── Ruined-pillar cover ring around the outer plaza ───────────────────────
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xb0a07e, roughness: 0.92 });
+    const capMat    = new THREE.MeshStandardMaterial({ color: 0x8f7d5c, roughness: 0.9 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.26;
+      const x = Math.cos(a) * 58, z = Math.sin(a) * 58;
+      const broken = i % 3 === 0;
+      const h = broken ? 3 + Math.random() * 3 : 8 + Math.random() * 4;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, h, 12), pillarMat);
+      col.position.set(x, h / 2, z); col.castShadow = col.receiveShadow = true;
+      this._addCollider(col);
+      if (!broken) {
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.8, 3.6), capMat);
+        cap.position.set(x, h + 0.4, z); this.scene.add(cap);
+        const band = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.09, 8, 20), this._neonMat(BLUE));
+        band.position.set(x, h - 0.6, z); band.rotation.x = Math.PI / 2; this.scene.add(band);
+      } else {
+        const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 3.4, 12), capMat);
+        drum.position.set(x + 2.6, 1.4, z + 1.2); drum.rotation.z = Math.PI / 2;
+        this._addCollider(drum);
+      }
+    }
+
+    // ── Scattered outer cover blocks for the long lanes (low, walkable tops) ───
+    for (const [x, z] of [[70, 20],[-70,-20],[20,70],[-20,-70],[70,-20],[-70,20]]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 6), mats.dark);
+      b.position.set(x, 1.6, z); b.castShadow = b.receiveShadow = true;
+      this._addCollider(b);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.2, 6.4), this._neonMat(ORANGE));
+      t.position.set(x, 3.3, z); this.scene.add(t);
+      this.platforms.push({ minX: x - 3, maxX: x + 3, minZ: z - 3, maxZ: z + 3, y0: 3.3, y1: 3.3 });
+    }
+  }
+
+  // One solid stone ziggurat tier: a full-height box collider with a walkable
+  // top platform (set a hair above the box so ramp lips read clean) and a
+  // glowing edge band.
+  _tier(cx, cz, w, d, h, mat, trimColor) {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    box.position.set(cx, h / 2, cz);
+    box.castShadow = true; box.receiveShadow = true;
+    box.matrixAutoUpdate = false; box.updateMatrix(); box.updateMatrixWorld(true);
+    this.scene.add(box);
+    this.colliders.push({
+      box: new THREE.Box3(new THREE.Vector3(cx - w / 2, 0, cz - d / 2),
+                          new THREE.Vector3(cx + w / 2, h, cz + d / 2)),
+      mesh: box,
+    });
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.28, d + 0.5), this._neonMat(trimColor));
+    band.position.set(cx, h + 0.02, cz); this.scene.add(band);
+    this.platforms.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y0: h + 0.08, y1: h + 0.08 });
+  }
+
+  // The colossal seated guardian. `baseY` is the pedestal top. Built from big
+  // primitives (colliders for the main mass) with a helmeted head — a callback
+  // to the soldier helmet — and walkable lap + shoulder perches.
+  _colossus(baseY, mats, C) {
+    const b = mats.bronze, bd = mats.bronzeD;
+    const glow = this._neonMat(C.TEAL), glowB = this._neonMat(C.BLUE);
+    const y = (v) => baseY + v;   // height above the pedestal
+
+    const solid = (cx, cy, cz, w, h, d, mat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(cx, cy, cz); m.castShadow = true; m.receiveShadow = true;
+      this.scene.add(m);
+      this.colliders.push({ box: new THREE.Box3(
+        new THREE.Vector3(cx - w / 2, cy - h / 2, cz - d / 2),
+        new THREE.Vector3(cx + w / 2, cy + h / 2, cz + d / 2)), mesh: m });
+      return m;
+    };
+    const deco = (geo, mat, x, yy, z) => {
+      const m = new THREE.Mesh(geo, mat); m.position.set(x, yy, z); m.castShadow = true;
+      this.scene.add(m); return m;
+    };
+
+    // Great obelisk rising behind the figure — the landmark spike.
+    const ob = deco(new THREE.CylinderGeometry(0.9, 3.0, 50, 4), bd, 0, y(25), -7);
+    ob.rotation.y = Math.PI / 4;
+    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(-3, baseY, -10), new THREE.Vector3(3, baseY + 50, -4)), mesh: ob });
+    const pyr = deco(new THREE.ConeGeometry(1.5, 4, 4), glow, 0, y(52), -7); pyr.rotation.y = Math.PI / 4;
+    for (const s of [-1, 1]) deco(new THREE.BoxGeometry(0.18, 46, 0.18), glow, s * 1.4, y(24), -6.0);
+
+    // Seated body.
+    solid(0, y(3.0), -2,   13, 6, 11, b);    // pelvis
+    solid(0, y(4.5), 6.5,  14, 5, 13, b);    // thighs (top = y21 → lap perch)
+    solid(0, y(1.5), 13,   13, 8, 5,  bd);   // shins to the feet
+    solid(0, y(13),  -3,   12, 13, 9, b);    // torso
+    deco(new THREE.OctahedronGeometry(1.7), glowB, 0, y(14), 2.0);   // chest core
+
+    // Shoulders (perch) — pauldrons.
+    solid(0, y(20), -3,  17, 5, 9, b);       // shoulders (top = y36.5 → perch)
+    deco(new THREE.SphereGeometry(3.2, 12, 10), b,  8.5, y(20.5), -3);  // right pauldron
+    deco(new THREE.SphereGeometry(3.2, 12, 10), b, -8.5, y(20.5), -3);  // left pauldron
+    // Arms: upper arm down each side, forearm forward, hands resting on the knees.
+    solid( 9, y(13), -1, 4.5, 15, 5, bd);    // right upper arm
+    solid(-9, y(13), -1, 4.5, 15, 5, bd);    // left upper arm
+    solid( 8, y(6.5), 4,  4, 4, 11, bd);     // right forearm (forward onto the knee)
+    solid(-8, y(6.5), 4,  4, 4, 11, bd);     // left forearm
+    deco(new THREE.BoxGeometry(4.6, 3.6, 5), b,  7.6, y(7.7), 9.2);   // right hand on knee
+    deco(new THREE.BoxGeometry(4.6, 3.6, 5), b, -7.6, y(7.7), 9.2);   // left hand on knee
+
+    // Neck + helmeted head — faces +Z (toward the approach from the south).
+    deco(new THREE.CylinderGeometry(2, 2.2, 3, 10), bd, 0, y(23), -3);
+    const hy = y(26.5);
+    deco(new THREE.SphereGeometry(3.5, 18, 14), b, 0, hy, -3);              // helm shell
+    deco(new THREE.BoxGeometry(5.4, 1.1, 1.4), b, 0, hy + 1.9, -0.4);       // brow ridge (front)
+    deco(new THREE.BoxGeometry(5.0, 2.1, 1.0), mats.visor, 0, hy + 0.1, 0.2);   // dark visor (front)
+    deco(new THREE.BoxGeometry(4.4, 0.55, 0.5), glowB, 0, hy + 0.35, 0.7);  // glowing visor line
+    deco(new THREE.BoxGeometry(0.7, 1.4, 5.6), b, 0, hy + 3.1, -2.6);       // crest (front→back ridge)
+    deco(new THREE.BoxGeometry(4.0, 1.3, 1.2), mats.visor, 0, hy - 2.0, 0.3);   // jaw / breather
+
+    // Floating halo above the head (spins).
+    const halo = deco(new THREE.TorusGeometry(4.4, 0.2, 10, 40), glow, 0, y(33), -3);
+    halo.rotation.x = Math.PI / 2;
+    this._spinRings.push({ mesh: halo, speed: 0.35 });
+
+    // Walkable perches: the lap (thigh top) and the shoulders.
+    this.platforms.push({ minX: -7, maxX: 7, minZ: 0.5, maxZ: 12.5, y0: y(7.1), y1: y(7.1) });      // lap ≈ 21
+    this.platforms.push({ minX: -8.5, maxX: 8.5, minZ: -7.5, maxZ: 1.5, y0: y(22.6), y1: y(22.6) }); // shoulders ≈ 36.6
+  }
+
+  // A corner shrine: a stepped walkable base topped by a glowing obelisk crystal.
+  _shrine(x, z, color) {
+    const stone = new THREE.MeshStandardMaterial({ color: 0xb0a07e, roughness: 0.9 });
+    const nm = this._neonMat(color);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(12, 2, 12), stone);
+    base.position.set(x, 1, z); base.castShadow = true; base.receiveShadow = true;
+    base.matrixAutoUpdate = false; base.updateMatrix(); base.updateMatrixWorld(true);
+    this.scene.add(base);
+    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 6, 0, z - 6), new THREE.Vector3(x + 6, 2, z + 6)), mesh: base });
+    this.platforms.push({ minX: x - 6, maxX: x + 6, minZ: z - 6, maxZ: z + 6, y0: 2.08, y1: 2.08 });
+    const ob = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.4, 14, 4), stone);
+    ob.position.set(x, 9, z); ob.rotation.y = Math.PI / 4; ob.castShadow = true; this.scene.add(ob);
+    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 1.4, 2, z - 1.4), new THREE.Vector3(x + 1.4, 16, z + 1.4)), mesh: ob });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(1.1), nm);
+    crystal.position.set(x, 17.6, z); this.scene.add(crystal);
+    this._spinRings.push({ mesh: crystal, speed: 0.8 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.1, 8, 24), nm);
+    ring.position.set(x, 2.3, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
+  }
+
   _buildSpawnPoints() {
-    // spawn out on the streets, never inside a block
+    // Spread across the open plaza around the monument — clear of the ziggurat
+    // (±32), the pillar ring (r≈58) and the corner shrines (±86).
     const coords = [
-      [0, 22], [0, -22], [22, 0], [-22, 0], [14, 14], [-14, -14],
-      [7.5, 42], [-7.5, -42], [42, 7.5], [-42, -7.5], [7.5, -50], [-7.5, 50],
-      [0, 60], [0, -60], [60, 0], [-60, 0]
+      [0, 46], [0, -46], [46, 0], [-46, 0],
+      [33, 33], [-33, 33], [33, -33], [-33, -33],
+      [0, 75], [0, -75], [75, 0], [-75, 0],
+      [50, 50], [-50, 50], [50, -50], [-50, -50],
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));
