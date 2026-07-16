@@ -749,9 +749,16 @@ function _buildArmorPieces(root, armorTypeId, look) {
   });
   // Clean armoured helmet shell — brighter than the plate and lightly polished so
   // the head reads as a sculpted helmet, not a bare scalp.
+  // Keep the shell's own hue (only a whisper toward white) so warm armours don't
+  // desaturate into a fleshy "bald head" tone — the helmet stays on-theme.
   const helmetMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.18),
-    roughness: 0.44, metalness: 0.5, envMapIntensity: 1.0,
+    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.08),
+    roughness: 0.44, metalness: 0.55, envMapIntensity: 1.0,
+  });
+  // Dark glossy visor glass — a near-black reflective faceplate (Halo/Titanfall
+  // style) so the face reads as a real visor, not a bright oval.
+  const visorMat = new THREE.MeshStandardMaterial({
+    color: 0x0a0e14, roughness: 0.12, metalness: 0.92, envMapIntensity: 1.3,
   });
 
   // ── Geometry helpers ────────────────────────────────────────────────────────
@@ -775,30 +782,33 @@ function _buildArmorPieces(root, armorTypeId, look) {
   // a brow, a curved glowing visor lens, a breather mandible, side comms housings,
   // a top crest, and a neck gorget that ties the head to the chest.
   const helmet = [
-    // Full cranium shell — a smooth ovoid (scaled sphere) covering the skull, hair
-    // and sides in one sculpted form. Front surface lands at z ≈ -0.14 where the
-    // visor + lower face sit; a back crown covers the nape.
-    { bone: 'Head', geo: scaled(sph(0.145), 0.88, 1.12, 1.0), mat: helmetMat, x: 0, y: 1.655, z: 0.005 },
-    { bone: 'Head', geo: scaled(sph(0.125), 0.96, 1.02, 0.9), mat: helmetMat, x: 0, y: 1.615, z: 0.08 },
-    // Flat angled faceplate across the front (brow → chin) — gives the visor a
-    // plane to sit flush on, instead of a bulging lens on the egg dome.
-    { bone: 'Head', geo: box(0.185, 0.225, 0.06), mat: helmetMat, x: 0, y: 1.545, z: -0.115 },
-    // Dark visor recess band inset into the faceplate + a flush glowing slit (the
-    // "eyes"). Kept thin and flush so it reads as a band, not a beak.
-    { bone: 'Head', geo: box(0.20, 0.072, 0.03), mat: dark, x: 0, y: 1.588, z: -0.128 },
-    { bone: 'Head', geo: scaled(sph(0.10), 1.0, 0.30, 0.12), mat: accent, x: 0, y: 1.588, z: -0.138,
-      anim: { type: 'pulse', freq: 1.0, min: 0.75, max: 1.15 } },
-    // Breather mandible (dark, proud of the chin) + a bright vent slit for detail.
-    { bone: 'Head', geo: box(0.12, 0.07, 0.055), mat: dark, x: 0, y: 1.475, z: -0.13 },
-    { bone: 'Head', geo: box(0.07, 0.018, 0.02), mat: trim, x: 0, y: 1.462, z: -0.158 },
-    // Top crest ridge (thin polished spine).
-    { bone: 'Head', geo: box(0.024, 0.04, 0.20), mat: trim, x: 0, y: 1.755, z: 0.005 },
+    // Colored shell — cranium + back crown, wrapping the whole head. A dark glossy
+    // visor band sits across the eyes; the rest of the face (brow, cheeks, jaw) is
+    // shell-coloured, so it reads as a Spartan helmet, not a bright-mouthed egg.
+    { bone: 'Head', geo: scaled(sph(0.144), 0.87, 1.17, 1.0), mat: helmetMat, x: 0, y: 1.665, z: 0.015 },
+    { bone: 'Head', geo: scaled(sph(0.128), 0.96, 1.02, 0.92), mat: helmetMat, x: 0, y: 1.62, z: 0.085 },
+    // Brow ridge (shell) overhanging the visor — the defining helmet line.
+    { bone: 'Head', geo: box(0.195, 0.05, 0.09), mat: helmetMat, x: 0, y: 1.64, z: -0.10 },
+    // Cheek plates + jaw (shell) framing the visor on the sides and bottom.
+    { bone: 'Head', geo: box(0.05, 0.14, 0.10), mat: helmetMat, x: -0.10, y: 1.55, z: -0.085 },
+    { bone: 'Head', geo: box(0.05, 0.14, 0.10), mat: helmetMat, x:  0.10, y: 1.55, z: -0.085 },
+    { bone: 'Head', geo: box(0.14, 0.075, 0.09), mat: helmetMat, x: 0, y: 1.47, z: -0.095 },  // jaw/chin
+    // Dark eye recess + a curved glossy dark visor band + a thin glowing eye-line.
+    { bone: 'Head', geo: box(0.16, 0.10, 0.05), mat: dark, x: 0, y: 1.585, z: -0.10 },
+    { bone: 'Head', geo: scaled(sph(0.098), 1.0, 0.46, 0.34), mat: visorMat, x: 0, y: 1.585, z: -0.122 },
+    { bone: 'Head', geo: scaled(sph(0.086), 1.0, 0.085, 0.10), mat: accent, x: 0, y: 1.588, z: -0.152,
+      anim: { type: 'pulse', freq: 1.0, min: 0.7, max: 1.2 } },
+    // Breather vent on the chin (dark) + a bright vent slit for detail.
+    { bone: 'Head', geo: box(0.07, 0.035, 0.03), mat: dark, x: 0, y: 1.468, z: -0.14 },
+    { bone: 'Head', geo: box(0.05, 0.014, 0.02), mat: trim, x: 0, y: 1.462, z: -0.156 },
+    // Top crest ridge (shell colour, integrated).
+    { bone: 'Head', geo: box(0.03, 0.05, 0.19), mat: helmetMat, x: 0, y: 1.76, z: 0.015 },
     // Side comms housings + status lights.
-    { bone: 'Head', geo: box(0.048, 0.10, 0.10), mat: dark, x: -0.120, y: 1.60, z: 0.0 },
-    { bone: 'Head', geo: box(0.048, 0.10, 0.10), mat: dark, x:  0.120, y: 1.60, z: 0.0 },
-    { bone: 'Head', geo: sph(0.013), mat: accent, x: -0.128, y: 1.625, z: -0.05,
+    { bone: 'Head', geo: box(0.05, 0.10, 0.10), mat: dark, x: -0.118, y: 1.60, z: 0.01 },
+    { bone: 'Head', geo: box(0.05, 0.10, 0.10), mat: dark, x:  0.118, y: 1.60, z: 0.01 },
+    { bone: 'Head', geo: sph(0.012), mat: accent, x: -0.126, y: 1.625, z: -0.04,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15 } },
-    { bone: 'Head', geo: sph(0.013), mat: accent, x:  0.128, y: 1.625, z: -0.05,
+    { bone: 'Head', geo: sph(0.012), mat: accent, x:  0.126, y: 1.625, z: -0.04,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15, phase: Math.PI } },
     // Neck gorget (dark) — seals the helmet to the collar without adding a bright
     // slab under the chin (neck bone ~1.453).
