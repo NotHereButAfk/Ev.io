@@ -40,15 +40,14 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the map. Currently **THE ARENA**: a compact, symmetric
-  ev.io-style 3-level combat space (ARENA_HALF=90) — a central high-ground deck
-  (mid deck y9 + king-of-the-hill core y12), four cardinal flank platforms linked
-  by bridges + ground ramps + jump-pads, diagonal teleporters, corner pillars and
-  cover walls forming lanes/flank routes. Built by `_buildArena()` (floating decks
-  via `_platformBox()`, ramps via `_rampBox()`, jump-pads via `_gravLift()`).
-  Collision via `colliders[]` (boxes) + `platforms[]` (walkable tops) +
-  `groundHeightAt()`. (The old `_buildMonument()`/`_buildWinterTown()` remain
-  defined but unused.)
+- `src/world/World.js` — the map. Currently the **GLASS FIELD** (ARENA_HALF=78):
+  a flat polished dark-glass floor (`MeshPhysicalMaterial`, clearcoat) with a
+  glowing inlaid grid (`GridHelper`), dotted with a jittered grid of translucent
+  glass pillars (transmission glass + glowing cap/base/core) that are the only
+  cover. Built by `_buildGlassField()` / `_glassPillar()`; the glass floor is in
+  `_buildGround()`. Collision via `colliders[]` (boxes) + `platforms[]` +
+  `groundHeightAt()`. (The old `_buildArena()`/`_buildMonument()`/
+  `_buildWinterTown()` remain defined but unused.)
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for

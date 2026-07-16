@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSettings } from '../core/GameSettings.js';
 
-const ARENA_HALF = 90;
+const ARENA_HALF = 78;
 const TAXI_YELLOW = 0xffcf3d;
 
 // ---------------------------------------------------------------------------
@@ -575,16 +575,13 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // THE ARENA (ev.io-style): a compact, symmetric 3-level combat space. A
-    // central stepped high-ground platform (mid deck + king-of-the-hill core),
-    // four cardinal flank platforms linked to it by bridges, ground ramps and
-    // jump-pads, teleporters across the diagonals, and cover walls/pillars
-    // forming lanes and flank routes. Built for movement + gunfights, not scenery.
+    // GLASS FIELD: a flat polished-glass floor with a glowing grid, dotted with
+    // translucent glass pillars (cover + sightline breaks). Clean and minimal.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
     this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
-    this._buildArena();           // THE ARENA: multi-level platforms, ramps, bridges, pads
+    this._buildGlassField();      // GLASS FIELD: glass floor + translucent glass pillars
     this._buildOrbitalRing();     // massive ring station overhead — the landmark
     this._buildSpawnPoints();
 
@@ -625,19 +622,26 @@ export class World {
   }
 
   _buildGround() {
-    const floorTex  = makeTechFloorTexture();
-    const roadMat = new THREE.MeshStandardMaterial({
-      map:          floorTex,
-      roughness:    0.82,
-      metalness:    0.28,
-      color:        0xaeb6c2, // tinted alloy (texture carries the plating detail)
+    // A polished dark-glass floor: near-black tinted, mirror-smooth with a
+    // clearcoat so it catches the sky/key as a glossy sheen, and a glowing
+    // energy grid inlaid on top.
+    const glass = new THREE.MeshPhysicalMaterial({
+      color: 0x0a1a22, roughness: 0.05, metalness: 0.0,
+      clearcoat: 1.0, clearcoatRoughness: 0.04, reflectivity: 0.9,
+      envMapIntensity: 1.2,
     });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), roadMat);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), glass);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     ground.matrixAutoUpdate = false;
     ground.updateMatrix();
     this.scene.add(ground);
+    // Glowing inlaid grid (bloom makes the lines glow on the glass).
+    const grid = new THREE.GridHelper(ARENA_HALF * 2, 48, 0x37d0ec, 0x0e3a48);
+    grid.position.y = 0.03;
+    grid.matrixAutoUpdate = false;
+    grid.updateMatrix();
+    this.scene.add(grid);
   }
 
   _buildSky() {
@@ -2529,9 +2533,61 @@ export class World {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
+  // GLASS FIELD — a flat glass floor dotted with translucent glass pillars.
+  // Clean and minimal: the pillars are the only cover / sightline breaks.
+  // ═════════════════════════════════════════════════════════════════════════
+  _buildGlassField() {
+    const colors = [0x37c4d4, 0x33a8ec, 0x8fe6ff, 0x6cc4f0];
+    // One shared translucent glass material for all pillars (transmission = real
+    // see-through glass; clearcoat gives the wet, polished highlight).
+    const glass = new THREE.MeshPhysicalMaterial({
+      color: 0xaee9ff, roughness: 0.05, metalness: 0.0,
+      transmission: 0.9, thickness: 3.0, ior: 1.45,
+      transparent: true, clearcoat: 1.0, clearcoatRoughness: 0.04,
+    });
+
+    // A loose, jittered grid of pillars with wave-varied heights — reads as a
+    // glass forest. Centre stays open; mirrored so the field is balanced.
+    const spacing = 22, range = 3;
+    for (let gx = -range; gx <= range; gx++) {
+      for (let gz = -range; gz <= range; gz++) {
+        if (Math.abs(gx) + Math.abs(gz) === 0) continue;   // keep spawn centre open
+        if (Math.abs(gx) === range && Math.abs(gz) === range) continue; // trim far corners
+        // deterministic jitter/heights so left/right stay roughly symmetric
+        const jitter = ((gx * 7 + gz * 13) % 5) - 2;
+        const x = gx * spacing + jitter;
+        const z = gz * spacing - jitter;
+        const w = 2.6 + (Math.abs((gx * 3 + gz) % 3)) * 0.7;
+        const h = 8 + Math.abs(Math.sin(gx * 0.8) * Math.cos(gz * 0.8)) * 18 + ((gx + gz) % 3) * 2;
+        this._glassPillar(x, z, w, h, glass, colors[Math.abs(gx * 2 + gz) % colors.length]);
+      }
+    }
+  }
+
+  // A single translucent glass pillar: a see-through column with a glowing top
+  // cap, base ring and an inner light core so it reads clearly against the floor.
+  _glassPillar(x, z, w, h, glassMat, glowColor) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), glassMat);
+    p.position.set(x, h / 2, z); p.castShadow = true; p.receiveShadow = true;
+    p.matrixAutoUpdate = false; p.updateMatrix(); p.updateMatrixWorld(true);
+    this.scene.add(p);
+    this.colliders.push({ box: new THREE.Box3(
+      new THREE.Vector3(x - w / 2, 0, z - w / 2),
+      new THREE.Vector3(x + w / 2, h, z + w / 2)), mesh: p });
+    const nm = this._neonMat(glowColor);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.3, w + 0.3), nm);
+    cap.position.set(x, h + 0.06, z); this.scene.add(cap);
+    const ring = new THREE.Mesh(new THREE.BoxGeometry(w + 0.45, 0.22, w + 0.45), nm);
+    ring.position.set(x, 0.12, z); this.scene.add(ring);
+    const core = new THREE.Mesh(new THREE.BoxGeometry(0.3, h * 0.9, 0.3), nm);
+    core.position.set(x, h / 2, z); this.scene.add(core);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
   // THE ARENA — a compact, symmetric ev.io-style combat space with three levels
   // (ground / mid deck / high core + flank platforms), connected by ramps,
   // bridges and jump-pads, with teleporters and cover for flow and gunfights.
+  // (Unused — the glass field above replaced it; kept for reference.)
   // ═════════════════════════════════════════════════════════════════════════
   _buildArena() {
     const BLUE = 0x33a8ec, ORANGE = 0xff8a2c, TEAL = 0x37c4d4;
@@ -2835,13 +2891,13 @@ export class World {
   }
 
   _buildSpawnPoints() {
-    // Spawn out around the ring, clear of the central deck, the flank platforms
-    // (±48 cardinals), the corner pillars (±40) and the teleporter pads (±66).
+    // Spawn out toward the edges of the glass field, in the gaps between the
+    // pillar grid (pillars span ~±66; centre is kept clear).
     const coords = [
-      [0, 76], [0, -76], [76, 0], [-76, 0],
-      [54, 54], [-54, 54], [54, -54], [-54, -54],
-      [22, 76], [-22, 76], [22, -76], [-22, -76],
-      [76, 22], [76, -22], [-76, 22], [-76, -22],
+      [0, 0],
+      [0, 62], [0, -62], [62, 0], [-62, 0],
+      [44, 44], [-44, 44], [44, -44], [-44, -44],
+      [11, 33], [-11, -33], [33, -11], [-33, 11],
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));

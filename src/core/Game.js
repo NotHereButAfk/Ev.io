@@ -42,7 +42,7 @@ import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
-const SPAWN_POINT = new THREE.Vector3(0, 0, 72);
+const SPAWN_POINT = new THREE.Vector3(0, 0, 0);
 
 // The arena is an always-on server with a fixed capacity. You take one slot;
 // the rest are filled with bots and simulated remote players (see ServerSim).
