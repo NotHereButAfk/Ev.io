@@ -202,9 +202,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     rArm:  findBone(root, 'RightArm'),
     lFore: findBone(root, 'LeftForeArm'),
     rFore: findBone(root, 'RightForeArm'),
+    lHand: findBone(root, 'LeftHand'),
     rHand: findBone(root, 'RightHand'),
     lLeg:  findBone(root, 'LeftUpLeg'),
     rLeg:  findBone(root, 'RightUpLeg'),
+    lCalf: findBone(root, 'LeftLeg'),
+    rCalf: findBone(root, 'RightLeg'),
   };
 
   // ── Weapon-hold references ──────────────────────────────────────────────────
@@ -227,10 +230,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   //   arm  X+ = flex forward/up/in    arm  Z+ = pull across the chest
   //   fore X+ = elbow flex up         fore Z+ = pull the hand inward
   const HOLD_POSES = {
-    gun: {   // two-handed low-ready: trigger hand at the chest, support hand on the forend
-      rArm:  _E(0.70, 0, 0.50),  rFore: _E(0.20, 0, 0.60),
-      lArm:  _E(0.45, 0, -0.50), lFore: _E(-0.10, 0, -0.70),
-      w: { idle: 0.85, walk: 0.78, run: 0.60, air: 0.90 },
+    gun: {   // two-handed low-ready: trigger hand at the chest, SUPPORT hand reaches
+             // forward onto the handguard. Upper arms hang low; the forearms flex
+             // up so both hands meet the weapon in front of the chest.
+      rArm:  _E(0.32, 0, 0.22),  rFore: _E(0.52, 0, 0.44),
+      lArm:  _E(0.54, 0, -0.30), lFore: _E(0.74, 0, -0.44),
+      w: { idle: 0.90, walk: 0.85, run: 0.70, air: 0.92 },
     },
     melee: { // relaxed low guard: blade arm bent forward at the side, off-hand free
       rArm:  _E(0.35, 0, 0.18),  rFore: _E(0.30, 0, 0.25),
@@ -271,17 +276,22 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   let _idleGlanceT = 0;
   let _idleGlanceTarget = 0;               // occasional idle head yaw target
   let _idleGlanceCooldown = 3 + Math.random() * 4;
+  let _jumpT      = 0;                      // seconds since the current jump launched
+  let _teleportT  = 0;                      // teleport reform timer, decays
+  const TP_DUR    = 0.42;                   // teleport reform duration (s)
 
   const setLocomotion = (speed, grounded = true, sprinting = false, strafe = 0) => {
     // Air state overrides everything — bots normally pass grounded=true, but a
     // player-controlled or scripted character can hop by setting grounded=false.
     if (!grounded) {
-      _grounded = false; _airT += 0;
+      if (_grounded) _jumpT = 0;   // just left the ground — start the jump clock
+      _grounded = false;
       _locName = 'air';
-      // Slow the walk clip way down as a filler cycle while airborne so the
-      // legs still have some tone; the procedural jump pose takes over.
-      setMotion('walk');
-      mixer.timeScale = baseTS * 0.35;
+      // Use a NEUTRAL (idle) leg base while airborne so the procedural jump pose
+      // reads as a real jump — a push-off, an apex tuck, and a reach for the
+      // landing — instead of a slow walk cycle treading the air.
+      setMotion('idle');
+      mixer.timeScale = baseTS;
     } else {
       if (!_grounded) { _landT = 0.24; _airT = 0; } // landing bounce
       _grounded = true;
@@ -304,7 +314,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // Impulse hooks: fire recoil, damage flinch, jump launch.
   const triggerFire = (kick = 1) => { _fireRecoil = Math.max(_fireRecoil, 0.12 * kick); };
   const triggerHit  = (dx = 0, dy = 0) => { _flinch.x = dx * 0.18; _flinch.y = dy * 0.14; _flinch.t = 0.35; };
-  const triggerJump = () => { _grounded = false; _airT = 0.001; };
+  const triggerJump = () => { _grounded = false; _airT = 0.001; _jumpT = 0; };
+  // Teleport/blink reform: the body arrives compressed and braced, then springs
+  // back to a full stance over TP_DUR — a quick recover that sells the blink.
+  const triggerTeleport = () => { _teleportT = TP_DUR; };
 
   // Stance offsets applied after mixer.update overwrites bones (per armor type).
   const poseOffsets = [];
@@ -315,6 +328,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 
   // Scratch quaternion pool — allocating per-frame in armorTick would thrash.
   const _q = [
+    new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
     new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
     new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
   ];
@@ -348,10 +362,11 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     const speedNow = _locName === 'run' ? 5.5 : _locName === 'walk' ? 1.8 : 0;
     _accel += ((speedNow - _lastSpeed) / Math.max(dt, 1e-3) - _accel) * Math.min(1, dt * 4);
     _lastSpeed = speedNow;
-    if (!_grounded) _airT += dt;
+    if (!_grounded) { _airT += dt; _jumpT += dt; }
     if (_landT > 0) _landT = Math.max(0, _landT - dt);
     if (_fireRecoil > 0) _fireRecoil = Math.max(0, _fireRecoil - dt * 1.4);
     if (_flinch.t > 0) _flinch.t = Math.max(0, _flinch.t - dt);
+    if (_teleportT > 0) _teleportT = Math.max(0, _teleportT - dt);
 
     // Smooth the aim tracking so quick camera whips don't snap the spine.
     _sAimYaw   += (_aimYaw   - _sAimYaw)   * Math.min(1, dt * 8);
@@ -391,21 +406,32 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
       if (B.head)  B.head.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Z, _flinch.x * bend * 0.6));
     }
 
-    // ── Layer 6: airborne pose (two-phase jump: tuck at launch, then the legs
-    // extend back down as the fall continues, prepping for the landing) ──
-    if (!_grounded && _airT > 0.02) {
-      const rise   = _clamp(_airT * 6, 0, 1);          // tuck ramps in over ~150ms
-      const settle = _clamp((_airT - 0.35) * 3, 0, 0.65); // legs reach for the ground
-      const tuckL  = -0.50 * rise + 0.34 * settle;
-      const tuckR  = -0.34 * rise + 0.22 * settle;
-      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.09 * rise - 0.04 * settle));
-      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, tuckL));
-      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, tuckR));
-      // Free arms flare for balance; armed limbs stay on the weapon (the hold
-      // layer below re-plants them, so only flare what the weapon doesn't own).
-      const flare = 0.20 * rise * (1 - 0.6 * settle);
-      if (B.lArm && _weaponKind !== 'gun') B.lArm.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Z,  flare));
-      if (B.rArm && !_weaponKind)          B.rArm.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Z, -flare));
+    // ── Layer 6: jump — a real three-phase jump keyed off the launch clock:
+    //   push-off  (~0–0.13s): legs drive down, body stretches, arms swing up
+    //   apex tuck (~0.10–0.5): knees gather up under the body, slight forward curl
+    //   reach     (~0.4s+)   : legs extend back down, prepping for the landing
+    if (!_grounded) {
+      const push  = _clamp(_jumpT / 0.13, 0, 1) * (1 - _clamp((_jumpT - 0.13) / 0.12, 0, 1));
+      const tuck  = _clamp((_jumpT - 0.09) * 5.5, 0, 1) * (1 - _clamp((_jumpT - 0.5) * 2, 0, 0.75));
+      const reach = _clamp((_jumpT - 0.4) * 3, 0, 0.9);
+
+      // Spine: brief stretch up on launch, small forward curl at the tuck.
+      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.10 * tuck - 0.05 * push));
+      // Thighs (−X raises the knee): drive down on launch, gather up at apex,
+      // extend down to reach for the ground. Legs slightly asymmetric = natural.
+      const thighL = 0.12 * push - 0.62 * tuck + 0.34 * reach;
+      const thighR = 0.12 * push - 0.46 * tuck + 0.28 * reach;
+      if (B.lLeg) B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, thighL));
+      if (B.rLeg) B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, thighR));
+      // Knees bend deeply at the apex tuck, straighten to reach for the landing.
+      const knee = 0.9 * tuck - 0.5 * reach;
+      if (B.lCalf) B.lCalf.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, knee));
+      if (B.rCalf) B.rCalf.quaternion.multiply(_q[4].setFromAxisAngle(_AX_X, knee * 0.85));
+      // Free arms swing up on the push-off for lift; armed limbs stay on the
+      // weapon (the hold layer re-plants them below).
+      const armUp = 0.6 * push + 0.15 * tuck;
+      if (B.lArm && _weaponKind !== 'gun') B.lArm.quaternion.multiply(_q[5].setFromAxisAngle(_AX_X, armUp));
+      if (B.rArm && !_weaponKind)          B.rArm.quaternion.multiply(_q[6].setFromAxisAngle(_AX_X, armUp));
     }
 
     // ── Layer 7: landing squish (brief hip drop, decays) ──
@@ -418,6 +444,25 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
         if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X,  -drop * 2.2));
         if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X,  -drop * 2.2));
       }
+    }
+
+    // ── Layer 7b: teleport reform — the body arrives compressed into a braced
+    // crouch (knees bent, torso curled, arms thrown out to steady) and springs
+    // back up to a full stance over TP_DUR. Sells the blink as a hard arrival. ──
+    if (_teleportT > 0) {
+      const p = 1 - _teleportT / TP_DUR;        // 0 (arrival) → 1 (recovered)
+      const c = Math.max(0, 1 - p * 1.12);      // compression, strongest at arrival
+      if (B.hips)  B.hips.position.y -= c * 0.22;
+      if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, c * 0.30));
+      if (B.s1)    B.s1.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, c * 0.15));
+      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, -c * 0.34));
+      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, -c * 0.34));
+      if (B.lCalf) B.lCalf.quaternion.multiply(_q[4].setFromAxisAngle(_AX_X, c * 0.72));
+      if (B.rCalf) B.rCalf.quaternion.multiply(_q[5].setFromAxisAngle(_AX_X, c * 0.72));
+      // Arms fling out to brace; the weapon hand keeps its grip.
+      const brace = c * 0.55;
+      if (B.lArm)                  B.lArm.quaternion.multiply(_q[6].setFromAxisAngle(_AX_Z,  brace));
+      if (B.rArm && !_weaponKind)  B.rArm.quaternion.multiply(_q[7].setFromAxisAngle(_AX_Z, -brace));
     }
 
     // ── Layer 8: rich idle life — breathing, weight shift, occasional glance ──
@@ -533,6 +578,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     triggerFire,     // (kick=1)     — brief recoil pulse when the character fires
     triggerHit,      // (dx, dy)     — damage flinch from a hit direction
     triggerJump,     // ()           — enters airborne state; setLocomotion(_,true,_) lands
+    triggerTeleport, // ()           — plays the blink-arrival reform (crouch → recover)
     attachWeapon,    // (weaponGroup, isMelee) — hold a weapon in the right hand
     armorTick,
     bodyMats,
