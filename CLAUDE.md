@@ -40,15 +40,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the map. Currently **THE MONUMENT** ("The Warden"):
-  a colossal seated guardian on a climbable stepped ziggurat (4 tiers, ramps),
-  crowned by a glowing obelisk + halo, on a large battlefield-dusk plaza
-  (ARENA_HALF=120). Walkable lap/shoulder perches, corner shrines linked by
-  teleporters, grav-lifts, and a ruined-pillar cover ring. Built by
-  `_buildMonument()` / `_tier()` / `_colossus()` / `_shrine()`. Collision via
-  `colliders[]` (boxes) + `platforms[]` (walkable tops) + `groundHeightAt()`.
-  (The old Winter-Bishop `_buildWinterTown()`/`_buildSnowProps()` remain defined
-  but are no longer called.)
+- `src/world/World.js` — the map. Currently **THE ARENA**: a compact, symmetric
+  ev.io-style 3-level combat space (ARENA_HALF=90) — a central high-ground deck
+  (mid deck y9 + king-of-the-hill core y12), four cardinal flank platforms linked
+  by bridges + ground ramps + jump-pads, diagonal teleporters, corner pillars and
+  cover walls forming lanes/flank routes. Built by `_buildArena()` (floating decks
+  via `_platformBox()`, ramps via `_rampBox()`, jump-pads via `_gravLift()`).
+  Collision via `colliders[]` (boxes) + `platforms[]` (walkable tops) +
+  `groundHeightAt()`. (The old `_buildMonument()`/`_buildWinterTown()` remain
+  defined but unused.)
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSettings } from '../core/GameSettings.js';
 
-const ARENA_HALF = 120;
+const ARENA_HALF = 90;
 const TAXI_YELLOW = 0xffcf3d;
 
 // ---------------------------------------------------------------------------
@@ -575,16 +575,16 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // THE MONUMENT (ev.io arena): a colossal seated guardian ("The Warden") on a
-    // climbable stepped ziggurat, crowned by a glowing obelisk and a halo. Tiered
-    // plazas linked by ramps + grav-lifts, walkable lap/shoulder perches, four
-    // corner shrines linked by teleporters, and a ruined-pillar cover ring — on a
-    // much larger battlefield-dusk plaza than the old town.
+    // THE ARENA (ev.io-style): a compact, symmetric 3-level combat space. A
+    // central stepped high-ground platform (mid deck + king-of-the-hill core),
+    // four cardinal flank platforms linked to it by bridges, ground ramps and
+    // jump-pads, teleporters across the diagonals, and cover walls/pillars
+    // forming lanes and flank routes. Built for movement + gunfights, not scenery.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
     this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
-    this._buildMonument();        // THE MONUMENT: colossus guardian + ziggurat + shrines
+    this._buildArena();           // THE ARENA: multi-level platforms, ramps, bridges, pads
     this._buildOrbitalRing();     // massive ring station overhead — the landmark
     this._buildSpawnPoints();
 
@@ -611,7 +611,7 @@ export class World {
     // emissive accents, which is the cheapest possible lighting to render.
     // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
     // the horizon fires rake warm light across the alloy structures.
-    const hemi = new THREE.HemisphereLight(0xb2cdea, 0x3b3324, 1.2);
+    const hemi = new THREE.HemisphereLight(0xb2cdea, 0x565b64, 1.35);
     this.scene.add(hemi);
     // Warm key from high FRONT (+Z) so the monument's face and the approach are
     // lit rather than silhouetted; a cool rim from behind carves the edges.
@@ -2529,10 +2529,96 @@ export class World {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
+  // THE ARENA — a compact, symmetric ev.io-style combat space with three levels
+  // (ground / mid deck / high core + flank platforms), connected by ramps,
+  // bridges and jump-pads, with teleporters and cover for flow and gunfights.
+  // ═════════════════════════════════════════════════════════════════════════
+  _buildArena() {
+    const BLUE = 0x33a8ec, ORANGE = 0xff8a2c, TEAL = 0x37c4d4;
+    const deck  = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.5, metalness: 0.6 });
+    const deckL = new THREE.MeshStandardMaterial({ color: 0x525d6c, roughness: 0.5, metalness: 0.55 });
+    const cover = new THREE.MeshStandardMaterial({ color: 0x2a2f38, roughness: 0.55, metalness: 0.5 });
+
+    // Solid box collider with optional neon top-trim + optional walkable top.
+    const box = (cx, cy, cz, w, h, d, mat, trim, walk) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(cx, cy, cz); m.castShadow = true; m.receiveShadow = true;
+      m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(true);
+      this.scene.add(m);
+      this.colliders.push({ box: new THREE.Box3(
+        new THREE.Vector3(cx - w / 2, cy - h / 2, cz - d / 2),
+        new THREE.Vector3(cx + w / 2, cy + h / 2, cz + d / 2)), mesh: m });
+      if (trim != null) {
+        const t = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.12, d + 0.2), this._neonMat(trim));
+        t.position.set(cx, cy + h / 2 + 0.02, cz); this.scene.add(t);
+      }
+      if (walk) this.platforms.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y0: cy + h / 2 + 0.05, y1: cy + h / 2 + 0.05 });
+      return m;
+    };
+
+    // ── Central high-ground: mid deck (y9) + king-of-the-hill core (y12) ──
+    this._platformBox(0, 0, 34, 34, 9, deck, TEAL);
+    this._platformBox(0, 0, 13, 13, 12, deckL, ORANGE);
+    // direct ground → mid-deck ramps (one per cardinal, offset to one half of
+    // the edge so they don't collide with that side's bridge)
+    this._rampBox(-13, -5,  17, 31, 9, 0, 'z', deck, TEAL);   // N
+    this._rampBox(-13, -5, -31,-17, 0, 9, 'z', deck, TEAL);   // S
+    this._rampBox( 17, 31, -13, -5, 9, 0, 'x', deck, TEAL);   // E
+    this._rampBox(-31,-17, -13, -5, 0, 9, 'x', deck, TEAL);   // W
+    // short ramps mid-deck → core (2 sides)
+    this._rampBox(-3, 3,  6.5, 12, 12, 9, 'z', deckL, ORANGE);
+    this._rampBox(-3, 3, -12,-6.5, 9, 12, 'z', deckL, ORANGE);
+    // cover on the mid deck + a power-weapon marker on the core
+    for (const [cx, cz] of [[11, 11],[-11, 11],[11, -11],[-11, -11]]) box(cx, 10.4, cz, 3.4, 2.8, 3.4, cover, BLUE, true);
+    this._spawnPadMarker(0, 0, 12.1, ORANGE);
+
+    // ── Four cardinal flank platforms (y13): bridge in, ramp down, jump-pad up ──
+    // N
+    this._platformBox(0, 48, 16, 16, 13, deck, ORANGE);
+    this._rampBox(5, 13, 17, 40, 9, 13, 'z', deck, ORANGE);   // bridge deck→platform
+    this._rampBox(-4, 4, 56, 68, 13, 0, 'z', deck, ORANGE);   // platform→ground
+    this._gravLift(0, 48, 13, 15);
+    // S
+    this._platformBox(0, -48, 16, 16, 13, deck, ORANGE);
+    this._rampBox(5, 13, -40, -17, 13, 9, 'z', deck, ORANGE);
+    this._rampBox(-4, 4, -68, -56, 0, 13, 'z', deck, ORANGE);
+    this._gravLift(0, -48, 13, 15);
+    // E
+    this._platformBox(48, 0, 16, 16, 13, deck, ORANGE);
+    this._rampBox(17, 40, 5, 13, 9, 13, 'x', deck, ORANGE);
+    this._rampBox(56, 68, -4, 4, 13, 0, 'x', deck, ORANGE);
+    this._gravLift(48, 0, 13, 15);
+    // W
+    this._platformBox(-48, 0, 16, 16, 13, deck, ORANGE);
+    this._rampBox(-40, -17, 5, 13, 13, 9, 'x', deck, ORANGE);
+    this._rampBox(-68, -56, -4, 4, 0, 13, 'x', deck, ORANGE);
+    this._gravLift(-48, 0, 13, 15);
+
+    // ── Diagonal cover: corner pillars + waist-high cover chunks (walkable) ──
+    for (const [sx, sz] of [[1,1],[1,-1],[-1,1],[-1,-1]]) {
+      box(sx * 40, 6, sz * 40, 3, 12, 3, deck, TEAL, false);          // tall corner pillar
+      box(sx * 26, 2.5, sz * 26, 6, 5, 6, cover, BLUE, true);         // cover chunk
+      box(sx * 70, 2.5, sz * 70, 5, 5, 5, cover, ORANGE, true);      // outer cover
+    }
+    // lane-breaking cover walls between the deck and each flank platform
+    box( 0, 2, 30, 12, 4, 2, cover, BLUE, false);
+    box( 0, 2,-30, 12, 4, 2, cover, BLUE, false);
+    box( 30, 2, 0, 2, 4, 12, cover, BLUE, false);
+    box(-30, 2, 0, 2, 4, 12, cover, BLUE, false);
+    // cover under the mid-deck (the covered "basement" passage)
+    for (const [cx, cz] of [[10, 0],[-10, 0],[0, 10],[0, -10]]) box(cx, 1.6, cz, 3, 3.2, 3, cover, TEAL, false);
+
+    // ── Teleporters across the diagonals (fast rotations) ──
+    this._teleporterPair( 66,  66, -66, -66, TEAL);
+    this._teleporterPair(-66,  66,  66, -66, BLUE);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
   // THE MONUMENT — "The Warden": a colossal seated guardian on a stepped
   // ziggurat, crowned by a glowing obelisk. A climbable central landmark with
   // tiered plazas (ramps + grav-lifts), a walkable lap and shoulders for perches,
-  // corner shrines linked by teleporters, and ruined-pillar cover.
+  // corner shrines linked by teleporters, and ruined-pillar cover. (Unused — the
+  // arena above replaced it; kept for reference.)
   // ═════════════════════════════════════════════════════════════════════════
   _buildMonument() {
     const BLUE = 0x33a8ec, ORANGE = 0xff8a2c, TEAL = 0x37c4d4;
@@ -2749,13 +2835,13 @@ export class World {
   }
 
   _buildSpawnPoints() {
-    // Spread across the open plaza around the monument — clear of the ziggurat
-    // (±32), the pillar ring (r≈58) and the corner shrines (±86).
+    // Spawn out around the ring, clear of the central deck, the flank platforms
+    // (±48 cardinals), the corner pillars (±40) and the teleporter pads (±66).
     const coords = [
-      [0, 46], [0, -46], [46, 0], [-46, 0],
-      [33, 33], [-33, 33], [33, -33], [-33, -33],
-      [0, 75], [0, -75], [75, 0], [-75, 0],
-      [50, 50], [-50, 50], [50, -50], [-50, -50],
+      [0, 76], [0, -76], [76, 0], [-76, 0],
+      [54, 54], [-54, 54], [54, -54], [-54, -54],
+      [22, 76], [-22, 76], [22, -76], [-22, -76],
+      [76, 22], [76, -22], [-76, 22], [-76, -22],
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));
