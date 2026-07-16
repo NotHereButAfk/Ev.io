@@ -41,6 +41,11 @@ export function isHumanSoldierReady() { return !!_template; }
 // character pedestal / capsule assumes ~1.8m standing at y=0. Tune to taste.
 const MODEL_SCALE = 1.0;
 
+// The Vanguard head/hair is tall; we compress it vertically (and shrink it a
+// little) so the helmet can be a compact round shape instead of a tall egg. The
+// head is fully hidden under the helmet, so this only frees up the silhouette.
+const HEAD_SQUASH = new THREE.Vector3(0.82, 0.6, 0.86);
+
 // ── Per-armor-type Spartan variants ─────────────────────────────────────────
 // Each loadout armor type renders a visibly distinct futuristic super-soldier:
 // its own armour colour, glowing visor/accent hue, surface finish, and build
@@ -111,6 +116,15 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 
   const group = new THREE.Group();
   group.add(root);
+
+  // Squash the head down. The Vanguard's tall hair/scalp forces any helmet that
+  // covers it into an egg silhouette; since the head is fully hidden under the
+  // helmet, we vertically compress (and slightly shrink) the head bone so a
+  // compact, ROUND helmet can cover it. The armour pieces are pinned in world
+  // space by _attachAtWorld, so they are unaffected by this bone scale — only the
+  // hidden head mesh shrinks. HEAD_SQUASH is re-asserted each frame in armorTick.
+  const _headBone = findBone(root, 'Head');
+  if (_headBone) _headBone.scale.copy(HEAD_SQUASH);
 
   // Bolt on this loadout's distinct armour set (bone-parented so plates ride the
   // skeleton during the animation). Each armor type gets its own silhouette.
@@ -309,6 +323,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const armorTick = (dt) => {
     armorT += dt;
     const t = armorT;
+
+    // Keep the head squashed even if an animation clip touches head scale.
+    if (B.head) B.head.scale.copy(HEAD_SQUASH);
 
     // ── Animated armor pieces (visor blink, thruster pulse, plate sway) ──
     for (const a of armor.animated) {
@@ -782,28 +799,28 @@ function _buildArmorPieces(root, armorTypeId, look) {
   // a brow, a curved glowing visor lens, a breather mandible, side comms housings,
   // a top crest, and a neck gorget that ties the head to the chest.
   const helmet = [
-    // Smooth outer shell — one form covering the whole head (skull, sides, back).
-    { bone: 'Head', geo: scaled(sph(0.146), 0.95, 1.14, 1.0), mat: helmetMat, x: 0, y: 1.672, z: 0.02 },
+    // Compact ROUND shell (width ≈ height) — sits on the squashed head, so it's a
+    // helmet skull, not a tall egg.
+    { bone: 'Head', geo: scaled(sph(0.129), 1.0, 1.02, 1.08), mat: helmetMat, x: 0, y: 1.592, z: 0.0 },
     // Big curved dark glossy visor across the whole front (motorcycle-/Spartan-
-    // style). This single large visor is what makes it read unmistakably as a
-    // helmet instead of a smooth egg with a stripe.
-    { bone: 'Head', geo: scaled(sph(0.126), 0.92, 1.0, 0.64), mat: visorMat, x: 0, y: 1.55, z: -0.07 },
+    // style) — the single feature that makes it read unmistakably as a helmet.
+    { bone: 'Head', geo: scaled(sph(0.118), 0.95, 0.98, 0.62), mat: visorMat, x: 0, y: 1.55, z: -0.05 },
     // Glowing eye-line across the visor.
-    { bone: 'Head', geo: scaled(sph(0.10), 0.98, 0.08, 0.18), mat: accent, x: 0, y: 1.578, z: -0.15,
+    { bone: 'Head', geo: scaled(sph(0.09), 0.98, 0.08, 0.18), mat: accent, x: 0, y: 1.572, z: -0.128,
       anim: { type: 'pulse', freq: 1.0, min: 0.7, max: 1.2 } },
     // Shell brow lip + chin guard capping the visor top and bottom.
-    { bone: 'Head', geo: box(0.185, 0.04, 0.10), mat: helmetMat, x: 0, y: 1.65, z: -0.075 },
-    { bone: 'Head', geo: box(0.15, 0.05, 0.10), mat: helmetMat, x: 0, y: 1.44, z: -0.075 },
+    { bone: 'Head', geo: box(0.175, 0.04, 0.09), mat: helmetMat, x: 0, y: 1.638, z: -0.055 },
+    { bone: 'Head', geo: box(0.14, 0.05, 0.09), mat: helmetMat, x: 0, y: 1.452, z: -0.055 },
     // Chin breather vent slit (bright detail).
-    { bone: 'Head', geo: box(0.06, 0.028, 0.03), mat: trim, x: 0, y: 1.44, z: -0.126 },
+    { bone: 'Head', geo: box(0.055, 0.024, 0.03), mat: trim, x: 0, y: 1.45, z: -0.108 },
     // Top crest ridge (shell colour, integrated).
-    { bone: 'Head', geo: box(0.03, 0.045, 0.18), mat: helmetMat, x: 0, y: 1.785, z: 0.02 },
+    { bone: 'Head', geo: box(0.028, 0.04, 0.16), mat: helmetMat, x: 0, y: 1.70, z: 0.0 },
     // Side comms housings + status lights.
-    { bone: 'Head', geo: box(0.05, 0.11, 0.11), mat: dark, x: -0.128, y: 1.56, z: 0.01 },
-    { bone: 'Head', geo: box(0.05, 0.11, 0.11), mat: dark, x:  0.128, y: 1.56, z: 0.01 },
-    { bone: 'Head', geo: sph(0.012), mat: accent, x: -0.136, y: 1.585, z: -0.03,
+    { bone: 'Head', geo: box(0.045, 0.10, 0.10), mat: dark, x: -0.116, y: 1.558, z: 0.005 },
+    { bone: 'Head', geo: box(0.045, 0.10, 0.10), mat: dark, x:  0.116, y: 1.558, z: 0.005 },
+    { bone: 'Head', geo: sph(0.011), mat: accent, x: -0.123, y: 1.58, z: -0.03,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15 } },
-    { bone: 'Head', geo: sph(0.012), mat: accent, x:  0.136, y: 1.585, z: -0.03,
+    { bone: 'Head', geo: sph(0.011), mat: accent, x:  0.123, y: 1.58, z: -0.03,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15, phase: Math.PI } },
     // Neck gorget (dark) — seals the helmet to the collar (neck bone ~1.453).
     { bone: 'Neck', geo: box(0.225, 0.08, 0.205), mat: dark, x: 0, y: 1.42, z: 0.02 },
@@ -854,9 +871,9 @@ function _buildArmorPieces(root, armorTypeId, look) {
       { bone: 'Spine2', geo: box(0.26, 0.32, 0.06), mat: plate, x: 0, y: 1.28, z: -0.070 },
       { bone: 'LeftShoulder', geo: oct(0.085), mat: dark, x: -0.185, y: 1.45, z: 0.02 },
       { bone: 'RightShoulder', geo: oct(0.085), mat: dark, x: 0.185, y: 1.45, z: 0.02 },
-      { bone: 'Head', geo: box(0.205, 0.16, 0.20), mat: dark, x: 0, y: 1.645, z: 0.09, quat: tiltBack }, // cowl
-      { bone: 'Head', geo: box(0.16, 0.03, 0.16), mat: accent, x: 0, y: 1.585, z: 0.09,
-        anim: { type: 'pulse', freq: 1.5, min: 0.12, max: 0.7 } },        // cowl rim glow
+      { bone: 'Head', geo: box(0.185, 0.15, 0.14), mat: dark, x: 0, y: 1.565, z: 0.105, quat: tiltBack }, // hood
+      { bone: 'Head', geo: box(0.15, 0.03, 0.12), mat: accent, x: 0, y: 1.50, z: 0.105,
+        anim: { type: 'pulse', freq: 1.5, min: 0.12, max: 0.7 } },        // hood rim glow
       { bone: 'Spine2', geo: box(0.05, 0.42, 0.10), mat: dark, x: 0.07, y: 1.27, z: 0.13,
         anim: { type: 'sway', axis: 'x', amp: 0.06, freq: 1.6 } },        // back sheath
       { bone: 'Spine2', geo: box(0.03, 0.28, 0.03), mat: accent, x: 0, y: 1.28, z: -0.095,
