@@ -611,12 +611,17 @@ export class World {
     // emissive accents, which is the cheapest possible lighting to render.
     // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
     // the horizon fires rake warm light across the alloy structures.
-    const hemi = new THREE.HemisphereLight(0x9db8d8, 0x2a2e36, 1.05);
+    const hemi = new THREE.HemisphereLight(0xb2cdea, 0x3b3324, 1.2);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffb070, 0.9);
-    key.position.set(80, 60, -40); // low ember sun near the burning horizon
+    // Warm key from high FRONT (+Z) so the monument's face and the approach are
+    // lit rather than silhouetted; a cool rim from behind carves the edges.
+    const key = new THREE.DirectionalLight(0xffe0b0, 1.7);
+    key.position.set(-34, 96, 90);
     key.castShadow = false;
     this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0x74a6ff, 0.7);
+    rim.position.set(40, 46, -96);
+    this.scene.add(rim);
   }
 
   _buildGround() {
@@ -2567,8 +2572,8 @@ export class World {
     this._gravLift(-44,  44, 7.5, 14);
     this._gravLift( 44, -44, 7.5, 14);
     this._gravLift(-44, -44, 7.5, 14);
-    this._gravLift( 13,  0, 36.6, 26);   // ride up onto the colossus' shoulders
-    this._gravLift(-13,  0, 36.6, 26);
+    this._gravLift( 8, 15, 25.1, 17);    // ride up onto the guardian's chest deck
+    this._gravLift(-8, 15, 25.1, 17);
 
     // ── Corner shrines linked by teleporters (cross-map jumps) ────────────────
     this._shrine( 86,  86, TEAL);
@@ -2578,38 +2583,62 @@ export class World {
     this._teleporterPair( 82,  82, -82, -82, TEAL);
     this._teleporterPair(-82,  82,  82, -82, BLUE);
 
-    // ── Ruined-pillar cover ring around the outer plaza ───────────────────────
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0xb0a07e, roughness: 0.92 });
-    const capMat    = new THREE.MeshStandardMaterial({ color: 0x8f7d5c, roughness: 0.9 });
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2 + 0.26;
-      const x = Math.cos(a) * 58, z = Math.sin(a) * 58;
-      const broken = i % 3 === 0;
-      const h = broken ? 3 + Math.random() * 3 : 8 + Math.random() * 4;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, h, 12), pillarMat);
-      col.position.set(x, h / 2, z); col.castShadow = col.receiveShadow = true;
-      this._addCollider(col);
-      if (!broken) {
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.8, 3.6), capMat);
-        cap.position.set(x, h + 0.4, z); this.scene.add(cap);
-        const band = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.09, 8, 20), this._neonMat(BLUE));
-        band.position.set(x, h - 0.6, z); band.rotation.x = Math.PI / 2; this.scene.add(band);
-      } else {
-        const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 3.4, 12), capMat);
-        drum.position.set(x + 2.6, 1.4, z + 1.2); drum.rotation.z = Math.PI / 2;
-        this._addCollider(drum);
-      }
+    // ── Grand colonnade ring: tall clean columns framing the monument ─────────
+    this._colonnade(46, 12, mats.stone, BLUE);
+
+    // ── Braziers flanking the main stairs + on the plaza — warm glowing pools ──
+    for (const [x, z] of [[10, 40],[-10, 40],[10,-40],[-10,-40],[40,10],[40,-10],[-40,10],[-40,-10]]) {
+      this._brazier(x, z, ORANGE);
     }
 
-    // ── Scattered outer cover blocks for the long lanes (low, walkable tops) ───
-    for (const [x, z] of [[70, 20],[-70,-20],[20,70],[-20,-70],[70,-20],[-70,20]]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 6), mats.dark);
-      b.position.set(x, 1.6, z); b.castShadow = b.receiveShadow = true;
+    // ── Broken ruins + low cover blocks out in the long lanes ─────────────────
+    const ruinMat = new THREE.MeshStandardMaterial({ color: 0xb5a582, roughness: 0.94 });
+    for (const [x, z, ry] of [[72, 26, 0.5],[-72,-26, 1.1],[26,72, 2.0],[-26,-72, 0.2],[72,-26, 1.6],[-72,26, 2.6]]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(7, 3.4, 7), ruinMat);
+      b.position.set(x, 1.7, z); b.rotation.y = ry; b.castShadow = b.receiveShadow = true;
       this._addCollider(b);
-      const t = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.2, 6.4), this._neonMat(ORANGE));
-      t.position.set(x, 3.3, z); this.scene.add(t);
-      this.platforms.push({ minX: x - 3, maxX: x + 3, minZ: z - 3, maxZ: z + 3, y0: 3.3, y1: 3.3 });
+      const t = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 7.2), this._neonMat(ORANGE));
+      t.position.set(x, 3.45, z); t.rotation.y = ry; this.scene.add(t);
+      this.platforms.push({ minX: x - 3.4, maxX: x + 3.4, minZ: z - 3.4, maxZ: z + 3.4, y0: 3.45, y1: 3.45 });
+      // a toppled drum beside it
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 4, 12), ruinMat);
+      drum.position.set(x + 5, 1.5, z + 3); drum.rotation.z = Math.PI / 2; drum.rotation.y = ry;
+      this._addCollider(drum);
     }
+  }
+
+  // A ring of tall, clean temple columns (base + fluted shaft + capital + glow).
+  _colonnade(radius, count, shaftMat, glowColor) {
+    const capMat = new THREE.MeshStandardMaterial({ color: 0xcbb890, roughness: 0.88 });
+    const nm = this._neonMat(glowColor);
+    const H = 19;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.PI / count;
+      const x = Math.cos(a) * radius, z = Math.sin(a) * radius;
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 2.0, H, 16), shaftMat);
+      shaft.position.set(x, H / 2 + 0.6, z); shaft.castShadow = shaft.receiveShadow = true;
+      this._addCollider(shaft);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 1.2, 16), capMat);
+      base.position.set(x, 0.6, z); this.scene.add(base);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(5.2, 1.6, 5.2), capMat);
+      cap.position.set(x, H + 1.4, z); this.scene.add(cap);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(2.1, 0.12, 8, 22), nm);
+      ring.position.set(x, H + 0.2, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
+    }
+  }
+
+  // A brazier: a stone bowl on a plinth with a glowing ember core (bloom does
+  // the fire glow — no point light needed).
+  _brazier(x, z, color) {
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8f7d5c, roughness: 0.9 });
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.1, 3.4, 10), stone);
+    plinth.position.set(x, 1.7, z); this._addCollider(plinth);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.9, 1.0, 12), stone);
+    bowl.position.set(x, 3.6, z); this.scene.add(bowl);
+    const emberMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.4, roughness: 0.5 });
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), emberMat);
+    ember.position.set(x, 4.2, z); ember.scale.y = 1.3; this.scene.add(ember);
+    this._pulseMats.push(emberMat);
   }
 
   // One solid stone ziggurat tier: a full-height box collider with a walkable
@@ -2653,50 +2682,50 @@ export class World {
       this.scene.add(m); return m;
     };
 
-    // Great obelisk rising behind the figure — the landmark spike.
-    const ob = deco(new THREE.CylinderGeometry(0.9, 3.0, 50, 4), bd, 0, y(25), -7);
+    // A scaled sphere (baked non-uniform scale) — for smooth helmet/pauldron forms.
+    const ss = (r, sx, sy, sz) => { const g = new THREE.SphereGeometry(r, 22, 16); g.scale(sx, sy, sz); return g; };
+
+    // The Warden is a colossal HELMETED BUST — head + shoulders rising from the
+    // dais (a giant version of the soldier helmet). A bust reads as a grand
+    // monument and avoids the janky look of a full box-figure.
+
+    // Great obelisk far behind — the skyline spike.
+    const ob = deco(new THREE.CylinderGeometry(0.7, 2.4, 46, 4), bd, 0, y(31), -14);
     ob.rotation.y = Math.PI / 4;
-    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(-3, baseY, -10), new THREE.Vector3(3, baseY + 50, -4)), mesh: ob });
-    const pyr = deco(new THREE.ConeGeometry(1.5, 4, 4), glow, 0, y(52), -7); pyr.rotation.y = Math.PI / 4;
-    for (const s of [-1, 1]) deco(new THREE.BoxGeometry(0.18, 46, 0.18), glow, s * 1.4, y(24), -6.0);
+    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(-2.4, baseY, -16.4), new THREE.Vector3(2.4, baseY + 46, -11.6)), mesh: ob });
+    deco(new THREE.ConeGeometry(1.3, 4, 4), glow, 0, y(56), -14).rotation.y = Math.PI / 4;
+    for (const s of [-1, 1]) deco(new THREE.BoxGeometry(0.16, 42, 0.16), glow, s * 1.1, y(30), -12.9);
 
-    // Seated body.
-    solid(0, y(3.0), -2,   13, 6, 11, b);    // pelvis
-    solid(0, y(4.5), 6.5,  14, 5, 13, b);    // thighs (top = y21 → lap perch)
-    solid(0, y(1.5), 13,   13, 8, 5,  bd);   // shins to the feet
-    solid(0, y(13),  -3,   12, 13, 9, b);    // torso
-    deco(new THREE.OctahedronGeometry(1.7), glowB, 0, y(14), 2.0);   // chest core
+    // ── Shoulders / chest rising from the pedestal, with rounded pauldrons ──
+    solid(0, y(5), -1, 25, 12, 16, b);                        // chest mass
+    deco(ss(6.4, 1.0, 0.9, 1.0), b,  11.5, y(8), 0.5);        // right pauldron dome
+    deco(ss(6.4, 1.0, 0.9, 1.0), b, -11.5, y(8), 0.5);        // left pauldron dome
+    deco(new THREE.TorusGeometry(3.2, 0.5, 10, 24), glowB, 0, y(7), 8.2).rotation.x = 0.3; // chest sigil ring
+    deco(new THREE.OctahedronGeometry(2.0), glowB, 0, y(7), 8.4);   // chest core
+    solid(0, y(12), -1, 11, 6, 10, bd);                      // gorget / neck
 
-    // Shoulders (perch) — pauldrons.
-    solid(0, y(20), -3,  17, 5, 9, b);       // shoulders (top = y36.5 → perch)
-    deco(new THREE.SphereGeometry(3.2, 12, 10), b,  8.5, y(20.5), -3);  // right pauldron
-    deco(new THREE.SphereGeometry(3.2, 12, 10), b, -8.5, y(20.5), -3);  // left pauldron
-    // Arms: upper arm down each side, forearm forward, hands resting on the knees.
-    solid( 9, y(13), -1, 4.5, 15, 5, bd);    // right upper arm
-    solid(-9, y(13), -1, 4.5, 15, 5, bd);    // left upper arm
-    solid( 8, y(6.5), 4,  4, 4, 11, bd);     // right forearm (forward onto the knee)
-    solid(-8, y(6.5), 4,  4, 4, 11, bd);     // left forearm
-    deco(new THREE.BoxGeometry(4.6, 3.6, 5), b,  7.6, y(7.7), 9.2);   // right hand on knee
-    deco(new THREE.BoxGeometry(4.6, 3.6, 5), b, -7.6, y(7.7), 9.2);   // left hand on knee
-
-    // Neck + helmeted head — faces +Z (toward the approach from the south).
-    deco(new THREE.CylinderGeometry(2, 2.2, 3, 10), bd, 0, y(23), -3);
-    const hy = y(26.5);
-    deco(new THREE.SphereGeometry(3.5, 18, 14), b, 0, hy, -3);              // helm shell
-    deco(new THREE.BoxGeometry(5.4, 1.1, 1.4), b, 0, hy + 1.9, -0.4);       // brow ridge (front)
-    deco(new THREE.BoxGeometry(5.0, 2.1, 1.0), mats.visor, 0, hy + 0.1, 0.2);   // dark visor (front)
-    deco(new THREE.BoxGeometry(4.4, 0.55, 0.5), glowB, 0, hy + 0.35, 0.7);  // glowing visor line
-    deco(new THREE.BoxGeometry(0.7, 1.4, 5.6), b, 0, hy + 3.1, -2.6);       // crest (front→back ridge)
-    deco(new THREE.BoxGeometry(4.0, 1.3, 1.2), mats.visor, 0, hy - 2.0, 0.3);   // jaw / breather
+    // ── Colossal helmet (giant soldier helmet: shell + dark visor band) ──
+    const HY = y(21);
+    deco(ss(6.8, 1.0, 1.06, 1.02), b, 0, HY, -1);            // shell
+    deco(ss(5.9, 1.0, 0.5, 0.34), mats.visor, 0, HY - 0.4, 5.0);    // dark visor band (front)
+    deco(new THREE.BoxGeometry(8.6, 0.9, 0.6), glowB, 0, HY - 0.1, 6.7);   // glowing eye-line
+    deco(new THREE.BoxGeometry(11.2, 1.8, 2.4), b, 0, HY + 3.0, 4.4);      // brow
+    deco(new THREE.BoxGeometry(2.7, 7.5, 4.4), b,  5.3, HY - 1.8, 3.6);    // right cheek
+    deco(new THREE.BoxGeometry(2.7, 7.5, 4.4), b, -5.3, HY - 1.8, 3.6);    // left cheek
+    deco(new THREE.BoxGeometry(7.6, 3.0, 3.4), bd, 0, HY - 5.2, 4.4);      // jaw / breather
+    deco(new THREE.BoxGeometry(1.4, 2.6, 11.5), b, 0, HY + 6.0, -1);       // crest (front→back ridge)
+    deco(new THREE.BoxGeometry(2.6, 6.0, 6.0), bd,  6.4, HY - 0.6, -1);    // right comms
+    deco(new THREE.BoxGeometry(2.6, 6.0, 6.0), bd, -6.4, HY - 0.6, -1);    // left comms
+    const shell = deco(ss(0.1, 1, 1, 1), b, 0, HY, -1); shell.visible = false;
+    this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(-7.2, HY - 7, -8), new THREE.Vector3(7.2, HY + 7, 6)), mesh: shell });
 
     // Floating halo above the head (spins).
-    const halo = deco(new THREE.TorusGeometry(4.4, 0.2, 10, 40), glow, 0, y(33), -3);
+    const halo = deco(new THREE.TorusGeometry(8.6, 0.32, 12, 48), glow, 0, y(31), -1);
     halo.rotation.x = Math.PI / 2;
-    this._spinRings.push({ mesh: halo, speed: 0.35 });
+    this._spinRings.push({ mesh: halo, speed: 0.3 });
 
-    // Walkable perches: the lap (thigh top) and the shoulders.
-    this.platforms.push({ minX: -7, maxX: 7, minZ: 0.5, maxZ: 12.5, y0: y(7.1), y1: y(7.1) });      // lap ≈ 21
-    this.platforms.push({ minX: -8.5, maxX: 8.5, minZ: -7.5, maxZ: 1.5, y0: y(22.6), y1: y(22.6) }); // shoulders ≈ 36.6
+    // Walkable perch: the chest/shoulder deck, right in front of the giant face.
+    this.platforms.push({ minX: -9, maxX: 9, minZ: 1.5, maxZ: 8, y0: y(11.1), y1: y(11.1) });   // ≈ 25
   }
 
   // A corner shrine: a stepped walkable base topped by a glowing obelisk crystal.
