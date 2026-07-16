@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Real rigged human soldier (Mixamo "Vanguard"), with Idle / Walk / Run clips.
@@ -729,39 +730,79 @@ function _buildArmorPieces(root, armorTypeId, look) {
   const bone = (n) => findBone(root, n);
   const s = look.scale || 1;
 
+  // ── Materials ──────────────────────────────────────────────────────────────
+  // Layered plate finish: a matte-metal base plate, near-black recessed joints, a
+  // bright polished trim for edges/rails, and the variant's glowing accent. The
+  // trim is what makes the suit read as authored hard-surface rather than a slab.
   const plate = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).multiplyScalar(0.78),
-    roughness: look.roughness ?? 0.5, metalness: 0.62,
+    color: new THREE.Color(look.body).multiplyScalar(0.80),
+    roughness: (look.roughness ?? 0.5) * 0.85, metalness: 0.66, envMapIntensity: 1.1,
   });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x11151d, roughness: 0.45, metalness: 0.78 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0d1016, roughness: 0.42, metalness: 0.82 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0xd6dde4, roughness: 0.24, metalness: 0.95, envMapIntensity: 1.25 });
   const accent = new THREE.MeshStandardMaterial({
-    color: look.visor, emissive: look.visor, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.6,
+    color: look.visor, emissive: look.visor, emissiveIntensity: 0.9, roughness: 0.26, metalness: 0.5,
   });
   const cape = new THREE.MeshStandardMaterial({
     color: new THREE.Color(look.body).multiplyScalar(0.4), roughness: 0.92, metalness: 0.05,
     side: THREE.DoubleSide,
   });
-  // Clean armoured helmet shell — slightly lighter than the plate so the head
-  // reads as a helmet, not a bare scalp.
+  // Clean armoured helmet shell — brighter than the plate and lightly polished so
+  // the head reads as a sculpted helmet, not a bare scalp.
   const helmetMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.25),
-    roughness: 0.45, metalness: 0.55,
+    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.18),
+    roughness: 0.44, metalness: 0.5, envMapIntensity: 1.0,
   });
 
-  const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-  const sph = (r) => new THREE.SphereGeometry(r, 16, 12);
+  // ── Geometry helpers ────────────────────────────────────────────────────────
+  // Every plate is a *rounded* box: chamfered edges catch the light so the armour
+  // reads as milled hard-surface instead of a Lego brick. Radius scales with the
+  // smallest dimension and is clamped so thin rails stay valid.
+  const box = (w, h, d) => {
+    const r = Math.max(0.004, Math.min(0.03, Math.min(w, h, d) * 0.28));
+    return new RoundedBoxGeometry(w, h, d, 3, r);
+  };
+  const sph = (r) => new THREE.SphereGeometry(r, 20, 14);
   const oct = (r) => new THREE.OctahedronGeometry(r);
-  const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 8);
+  const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 12);
+  // Bake a non-uniform scale into a geometry (spec attach only allows uniform
+  // scale) — used to squash a sphere into a curved visor lens.
+  const scaled = (geo, sx, sy, sz) => { geo.scale(sx, sy, sz); return geo; };
   const tiltBack = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, 0));
 
-  // Helmet worn by EVERY variant — covers the bald untextured head and gives the
-  // soldier a face: an armoured shell + brow, a glowing visor, and a jaw guard.
+  // Helmet worn by EVERY variant — a full sci-fi helmet that covers the bald head
+  // and gives the soldier a real face: a rounded cranium, an angled faceplate with
+  // a brow, a curved glowing visor lens, a breather mandible, side comms housings,
+  // a top crest, and a neck gorget that ties the head to the chest.
   const helmet = [
-    { bone: 'Head', geo: sph(0.135), mat: helmetMat, x: 0, y: 1.605, z: 0.045 },         // shell
-    { bone: 'Head', geo: box(0.20, 0.05, 0.16), mat: helmetMat, x: 0, y: 1.635, z: 0.0 }, // brow ridge
-    { bone: 'Head', geo: box(0.13, 0.075, 0.12), mat: helmetMat, x: 0, y: 1.50, z: -0.015 }, // jaw guard
-    { bone: 'Head', geo: box(0.185, 0.055, 0.05), mat: accent, x: 0, y: 1.585, z: -0.085,
-      anim: { type: 'pulse', freq: 1.1, min: 0.7, max: 1.15 } },                          // glowing visor (the "face")
+    // Full cranium shell — a smooth ovoid (scaled sphere) covering the skull, hair
+    // and sides in one sculpted form. Front surface lands at z ≈ -0.14 where the
+    // visor + lower face sit; a back crown covers the nape.
+    { bone: 'Head', geo: scaled(sph(0.145), 0.88, 1.12, 1.0), mat: helmetMat, x: 0, y: 1.655, z: 0.005 },
+    { bone: 'Head', geo: scaled(sph(0.125), 0.96, 1.02, 0.9), mat: helmetMat, x: 0, y: 1.615, z: 0.08 },
+    // Flat angled faceplate across the front (brow → chin) — gives the visor a
+    // plane to sit flush on, instead of a bulging lens on the egg dome.
+    { bone: 'Head', geo: box(0.185, 0.225, 0.06), mat: helmetMat, x: 0, y: 1.545, z: -0.115 },
+    // Dark visor recess band inset into the faceplate + a flush glowing slit (the
+    // "eyes"). Kept thin and flush so it reads as a band, not a beak.
+    { bone: 'Head', geo: box(0.20, 0.072, 0.03), mat: dark, x: 0, y: 1.588, z: -0.128 },
+    { bone: 'Head', geo: scaled(sph(0.10), 1.0, 0.30, 0.12), mat: accent, x: 0, y: 1.588, z: -0.138,
+      anim: { type: 'pulse', freq: 1.0, min: 0.75, max: 1.15 } },
+    // Breather mandible (dark, proud of the chin) + a bright vent slit for detail.
+    { bone: 'Head', geo: box(0.12, 0.07, 0.055), mat: dark, x: 0, y: 1.475, z: -0.13 },
+    { bone: 'Head', geo: box(0.07, 0.018, 0.02), mat: trim, x: 0, y: 1.462, z: -0.158 },
+    // Top crest ridge (thin polished spine).
+    { bone: 'Head', geo: box(0.024, 0.04, 0.20), mat: trim, x: 0, y: 1.755, z: 0.005 },
+    // Side comms housings + status lights.
+    { bone: 'Head', geo: box(0.048, 0.10, 0.10), mat: dark, x: -0.120, y: 1.60, z: 0.0 },
+    { bone: 'Head', geo: box(0.048, 0.10, 0.10), mat: dark, x:  0.120, y: 1.60, z: 0.0 },
+    { bone: 'Head', geo: sph(0.013), mat: accent, x: -0.128, y: 1.625, z: -0.05,
+      anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15 } },
+    { bone: 'Head', geo: sph(0.013), mat: accent, x:  0.128, y: 1.625, z: -0.05,
+      anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15, phase: Math.PI } },
+    // Neck gorget (dark) — seals the helmet to the collar without adding a bright
+    // slab under the chin (neck bone ~1.453).
+    { bone: 'Neck', geo: box(0.225, 0.08, 0.205), mat: dark, x: 0, y: 1.425, z: 0.02 },
   ];
 
   // spec: { bone, geo, mat, x, y, z, quat?, anim? }
@@ -770,66 +811,80 @@ function _buildArmorPieces(root, armorTypeId, look) {
 
   if (armorTypeId === 'recon') {
     specs = [
-      { bone: 'Spine2', geo: box(0.24, 0.26, 0.06), mat: plate, x: 0, y: 1.40, z: -0.075 },
-      { bone: 'LeftShoulder', geo: box(0.11, 0.09, 0.13), mat: plate, x: -0.16, y: 1.52, z: 0.04 },
-      { bone: 'Head', geo: box(0.06, 0.05, 0.09), mat: dark, x: 0.085, y: 1.585, z: -0.01 },
-      { bone: 'Head', geo: box(0.11, 0.015, 0.015), mat: accent, x: 0.10, y: 1.585, z: -0.055,
-        anim: { type: 'pulse', freq: 6, min: 0.4, max: 1.9 } },           // visor scanner line
-      { bone: 'Head', geo: cyl(0.008, 0.20), mat: dark, x: 0.085, y: 1.72, z: 0.05 },
-      { bone: 'Head', geo: sph(0.013), mat: accent, x: 0.085, y: 1.82, z: 0.05,
+      { bone: 'Spine2', geo: box(0.26, 0.30, 0.07), mat: plate, x: 0, y: 1.28, z: -0.070 },
+      { bone: 'Spine2', geo: box(0.045, 0.20, 0.03), mat: accent, x: 0, y: 1.28, z: -0.112,
+        anim: { type: 'pulse', freq: 4.5, min: 0.4, max: 1.7 } },          // slim chest emitter
+      { bone: 'LeftShoulder',  geo: box(0.13, 0.10, 0.15), mat: plate, x: -0.185, y: 1.45, z: 0.02 },
+      { bone: 'RightShoulder', geo: box(0.115, 0.09, 0.13), mat: plate, x:  0.185, y: 1.45, z: 0.02 },
+      { bone: 'Head', geo: cyl(0.007, 0.18), mat: dark, x: 0.10, y: 1.74, z: 0.05 },
+      { bone: 'Head', geo: sph(0.013), mat: accent, x: 0.10, y: 1.83, z: 0.05,
         anim: { type: 'blink', freq: 5, on: 2.4, off: 0.1 } },            // antenna tip blink
-      { bone: 'Spine2', geo: box(0.05, 0.05, 0.10), mat: accent, x: 0, y: 1.30, z: 0.12,
+      { bone: 'Spine2', geo: box(0.05, 0.05, 0.10), mat: accent, x: 0, y: 1.20, z: 0.115,
         anim: { type: 'pulse', freq: 4, min: 0.3, max: 1.6 } },           // back beacon
     ];
   } else if (armorTypeId === 'heavy') {
     specs = [
-      { bone: 'Spine2', geo: box(0.40, 0.42, 0.18), mat: plate, x: 0, y: 1.40, z: -0.05 },
-      { bone: 'Spine1', geo: box(0.34, 0.18, 0.14), mat: plate, x: 0, y: 1.21, z: -0.05 },
-      { bone: 'LeftShoulder', geo: sph(0.135), mat: plate, x: -0.205, y: 1.52, z: 0.03 },
-      { bone: 'RightShoulder', geo: sph(0.135), mat: plate, x: 0.205, y: 1.52, z: 0.03 },
-      { bone: 'LeftShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: -0.205, y: 1.61, z: 0.03,
+      { bone: 'Spine2', geo: box(0.40, 0.40, 0.18), mat: plate, x: 0, y: 1.28, z: -0.05 },
+      { bone: 'Spine1', geo: box(0.34, 0.18, 0.14), mat: plate, x: 0, y: 1.14, z: -0.05 },
+      { bone: 'Spine2', geo: box(0.07, 0.24, 0.04), mat: accent, x: 0, y: 1.28, z: -0.108,
+        anim: { type: 'pulse', freq: 2.4, min: 0.5, max: 2.0 } },         // chest reactor strip
+      { bone: 'LeftShoulder', geo: sph(0.135), mat: plate, x: -0.205, y: 1.46, z: 0.02 },
+      { bone: 'RightShoulder', geo: sph(0.135), mat: plate, x: 0.205, y: 1.46, z: 0.02 },
+      { bone: 'LeftShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: -0.205, y: 1.55, z: 0.02,
         anim: { type: 'thruster', freq: 2.2, min: 0.6, max: 2.6 } },      // shoulder vents
-      { bone: 'RightShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: 0.205, y: 1.61, z: 0.03,
+      { bone: 'RightShoulder', geo: box(0.10, 0.05, 0.10), mat: accent, x: 0.205, y: 1.55, z: 0.02,
         anim: { type: 'thruster', freq: 2.2, min: 0.6, max: 2.6, phase: 1.0 } },
-      { bone: 'Spine2', geo: box(0.32, 0.36, 0.20), mat: dark, x: 0, y: 1.40, z: 0.17 },
-      { bone: 'Spine2', geo: box(0.07, 0.30, 0.06), mat: accent, x: 0, y: 1.40, z: 0.28,
+      { bone: 'Spine2', geo: box(0.32, 0.34, 0.20), mat: dark, x: 0, y: 1.27, z: 0.16 },
+      { bone: 'Spine2', geo: box(0.07, 0.28, 0.06), mat: accent, x: 0, y: 1.27, z: 0.27,
         anim: { type: 'pulse', freq: 1.6, min: 0.5, max: 2.4 } },         // power core
-      { bone: 'Neck', geo: box(0.28, 0.11, 0.24), mat: plate, x: 0, y: 1.52, z: 0.04 },
+      { bone: 'Neck', geo: box(0.30, 0.11, 0.25), mat: plate, x: 0, y: 1.42, z: 0.03 },
       { bone: 'LeftUpLeg', geo: box(0.15, 0.24, 0.17), mat: plate, x: -0.115, y: 0.92, z: -0.02 },
       { bone: 'RightUpLeg', geo: box(0.15, 0.24, 0.17), mat: plate, x: 0.115, y: 0.92, z: -0.02 },
-      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: -0.10, y: 1.27, z: 0.30,
+      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: -0.10, y: 1.15, z: 0.29,
         anim: { type: 'thruster', freq: 3, min: 0.4, max: 2.2 } },        // exhaust nozzles
-      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: 0.10, y: 1.27, z: 0.30,
+      { bone: 'Spine2', geo: cyl(0.045, 0.12), mat: accent, x: 0.10, y: 1.15, z: 0.29,
         anim: { type: 'thruster', freq: 3, min: 0.4, max: 2.2, phase: 1.6 } },
     ];
   } else if (armorTypeId === 'stealth') {
     specs = [
-      { bone: 'Spine2', geo: box(0.25, 0.30, 0.05), mat: plate, x: 0, y: 1.40, z: -0.075 },
-      { bone: 'LeftShoulder', geo: oct(0.085), mat: dark, x: -0.17, y: 1.52, z: 0.04 },
-      { bone: 'RightShoulder', geo: oct(0.085), mat: dark, x: 0.17, y: 1.52, z: 0.04 },
-      { bone: 'Head', geo: box(0.20, 0.16, 0.20), mat: dark, x: 0, y: 1.65, z: 0.10, quat: tiltBack }, // cowl
-      { bone: 'Head', geo: box(0.16, 0.03, 0.16), mat: accent, x: 0, y: 1.60, z: 0.10,
+      { bone: 'Spine2', geo: box(0.26, 0.32, 0.06), mat: plate, x: 0, y: 1.28, z: -0.070 },
+      { bone: 'LeftShoulder', geo: oct(0.085), mat: dark, x: -0.185, y: 1.45, z: 0.02 },
+      { bone: 'RightShoulder', geo: oct(0.085), mat: dark, x: 0.185, y: 1.45, z: 0.02 },
+      { bone: 'Head', geo: box(0.205, 0.16, 0.20), mat: dark, x: 0, y: 1.645, z: 0.09, quat: tiltBack }, // cowl
+      { bone: 'Head', geo: box(0.16, 0.03, 0.16), mat: accent, x: 0, y: 1.585, z: 0.09,
         anim: { type: 'pulse', freq: 1.5, min: 0.12, max: 0.7 } },        // cowl rim glow
-      { bone: 'Spine2', geo: box(0.05, 0.42, 0.10), mat: dark, x: 0.07, y: 1.40, z: 0.14,
+      { bone: 'Spine2', geo: box(0.05, 0.42, 0.10), mat: dark, x: 0.07, y: 1.27, z: 0.13,
         anim: { type: 'sway', axis: 'x', amp: 0.06, freq: 1.6 } },        // back sheath
-      { bone: 'Spine2', geo: box(0.03, 0.30, 0.03), mat: accent, x: 0, y: 1.40, z: -0.10,
+      { bone: 'Spine2', geo: box(0.03, 0.28, 0.03), mat: accent, x: 0, y: 1.28, z: -0.095,
         anim: { type: 'pulse', freq: 2.0, min: 0.15, max: 0.95 } },       // chest light strip
-      { bone: 'Spine2', geo: box(0.32, 0.55, 0.02), mat: cape, x: 0, y: 1.12, z: 0.135,
+      { bone: 'Spine2', geo: box(0.32, 0.55, 0.02), mat: cape, x: 0, y: 1.02, z: 0.125,
         anim: { type: 'sway', axis: 'x', amp: 0.10, freq: 1.25 } },       // flowing cape
     ];
   } else {
     specs = [
-      { bone: 'Spine2', geo: box(0.31, 0.35, 0.12), mat: plate, x: 0, y: 1.40, z: -0.055 },
-      { bone: 'Spine2', geo: box(0.05, 0.22, 0.04), mat: accent, x: 0, y: 1.40, z: -0.115,
+      // Layered chest cuirass (Spine2 ~1.314): a main breastplate, an upper-chest
+      // collar deck, and a polished sternum ridge with the glowing emitter set in.
+      { bone: 'Spine2', geo: box(0.32, 0.34, 0.12), mat: plate, x: 0, y: 1.27, z: -0.055 },
+      { bone: 'Spine2', geo: box(0.25, 0.12, 0.11), mat: plate, x: 0, y: 1.405, z: -0.070 }, // upper chest deck
+      { bone: 'Spine2', geo: box(0.06, 0.30, 0.05), mat: trim,  x: 0, y: 1.28, z: -0.108 },  // sternum ridge
+      { bone: 'Spine2', geo: box(0.045, 0.20, 0.03), mat: accent, x: 0, y: 1.27, z: -0.126,
         anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },         // chest emitter heartbeat
-      { bone: 'LeftShoulder', geo: box(0.15, 0.13, 0.17), mat: plate, x: -0.18, y: 1.51, z: 0.04 },
-      { bone: 'RightShoulder', geo: box(0.15, 0.13, 0.17), mat: plate, x: 0.18, y: 1.51, z: 0.04 },
-      { bone: 'LeftShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: -0.18, y: 1.59, z: 0.04,
+      { bone: 'Spine2', geo: box(0.17, 0.02, 0.03), mat: trim, x: 0, y: 1.39, z: -0.118 },   // clavicle rail
+      // Layered pauldrons (shoulder bone ~1.429): a rounded cap, a polished trim
+      // lip, and a status beacon on the outer face.
+      { bone: 'LeftShoulder',  geo: box(0.16, 0.13, 0.18), mat: plate, x: -0.185, y: 1.45, z: 0.02 },
+      { bone: 'RightShoulder', geo: box(0.16, 0.13, 0.18), mat: plate, x:  0.185, y: 1.45, z: 0.02 },
+      { bone: 'LeftShoulder',  geo: box(0.15, 0.035, 0.165), mat: trim,  x: -0.185, y: 1.505, z: 0.02 },
+      { bone: 'RightShoulder', geo: box(0.15, 0.035, 0.165), mat: trim,  x:  0.185, y: 1.505, z: 0.02 },
+      { bone: 'LeftShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: -0.20, y: 1.49, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
-      { bone: 'RightShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: 0.18, y: 1.59, z: 0.04,
+      { bone: 'RightShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: 0.20, y: 1.49, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2, phase: Math.PI } },
-      { bone: 'Spine', geo: box(0.32, 0.09, 0.22), mat: dark, x: 0, y: 1.13, z: -0.01 },     // belt
-      { bone: 'Spine2', geo: box(0.22, 0.26, 0.13), mat: dark, x: 0, y: 1.38, z: 0.14 },     // pack
+      { bone: 'Spine', geo: box(0.33, 0.09, 0.23), mat: dark, x: 0, y: 1.04, z: -0.01 },     // belt (Spine ~1.075)
+      { bone: 'Spine', geo: box(0.35, 0.03, 0.25), mat: trim, x: 0, y: 1.085, z: -0.01 },    // belt trim lip
+      { bone: 'Spine2', geo: box(0.22, 0.26, 0.13), mat: dark, x: 0, y: 1.25, z: 0.135 },    // pack
+      { bone: 'Spine2', geo: box(0.16, 0.035, 0.03), mat: accent, x: 0, y: 1.35, z: 0.195,
+        anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2 } },         // back power bar
     ];
   }
 
