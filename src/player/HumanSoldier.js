@@ -782,37 +782,31 @@ function _buildArmorPieces(root, armorTypeId, look) {
   // a brow, a curved glowing visor lens, a breather mandible, side comms housings,
   // a top crest, and a neck gorget that ties the head to the chest.
   const helmet = [
-    // Colored shell — cranium + back crown, wrapping the whole head. A dark glossy
-    // visor band sits across the eyes; the rest of the face (brow, cheeks, jaw) is
-    // shell-coloured, so it reads as a Spartan helmet, not a bright-mouthed egg.
-    { bone: 'Head', geo: scaled(sph(0.144), 0.87, 1.17, 1.0), mat: helmetMat, x: 0, y: 1.665, z: 0.015 },
-    { bone: 'Head', geo: scaled(sph(0.128), 0.96, 1.02, 0.92), mat: helmetMat, x: 0, y: 1.62, z: 0.085 },
-    // Brow ridge (shell) overhanging the visor — the defining helmet line.
-    { bone: 'Head', geo: box(0.195, 0.05, 0.09), mat: helmetMat, x: 0, y: 1.64, z: -0.10 },
-    // Cheek plates + jaw (shell) framing the visor on the sides and bottom.
-    { bone: 'Head', geo: box(0.05, 0.14, 0.10), mat: helmetMat, x: -0.10, y: 1.55, z: -0.085 },
-    { bone: 'Head', geo: box(0.05, 0.14, 0.10), mat: helmetMat, x:  0.10, y: 1.55, z: -0.085 },
-    { bone: 'Head', geo: box(0.14, 0.075, 0.09), mat: helmetMat, x: 0, y: 1.47, z: -0.095 },  // jaw/chin
-    // Dark eye recess + a curved glossy dark visor band + a thin glowing eye-line.
-    { bone: 'Head', geo: box(0.16, 0.10, 0.05), mat: dark, x: 0, y: 1.585, z: -0.10 },
-    { bone: 'Head', geo: scaled(sph(0.098), 1.0, 0.46, 0.34), mat: visorMat, x: 0, y: 1.585, z: -0.122 },
-    { bone: 'Head', geo: scaled(sph(0.086), 1.0, 0.085, 0.10), mat: accent, x: 0, y: 1.588, z: -0.152,
+    // Smooth outer shell — one form covering the whole head (skull, sides, back).
+    { bone: 'Head', geo: scaled(sph(0.146), 0.95, 1.14, 1.0), mat: helmetMat, x: 0, y: 1.672, z: 0.02 },
+    // Big curved dark glossy visor across the whole front (motorcycle-/Spartan-
+    // style). This single large visor is what makes it read unmistakably as a
+    // helmet instead of a smooth egg with a stripe.
+    { bone: 'Head', geo: scaled(sph(0.126), 0.92, 1.0, 0.64), mat: visorMat, x: 0, y: 1.55, z: -0.07 },
+    // Glowing eye-line across the visor.
+    { bone: 'Head', geo: scaled(sph(0.10), 0.98, 0.08, 0.18), mat: accent, x: 0, y: 1.578, z: -0.15,
       anim: { type: 'pulse', freq: 1.0, min: 0.7, max: 1.2 } },
-    // Breather vent on the chin (dark) + a bright vent slit for detail.
-    { bone: 'Head', geo: box(0.07, 0.035, 0.03), mat: dark, x: 0, y: 1.468, z: -0.14 },
-    { bone: 'Head', geo: box(0.05, 0.014, 0.02), mat: trim, x: 0, y: 1.462, z: -0.156 },
+    // Shell brow lip + chin guard capping the visor top and bottom.
+    { bone: 'Head', geo: box(0.185, 0.04, 0.10), mat: helmetMat, x: 0, y: 1.65, z: -0.075 },
+    { bone: 'Head', geo: box(0.15, 0.05, 0.10), mat: helmetMat, x: 0, y: 1.44, z: -0.075 },
+    // Chin breather vent slit (bright detail).
+    { bone: 'Head', geo: box(0.06, 0.028, 0.03), mat: trim, x: 0, y: 1.44, z: -0.126 },
     // Top crest ridge (shell colour, integrated).
-    { bone: 'Head', geo: box(0.03, 0.05, 0.19), mat: helmetMat, x: 0, y: 1.76, z: 0.015 },
+    { bone: 'Head', geo: box(0.03, 0.045, 0.18), mat: helmetMat, x: 0, y: 1.785, z: 0.02 },
     // Side comms housings + status lights.
-    { bone: 'Head', geo: box(0.05, 0.10, 0.10), mat: dark, x: -0.118, y: 1.60, z: 0.01 },
-    { bone: 'Head', geo: box(0.05, 0.10, 0.10), mat: dark, x:  0.118, y: 1.60, z: 0.01 },
-    { bone: 'Head', geo: sph(0.012), mat: accent, x: -0.126, y: 1.625, z: -0.04,
+    { bone: 'Head', geo: box(0.05, 0.11, 0.11), mat: dark, x: -0.128, y: 1.56, z: 0.01 },
+    { bone: 'Head', geo: box(0.05, 0.11, 0.11), mat: dark, x:  0.128, y: 1.56, z: 0.01 },
+    { bone: 'Head', geo: sph(0.012), mat: accent, x: -0.136, y: 1.585, z: -0.03,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15 } },
-    { bone: 'Head', geo: sph(0.012), mat: accent, x:  0.126, y: 1.625, z: -0.04,
+    { bone: 'Head', geo: sph(0.012), mat: accent, x:  0.136, y: 1.585, z: -0.03,
       anim: { type: 'blink', freq: 3.5, on: 1.8, off: 0.15, phase: Math.PI } },
-    // Neck gorget (dark) — seals the helmet to the collar without adding a bright
-    // slab under the chin (neck bone ~1.453).
-    { bone: 'Neck', geo: box(0.225, 0.08, 0.205), mat: dark, x: 0, y: 1.425, z: 0.02 },
+    // Neck gorget (dark) — seals the helmet to the collar (neck bone ~1.453).
+    { bone: 'Neck', geo: box(0.225, 0.08, 0.205), mat: dark, x: 0, y: 1.42, z: 0.02 },
   ];
 
   // spec: { bone, geo, mat, x, y, z, quat?, anim? }
