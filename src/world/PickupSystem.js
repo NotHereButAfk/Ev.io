@@ -10,11 +10,11 @@ const WEAPON_COLLECT_RADIUS = 2.0;
 // The five "power" weapons that spawn on the map (ev.io style): a marked beam of
 // light with the floating weapon inside. Collecting one swaps it into your hands.
 const SPECIAL_WEAPONS = [
-  { id: 'rpg',        pos: [  0,   0], color: 0xff7a1a },  // Nova Launcher (centre — most contested)
-  { id: 'boltsniper', pos: [ 34,   0], color: 0x33d0ec },  // Rail Driver
-  { id: 'fuelrod',    pos: [-34,   0], color: 0x5cff7a },  // Fuel Rod
-  { id: 'needler',    pos: [  0,  34], color: 0xff4dd2 },  // Needler
-  { id: 'concussion', pos: [  0, -34], color: 0xb27bff },  // Concussion Rifle
+  { id: 'rpg',        pos: [  0,   0], color: 0xff7a1a },  // Nova Launcher (centre holo-fountain — most contested)
+  { id: 'boltsniper', pos: [ 22,   0], color: 0x33d0ec },  // Rail Driver
+  { id: 'fuelrod',    pos: [-22,   0], color: 0x5cff7a },  // Fuel Rod
+  { id: 'needler',    pos: [  0,  22], color: 0xff4dd2 },  // Needler
+  { id: 'concussion', pos: [  0, -22], color: 0xb27bff },  // Concussion Rifle
 ];
 
 // Pickup definitions: type, color, geometry size
@@ -30,8 +30,8 @@ const SPAWN_LAYOUT = [
   // Centre cross-avenues (health + ammo alternating)
   ['health', [  0,  28]], ['ammo',   [  0, -28]],
   ['health', [ 28,   0]], ['ammo',   [-28,   0]],
-  ['health', [  0,  58]], ['ammo',   [  0, -58]],
-  ['health', [ 58,   0]], ['ammo',   [-58,   0]],
+  ['health', [  0,  44]], ['ammo',   [  0, -44]],
+  ['health', [ 44,   0]], ['ammo',   [-44,   0]],
   // Cross-street corners (the old corner spots are now inside the towers)
   ['shield', [ 38,  38]], ['shield', [-38,  38]],
   ['shield', [ 38, -38]], ['shield', [-38, -38]],

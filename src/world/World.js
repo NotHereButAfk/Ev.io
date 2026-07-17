@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSettings } from '../core/GameSettings.js';
 
-const ARENA_HALF = 78;
+const ARENA_HALF = 62;
 const TAXI_YELLOW = 0xffcf3d;
 
 // ---------------------------------------------------------------------------
@@ -575,13 +575,14 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // GLASS FIELD: a flat polished-glass floor with a glowing grid, dotted with
-    // translucent glass pillars (cover + sightline breaks). Clean and minimal.
+    // SCI-FI SHOPPING MALL: a two-level neon concourse — storefronts + mezzanine
+    // balconies (escalators + grav-lift elevators), a central holo-fountain, and
+    // kiosks/planters as cover. Medium-sized.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
     this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
-    this._buildGlassField();      // GLASS FIELD: glass floor + translucent glass pillars
+    this._buildMall();            // SCI-FI MALL: 2-level concourse, storefronts, escalators
     this._buildOrbitalRing();     // massive ring station overhead — the landmark
     this._buildSpawnPoints();
 
@@ -608,36 +609,33 @@ export class World {
     // emissive accents, which is the cheapest possible lighting to render.
     // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
     // the horizon fires rake warm light across the alloy structures.
-    const hemi = new THREE.HemisphereLight(0xb2cdea, 0x565b64, 1.35);
+    // Bright, clean interior — a soft overhead key + strong sky fill so the mall
+    // reads as lit retail space; the neon shop signs carry the colour.
+    const hemi = new THREE.HemisphereLight(0xdbe6f2, 0x6a7280, 1.55);
     this.scene.add(hemi);
-    // Warm key from high FRONT (+Z) so the monument's face and the approach are
-    // lit rather than silhouetted; a cool rim from behind carves the edges.
-    const key = new THREE.DirectionalLight(0xffe0b0, 1.7);
-    key.position.set(-34, 96, 90);
+    const key = new THREE.DirectionalLight(0xfff3e0, 1.35);
+    key.position.set(20, 120, 40);
     key.castShadow = false;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x74a6ff, 0.7);
-    rim.position.set(40, 46, -96);
-    this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0x9ec4ff, 0.55);
+    fill.position.set(-60, 50, -70);
+    this.scene.add(fill);
   }
 
   _buildGround() {
-    // A polished dark-glass floor: near-black tinted, mirror-smooth with a
-    // clearcoat so it catches the sky/key as a glossy sheen, and a glowing
-    // energy grid inlaid on top.
-    const glass = new THREE.MeshPhysicalMaterial({
-      color: 0x0a1a22, roughness: 0.05, metalness: 0.0,
-      clearcoat: 1.0, clearcoatRoughness: 0.04, reflectivity: 0.9,
-      envMapIntensity: 1.2,
+    // Clean polished mall concourse floor: light tiled composite with a soft
+    // sheen (clearcoat) and a faint inlaid grid of light seams.
+    const floor = new THREE.MeshPhysicalMaterial({
+      color: 0x9aa6b4, roughness: 0.28, metalness: 0.1,
+      clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.9,
     });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), glass);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     ground.matrixAutoUpdate = false;
     ground.updateMatrix();
     this.scene.add(ground);
-    // Glowing inlaid grid (bloom makes the lines glow on the glass).
-    const grid = new THREE.GridHelper(ARENA_HALF * 2, 48, 0x37d0ec, 0x0e3a48);
+    const grid = new THREE.GridHelper(ARENA_HALF * 2, 40, 0x5fd6ec, 0x40505e);
     grid.position.y = 0.03;
     grid.matrixAutoUpdate = false;
     grid.updateMatrix();
@@ -2533,8 +2531,158 @@ export class World {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
+  // SCI-FI SHOPPING MALL — a medium, two-level neon concourse. Storefront walls
+  // ring the space with glowing signs + lit windows; a mezzanine balcony runs in
+  // front of the upper shops (reached by escalators + grav-lift elevators, with
+  // glass railings over the atrium). A central holo-fountain + kiosks/planters
+  // are the cover. Built for close-mid gunfights across two floors.
+  // ═════════════════════════════════════════════════════════════════════════
+  _buildMall() {
+    const NEON = [0x33d0ec, 0xff4dd2, 0xff8a2c, 0x5cff9e, 0x6c7bff, 0xffd23b];
+    const wall   = new THREE.MeshStandardMaterial({ color: 0x424b58, roughness: 0.55, metalness: 0.4 });
+    const wall2  = new THREE.MeshStandardMaterial({ color: 0x2c333d, roughness: 0.6,  metalness: 0.35 });
+    const deckM  = new THREE.MeshStandardMaterial({ color: 0x5a6474, roughness: 0.45, metalness: 0.5 });
+    const trimM  = new THREE.MeshStandardMaterial({ color: 0xc7d2dd, roughness: 0.25, metalness: 0.85 });
+    const winMat = new THREE.MeshStandardMaterial({ color: 0x0b1522, roughness: 0.12, metalness: 0.6, emissive: 0x14304a, emissiveIntensity: 0.6 });
+
+    const F = 54;        // storefront distance from centre
+    const MEZ_Y = 6.6;   // mezzanine floor height
+    const MEZ_IN = 34;   // mezzanine inner edge (atrium half-size)
+
+    // solid collider box
+    const solid = (cx, cy, cz, w, h, d, mat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(cx, cy, cz); m.castShadow = true; m.receiveShadow = true;
+      m.matrixAutoUpdate = false; m.updateMatrix(); m.updateMatrixWorld(true);
+      this.scene.add(m);
+      this.colliders.push({ box: new THREE.Box3(
+        new THREE.Vector3(cx - w / 2, cy - h / 2, cz - d / 2),
+        new THREE.Vector3(cx + w / 2, cy + h / 2, cz + d / 2)), mesh: m });
+      return m;
+    };
+    const deco = (geo, mat, x, y, z, ry = 0) => {
+      const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (ry) m.rotation.y = ry;
+      m.castShadow = true; this.scene.add(m); return m;
+    };
+
+    // ── Storefront facades (2-storey walls with lit windows + neon signs) ──
+    const sides = [
+      { c: [0,  F], n: [0, -1], r: [1, 0] },   // N wall
+      { c: [0, -F], n: [0,  1], r: [1, 0] },   // S wall
+      { c: [ F, 0], n: [-1, 0], r: [0, 1] },   // E wall
+      { c: [-F, 0], n: [ 1, 0], r: [0, 1] },   // W wall
+    ];
+    for (const s of sides) {
+      const [cx, cz] = s.c, [nx, nz] = s.n, [rx, rz] = s.r;
+      const len = F * 2 + 8;
+      const w = Math.abs(rx) * len + Math.abs(nx) * 4;
+      const d = Math.abs(rz) * len + Math.abs(nz) * 4;
+      solid(cx, 7, cz, w, 14, d, wall);                 // 2-storey back wall
+      // a horizontal band splitting the two storeys
+      deco(new THREE.BoxGeometry(Math.abs(rx) * len + Math.abs(nx) * 4.4, 0.5, Math.abs(rz) * len + Math.abs(nz) * 4.4), trimM, cx, MEZ_Y - 0.4, cz);
+      // shop units along the wall
+      const N = 6;
+      for (let i = 0; i < N; i++) {
+        const along = ((i + 0.5) / N - 0.5) * (len - 6);
+        const px = cx + rx * along + nx * 2.1;
+        const pz = cz + rz * along + nz * 2.1;
+        const col = NEON[(i + (cx + cz > 0 ? 0 : 3)) % NEON.length];
+        const nm = this._neonMat(col);
+        // ground-floor lit window
+        deco(new THREE.BoxGeometry(Math.abs(rx) * 12 + Math.abs(nx) * 0.5, 4.6, Math.abs(rz) * 12 + Math.abs(nz) * 0.5), winMat, px, 3.0, pz);
+        // upper-floor lit window
+        deco(new THREE.BoxGeometry(Math.abs(rx) * 12 + Math.abs(nx) * 0.5, 4.0, Math.abs(rz) * 12 + Math.abs(nz) * 0.5), winMat, px, MEZ_Y + 3.4, pz);
+        // glowing sign band above the shopfront
+        deco(new THREE.BoxGeometry(Math.abs(rx) * 12.5 + Math.abs(nx) * 0.4, 0.9, Math.abs(rz) * 12.5 + Math.abs(nz) * 0.4), nm, px + nx * 0.2, 5.5, pz + nz * 0.2);
+      }
+    }
+
+    // ── Mezzanine balcony ring (walkable upper floor) + glass railings ──
+    // Four strips from the facade (±F) inward to ±MEZ_IN; the centre atrium is
+    // open (double-height). Solid decks + platform tops + support columns.
+    const bW = F * 2, bD = F - MEZ_IN;                 // strip footprint
+    const mzc = MEZ_IN + bD / 2;                        // strip centre offset
+    // N & S (run along x)
+    for (const sgn of [1, -1]) {
+      const cz = sgn * mzc;
+      deco(new THREE.BoxGeometry(bW + 8, 0.5, bD), deckM, 0, MEZ_Y - 0.25, cz);
+      this.platforms.push({ minX: -(F + 4), maxX: F + 4, minZ: cz - bD / 2, maxZ: cz + bD / 2, y0: MEZ_Y + 0.05, y1: MEZ_Y + 0.05 });
+      this._mallRailing(0, sgn * MEZ_IN, bW, 'x', MEZ_Y);
+      // under-balcony LED strip — lights the concourse edge under the mezzanine
+      deco(new THREE.BoxGeometry(bW, 0.16, 0.7), this._neonMat(0x33d0ec), 0, MEZ_Y - 0.58, sgn * (MEZ_IN + 1.4));
+      for (let x = -F + 6; x <= F - 6; x += 18) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 10), trimM, x, MEZ_Y / 2, cz + sgn * (bD / 2 - 2));
+    }
+    // E & W (run along z)
+    for (const sgn of [1, -1]) {
+      const cx = sgn * mzc;
+      deco(new THREE.BoxGeometry(bD, 0.5, bW + 8), deckM, cx, MEZ_Y - 0.25, 0);
+      this.platforms.push({ minX: cx - bD / 2, maxX: cx + bD / 2, minZ: -(F + 4), maxZ: F + 4, y0: MEZ_Y + 0.05, y1: MEZ_Y + 0.05 });
+      this._mallRailing(sgn * MEZ_IN, 0, bW, 'z', MEZ_Y);
+      // under-balcony LED strip — lights the concourse edge under the mezzanine
+      deco(new THREE.BoxGeometry(0.7, 0.16, bW), this._neonMat(0x33d0ec), sgn * (MEZ_IN + 1.4), MEZ_Y - 0.58, 0);
+      for (let z = -F + 6; z <= F - 6; z += 18) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 10), trimM, cx + sgn * (bD / 2 - 2), MEZ_Y / 2, z);
+    }
+
+    // ── Escalators (ramps ground→mezzanine) at the four mid-sides ──
+    this._rampBox(-5, 5,  MEZ_IN - 4, MEZ_IN + 6, MEZ_Y, 0, 'z', deckM, 0xff8a2c);   // N
+    this._rampBox(-5, 5, -(MEZ_IN + 6), -(MEZ_IN - 4), 0, MEZ_Y, 'z', deckM, 0xff8a2c); // S
+    this._rampBox(MEZ_IN - 4, MEZ_IN + 6, -5, 5, MEZ_Y, 0, 'x', deckM, 0xff8a2c);     // E
+    this._rampBox(-(MEZ_IN + 6), -(MEZ_IN - 4), -5, 5, 0, MEZ_Y, 'x', deckM, 0xff8a2c); // W
+
+    // ── Grav-lift elevators at the atrium corners ──
+    this._gravLift( 28,  28, MEZ_Y, 12);
+    this._gravLift(-28,  28, MEZ_Y, 12);
+    this._gravLift( 28, -28, MEZ_Y, 12);
+    this._gravLift(-28, -28, MEZ_Y, 12);
+
+    // ── Central holo-fountain (cover + landmark) ──
+    deco(new THREE.CylinderGeometry(5.5, 6.2, 0.6, 28), deckM, 0, 0.3, 0);
+    deco(new THREE.CylinderGeometry(3.6, 4.0, 1.2, 24), wall2, 0, 0.9, 0);
+    const water = new THREE.MeshPhysicalMaterial({ color: 0x2fd0ff, roughness: 0.1, metalness: 0, transmission: 0.7, transparent: true, opacity: 0.7, emissive: 0x0a6a9a, emissiveIntensity: 0.5 });
+    deco(new THREE.CylinderGeometry(3.4, 3.4, 0.3, 24), water, 0, 1.5, 0);
+    const holoMat = new THREE.MeshBasicMaterial({ color: 0x8fe6ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+    deco(new THREE.CylinderGeometry(0.5, 1.8, 9, 20, 1, true), holoMat, 0, 6, 0);
+    const holoRing = deco(new THREE.TorusGeometry(2.6, 0.12, 10, 32), this._neonMat(0x33d0ec), 0, 5, 0);
+    holoRing.rotation.x = Math.PI / 2; this._spinRings.push({ mesh: holoRing, speed: 0.5 });
+    const holoCore = deco(new THREE.IcosahedronGeometry(1.3, 0), this._neonMat(0x8fe6ff), 0, 7.5, 0);
+    this._spinRings.push({ mesh: holoCore, speed: 0.8 });
+
+    // ── Kiosks (small shops) + planters as concourse cover ──
+    for (const [x, z, col] of [[20, 20, 0xff4dd2], [-20, 20, 0x5cff9e], [20, -20, 0xffd23b], [-20, -20, 0x6c7bff]]) {
+      solid(x, 1.6, z, 5, 3.2, 5, wall2);
+      deco(new THREE.BoxGeometry(5.6, 0.7, 5.6), this._neonMat(col), x, 3.7, z);   // glowing kiosk sign
+      this.platforms.push({ minX: x - 2.5, maxX: x + 2.5, minZ: z - 2.5, maxZ: z + 2.5, y0: 3.25, y1: 3.25 });
+    }
+    for (const [x, z] of [[12, 0], [-12, 0], [0, 12], [0, -12], [30, 0], [-30, 0], [0, 30], [0, -30]]) {
+      deco(new THREE.CylinderGeometry(1.3, 1.5, 0.8, 12), wall2, x, 0.4, z);        // planter pot
+      deco(new THREE.SphereGeometry(1.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2f7a3a, roughness: 0.9, emissive: 0x0a2a12, emissiveIntensity: 0.4 }), x, 2.4, z);
+      this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 1.5, 0, z - 1.5), new THREE.Vector3(x + 1.5, 1.2, z + 1.5)), mesh: null });
+    }
+  }
+
+  // Glass railing along a mezzanine inner edge (with a central gap for the
+  // escalator). `axis` is the edge's run direction; (ex,ez) is the edge line.
+  _mallRailing(ex, ez, len, axis, y) {
+    const glass = new THREE.MeshPhysicalMaterial({ color: 0xaee6ff, roughness: 0.06, metalness: 0, transmission: 0.9, thickness: 1.0, transparent: true, clearcoat: 1 });
+    const nm = this._neonMat(0x33d0ec);
+    const seg = (len - 16) / 2;   // two segments, 16-wide gap in the middle for the escalator
+    for (const s of [-1, 1]) {
+      const off = s * (8 + seg / 2);
+      const cx = axis === 'x' ? ex + off : ex;
+      const cz = axis === 'x' ? ez : ez + off;
+      const gw = axis === 'x' ? seg : 0.2;
+      const gd = axis === 'x' ? 0.2 : seg;
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(gw, 1.1, gd), glass);
+      panel.position.set(cx, y + 0.55, cz); this.scene.add(panel);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(gw + 0.1, 0.1, gd + 0.1), nm);
+      rail.position.set(cx, y + 1.15, cz); this.scene.add(rail);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
   // GLASS FIELD — a flat glass floor dotted with translucent glass pillars.
   // Clean and minimal: the pillars are the only cover / sightline breaks.
+  // (Unused — the mall above replaced it; kept for reference.)
   // ═════════════════════════════════════════════════════════════════════════
   _buildGlassField() {
     const colors = [0x37c4d4, 0x33a8ec, 0x8fe6ff, 0x6cc4f0];
@@ -2894,10 +3042,12 @@ export class World {
     // Spawn out toward the edges of the glass field, in the gaps between the
     // pillar grid (pillars span ~±66; centre is kept clear).
     const coords = [
-      [0, 54], [0, -54], [54, 0], [-54, 0],
-      [0, 62], [0, -62], [62, 0], [-62, 0],
-      [44, 44], [-44, 44], [44, -44], [-44, -44],
-      [24, 0], [-24, 0], [0, 24], [0, -24],
+      // ground-floor concourse (around the central fountain)
+      [24, 24], [-24, 24], [24, -24], [-24, -24],
+      [0, 26], [0, -26], [26, 0], [-26, 0],
+      // upper-floor mezzanine balconies (spawn falls onto the y6.6 deck)
+      [0, 46], [0, -46], [46, 0], [-46, 0],
+      [42, 42], [-42, 42], [42, -42], [-42, -42],
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));

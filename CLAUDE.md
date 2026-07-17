@@ -40,14 +40,21 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the map. Currently the **GLASS FIELD** (ARENA_HALF=78):
-  a flat polished dark-glass floor (`MeshPhysicalMaterial`, clearcoat) with a
-  glowing inlaid grid (`GridHelper`), dotted with a jittered grid of translucent
-  glass pillars (transmission glass + glowing cap/base/core) that are the only
-  cover. Built by `_buildGlassField()` / `_glassPillar()`; the glass floor is in
-  `_buildGround()`. Collision via `colliders[]` (boxes) + `platforms[]` +
-  `groundHeightAt()`. (The old `_buildArena()`/`_buildMonument()`/
-  `_buildWinterTown()` remain defined but unused.)
+- `src/world/World.js` — the map. Currently the **SCI-FI SHOPPING MALL**
+  (ARENA_HALF=62): a medium two-level neon concourse. A polished tiled floor
+  (`MeshPhysicalMaterial`, clearcoat) + faint `GridHelper`; four 2-storey
+  storefront facades (lit windows + glowing neon sign bands) ring the space;
+  a walkable **mezzanine balcony** (`platforms[]`) runs around all four sides
+  with glass railings (`_mallRailing`), under-balcony LED strips, and support
+  columns; four **escalators** (`_rampBox`, orange trim) at the mid-sides and
+  four **grav-lifts** at the atrium corners link the levels; a central
+  **holo-fountain** (spinning ring + icosahedron core) is the landmark/cover;
+  4 colored **kiosks** (walkable) + 8 **planters** are concourse cover. Built
+  by `_buildMall()`; floor in `_buildGround()`, bright interior lighting in
+  `_buildLighting()`. Collision via `colliders[]` (boxes) + `platforms[]` +
+  `gravLifts[]` + `groundHeightAt()`. (The old `_buildGlassField()`/
+  `_glassPillar()`, `_buildArena()`, `_buildMonument()`, `_buildWinterTown()`
+  remain defined but unused.)
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
