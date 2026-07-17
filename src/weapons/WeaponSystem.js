@@ -308,26 +308,44 @@ export class WeaponSystem {
     const melee = this.allWeapons.find((w) => w.id === meleeId && w.kind === 'melee')
                || this.allWeapons.find((w) => w.kind === 'melee');
     this.loadout = [gun, melee].filter(Boolean);
+    this._mainGunId = gun?.id ?? null;   // remembered so map power-weapons can be dropped on respawn
+    this._meleeId   = melee?.id ?? null;
     this.currentIndex = 0;
     this._rebuildKeyMap();
     this._setActiveModel(0);
   }
 
-  // Swap the primary gun to a map-collected weapon, keeping the current melee,
-  // refill it to full, and switch to holding it. Returns the weapon def (or null).
-  equipMapGun(gunId) {
+  // Add a map-collected POWER weapon as an extra slot alongside the main gun, so
+  // the HUD shows [main gun, power gun, melee]. Switches to it and refills it.
+  // Picking up a different power weapon replaces the power slot (you carry one).
+  addMapGun(gunId) {
     const def = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee');
     if (!def) return null;
-    const melee = this.loadout.find((w) => w.kind === 'melee');
-    this.setLoadout(gunId, melee?.id);
-    const st = this.state.get(gunId);
+    const main  = this.allWeapons.find((w) => w.id === this._mainGunId && w.kind !== 'melee')
+               || this.loadout.find((w) => w.kind !== 'melee');
+    const melee = this.allWeapons.find((w) => w.id === this._meleeId && w.kind === 'melee')
+               || this.loadout.find((w) => w.kind === 'melee');
+    const slots = [];
+    if (main) slots.push(main);
+    if (!main || main.id !== def.id) slots.push(def);   // the extra power slot
+    if (melee) slots.push(melee);
+    this.loadout = slots;
+    this.currentIndex = this.loadout.indexOf(def);
+    this._rebuildKeyMap();
+    const st = this.state.get(def.id);
     if (st) {
       st.magAmmo = def.magSize;
       st.reserveAmmo = def.reserveMax;
       st.isReloading = false;
       st.reloadTimer = 0;
     }
+    this._setActiveModel(this.currentIndex);
     return def;
+  }
+
+  // Drop any picked-up power weapon — back to the base main gun + melee.
+  resetLoadout() {
+    this.setLoadout(this._mainGunId, this._meleeId);
   }
 
   _setActiveModel(index) {

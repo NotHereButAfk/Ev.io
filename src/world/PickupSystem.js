@@ -164,9 +164,13 @@ export class PickupSystem {
     pickup.mesh.visible = false;
 
     if (pickup.type === 'weapon') {
-      if (weaponSystem?.equipMapGun) {
-        const def = weaponSystem.equipMapGun(pickup.gunId);
-        if (def && hud) hud.addKillFeed(`PICKED UP — ${def.name}`);
+      if (weaponSystem?.addMapGun) {
+        const def = weaponSystem.addMapGun(pickup.gunId);
+        if (def && hud) {
+          hud.addKillFeed(`PICKED UP — ${def.name}`);
+          // Rebuild the right-side weapon inventory so the extra shows next to the main.
+          hud.buildWeaponSlots?.(weaponSystem.getHudInfo().slots, weaponSystem.currentIndex);
+        }
       }
       return;
     }

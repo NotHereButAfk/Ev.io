@@ -909,6 +909,13 @@ export class Game {
     );
   }
 
+  // Drop any picked-up map power weapon and refresh the right-side weapon
+  // inventory back to the base main gun + melee.
+  _resetLoadoutHud() {
+    this.weaponSystem.resetLoadout?.();
+    this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
+  }
+
   // ── Player damage / death ───────────────────────────────────────────────────
 
   _onPlayerDamaged(dmg) {
@@ -937,6 +944,7 @@ export class Game {
       setTimeout(() => {
         this.player.respawn(SPAWN_POINT);
         this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+        this._resetLoadoutHud();   // drop any picked-up power weapon
         this.hud.addKillFeed('RESPAWNING...');
       }, 1200);
       return;
@@ -948,6 +956,7 @@ export class Game {
       if (this._lives > 0 && this._mode?.waves) {
         setTimeout(() => {
           this.player.respawn(SPAWN_POINT);
+          this._resetLoadoutHud();   // drop any picked-up power weapon
           this._refreshModeHUD();
         }, 1500);
         return;
