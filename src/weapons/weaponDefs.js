@@ -374,6 +374,23 @@ export const WEAPONS = [
   },
 ];
 
+// Organise the arsenal into categories:
+//   'main'  — the balanced core guns featured in the loadout,
+//   'extra' — the specials / heavies (snipers, launchers, exotics),
+//   'melee' — the blades / hammer.
+// Tagged here (rather than on each def) so it stays in one place. Consumed by
+// the inventory to split the arsenal into Main / Extra / Melee groups.
+export const MAIN_WEAPON_IDS = ['m4', 'magnum', 'battlerifle', 'energyshotgun', 'plasmarifle'];
+const _MAIN = new Set(MAIN_WEAPON_IDS);
+for (const w of WEAPONS) {
+  w.category = w.kind === 'melee' ? 'melee' : (_MAIN.has(w.id) ? 'main' : 'extra');
+}
+
 export function getWeapon(id) {
   return WEAPONS.find((w) => w.id === id);
+}
+
+// Guns/blades in a given category, in arsenal order.
+export function weaponsByCategory(category) {
+  return WEAPONS.filter((w) => w.category === category);
 }
