@@ -2894,10 +2894,10 @@ export class World {
     // Spawn out toward the edges of the glass field, in the gaps between the
     // pillar grid (pillars span ~±66; centre is kept clear).
     const coords = [
-      [0, 0],
+      [0, 54], [0, -54], [54, 0], [-54, 0],
       [0, 62], [0, -62], [62, 0], [-62, 0],
       [44, 44], [-44, 44], [44, -44], [-44, -44],
-      [11, 33], [-11, -33], [33, -11], [-33, 11],
+      [24, 0], [-24, 0], [0, 24], [0, -24],
     ];
     for (const [x, z] of coords) {
       this.spawnPoints.push(new THREE.Vector3(x, 0, z));
