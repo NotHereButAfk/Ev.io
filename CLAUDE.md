@@ -54,10 +54,20 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   a walkable **mezzanine** (`platforms[]`) around a central **light-well** with
   clear glass + steel railings (`_mallRailing`), white soffit ceilings + recessed
   downlights; four **escalators** (`_rampBox`, dark steel treads + glass
-  balustrades) and four **glass scenic elevators** (`_gravLift`, reskinned — clear
-  glass shaft + lit cabin, still launches you up) link the levels; a central
-  **tiered stone fountain** is the landmark/cover; **leafy ficus trees** in stone
-  pots + bright **retail kiosks** (walkable) are the concourse cover. Collision
+  balustrades, rising ±24→±34 to meet the deck through the railing gaps) and four
+  **glass scenic elevators** (`_gravLift`, reskinned — clear glass shaft + lit
+  cabin, still launches you up) link the levels; a central **tiered stone
+  fountain** is the landmark/cover; **leafy ficus trees** in stone pots + bright
+  **retail kiosks** (walkable) are the concourse cover. Deep detail pass: every
+  shop has a **named illuminated lightbox sign** (canvas `makeStoreSignTexture`,
+  12 store brands × 3 sign styles), **stocked display windows** (shelves +
+  product boxes + mannequins behind glass, sealed by invisible display
+  colliders), and one **open entrance alcove per side** (welcome mat + shrubs —
+  a shallow cover niche); décor = floor **medallion** rings, wood **benches**,
+  trash bins, a **café terrace** (tables/stools/red umbrellas), **MALL MAP**
+  directory boards, 16 hanging **promo banners** (`makeBannerTexture`: SALE /
+  NEW SEASON / KYX GALLERIA), mezzanine railing **hedge planters**, and warm
+  track **spotlights** on the roof's dark clerestory fascia. Collision
   via `colliders[]` (boxes) + `platforms[]` + `gravLifts[]` + `groundHeightAt()`.
   (The old `_buildGlassField()`/`_glassPillar()`, `_buildArena()`,
   `_buildMonument()`, `_buildWinterTown()`, `_buildOrbitalRing()` remain defined

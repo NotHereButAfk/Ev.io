@@ -118,6 +118,36 @@ function makeSkyGradientTexture() {
   return tex;
 }
 
+// Illuminated store-sign lightbox: bold retail lettering with a thin border.
+function makeStoreSignTexture(name, bg, fg) {
+  const w = 512, h = 96;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = fg; g.globalAlpha = 0.3; g.lineWidth = 3; g.strokeRect(8, 8, w - 16, h - 16); g.globalAlpha = 1;
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '700 46px Arial, Helvetica, sans-serif';
+  g.fillText(name, w / 2, h / 2 + 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return tex;
+}
+
+// Vertical promo banner / board: stacked lines of big lettering.
+function makeBannerTexture(lines, bg, fg) {
+  const w = 256, h = 384;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.strokeStyle = fg; g.globalAlpha = 0.35; g.lineWidth = 5; g.strokeRect(10, 10, w - 20, h - 20); g.globalAlpha = 1;
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '800 58px Arial, Helvetica, sans-serif';
+  lines.forEach((ln, i) => g.fillText(ln, w / 2, h / 2 + (i - (lines.length - 1) / 2) * 74));
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return tex;
+}
+
 // Sci-fi bunker wall: alloy panel plating with seam lines, vents, and a loose
 // grid of glowing light-slit windows (cyan, with the odd warning-orange one).
 // One texture per palette colour, shared by every building of that colour.
@@ -2336,7 +2366,9 @@ export class World {
       emissive: 0xeef7ff, emissiveIntensity: 0.6, side: THREE.DoubleSide, depthWrite: false,
     });
     const steel   = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.45, metalness: 0.55 });
-    const fasciaM = new THREE.MeshStandardMaterial({ color: 0xeceae3, roughness: 0.6, metalness: 0.1 });
+    // dark clerestory band with track spotlights, like the reference mall
+    const fasciaM = new THREE.MeshStandardMaterial({ color: 0x3f3833, roughness: 0.6, metalness: 0.2 });
+    const spotM   = new THREE.MeshStandardMaterial({ color: 0xfff2da, emissive: 0xffe2ae, emissiveIntensity: 1.6, roughness: 0.4 });
     const roof = new THREE.Group();
     const roofLen = span * 2;   // extent along X
 
@@ -2403,6 +2435,15 @@ export class World {
       const f = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.8, roofLen + 3), fasciaM);
       f.position.set(sx * span, baseY - 0.6, 0);
       roof.add(f);
+    }
+    // rows of warm track spotlights along the underside of the fascia
+    for (const sz of [-1, 1]) for (let x = -span + 4; x <= span - 4; x += 8) {
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), spotM);
+      d.position.set(x, baseY - 1.15, sz * (span - 0.9)); roof.add(d);
+    }
+    for (const sx of [-1, 1]) for (let z = -span + 4; z <= span - 4; z += 8) {
+      const d = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), spotM);
+      d.position.set(sx * (span - 0.9), baseY - 1.15, z); roof.add(d);
     }
 
     this.scene.add(roof);
@@ -2678,44 +2719,131 @@ export class World {
       { c: [ F, 0], n: [-1, 0], r: [0, 1] },   // E wall
       { c: [-F, 0], n: [ 1, 0], r: [0, 1] },   // W wall
     ];
+    // Store branding: names + sign styles, cached canvas lightbox textures.
+    const STORE_NAMES = ['NOVA', 'KYRA & CO', 'APEX SPORT', 'LUMEN', 'VELA CAFE', 'ORBIT',
+                         'STELLA', 'URBANE', 'AURUM', 'VERDE', 'MODA', 'PIXEL'];
+    const SIGN_STYLES = [
+      { bg: '#f5f2ec', fg: '#2b2b2e' },   // white lightbox, dark lettering
+      { bg: '#b8352a', fg: '#ffffff' },   // retail red, white lettering
+      { bg: '#26262a', fg: '#ffd9a0' },   // dark box, warm glowing lettering
+    ];
+    const signTexCache = new Map();
+    const storeSign = (name, style, w, x, y, z, ry) => {
+      const key = name + '|' + style.bg;
+      let tex = signTexCache.get(key);
+      if (!tex) { tex = makeStoreSignTexture(name, style.bg, style.fg); signTexCache.set(key, tex); }
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.05), new THREE.MeshBasicMaterial({ map: tex }));
+      m.position.set(x, y, z); m.rotation.y = ry; this.scene.add(m);
+      return m;
+    };
+    // Shop-window merchandise materials.
+    const productM = [0xb8352a, 0x2e4a6b, 0xc9a227, 0x3d7a68, 0x8a5f9e, 0x6b4a2e]
+      .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0.05 }));
+    const shelfM  = new THREE.MeshStandardMaterial({ color: 0xf0ede6, roughness: 0.6, metalness: 0.05 });
+    const matRedM = new THREE.MeshStandardMaterial({ color: 0x7a2e28, roughness: 0.95, metalness: 0 });
+
     let sideIx = 0;
     for (const s of sides) {
       const [cx, cz] = s.c, [nx, nz] = s.n, [rx, rz] = s.r;
       const len = F * 2 + 8;
       const ax = Math.abs(rx), az = Math.abs(rz), bx = Math.abs(nx), bz = Math.abs(nz);
+      const faceRy = Math.atan2(nx, nz);   // plane rotation to face into the mall
+      // A box spanning `alongW` along the wall and `depth` through it, centred at
+      // (along, offN) in the wall's local frame — cuts the axis-juggling noise.
+      const unitBox = (alongW, h, depth, along, offN, y, mat) =>
+        deco(new THREE.BoxGeometry(ax * alongW + bx * depth, h, az * alongW + bz * depth),
+             mat, cx + rx * along + nx * offN, y, cz + rz * along + nz * offN);
+      // Invisible display-window collider running a0→a1 along the wall at offN.
+      const wallCollider = (a0, a1, offN, y0, y1) => {
+        const p0x = cx + rx * a0 + nx * offN, p0z = cz + rz * a0 + nz * offN;
+        const p1x = cx + rx * a1 + nx * offN, p1z = cz + rz * a1 + nz * offN;
+        this.colliders.push({ box: new THREE.Box3(
+          new THREE.Vector3(Math.min(p0x, p1x) - 0.15 * bx, y0, Math.min(p0z, p1z) - 0.15 * bz),
+          new THREE.Vector3(Math.max(p0x, p1x) + 0.15 * bx, y1, Math.max(p0z, p1z) + 0.15 * bz)), mesh: null });
+      };
+
       solid(cx, 8, cz, ax * len + bx * 4, 16, az * len + bz * 4, wallBack);   // 2-storey pale back wall
-      // white soffit fascia band splitting the two storeys + a red accent line
-      deco(new THREE.BoxGeometry(ax * len + bx * 4.4, 0.8, az * len + bz * 4.4), soffitM, cx, MEZ_Y - 0.2, cz);
-      deco(new THREE.BoxGeometry(ax * len + bx * 4.5, 0.18, az * len + bz * 4.5), redM, cx + nx * 0.05, MEZ_Y - 0.62, cz + nz * 0.05);
+      // Floor-slab canopy splitting the storeys (comes proud over the shopfronts,
+      // like a real mall's balcony edge) + a red accent line along its underside.
+      unitBox(len + 0.4, 0.8, 7.6, 0, 0, MEZ_Y - 0.2, soffitM);
+      unitBox(len + 0.5, 0.18, 7.7, 0, 0, MEZ_Y - 0.62, redM);
+      // Solid white bulkhead band under the upper shop glass.
+      unitBox(len - 6, 1.4, 0.3, 0, 3.5, MEZ_Y + 0.75, frameM);
+
       const N = 6;
+      const entIx = (sideIx % 4 === 0) ? 2 : 3;   // one open shop entrance per side
+      const entAlong = ((entIx + 0.5) / N - 0.5) * (len - 6);
       for (let i = 0; i < N; i++) {
         const along = ((i + 0.5) / N - 0.5) * (len - 6);
-        const px = cx + rx * along + nx * 2.1;
-        const pz = cz + rz * along + nz * 2.1;
-        const lit = litSet[(i + sideIx) % litSet.length];
-        // ground-floor lit interior + clear glass pane
-        deco(new THREE.BoxGeometry(ax * 12 + bx * 0.5, 4.4, az * 12 + bz * 0.5), lit, px, 2.9, pz);
-        deco(new THREE.BoxGeometry(ax * 12.4 + bx * 0.2, 4.6, az * 12.4 + bz * 0.2), glassClear, px + nx * 0.4, 2.9, pz + nz * 0.4);
-        // upper-floor lit interior + glass
-        deco(new THREE.BoxGeometry(ax * 12 + bx * 0.5, 3.8, az * 12 + bz * 0.5), lit, px, MEZ_Y + 3.3, pz);
-        deco(new THREE.BoxGeometry(ax * 12.4 + bx * 0.2, 4.0, az * 12.4 + bz * 0.2), glassClear, px + nx * 0.4, MEZ_Y + 3.3, pz + nz * 0.4);
-        // illuminated sign lightbox over the shopfront (every 3rd one red-backed)
-        deco(new THREE.BoxGeometry(ax * 11.5 + bx * 0.3, 0.85, az * 11.5 + bz * 0.3), (i % 3 === 1) ? redM : signM, px + nx * 0.25, 5.45, pz + nz * 0.25);
-        // a mannequin in the ground-floor window
-        const mxo = rx * 2.4, mzo = rz * 2.4;
-        for (const so of [-1, 1]) {
-          const mx = px + mxo * so, mz = pz + mzo * so;
-          deco(new THREE.CylinderGeometry(0.12, 0.18, 0.9, 8), steelM, mx, 0.45, mz);
-          deco(new THREE.CapsuleGeometry(0.28, 0.7, 4, 8), dispM, mx, 1.55, mz);
-          deco(new THREE.SphereGeometry(0.22, 10, 8), dispM, mx, 2.2, mz);
+        const isEntrance = i === entIx;
+        const nameG  = STORE_NAMES[(i + sideIx) % STORE_NAMES.length];
+        const nameU  = STORE_NAMES[(i + sideIx + 6) % STORE_NAMES.length];
+        const style  = SIGN_STYLES[(i + sideIx) % SIGN_STYLES.length];
+        const styleU = SIGN_STYLES[(i + sideIx + 1) % SIGN_STYLES.length];
+
+        // warm-lit interior wash against the back wall (both floors)
+        unitBox(12, 4.6, 0.15, along, 2.1, 2.9, litSet[(i + sideIx) % litSet.length]);
+        unitBox(12, 3.8, 0.15, along, 2.1, MEZ_Y + 3.3, litSet[(i + sideIx + 1) % litSet.length]);
+
+        if (!isEntrance) {
+          // stocked display window: two shelves of goods + a pair of mannequins
+          for (const sy of [1.05, 2.05]) unitBox(8.6, 0.12, 0.85, along, 2.6, sy, shelfM);
+          for (let k = 0; k < 5; k++) {
+            const boxAlong = along + (k - 2) * 1.45 + ((i + k) % 3 - 1) * 0.22;
+            const sy = (k % 2) ? 1.05 : 2.05;
+            unitBox(0.62, 0.55, 0.5, boxAlong, 2.6, sy + 0.34, productM[(i * 7 + k + sideIx) % productM.length]);
+          }
+          for (const so of [-1, 1]) {
+            const mAlong = along + so * 3.6;
+            unitBox(0.24, 0.9, 0.24, mAlong, 2.95, 0.45, steelM);   // stand
+            const mx = cx + rx * mAlong + nx * 2.95, mz = cz + rz * mAlong + nz * 2.95;
+            deco(new THREE.CapsuleGeometry(0.28, 0.7, 4, 8), dispM, mx, 1.55, mz);
+            deco(new THREE.SphereGeometry(0.22, 10, 8), dispM, mx, 2.2, mz);
+          }
+          // clear glass shopfront pane (movement is blocked by wallCollider below)
+          unitBox(12.4, 4.6, 0.12, along, 3.5, 2.9, glassClear);
+        } else {
+          // OPEN shop entrance: welcome mat + flanking shrubs; the alcove doubles
+          // as a shallow cover niche on the concourse. Glass side panes seal the
+          // display run on either side of the doorway.
+          unitBox(5.2, 0.06, 1.6, along, 3.3, 0.04, matRedM);
+          for (const so of [-1, 1]) {
+            const px2 = cx + rx * (along + so * 4.6) + nx * 3.2, pz2 = cz + rz * (along + so * 4.6) + nz * 3.2;
+            deco(new THREE.CylinderGeometry(0.34, 0.42, 0.5, 10), potM, px2, 0.25, pz2);
+            deco(new THREE.SphereGeometry(0.5, 10, 8), leafM, px2, 0.95, pz2);
+            const da = along + so * 6.2;
+            unitBox(0.18, 5.2, 1.5, da, 2.8, 2.6, glassClear);     // alcove side pane
+            const p0x = cx + rx * da + nx * 2.0, p0z = cz + rz * da + nz * 2.0;
+            const p1x = cx + rx * da + nx * 3.6, p1z = cz + rz * da + nz * 3.6;
+            this.colliders.push({ box: new THREE.Box3(
+              new THREE.Vector3(Math.min(p0x, p1x) - 0.2 * ax, 0, Math.min(p0z, p1z) - 0.2 * az),
+              new THREE.Vector3(Math.max(p0x, p1x) + 0.2 * ax, 5.3, Math.max(p0z, p1z) + 0.2 * az)), mesh: null });
+          }
         }
+        // ground-floor illuminated store-name lightbox
+        unitBox(11.8, 1.25, 0.35, along, 3.55, 5.32, frameM);
+        storeSign(nameG, style, 11.2, cx + rx * along + nx * 3.78, 5.32, cz + rz * along + nz * 3.78, faceRy);
+
+        // upper floor: a mannequin + glass + its own sign
+        const uAlong = along + ((i % 2) ? 2.2 : -2.2);
+        unitBox(0.24, 0.9, 0.24, uAlong, 2.95, MEZ_Y + 0.45, steelM);
+        const ux = cx + rx * uAlong + nx * 2.95, uz = cz + rz * uAlong + nz * 2.95;
+        deco(new THREE.CapsuleGeometry(0.28, 0.7, 4, 8), dispM, ux, MEZ_Y + 1.55, uz);
+        deco(new THREE.SphereGeometry(0.22, 10, 8), dispM, ux, MEZ_Y + 2.2, uz);
+        unitBox(12.4, 4.0, 0.12, along, 3.5, MEZ_Y + 3.3, glassClear);
+        unitBox(11.8, 1.15, 0.35, along, 3.55, MEZ_Y + 5.75, frameM);
+        storeSign(nameU, styleU, 11.2, cx + rx * along + nx * 3.78, MEZ_Y + 5.75, cz + rz * along + nz * 3.78, faceRy);
       }
-      // white pilasters between the shop units
+      // Continuous display colliders: ground floor is broken only at the entrance
+      // alcove; the upper run is sealed end to end.
+      wallCollider(-(len / 2), entAlong - 6.2, 3.5, 0, 5.3);
+      wallCollider(entAlong + 6.2, len / 2, 3.5, 0, 5.3);
+      wallCollider(-(len / 2), len / 2, 3.5, MEZ_Y, 12);
+
+      // white pilasters between the shop units, framing the glass
       for (let i = 0; i <= N; i++) {
         const along = (i / N - 0.5) * (len - 6);
-        const px = cx + rx * along + nx * 1.9;
-        const pz = cz + rz * along + nz * 1.9;
-        deco(new THREE.BoxGeometry(ax * 0.7 + bx * 1.4, 12.6, az * 0.7 + bz * 1.4), frameM, px, 6.3, pz);
+        unitBox(1.0, 12.6, 1.6, along, 2.9, 6.3, frameM);
       }
       sideIx += 2;
     }
@@ -2748,29 +2876,30 @@ export class World {
     }
 
     // ── Escalators (dark steel treads, glass balustrades) at the four mid-sides ──
+    // Each rises from the atrium floor at ±(MEZ_IN-10) up to the deck edge at
+    // ±MEZ_IN, meeting it exactly through the railing gap (so you can actually
+    // ride them onto the mezzanine).
     const escM = new THREE.MeshStandardMaterial({ color: 0x353a42, roughness: 0.5, metalness: 0.7 });
     const escSpecs = [
-      { a: [-5, 5,  MEZ_IN - 4, MEZ_IN + 6, MEZ_Y, 0, 'z'], bal: [[-5, 5], [ MEZ_IN - 4, MEZ_IN + 6]] },
-      { a: [-5, 5, -(MEZ_IN + 6), -(MEZ_IN - 4), 0, MEZ_Y, 'z'], bal: [[-5, 5], [-(MEZ_IN + 6), -(MEZ_IN - 4)]] },
-      { a: [MEZ_IN - 4, MEZ_IN + 6, -5, 5, MEZ_Y, 0, 'x'], bal: [[MEZ_IN - 4, MEZ_IN + 6], [-5, 5]] },
-      { a: [-(MEZ_IN + 6), -(MEZ_IN - 4), -5, 5, 0, MEZ_Y, 'x'], bal: [[-(MEZ_IN + 6), -(MEZ_IN - 4)], [-5, 5]] },
+      [-5, 5,  MEZ_IN - 10, MEZ_IN, 0, MEZ_Y, 'z'],       // N: up toward +z
+      [-5, 5, -MEZ_IN, -(MEZ_IN - 10), MEZ_Y, 0, 'z'],    // S: up toward -z
+      [MEZ_IN - 10, MEZ_IN, -5, 5, 0, MEZ_Y, 'x'],        // E: up toward +x
+      [-MEZ_IN, -(MEZ_IN - 10), -5, 5, MEZ_Y, 0, 'x'],    // W: up toward -x
     ];
-    for (const e of escSpecs) {
-      this._rampBox(e.a[0], e.a[1], e.a[2], e.a[3], e.a[4], e.a[5], e.a[6], escM, 0xffe6c2);
+    for (const [x0, x1, z0, z1, y0, y1, runAxis] of escSpecs) {
+      this._rampBox(x0, x1, z0, z1, y0, y1, runAxis, escM, 0xffe6c2);
       // glass balustrade panels down both sides of the run
-      const [[x0, x1], [z0, z1]] = e.bal;
-      const runAxis = e.a[6];
       const cxm = (x0 + x1) / 2, czm = (z0 + z1) / 2;
       const runLen = runAxis === 'x' ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
-      const midY = (e.a[4] + e.a[5]) / 2 + 0.9;
+      const midY = (y0 + y1) / 2 + 0.9;
       for (const so of [-1, 1]) {
         const off = so * (runAxis === 'x' ? Math.abs(z1 - z0) : Math.abs(x1 - x0)) / 2;
-        const bx = runAxis === 'x' ? cxm : cxm + off;
-        const bz = runAxis === 'x' ? czm + off : czm;
+        const px2 = runAxis === 'x' ? cxm : cxm + off;
+        const pz2 = runAxis === 'x' ? czm + off : czm;
         const gw = runAxis === 'x' ? runLen : 0.14;
         const gd = runAxis === 'x' ? 0.14 : runLen;
         const pane = new THREE.Mesh(new THREE.BoxGeometry(gw, 1.5, gd), glassClear);
-        pane.position.set(bx, midY, bz); this.scene.add(pane);
+        pane.position.set(px2, midY, pz2); this.scene.add(pane);
       }
     }
 
@@ -2799,7 +2928,95 @@ export class World {
       this.platforms.push({ minX: x - 2.5, maxX: x + 2.5, minZ: z - 2.5, maxZ: z + 2.5, y0: 2.85, y1: 2.85 });
     }
     // ── Leafy trees along the concourse avenues ──
-    for (const [x, z] of [[12, 0], [-12, 0], [0, 12], [0, -12], [30, 0], [-30, 0], [0, 30], [0, -30]]) tree(x, z, 1);
+    // (outer four sit on the diagonals, clear of the escalator runs)
+    for (const [x, z] of [[12, 0], [-12, 0], [0, 12], [0, -12], [26, 10], [-26, -10], [10, -26], [-10, 26]]) tree(x, z, 1);
+
+    // ── Concourse decorations ──
+    const woodM = new THREE.MeshStandardMaterial({ color: 0x8a6a48, roughness: 0.8, metalness: 0 });
+    const binM  = new THREE.MeshStandardMaterial({ color: 0x5a6066, roughness: 0.4, metalness: 0.7 });
+    // bench: stone ends + wood slat seat (axis-aligned; collider only at ground level)
+    const bench = (x, z, alongX, y = 0) => {
+      const ex2 = alongX ? 1.05 : 0, ez2 = alongX ? 0 : 1.05;
+      for (const so of [-1, 1])
+        deco(new THREE.BoxGeometry(alongX ? 0.3 : 0.66, 0.5, alongX ? 0.66 : 0.3), potM, x + so * ex2, y + 0.25, z + so * ez2);
+      deco(new THREE.BoxGeometry(alongX ? 2.6 : 0.6, 0.14, alongX ? 0.6 : 2.6), woodM, x, y + 0.57, z);
+      if (y === 0) this.colliders.push({ box: new THREE.Box3(
+        new THREE.Vector3(x - (alongX ? 1.35 : 0.4), 0, z - (alongX ? 0.4 : 1.35)),
+        new THREE.Vector3(x + (alongX ? 1.35 : 0.4), 0.65, z + (alongX ? 0.4 : 1.35))), mesh: null });
+    };
+
+    // fountain plaza: inlaid floor medallion rings + benches facing the water
+    const medM = new THREE.MeshStandardMaterial({ color: 0xc4b394, roughness: 0.55, metalness: 0.05 });
+    for (const [r, w] of [[7.6, 0.55], [10.6, 0.35]]) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r - w, r, 56), medM);
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.035; this.scene.add(ring);
+    }
+    bench( 7.6,  7.6, true); bench(-7.6,  7.6, true);
+    bench( 7.6, -7.6, true); bench(-7.6, -7.6, true);
+    bench( 24,  8, true); bench(-24, -8, true);
+    bench( 8, -22, false); bench(-8,  22, false);
+
+    // trash bins by the kiosks
+    for (const [x, z] of [[17, 23], [-23, 17], [23, -17], [-17, -23]]) {
+      deco(new THREE.CylinderGeometry(0.34, 0.3, 0.95, 12), binM, x, 0.48, z);
+      deco(new THREE.CylinderGeometry(0.38, 0.38, 0.09, 12), dispM, x, 0.99, z);
+    }
+
+    // café terrace by the south-west kiosk: tables, stools, red umbrellas
+    for (const [x, z] of [[-15.5, -19], [-19.5, -15], [-13, -16]]) {
+      deco(new THREE.CylinderGeometry(0.07, 0.07, 1.05, 8), steelM, x, 0.52, z);
+      deco(new THREE.CylinderGeometry(0.8, 0.8, 0.06, 16), frameM, x, 1.05, z);
+      deco(new THREE.CylinderGeometry(0.05, 0.05, 2.1, 6), steelM, x, 2.1, z);
+      deco(new THREE.ConeGeometry(1.55, 0.55, 10), redM, x, 3.2, z);
+      for (let k = 0; k < 3; k++) {
+        const aa = k * 2.1 + x + z;
+        deco(new THREE.CylinderGeometry(0.26, 0.3, 0.52, 10), woodM, x + Math.cos(aa) * 1.35, 0.26, z + Math.sin(aa) * 1.35);
+      }
+      this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 0.85, 0, z - 0.85), new THREE.Vector3(x + 0.85, 1.1, z + 0.85)), mesh: null });
+    }
+
+    // mall directory boards near the north/south under-balcony shops
+    const dirTex = makeBannerTexture(['MALL', 'MAP'], '#26262a', '#ffd9a0');
+    for (const [x, z, ry] of [[10, 40, Math.PI], [-10, -40, 0]]) {
+      deco(new THREE.BoxGeometry(0.5, 0.2, 0.5), binM, x, 0.1, z);
+      deco(new THREE.BoxGeometry(0.12, 2.5, 0.12), binM, x, 1.35, z);
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.0), new THREE.MeshBasicMaterial({ map: dirTex, side: THREE.DoubleSide }));
+      board.position.set(x, 1.85, z); board.rotation.y = ry; this.scene.add(board);
+      this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 0.4, 0, z - 0.4), new THREE.Vector3(x + 0.4, 1.2, z + 0.4)), mesh: null });
+    }
+
+    // hanging promo banners on the light-well railings
+    const bannerTex = [
+      makeBannerTexture(['SALE', '-50%'], '#b8352a', '#ffffff'),
+      makeBannerTexture(['NEW', 'SEASON'], '#f5f2ec', '#2b2b2e'),
+      makeBannerTexture(['KYX', 'GALLERIA'], '#26262a', '#ffd9a0'),
+    ];
+    let bIx = 0;
+    const IN_B = MEZ_IN - 0.6;
+    for (const [bx2, bz2, bry] of [
+      [ 14,  IN_B, Math.PI], [-14,  IN_B, Math.PI], [ 26,  IN_B, Math.PI], [-26,  IN_B, Math.PI],
+      [ 14, -IN_B, 0], [-14, -IN_B, 0], [ 26, -IN_B, 0], [-26, -IN_B, 0],
+      [ IN_B,  14, -Math.PI / 2], [ IN_B, -14, -Math.PI / 2], [ IN_B,  26, -Math.PI / 2], [ IN_B, -26, -Math.PI / 2],
+      [-IN_B,  14,  Math.PI / 2], [-IN_B, -14,  Math.PI / 2], [-IN_B,  26,  Math.PI / 2], [-IN_B, -26,  Math.PI / 2],
+    ]) {
+      const banner = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 3.0),
+        new THREE.MeshBasicMaterial({ map: bannerTex[bIx++ % 3], side: THREE.DoubleSide }));
+      banner.position.set(bx2, 4.7, bz2); banner.rotation.y = bry;
+      this.scene.add(banner);
+      const alongZ = Math.abs(bry) === Math.PI / 2;
+      const rod = new THREE.Mesh(new THREE.BoxGeometry(alongZ ? 0.08 : 2.3, 0.08, alongZ ? 2.3 : 0.08), steelM);
+      rod.position.set(bx2, 6.28, bz2); this.scene.add(rod);
+    }
+
+    // mezzanine: railing planter hedges + a couple of benches
+    const HG = MEZ_IN + 1.3;
+    for (const [hx2, hz2, alongX] of [[20, HG, true], [-20, HG, true], [20, -HG, true], [-20, -HG, true],
+                                      [HG, 20, false], [HG, -20, false], [-HG, 20, false], [-HG, -20, false]]) {
+      deco(new THREE.BoxGeometry(alongX ? 4.2 : 1.0, 0.62, alongX ? 1.0 : 4.2), potM, hx2, MEZ_Y + 0.36, hz2);
+      deco(new THREE.BoxGeometry(alongX ? 3.8 : 0.8, 0.55, alongX ? 0.8 : 3.8), leafM, hx2, MEZ_Y + 0.9, hz2);
+    }
+    bench(20, 44, true, MEZ_Y + 0.05); bench(-20, -44, true, MEZ_Y + 0.05);
+    bench(44, -20, false, MEZ_Y + 0.05); bench(-44, 20, false, MEZ_Y + 0.05);
   }
 
   // Glass railing along a mezzanine inner edge (with a central gap for the
@@ -3182,12 +3399,12 @@ export class World {
   }
 
   _buildSpawnPoints() {
-    // Spawn out toward the edges of the glass field, in the gaps between the
-    // pillar grid (pillars span ~±66; centre is kept clear).
+    // Mall spawns: ground concourse + mezzanine. The axis spawns sit inside the
+    // escalator runs' inner ends (±24..34), so they stay closer at ±18.
     const coords = [
       // ground-floor concourse (around the central fountain)
       [24, 24], [-24, 24], [24, -24], [-24, -24],
-      [0, 26], [0, -26], [26, 0], [-26, 0],
+      [0, 18], [0, -18], [18, 0], [-18, 0],
       // upper-floor mezzanine balconies (spawn falls onto the y6.6 deck)
       [0, 46], [0, -46], [46, 0], [-46, 0],
       [42, 42], [-42, 42], [42, -42], [-42, -42],
