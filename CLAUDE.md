@@ -40,21 +40,28 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the map. Currently the **SCI-FI SHOPPING MALL**
-  (ARENA_HALF=62): a medium two-level neon concourse. A polished tiled floor
-  (`MeshPhysicalMaterial`, clearcoat) + faint `GridHelper`; four 2-storey
-  storefront facades (lit windows + glowing neon sign bands) ring the space;
-  a walkable **mezzanine balcony** (`platforms[]`) runs around all four sides
-  with glass railings (`_mallRailing`), under-balcony LED strips, and support
-  columns; four **escalators** (`_rampBox`, orange trim) at the mid-sides and
-  four **grav-lifts** at the atrium corners link the levels; a central
-  **holo-fountain** (spinning ring + icosahedron core) is the landmark/cover;
-  4 colored **kiosks** (walkable) + 8 **planters** are concourse cover. Built
-  by `_buildMall()`; floor in `_buildGround()`, bright interior lighting in
-  `_buildLighting()`. Collision via `colliders[]` (boxes) + `platforms[]` +
-  `gravLifts[]` + `groundHeightAt()`. (The old `_buildGlassField()`/
-  `_glassPillar()`, `_buildArena()`, `_buildMonument()`, `_buildWinterTown()`
-  remain defined but unused.)
+- `src/world/World.js` — the map. Currently a **REAL SHOPPING MALL**
+  (ARENA_HALF=62): a bright, **daylit** two-level retail gallery modelled on a
+  real mall photo. Cream stone-tile floor (`_buildGround`, `MeshPhysicalMaterial`
+  clearcoat + faint grout grid); pale-plaster outer shell (`_buildArenaWalls`);
+  daylight lighting (`_buildLighting`: strong warm hemisphere + near-vertical
+  "sun through the roof" key). The hero feature is a **vaulted glass skylight
+  roof** (`_buildGlassRoof`) — a barrel vault of emissive translucent glass on
+  white steel arch ribs + purlins, arcing over the whole atrium (decorative, no
+  colliders). `_buildMall()` builds the interior: four sides of **warm-lit glass
+  storefronts** (bright emissive shop interiors + clear glass panes + red accents
+  + illuminated lightbox signs + mannequin displays, 2 storeys, white pilasters);
+  a walkable **mezzanine** (`platforms[]`) around a central **light-well** with
+  clear glass + steel railings (`_mallRailing`), white soffit ceilings + recessed
+  downlights; four **escalators** (`_rampBox`, dark steel treads + glass
+  balustrades) and four **glass scenic elevators** (`_gravLift`, reskinned — clear
+  glass shaft + lit cabin, still launches you up) link the levels; a central
+  **tiered stone fountain** is the landmark/cover; **leafy ficus trees** in stone
+  pots + bright **retail kiosks** (walkable) are the concourse cover. Collision
+  via `colliders[]` (boxes) + `platforms[]` + `gravLifts[]` + `groundHeightAt()`.
+  (The old `_buildGlassField()`/`_glassPillar()`, `_buildArena()`,
+  `_buildMonument()`, `_buildWinterTown()`, `_buildOrbitalRing()` remain defined
+  but unused.)
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for

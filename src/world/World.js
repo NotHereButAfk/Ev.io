@@ -105,14 +105,12 @@ function makeSkyGradientTexture() {
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  // Sci-fi battlefield dusk: deep space indigo zenith falling into a smoky
-  // teal band, then a burning ember horizon — a war going on past the walls.
-  grad.addColorStop(0.00, '#0b1024'); // deep space indigo
-  grad.addColorStop(0.35, '#16233f');
-  grad.addColorStop(0.62, '#274a5c'); // smoky teal band
-  grad.addColorStop(0.82, '#8a5a33'); // burnt amber build-up
-  grad.addColorStop(0.93, '#d68a3f'); // ember glow band
-  grad.addColorStop(1.00, '#f0b46a'); // fire on the horizon
+  // Bright clear daytime — a real shopping mall floods with daylight through its
+  // glass roof. Soft blue zenith falling to a hazy near-white horizon.
+  grad.addColorStop(0.00, '#8fc4f0'); // clear blue zenith
+  grad.addColorStop(0.45, '#bcdcf5');
+  grad.addColorStop(0.75, '#e2eef8'); // pale haze
+  grad.addColorStop(1.00, '#f6f9fb'); // near-white horizon
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
   const tex = new THREE.CanvasTexture(canvas);
@@ -575,15 +573,16 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // SCI-FI SHOPPING MALL: a two-level neon concourse — storefronts + mezzanine
-    // balconies (escalators + grav-lift elevators), a central holo-fountain, and
-    // kiosks/planters as cover. Medium-sized.
+    // REAL SHOPPING MALL: a bright, daylit two-level retail gallery — warm-lit
+    // glass storefronts, a walkable mezzanine around a central light-well, palm
+    // planters, escalators + glass elevators, and a vaulted glass skylight roof
+    // flooding the concourse with daylight. Medium-sized.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildArenaWalls();      // gunmetal perimeter with energy trim bands
-    this._buildMall();            // SCI-FI MALL: 2-level concourse, storefronts, escalators
-    this._buildOrbitalRing();     // massive ring station overhead — the landmark
+    this._buildArenaWalls();      // pale plaster mall shell
+    this._buildMall();            // 2-level concourse, glass storefronts, escalators
+    this._buildGlassRoof();       // vaulted glass skylight — the daylight landmark
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, 46);
@@ -609,25 +608,26 @@ export class World {
     // emissive accents, which is the cheapest possible lighting to render.
     // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
     // the horizon fires rake warm light across the alloy structures.
-    // Bright, clean interior — a soft overhead key + strong sky fill so the mall
-    // reads as lit retail space; the neon shop signs carry the colour.
-    const hemi = new THREE.HemisphereLight(0xdbe6f2, 0x6a7280, 1.55);
+    // Bright DAYLIGHT retail interior — a real mall with a glass roof. A strong
+    // warm-white sky fill (daylight bouncing off pale floors and ceilings) plus a
+    // high overhead key simulating sun pouring through the barrel-vault skylight.
+    const hemi = new THREE.HemisphereLight(0xf4f8ff, 0xcfd4d8, 2.15);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff3e0, 1.35);
-    key.position.set(20, 120, 40);
+    const key = new THREE.DirectionalLight(0xfff6ea, 1.7);
+    key.position.set(10, 160, 30);   // near-vertical: sun through the roof
     key.castShadow = false;
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0x9ec4ff, 0.55);
-    fill.position.set(-60, 50, -70);
+    const fill = new THREE.DirectionalLight(0xdfeaff, 0.7);
+    fill.position.set(-70, 60, -60);
     this.scene.add(fill);
   }
 
   _buildGround() {
-    // Clean polished mall concourse floor: light tiled composite with a soft
-    // sheen (clearcoat) and a faint inlaid grid of light seams.
+    // Polished cream stone-tile concourse floor — warm pale travertine with a
+    // soft sheen (clearcoat) and a faint tile grout grid, like a real mall.
     const floor = new THREE.MeshPhysicalMaterial({
-      color: 0x9aa6b4, roughness: 0.28, metalness: 0.1,
-      clearcoat: 0.7, clearcoatRoughness: 0.2, envMapIntensity: 0.9,
+      color: 0xdcd3c2, roughness: 0.35, metalness: 0.0,
+      clearcoat: 0.55, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -635,8 +635,11 @@ export class World {
     ground.matrixAutoUpdate = false;
     ground.updateMatrix();
     this.scene.add(ground);
-    const grid = new THREE.GridHelper(ARENA_HALF * 2, 40, 0x5fd6ec, 0x40505e);
+    // faint tile grout seams
+    const grid = new THREE.GridHelper(ARENA_HALF * 2, 44, 0xb7ad99, 0xc7bfad);
     grid.position.y = 0.03;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.5;
     grid.matrixAutoUpdate = false;
     grid.updateMatrix();
     this.scene.add(grid);
@@ -2282,11 +2285,14 @@ export class World {
   // Clean light panels with glowing blue trim + corner towers — the ev.io
   // "you're inside a built arena" feel, and the backdrop now that the city is gone.
   _buildArenaWalls() {
+    // The mall's outer shell — pale painted-plaster walls with a warm skirting and
+    // a light steel cornice up top. Mostly hidden behind the storefronts; reads as
+    // clean bright retail architecture, not a sci-fi bunker.
     const half = ARENA_HALF;
-    const H = 24, T = 2.5;
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.6, metalness: 0.55 });   // gunmetal alloy
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0x262c36, roughness: 0.55, metalness: 0.6 });  // darker inset plating
-    const trimMat = this._neonMat(0x33a8ec);  // energy containment bands
+    const H = 26, T = 2.5;
+    const wallMat  = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.85, metalness: 0.0 });  // warm plaster
+    const skirtMat = new THREE.MeshStandardMaterial({ color: 0xb9b0a0, roughness: 0.7,  metalness: 0.15 }); // stone skirting
+    const corniceMat = new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.55, metalness: 0.1 }); // light cornice
 
     const specs = [
       { w: half * 2 + T * 2, d: T, x: 0, z: -half },
@@ -2299,31 +2305,107 @@ export class World {
       wall.position.set(s.x, H / 2, s.z);
       wall.receiveShadow = true;
       this._addCollider(wall);
-      // inset panel stripe for paneling detail
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(s.w * 0.98, H * 0.5, s.d + 0.2), panelMat);
-      panel.position.set(s.x, H * 0.5, s.z);
-      this.scene.add(panel);
-      // glowing blue trim bands near the top and base
-      for (const ty of [H - 3.0, 1.0]) {
-        const band = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.15, 0.4, s.d + 0.15), trimMat);
-        band.position.set(s.x, ty, s.z);
-        this.scene.add(band);
+      // stone skirting at the base
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.15, 1.6, s.d + 0.15), skirtMat);
+      skirt.position.set(s.x, 0.8, s.z);
+      this.scene.add(skirt);
+      // light cornice near the top
+      const cornice = new THREE.Mesh(new THREE.BoxGeometry(s.w + 0.3, 0.7, s.d + 0.3), corniceMat);
+      cornice.position.set(s.x, H - 1.5, s.z);
+      this.scene.add(cornice);
+    }
+  }
+
+  // The signature feature: a vaulted GLASS SKYLIGHT ROOF over the atrium on a
+  // white steel frame, flooding the concourse with daylight (like the reference
+  // mall). A barrel vault whose axis runs along X; the arch curves across Z.
+  // Built by explicit arc sampling — robust, no fiddly cylinder-theta guessing.
+  // Purely decorative: no colliders (players never reach it).
+  _buildGlassRoof() {
+    const span   = ARENA_HALF - 2;   // arch reaches ±span across Z, roof runs ±span along X
+    const baseY  = 16;               // springing line height (above the shopfronts)
+    const arcHalf = 0.85;            // half-angle of the arch (~49°) → a tall airy vault
+    const R  = span / Math.sin(arcHalf);         // circle radius so springing lands at ±span
+    const cy = baseY - R * Math.cos(arcHalf);    // circle centre Y (below the floor)
+    const ridgeY = cy + R;                        // height of the ridge
+
+    // Bright translucent glass — emissive so it reads as glowing daylight.
+    const glass = new THREE.MeshPhysicalMaterial({
+      color: 0xdff0ff, roughness: 0.08, metalness: 0.0,
+      transmission: 0.5, thickness: 0.6, transparent: true, opacity: 0.42,
+      emissive: 0xeef7ff, emissiveIntensity: 0.6, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const steel   = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.45, metalness: 0.55 });
+    const fasciaM = new THREE.MeshStandardMaterial({ color: 0xeceae3, roughness: 0.6, metalness: 0.1 });
+    const roof = new THREE.Group();
+    const roofLen = span * 2;   // extent along X
+
+    // Arc point at angle a (measured from straight up): across Z / up Y.
+    const arcZ = (a) => R * Math.sin(a);
+    const arcY = (a) => cy + R * Math.cos(a);
+
+    // ── Glass shell: flat panel strips following the arch ──
+    const segs = 20;
+    const dz = R * (2 * arcHalf / segs) * 1.06;   // panel depth (slight overlap)
+    for (let i = 0; i < segs; i++) {
+      const a = -arcHalf + (i + 0.5) / segs * 2 * arcHalf;
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(roofLen, 0.1, dz), glass);
+      panel.position.set(0, arcY(a), arcZ(a));
+      panel.rotation.x = a;                        // tilt to lie tangent to the arch
+      roof.add(panel);
+    }
+
+    // ── Transverse steel arch ribs (every ~8 units along X) ──
+    // Build each rib in the XY plane as a partial torus, then a parent group turns
+    // it into the ZY plane so the arch spans Z.
+    for (let x = -span; x <= span + 0.01; x += 8) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(R, 0.22, 6, 40, arcHalf * 2), steel);
+      rib.rotation.z = Math.PI / 2 - arcHalf;      // centre the arc segment on straight-up
+      const g = new THREE.Group();
+      g.add(rib);
+      g.position.set(x, cy, 0);
+      g.rotation.y = Math.PI / 2;                  // XY arch → ZY arch (spans Z)
+      roof.add(g);
+    }
+
+    // ── Longitudinal purlins running the length of the roof at several heights ──
+    for (const frac of [-0.82, -0.5, -0.2, 0.2, 0.5, 0.82]) {
+      const a = frac * arcHalf;
+      const purlin = new THREE.Mesh(new THREE.BoxGeometry(roofLen, 0.14, 0.14), steel);
+      purlin.position.set(0, arcY(a) + 0.12, arcZ(a));
+      purlin.rotation.x = a;
+      roof.add(purlin);
+    }
+    // ridge beam
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(roofLen, 0.28, 0.28), steel);
+    ridge.position.set(0, ridgeY + 0.1, 0);
+    roof.add(ridge);
+
+    // ── End gables: glass tympanum closing the vault at ±X ──
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < segs; i++) {
+        const a = -arcHalf + (i + 0.5) / segs * 2 * arcHalf;
+        const h = arcY(a) - baseY;                 // fill from springing up to the arch
+        if (h <= 0) continue;
+        const fill = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, dz * 0.98), glass);
+        fill.position.set(sx * span, baseY + h / 2, arcZ(a));
+        roof.add(fill);
       }
     }
 
-    // Corner towers tie the walls together.
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.8, H + 5, 14), wallMat);
-        tower.position.set(sx * half, (H + 5) / 2, sz * half);
-        tower.receiveShadow = true;
-        this._addCollider(tower);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.18, 8, 26), trimMat);
-        ring.position.set(sx * half, H + 1.5, sz * half);
-        ring.rotation.x = Math.PI / 2;
-        this.scene.add(ring);
-      }
+    // ── Clerestory fascia band where the vault meets the walls ──
+    for (const sz of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(roofLen + 3, 1.8, 1.6), fasciaM);
+      f.position.set(0, baseY - 0.6, sz * span);
+      roof.add(f);
     }
+    for (const sx of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.8, roofLen + 3), fasciaM);
+      f.position.set(sx * span, baseY - 0.6, 0);
+      roof.add(f);
+    }
+
+    this.scene.add(roof);
   }
 
   _buildOrbitalRing() {
@@ -2531,19 +2613,34 @@ export class World {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
-  // SCI-FI SHOPPING MALL — a medium, two-level neon concourse. Storefront walls
-  // ring the space with glowing signs + lit windows; a mezzanine balcony runs in
-  // front of the upper shops (reached by escalators + grav-lift elevators, with
-  // glass railings over the atrium). A central holo-fountain + kiosks/planters
-  // are the cover. Built for close-mid gunfights across two floors.
+  // SHOPPING MALL — a bright, daylit two-level retail gallery (modelled on a real
+  // mall). Warm-lit glass storefronts with red accents + mannequin displays ring
+  // the space; a walkable mezzanine with clear glass railings runs in front of the
+  // upper shops (reached by escalators + glass elevators) around a central
+  // light-well. A tiered stone fountain, leafy ficus trees and retail kiosks are
+  // the cover. Daylight pours in through the vaulted glass roof (_buildGlassRoof).
   // ═════════════════════════════════════════════════════════════════════════
   _buildMall() {
-    const NEON = [0x33d0ec, 0xff4dd2, 0xff8a2c, 0x5cff9e, 0x6c7bff, 0xffd23b];
-    const wall   = new THREE.MeshStandardMaterial({ color: 0x424b58, roughness: 0.55, metalness: 0.4 });
-    const wall2  = new THREE.MeshStandardMaterial({ color: 0x2c333d, roughness: 0.6,  metalness: 0.35 });
-    const deckM  = new THREE.MeshStandardMaterial({ color: 0x5a6474, roughness: 0.45, metalness: 0.5 });
-    const trimM  = new THREE.MeshStandardMaterial({ color: 0xc7d2dd, roughness: 0.25, metalness: 0.85 });
-    const winMat = new THREE.MeshStandardMaterial({ color: 0x0b1522, roughness: 0.12, metalness: 0.6, emissive: 0x14304a, emissiveIntensity: 0.6 });
+    // Bright retail palette.
+    const frameM  = new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.55, metalness: 0.15 }); // white shopfront frame
+    const wallBack= new THREE.MeshStandardMaterial({ color: 0xe4e0d6, roughness: 0.85, metalness: 0.0 });  // pale shop back wall
+    const deckM   = new THREE.MeshStandardMaterial({ color: 0xe9e6de, roughness: 0.7,  metalness: 0.05 }); // mezzanine deck (pale stone)
+    const soffitM = new THREE.MeshStandardMaterial({ color: 0xf4f2ec, roughness: 0.6,  metalness: 0.05 }); // white ceiling soffit
+    const steelM  = new THREE.MeshStandardMaterial({ color: 0xc9ced4, roughness: 0.35, metalness: 0.8 });  // brushed steel
+    const redM    = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.5,  metalness: 0.1, emissive: 0x360d08, emissiveIntensity: 0.3 }); // retail red accent
+    const dispM   = new THREE.MeshStandardMaterial({ color: 0x394049, roughness: 0.6,  metalness: 0.2 });  // mannequin / display silhouette
+    const potM    = new THREE.MeshStandardMaterial({ color: 0xd7d0c1, roughness: 0.85, metalness: 0.05 }); // stone planter
+    const trunkM  = new THREE.MeshStandardMaterial({ color: 0x6d5a3c, roughness: 0.9,  metalness: 0.0 });  // tree trunk
+    const leafM   = new THREE.MeshStandardMaterial({ color: 0x4f9245, roughness: 0.9,  metalness: 0.0 });  // foliage
+    const water   = new THREE.MeshPhysicalMaterial({ color: 0x7fd0ea, roughness: 0.12, metalness: 0, transmission: 0.55, transparent: true, opacity: 0.7, emissive: 0x2a7fa6, emissiveIntensity: 0.25 });
+    const glassClear = new THREE.MeshPhysicalMaterial({ color: 0xeaf4fb, roughness: 0.05, metalness: 0, transmission: 0.92, thickness: 0.4, transparent: true, opacity: 0.32, clearcoat: 1 });
+    // bright lit shop interiors (glow warm/cool so the shopfronts read as "open")
+    const litWarm = new THREE.MeshStandardMaterial({ color: 0xfff3df, roughness: 0.4, metalness: 0, emissive: 0xffe4bc, emissiveIntensity: 1.4 });
+    const litCool = new THREE.MeshStandardMaterial({ color: 0xf2f7ff, roughness: 0.4, metalness: 0, emissive: 0xd8eaff, emissiveIntensity: 1.25 });
+    const litRed  = new THREE.MeshStandardMaterial({ color: 0xffe6e0, roughness: 0.4, metalness: 0, emissive: 0xde6252, emissiveIntensity: 1.1 });
+    const litSet  = [litWarm, litCool, litRed, litWarm, litCool, litRed];
+    const signM   = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0, emissive: 0xffffff, emissiveIntensity: 0.85 }); // illuminated lightbox sign
+    const dot     = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, emissive: 0xfff2da, emissiveIntensity: 1.2 });  // recessed downlight
 
     const F = 54;        // storefront distance from centre
     const MEZ_Y = 6.6;   // mezzanine floor height
@@ -2564,107 +2661,153 @@ export class World {
       const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (ry) m.rotation.y = ry;
       m.castShadow = true; this.scene.add(m); return m;
     };
+    // A leafy ficus tree in a stone pot (the reference mall's planters).
+    const tree = (x, z, scale = 1) => {
+      deco(new THREE.CylinderGeometry(1.3 * scale, 1.6 * scale, 1.1 * scale, 16), potM, x, 0.55 * scale, z);
+      deco(new THREE.CylinderGeometry(0.22 * scale, 0.32 * scale, 2.4 * scale, 8), trunkM, x, (1.1 + 1.2) * scale, z);
+      deco(new THREE.SphereGeometry(1.9 * scale, 12, 10), leafM, x, (3.6) * scale, z);
+      deco(new THREE.SphereGeometry(1.3 * scale, 12, 10), leafM, x + 0.9 * scale, (4.4) * scale, z + 0.4 * scale);
+      deco(new THREE.SphereGeometry(1.2 * scale, 12, 10), leafM, x - 0.8 * scale, (4.2) * scale, z - 0.6 * scale);
+      this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 1.5 * scale, 0, z - 1.5 * scale), new THREE.Vector3(x + 1.5 * scale, 1.3 * scale, z + 1.5 * scale)), mesh: null });
+    };
 
-    // ── Storefront facades (2-storey walls with lit windows + neon signs) ──
+    // ── Storefronts: pale back wall + warm-lit glass shopfronts, 2 storeys ──
     const sides = [
       { c: [0,  F], n: [0, -1], r: [1, 0] },   // N wall
       { c: [0, -F], n: [0,  1], r: [1, 0] },   // S wall
       { c: [ F, 0], n: [-1, 0], r: [0, 1] },   // E wall
       { c: [-F, 0], n: [ 1, 0], r: [0, 1] },   // W wall
     ];
+    let sideIx = 0;
     for (const s of sides) {
       const [cx, cz] = s.c, [nx, nz] = s.n, [rx, rz] = s.r;
       const len = F * 2 + 8;
-      const w = Math.abs(rx) * len + Math.abs(nx) * 4;
-      const d = Math.abs(rz) * len + Math.abs(nz) * 4;
-      solid(cx, 7, cz, w, 14, d, wall);                 // 2-storey back wall
-      // a horizontal band splitting the two storeys
-      deco(new THREE.BoxGeometry(Math.abs(rx) * len + Math.abs(nx) * 4.4, 0.5, Math.abs(rz) * len + Math.abs(nz) * 4.4), trimM, cx, MEZ_Y - 0.4, cz);
-      // shop units along the wall
+      const ax = Math.abs(rx), az = Math.abs(rz), bx = Math.abs(nx), bz = Math.abs(nz);
+      solid(cx, 8, cz, ax * len + bx * 4, 16, az * len + bz * 4, wallBack);   // 2-storey pale back wall
+      // white soffit fascia band splitting the two storeys + a red accent line
+      deco(new THREE.BoxGeometry(ax * len + bx * 4.4, 0.8, az * len + bz * 4.4), soffitM, cx, MEZ_Y - 0.2, cz);
+      deco(new THREE.BoxGeometry(ax * len + bx * 4.5, 0.18, az * len + bz * 4.5), redM, cx + nx * 0.05, MEZ_Y - 0.62, cz + nz * 0.05);
       const N = 6;
       for (let i = 0; i < N; i++) {
         const along = ((i + 0.5) / N - 0.5) * (len - 6);
         const px = cx + rx * along + nx * 2.1;
         const pz = cz + rz * along + nz * 2.1;
-        const col = NEON[(i + (cx + cz > 0 ? 0 : 3)) % NEON.length];
-        const nm = this._neonMat(col);
-        // ground-floor lit window
-        deco(new THREE.BoxGeometry(Math.abs(rx) * 12 + Math.abs(nx) * 0.5, 4.6, Math.abs(rz) * 12 + Math.abs(nz) * 0.5), winMat, px, 3.0, pz);
-        // upper-floor lit window
-        deco(new THREE.BoxGeometry(Math.abs(rx) * 12 + Math.abs(nx) * 0.5, 4.0, Math.abs(rz) * 12 + Math.abs(nz) * 0.5), winMat, px, MEZ_Y + 3.4, pz);
-        // glowing sign band above the shopfront
-        deco(new THREE.BoxGeometry(Math.abs(rx) * 12.5 + Math.abs(nx) * 0.4, 0.9, Math.abs(rz) * 12.5 + Math.abs(nz) * 0.4), nm, px + nx * 0.2, 5.5, pz + nz * 0.2);
+        const lit = litSet[(i + sideIx) % litSet.length];
+        // ground-floor lit interior + clear glass pane
+        deco(new THREE.BoxGeometry(ax * 12 + bx * 0.5, 4.4, az * 12 + bz * 0.5), lit, px, 2.9, pz);
+        deco(new THREE.BoxGeometry(ax * 12.4 + bx * 0.2, 4.6, az * 12.4 + bz * 0.2), glassClear, px + nx * 0.4, 2.9, pz + nz * 0.4);
+        // upper-floor lit interior + glass
+        deco(new THREE.BoxGeometry(ax * 12 + bx * 0.5, 3.8, az * 12 + bz * 0.5), lit, px, MEZ_Y + 3.3, pz);
+        deco(new THREE.BoxGeometry(ax * 12.4 + bx * 0.2, 4.0, az * 12.4 + bz * 0.2), glassClear, px + nx * 0.4, MEZ_Y + 3.3, pz + nz * 0.4);
+        // illuminated sign lightbox over the shopfront (every 3rd one red-backed)
+        deco(new THREE.BoxGeometry(ax * 11.5 + bx * 0.3, 0.85, az * 11.5 + bz * 0.3), (i % 3 === 1) ? redM : signM, px + nx * 0.25, 5.45, pz + nz * 0.25);
+        // a mannequin in the ground-floor window
+        const mxo = rx * 2.4, mzo = rz * 2.4;
+        for (const so of [-1, 1]) {
+          const mx = px + mxo * so, mz = pz + mzo * so;
+          deco(new THREE.CylinderGeometry(0.12, 0.18, 0.9, 8), steelM, mx, 0.45, mz);
+          deco(new THREE.CapsuleGeometry(0.28, 0.7, 4, 8), dispM, mx, 1.55, mz);
+          deco(new THREE.SphereGeometry(0.22, 10, 8), dispM, mx, 2.2, mz);
+        }
       }
+      // white pilasters between the shop units
+      for (let i = 0; i <= N; i++) {
+        const along = (i / N - 0.5) * (len - 6);
+        const px = cx + rx * along + nx * 1.9;
+        const pz = cz + rz * along + nz * 1.9;
+        deco(new THREE.BoxGeometry(ax * 0.7 + bx * 1.4, 12.6, az * 0.7 + bz * 1.4), frameM, px, 6.3, pz);
+      }
+      sideIx += 2;
     }
 
     // ── Mezzanine balcony ring (walkable upper floor) + glass railings ──
-    // Four strips from the facade (±F) inward to ±MEZ_IN; the centre atrium is
-    // open (double-height). Solid decks + platform tops + support columns.
-    const bW = F * 2, bD = F - MEZ_IN;                 // strip footprint
-    const mzc = MEZ_IN + bD / 2;                        // strip centre offset
+    // Four strips from the facade (±F) inward to ±MEZ_IN; the centre atrium is an
+    // open light-well (double-height). Pale decks + white soffit ceiling below +
+    // recessed downlights + support columns.
+    const bW = F * 2, bD = F - MEZ_IN;
+    const mzc = MEZ_IN + bD / 2;
     // N & S (run along x)
     for (const sgn of [1, -1]) {
       const cz = sgn * mzc;
-      deco(new THREE.BoxGeometry(bW + 8, 0.5, bD), deckM, 0, MEZ_Y - 0.25, cz);
+      deco(new THREE.BoxGeometry(bW + 8, 0.5, bD), deckM, 0, MEZ_Y - 0.25, cz);          // walking deck
+      deco(new THREE.BoxGeometry(bW + 8, 0.25, bD - 0.6), soffitM, 0, MEZ_Y - 0.62, cz); // white soffit ceiling below
       this.platforms.push({ minX: -(F + 4), maxX: F + 4, minZ: cz - bD / 2, maxZ: cz + bD / 2, y0: MEZ_Y + 0.05, y1: MEZ_Y + 0.05 });
       this._mallRailing(0, sgn * MEZ_IN, bW, 'x', MEZ_Y);
-      // under-balcony LED strip — lights the concourse edge under the mezzanine
-      deco(new THREE.BoxGeometry(bW, 0.16, 0.7), this._neonMat(0x33d0ec), 0, MEZ_Y - 0.58, sgn * (MEZ_IN + 1.4));
-      for (let x = -F + 6; x <= F - 6; x += 18) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 10), trimM, x, MEZ_Y / 2, cz + sgn * (bD / 2 - 2));
+      for (let x = -F + 8; x <= F - 8; x += 9) deco(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 14), dot, x, MEZ_Y - 0.76, sgn * (MEZ_IN + 2)); // downlights
+      for (let x = -F + 8; x <= F - 8; x += 20) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 12), frameM, x, MEZ_Y / 2, cz + sgn * (bD / 2 - 2)); // columns
     }
     // E & W (run along z)
     for (const sgn of [1, -1]) {
       const cx = sgn * mzc;
       deco(new THREE.BoxGeometry(bD, 0.5, bW + 8), deckM, cx, MEZ_Y - 0.25, 0);
+      deco(new THREE.BoxGeometry(bD - 0.6, 0.25, bW + 8), soffitM, cx, MEZ_Y - 0.62, 0);
       this.platforms.push({ minX: cx - bD / 2, maxX: cx + bD / 2, minZ: -(F + 4), maxZ: F + 4, y0: MEZ_Y + 0.05, y1: MEZ_Y + 0.05 });
       this._mallRailing(sgn * MEZ_IN, 0, bW, 'z', MEZ_Y);
-      // under-balcony LED strip — lights the concourse edge under the mezzanine
-      deco(new THREE.BoxGeometry(0.7, 0.16, bW), this._neonMat(0x33d0ec), sgn * (MEZ_IN + 1.4), MEZ_Y - 0.58, 0);
-      for (let z = -F + 6; z <= F - 6; z += 18) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 10), trimM, cx + sgn * (bD / 2 - 2), MEZ_Y / 2, z);
+      for (let z = -F + 8; z <= F - 8; z += 9) deco(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 14), dot, sgn * (MEZ_IN + 2), MEZ_Y - 0.76, z);
+      for (let z = -F + 8; z <= F - 8; z += 20) deco(new THREE.CylinderGeometry(0.5, 0.5, MEZ_Y, 12), frameM, cx + sgn * (bD / 2 - 2), MEZ_Y / 2, z);
     }
 
-    // ── Escalators (ramps ground→mezzanine) at the four mid-sides ──
-    this._rampBox(-5, 5,  MEZ_IN - 4, MEZ_IN + 6, MEZ_Y, 0, 'z', deckM, 0xff8a2c);   // N
-    this._rampBox(-5, 5, -(MEZ_IN + 6), -(MEZ_IN - 4), 0, MEZ_Y, 'z', deckM, 0xff8a2c); // S
-    this._rampBox(MEZ_IN - 4, MEZ_IN + 6, -5, 5, MEZ_Y, 0, 'x', deckM, 0xff8a2c);     // E
-    this._rampBox(-(MEZ_IN + 6), -(MEZ_IN - 4), -5, 5, 0, MEZ_Y, 'x', deckM, 0xff8a2c); // W
+    // ── Escalators (dark steel treads, glass balustrades) at the four mid-sides ──
+    const escM = new THREE.MeshStandardMaterial({ color: 0x353a42, roughness: 0.5, metalness: 0.7 });
+    const escSpecs = [
+      { a: [-5, 5,  MEZ_IN - 4, MEZ_IN + 6, MEZ_Y, 0, 'z'], bal: [[-5, 5], [ MEZ_IN - 4, MEZ_IN + 6]] },
+      { a: [-5, 5, -(MEZ_IN + 6), -(MEZ_IN - 4), 0, MEZ_Y, 'z'], bal: [[-5, 5], [-(MEZ_IN + 6), -(MEZ_IN - 4)]] },
+      { a: [MEZ_IN - 4, MEZ_IN + 6, -5, 5, MEZ_Y, 0, 'x'], bal: [[MEZ_IN - 4, MEZ_IN + 6], [-5, 5]] },
+      { a: [-(MEZ_IN + 6), -(MEZ_IN - 4), -5, 5, 0, MEZ_Y, 'x'], bal: [[-(MEZ_IN + 6), -(MEZ_IN - 4)], [-5, 5]] },
+    ];
+    for (const e of escSpecs) {
+      this._rampBox(e.a[0], e.a[1], e.a[2], e.a[3], e.a[4], e.a[5], e.a[6], escM, 0xffe6c2);
+      // glass balustrade panels down both sides of the run
+      const [[x0, x1], [z0, z1]] = e.bal;
+      const runAxis = e.a[6];
+      const cxm = (x0 + x1) / 2, czm = (z0 + z1) / 2;
+      const runLen = runAxis === 'x' ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+      const midY = (e.a[4] + e.a[5]) / 2 + 0.9;
+      for (const so of [-1, 1]) {
+        const off = so * (runAxis === 'x' ? Math.abs(z1 - z0) : Math.abs(x1 - x0)) / 2;
+        const bx = runAxis === 'x' ? cxm : cxm + off;
+        const bz = runAxis === 'x' ? czm + off : czm;
+        const gw = runAxis === 'x' ? runLen : 0.14;
+        const gd = runAxis === 'x' ? 0.14 : runLen;
+        const pane = new THREE.Mesh(new THREE.BoxGeometry(gw, 1.5, gd), glassClear);
+        pane.position.set(bx, midY, bz); this.scene.add(pane);
+      }
+    }
 
-    // ── Grav-lift elevators at the atrium corners ──
+    // ── Glass scenic elevators at the atrium corners (traversal up to mezzanine) ──
     this._gravLift( 28,  28, MEZ_Y, 12);
     this._gravLift(-28,  28, MEZ_Y, 12);
     this._gravLift( 28, -28, MEZ_Y, 12);
     this._gravLift(-28, -28, MEZ_Y, 12);
 
-    // ── Central holo-fountain (cover + landmark) ──
-    deco(new THREE.CylinderGeometry(5.5, 6.2, 0.6, 28), deckM, 0, 0.3, 0);
-    deco(new THREE.CylinderGeometry(3.6, 4.0, 1.2, 24), wall2, 0, 0.9, 0);
-    const water = new THREE.MeshPhysicalMaterial({ color: 0x2fd0ff, roughness: 0.1, metalness: 0, transmission: 0.7, transparent: true, opacity: 0.7, emissive: 0x0a6a9a, emissiveIntensity: 0.5 });
-    deco(new THREE.CylinderGeometry(3.4, 3.4, 0.3, 24), water, 0, 1.5, 0);
-    const holoMat = new THREE.MeshBasicMaterial({ color: 0x8fe6ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
-    deco(new THREE.CylinderGeometry(0.5, 1.8, 9, 20, 1, true), holoMat, 0, 6, 0);
-    const holoRing = deco(new THREE.TorusGeometry(2.6, 0.12, 10, 32), this._neonMat(0x33d0ec), 0, 5, 0);
-    holoRing.rotation.x = Math.PI / 2; this._spinRings.push({ mesh: holoRing, speed: 0.5 });
-    const holoCore = deco(new THREE.IcosahedronGeometry(1.3, 0), this._neonMat(0x8fe6ff), 0, 7.5, 0);
-    this._spinRings.push({ mesh: holoCore, speed: 0.8 });
+    // ── Central tiered stone fountain (landmark + cover) ──
+    deco(new THREE.CylinderGeometry(6.0, 6.6, 0.7, 32), potM, 0, 0.35, 0);      // basin rim
+    deco(new THREE.CylinderGeometry(5.5, 5.5, 0.4, 32), water, 0, 0.72, 0);      // lower water
+    deco(new THREE.CylinderGeometry(2.3, 2.7, 1.5, 24), potM, 0, 1.1, 0);        // pedestal
+    deco(new THREE.CylinderGeometry(2.0, 2.0, 0.35, 24), water, 0, 1.95, 0);     // upper water
+    deco(new THREE.CylinderGeometry(0.28, 0.32, 2.6, 12), steelM, 0, 3.2, 0);    // jet column
+    deco(new THREE.SphereGeometry(0.95, 16, 12), steelM, 0, 4.7, 0);            // finial sphere
+    // four ficus trees + benches ringing the fountain
+    for (const [tx, tz] of [[9, 0], [-9, 0], [0, 9], [0, -9]]) tree(tx, tz, 1.05);
 
-    // ── Kiosks (small shops) + planters as concourse cover ──
-    for (const [x, z, col] of [[20, 20, 0xff4dd2], [-20, 20, 0x5cff9e], [20, -20, 0xffd23b], [-20, -20, 0x6c7bff]]) {
-      solid(x, 1.6, z, 5, 3.2, 5, wall2);
-      deco(new THREE.BoxGeometry(5.6, 0.7, 5.6), this._neonMat(col), x, 3.7, z);   // glowing kiosk sign
-      this.platforms.push({ minX: x - 2.5, maxX: x + 2.5, minZ: z - 2.5, maxZ: z + 2.5, y0: 3.25, y1: 3.25 });
+    // ── Retail kiosks (bright glass display islands) as concourse cover ──
+    for (const [x, z, accent] of [[20, 20, redM], [-20, 20, litCool], [20, -20, signM], [-20, -20, redM]]) {
+      solid(x, 1.4, z, 5, 2.8, 5, frameM);                                       // white body
+      deco(new THREE.BoxGeometry(5.2, 0.5, 5.2), accent, x, 0.5, z);             // accent base band
+      deco(new THREE.BoxGeometry(4.4, 1.5, 4.4), glassClear, x, 2.4, z);        // glass display top
+      deco(new THREE.BoxGeometry(5.8, 0.55, 5.8), signM, x, 3.35, z);           // illuminated canopy sign
+      this.platforms.push({ minX: x - 2.5, maxX: x + 2.5, minZ: z - 2.5, maxZ: z + 2.5, y0: 2.85, y1: 2.85 });
     }
-    for (const [x, z] of [[12, 0], [-12, 0], [0, 12], [0, -12], [30, 0], [-30, 0], [0, 30], [0, -30]]) {
-      deco(new THREE.CylinderGeometry(1.3, 1.5, 0.8, 12), wall2, x, 0.4, z);        // planter pot
-      deco(new THREE.SphereGeometry(1.7, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2f7a3a, roughness: 0.9, emissive: 0x0a2a12, emissiveIntensity: 0.4 }), x, 2.4, z);
-      this.colliders.push({ box: new THREE.Box3(new THREE.Vector3(x - 1.5, 0, z - 1.5), new THREE.Vector3(x + 1.5, 1.2, z + 1.5)), mesh: null });
-    }
+    // ── Leafy trees along the concourse avenues ──
+    for (const [x, z] of [[12, 0], [-12, 0], [0, 12], [0, -12], [30, 0], [-30, 0], [0, 30], [0, -30]]) tree(x, z, 1);
   }
 
   // Glass railing along a mezzanine inner edge (with a central gap for the
   // escalator). `axis` is the edge's run direction; (ex,ez) is the edge line.
   _mallRailing(ex, ez, len, axis, y) {
-    const glass = new THREE.MeshPhysicalMaterial({ color: 0xaee6ff, roughness: 0.06, metalness: 0, transmission: 0.9, thickness: 1.0, transparent: true, clearcoat: 1 });
-    const nm = this._neonMat(0x33d0ec);
+    // Clear glass balustrade with a brushed-steel top handrail — like a real mall.
+    const glass = new THREE.MeshPhysicalMaterial({ color: 0xeaf4fb, roughness: 0.05, metalness: 0, transmission: 0.92, thickness: 0.5, transparent: true, opacity: 0.32, clearcoat: 1 });
+    const nm = new THREE.MeshStandardMaterial({ color: 0xd2d7dc, roughness: 0.3, metalness: 0.85 });
     const seg = (len - 16) / 2;   // two segments, 16-wide gap in the middle for the escalator
     for (const s of [-1, 1]) {
       const off = s * (8 + seg / 2);
@@ -2674,8 +2817,8 @@ export class World {
       const gd = axis === 'x' ? 0.2 : seg;
       const panel = new THREE.Mesh(new THREE.BoxGeometry(gw, 1.1, gd), glass);
       panel.position.set(cx, y + 0.55, cz); this.scene.add(panel);
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(gw + 0.1, 0.1, gd + 0.1), nm);
-      rail.position.set(cx, y + 1.15, cz); this.scene.add(rail);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(gw + 0.12, 0.14, gd + 0.12), nm);
+      rail.position.set(cx, y + 1.18, cz); this.scene.add(rail);
     }
   }
 
@@ -3504,41 +3647,40 @@ export class World {
     this._spinRings.push({ mesh: core, speed: 1.4 });
   }
 
-  // Grav-lift: a translucent energy column that launches the player upward.
+  // Glass scenic elevator: a clear glass shaft with a steel frame and a lit cabin.
+  // Stepping onto the pad carries the player up to the mezzanine (a real mall's
+  // panoramic lift). Same launch mechanic as before, restyled for the mall.
   _gravLift(x, z, topY, power) {
-    const color = 0x37c4d4;
-    const nm = this._neonMat(color);
-    const metal = new THREE.MeshStandardMaterial({ color: 0x07101c, roughness: 0.3, metalness: 0.85 });
-
-    // base ring pad
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.4, 0.18, 20), metal);
-    pad.position.set(x, 0.09, z);
-    pad.receiveShadow = true;
-    this.scene.add(pad);
-    const baseRing = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.1, 8, 28), nm);
-    baseRing.position.set(x, 0.2, z);
-    baseRing.rotation.x = Math.PI / 2;
-    this.scene.add(baseRing);
-
-    // translucent updraft column
-    const colMat = new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.8,
-      transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false,
+    const steel = new THREE.MeshStandardMaterial({ color: 0xd2d7dc, roughness: 0.32, metalness: 0.82 });
+    const glass = new THREE.MeshPhysicalMaterial({
+      color: 0xeaf4fb, roughness: 0.05, metalness: 0, transmission: 0.9, thickness: 0.4,
+      transparent: true, opacity: 0.28, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false,
     });
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.9, topY, 20, 1, true), colMat);
-    col.position.set(x, topY / 2, z);
-    this.scene.add(col);
+    const cabinM = new THREE.MeshStandardMaterial({ color: 0xfff3df, roughness: 0.4, metalness: 0, emissive: 0xffe6c2, emissiveIntensity: 0.9 });
+    const shaftH = topY + 2.4;
 
-    // floating accelerator rings up the column (spin for energy feel)
-    for (let i = 1; i <= 4; i++) {
-      const ry = (topY / 5) * i;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.06, 6, 24), nm);
-      ring.position.set(x, ry, z);
-      ring.rotation.x = Math.PI / 2;
-      this.scene.add(ring);
-      this._spinRings.push({ mesh: ring, speed: 0.8 + i * 0.3 });
+    // stone base pad
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 0.3, 24), steel);
+    pad.position.set(x, 0.15, z); pad.receiveShadow = true; this.scene.add(pad);
+
+    // four corner steel posts
+    for (const [ox, oz] of [[1.6, 1.6], [-1.6, 1.6], [1.6, -1.6], [-1.6, -1.6]]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, shaftH, 8), steel);
+      post.position.set(x + ox, shaftH / 2, z + oz); this.scene.add(post);
     }
-    this._accentLight(this.scene, color, 3, 16, x, 2.5, z);
+    // clear glass shaft
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.75, shaftH, 20, 1, true), glass);
+    shaft.position.set(x, shaftH / 2, z); this.scene.add(shaft);
+    // steel rings top + bottom of the shaft
+    for (const ry of [0.4, shaftH - 0.2]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.09, 8, 24), steel);
+      ring.position.set(x, ry, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
+    }
+    // lit glass cabin resting at the top landing
+    const cabin = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.2, 16), cabinM);
+    cabin.position.set(x, topY + 1.1, z); this.scene.add(cabin);
+    const cabinGlass = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 2.2, 16, 1, true), glass);
+    cabinGlass.position.set(x, topY + 1.1, z); this.scene.add(cabinGlass);
 
     this.gravLifts.push({ x, z, r: 1.9, topY, power });
   }
