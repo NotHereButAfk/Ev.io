@@ -76,7 +76,8 @@ export const WEAPONS = [
     recoil: 0.02,
     color: 0x394049,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'm16',
@@ -219,7 +220,8 @@ export const WEAPONS = [
     recoil: 0.028,
     color: 0x394049,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'battlerifle',
@@ -240,7 +242,8 @@ export const WEAPONS = [
     recoil: 0.022,
     color: 0x394049,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'needler',
@@ -278,7 +281,8 @@ export const WEAPONS = [
     recoil: 0.014,
     color: 0x394049,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'dmr',
@@ -359,7 +363,8 @@ export const WEAPONS = [
     recoil: 0.055,
     color: 0x394049,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'ghammer',

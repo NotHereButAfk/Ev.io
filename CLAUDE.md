@@ -76,7 +76,10 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
-- `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB).
+- `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
+  loader + detailed realistic procedural builders; the 5 main guns set
+  `proceduralModel: true` so the high-detail procedural models beat the GLB
+  placeholders, and needler/fuelrod/concussion/dmr have dedicated builders).
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
   (green/cyan/amber bars, coin popups, weapon wheel), `Nameplates.js`,
