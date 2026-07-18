@@ -20,7 +20,9 @@ export const WEAPONS = [
     reloadTime: 1.4,
     range: 140,
     recoil: 0.035,
-    color: 0x061a2a
+    color: 0xd2cdc3,        // clean light-grey polymer default finish
+    energyColor: 0x50d4ff,  // cyan energy accents
+    proceduralModel: true   // use the detailed faceted procedural pistol, not the GLB placeholder
   },
   {
     id: 'uzi',

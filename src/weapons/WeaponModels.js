@@ -263,91 +263,77 @@ function picRail(group, mat, x, y, zStart, length, step = 0.028) {
 // PISTOLS
 // ===========================================================================
 
-function buildSidearm(color) {
+// Pulse Pistol — clean light-grey faceted sci-fi Glock: long slide with a
+// raised top rib and chamfered nose, bevelled frame + grip, dark cyan-lit
+// barrel, and glowing cyan energy accents (sight dots, a bolt slash on the
+// frame, grip charge lines + a base chevron). Default light finish is the skin.
+function buildSidearm(color, def = {}) {
   const g = new THREE.Group();
-  const body    = M('body',   color,    { roughness: 0.55, metalness: 0.35 });
-  const slide   = M('accent', 0x18191d, { roughness: 0.35, metalness: 0.72 });
-  const metal   = M('metal',  0x6c7177, { metalness: 0.85, roughness: 0.25 });
-  const dark    = M('accent', 0x0e0f11, { roughness: 0.65, metalness: 0.2  });
+  const eCol = def.energyColor ?? 0x50d4ff;
+  const body  = M('body',   color ?? 0xd2cdc3, { roughness: 0.5,  metalness: 0.25 });   // light polymer frame/grip
+  const slide = M('accent', 0xcac5bb,          { roughness: 0.42, metalness: 0.45 });   // slide, a hair cooler
+  const metal = M('metal',  0x8a8f96,          { metalness: 0.9,  roughness: 0.28 });   // small steel bits
+  const dark  = M('accent', 0x2e3238,          { roughness: 0.5,  metalness: 0.55 });   // muzzle / insets (dark grey, not black)
+  const energy = M('energy', new THREE.Color(eCol).multiplyScalar(0.22).getHex(),
+    { roughness: 0.2, metalness: 0.1, emissive: eCol, emissiveIntensity: 1.5 });
 
-  // Frame
-  const frame = box(0.072, 0.055, 0.28, body);
-  frame.position.set(0, 0.0, -0.02);
-  g.add(frame);
+  // ── slide: main block + chamfer strips + raised top rib + angled nose ──
+  const sl = box(0.078, 0.082, 0.38, slide); sl.position.set(0, 0.062, -0.05); g.add(sl);
+  for (const sx of [-1, 1]) { const chamf = box(0.010, 0.024, 0.38, slide); chamf.position.set(sx * 0.036, 0.096, -0.05); chamf.rotation.z = sx * -0.5; g.add(chamf); }
+  const topRib = box(0.030, 0.014, 0.36, slide); topRib.position.set(0, 0.106, -0.05); g.add(topRib);
+  const nose = box(0.070, 0.070, 0.05, slide); nose.position.set(0, 0.058, -0.235); nose.rotation.x = -0.18; g.add(nose);
+  // rear + front cocking serrations
+  for (let i = 0; i < 6; i++) { const s = box(0.082, 0.066, 0.006, dark); s.position.set(0, 0.062, 0.075 + i * 0.015); g.add(s); }
+  for (let i = 0; i < 4; i++) { const s = box(0.082, 0.056, 0.006, dark); s.position.set(0, 0.058, -0.175 + i * 0.015); g.add(s); }
+  // ejection port
+  const ej = box(0.006, 0.036, 0.075, dark); ej.position.set(0.040, 0.072, -0.085); g.add(ej);
 
-  // Slide
-  const sl = box(0.080, 0.088, 0.36, slide);
-  sl.position.set(0, 0.062, -0.04);
-  g.add(sl);
+  // ── frame: bevelled block + accessory rail + takedown pin ──
+  const frame = box(0.070, 0.052, 0.30, body); frame.position.set(0, 0.004, -0.03); g.add(frame);
+  const frameBevelF = box(0.062, 0.030, 0.05, body); frameBevelF.position.set(0, -0.014, -0.16); frameBevelF.rotation.x = 0.4; g.add(frameBevelF);
+  const rail = box(0.048, 0.014, 0.13, dark); rail.position.set(0, -0.024, -0.11); g.add(rail);
+  for (let i = 0; i < 4; i++) { const tooth = box(0.050, 0.006, 0.010, metal); tooth.position.set(0, -0.014, -0.065 - i * 0.026); g.add(tooth); }
+  const pin = cyl(0.008, 0.008, 0.080, metal, 12, 0); pin.rotation.z = Math.PI / 2; pin.position.set(0, 0.000, -0.05); g.add(pin);
 
-  // Rear serrations on slide
-  for (let i = 0; i < 6; i++) {
-    const s = box(0.084, 0.072, 0.007, metal);
-    s.position.set(0, 0.062, 0.06 + i * 0.016);
-    g.add(s);
+  // ── grip: bevelled panels + stipple ──
+  const grip = box(0.074, 0.20, 0.098, body); grip.position.set(0, -0.115, 0.105); grip.rotation.x = 0.2; g.add(grip);
+  for (const sx of [-1, 1]) { const panel = box(0.010, 0.15, 0.070, body); panel.position.set(sx * 0.036, -0.11, 0.105); panel.rotation.z = sx * -0.35; panel.rotation.x = 0.2; g.add(panel); }
+  stippleGrip(g, dark, 0.038, -0.10, 0.070, 0.0, 0.14, 3, 5);
+  const magBase = box(0.078, 0.020, 0.10, dark); magBase.position.set(0, -0.215, 0.140); magBase.rotation.x = 0.2; g.add(magBase);
+
+  // ── angular trigger guard ──
+  const tgBot = box(0.050, 0.014, 0.10, body); tgBot.position.set(0, -0.050, 0.02); g.add(tgBot);
+  const tgFront = box(0.050, 0.044, 0.014, body); tgFront.position.set(0, -0.028, -0.028); tgFront.rotation.x = -0.25; g.add(tgFront);
+  const trig = box(0.014, 0.044, 0.016, metal); trig.position.set(0, -0.022, 0.008); g.add(trig);
+
+  // ── dark barrel with a cyan-lit chamber, poking through the nose ──
+  const barrel = cyl(0.016, 0.015, 0.075, dark, 14); barrel.position.set(0, 0.060, -0.255); g.add(barrel);
+  const crown = cyl(0.018, 0.019, 0.012, dark, 14); crown.position.set(0, 0.060, -0.290); g.add(crown);
+  const bore = cyl(0.010, 0.012, 0.010, energy, 12); bore.position.set(0, 0.060, -0.295); g.add(bore);
+
+  // ── iron sights with glowing cyan dots ──
+  const sightR = box(0.024, 0.016, 0.016, dark); sightR.position.set(0, 0.120, 0.10); g.add(sightR);
+  for (const sx of [-1, 1]) { const d = box(0.004, 0.005, 0.004, energy); d.position.set(sx * 0.008, 0.124, 0.104); g.add(d); }
+  const sightF = box(0.010, 0.016, 0.010, dark); sightF.position.set(0, 0.120, -0.20); g.add(sightF);
+  const fDot = box(0.005, 0.006, 0.004, energy); fDot.position.set(0, 0.126, -0.204); g.add(fDot);
+
+  // ── cyan energy accents (the skin's signature glow) ──
+  // a lightning-bolt slash on each frame flank above the trigger
+  for (const sx of [-1, 1]) {
+    const b1 = box(0.004, 0.010, 0.030, energy); b1.position.set(sx * 0.036, 0.014, -0.005); b1.rotation.x = 0.7; g.add(b1);
+    const b2 = box(0.004, 0.010, 0.026, energy); b2.position.set(sx * 0.036, 0.002, 0.020); b2.rotation.x = -0.6; g.add(b2);
   }
-
-  // Front serrations
-  for (let i = 0; i < 3; i++) {
-    const s = box(0.084, 0.06, 0.007, metal);
-    s.position.set(0, 0.062, -0.18 + i * 0.016);
-    g.add(s);
+  // a big cyan chevron mid-grip (the skin's signature) + charge dashes at the base
+  for (const sx of [-1, 1]) {
+    const cvU = box(0.004, 0.008, 0.030, energy); cvU.position.set(sx * 0.035, -0.090, 0.095); cvU.rotation.x = 0.9; g.add(cvU);
+    const cvL = box(0.004, 0.008, 0.030, energy); cvL.position.set(sx * 0.035, -0.118, 0.100); cvL.rotation.x = -0.4; g.add(cvL);
+    const l1 = box(0.004, 0.006, 0.030, energy); l1.position.set(sx * 0.035, -0.168, 0.152); l1.rotation.x = 0.2; g.add(l1);
+    const l2 = box(0.004, 0.006, 0.030, energy); l2.position.set(sx * 0.035, -0.192, 0.157); l2.rotation.x = 0.2; g.add(l2);
   }
+  // slide-side energy vent line
+  for (const sx of [-1, 1]) { const v = box(0.004, 0.008, 0.10, energy); v.position.set(sx * 0.040, 0.040, -0.03); g.add(v); }
 
-  // Ejection port (inset panel on slide side)
-  const ej = box(0.005, 0.04, 0.08, dark);
-  ej.position.set(0.041, 0.07, -0.08);
-  g.add(ej);
-
-  // Dust cover rail
-  const rail = box(0.05, 0.016, 0.14, dark);
-  rail.position.set(0, -0.022, -0.1);
-  g.add(rail);
-  for (let i = 0; i < 4; i++) {
-    const tooth = box(0.052, 0.006, 0.012, metal);
-    tooth.position.set(0, -0.012, -0.06 - i * 0.026);
-    g.add(tooth);
-  }
-
-  // Grip
-  const grip = box(0.078, 0.195, 0.1, body);
-  grip.position.set(0, -0.11, 0.1);
-  grip.rotation.x = 0.2;
-  g.add(grip);
-  stippleGrip(g, dark, 0.041, -0.1, 0.06, 0.0, 0.15, 4, 6);
-
-  // Trigger guard
-  const tgBot = box(0.052, 0.014, 0.1, body);
-  tgBot.position.set(0, -0.048, 0.02);
-  g.add(tgBot);
-  const tgFront = box(0.052, 0.04, 0.014, body);
-  tgFront.position.set(0, -0.026, -0.03);
-  g.add(tgFront);
-
-  // Trigger
-  const trig = box(0.016, 0.048, 0.018, metal);
-  trig.position.set(0, -0.02, 0.01);
-  g.add(trig);
-
-  // Barrel
-  const barrel = cyl(0.016, 0.014, 0.065, metal);
-  barrel.position.set(0, 0.062, -0.25);
-  g.add(barrel);
-
-  // Sights
-  const sightR = box(0.022, 0.016, 0.018, metal);
-  sightR.position.set(0, 0.112, -0.18);
-  g.add(sightR);
-  const sightF = box(0.01, 0.014, 0.012, metal);
-  sightF.position.set(0, 0.112, 0.09);
-  g.add(sightF);
-
-  // Takedown pin
-  const pin = cyl(0.008, 0.008, 0.086, metal, 16, 0);
-  pin.position.set(0, -0.002, -0.04);
-  g.add(pin);
-
-  const muzzle = addMuzzle(g, 0, 0.062, -0.295);
+  const muzzle = addMuzzle(g, 0, 0.060, -0.31);
   return { group: g, muzzle };
 }
 
