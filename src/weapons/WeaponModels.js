@@ -2096,24 +2096,45 @@ function buildNeedler(color, def = {}) {
     const slit = box(0.005, 0.016, 0.007, energy); slit.position.set(sx * 0.030, 0.058, 0.005 + i * 0.05); g.add(slit);
   }
 
-  // ── top ammo rack: an open channel the crystal shards seat into ──
-  const rackFloor = box(0.036, 0.010, 0.26, dark); rackFloor.position.set(0, 0.096, 0.045); g.add(rackFloor);
-  for (const sx of [-1, 1]) { const wall = box(0.008, 0.026, 0.26, dark); wall.position.set(sx * 0.020, 0.104, 0.045); g.add(wall); }
-  // six crystal shards — the visible needle ammunition
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const h = 0.048 + Math.sin(t * Math.PI) * 0.032;
-    const spike = cone(0.010 + 0.003 * Math.sin(t * Math.PI), h, crystal, 6, 0);
-    spike.position.set(0, 0.098 + h * 0.42, 0.145 - i * 0.042);
-    spike.rotation.x = 0.05 + (1 - t) * 0.14;
+  // ── top-mounted needle magazine: a translucent box mag (like a P90's) with
+  // the glowing needle rounds stacked visibly inside — reads as real ammo in a
+  // real container, not exposed spikes ──
+  // clear smoked-glass housing (barely tinted so the rounds read through it)
+  const housingMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(eCol).multiplyScalar(0.6), roughness: 0.05, metalness: 0.0,
+    transmission: 0.85, thickness: 0.2, transparent: true, opacity: 0.22,
+    clearcoat: 1.0, clearcoatRoughness: 0.04, ior: 1.4,
+  });
+  housingMat.userData.role = 'special';
+  // brighter needle rounds so they punch through the glass
+  const round = M('energy', new THREE.Color(eCol).multiplyScalar(0.3).getHex(),
+    { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 3.0 });
+  // steel end caps + a spine rib bolting the magazine to the receiver
+  const capF = box(0.048, 0.058, 0.020, dark); capF.position.set(0, 0.130, -0.088); g.add(capF);
+  const capR = box(0.048, 0.058, 0.020, dark); capR.position.set(0, 0.130, 0.166); g.add(capR);
+  const clampBar = box(0.052, 0.012, 0.030, dark); clampBar.position.set(0, 0.097, 0.040); g.add(clampBar);
+  // needle rounds inside — a dense row of diagonal cartridges under the glass
+  for (let i = 0; i < 11; i++) {
+    const t = i / 10;
+    const spike = cone(0.0075, 0.070, round, 6, 0);
+    spike.position.set(0, 0.140, 0.150 - i * 0.026);
+    spike.rotation.x = 0.42;    // all leaning forward, like stacked rounds
     g.add(spike);
   }
+  // the clear housing shell over the rounds (slimmer, lower)
+  const housing = box(0.044, 0.070, 0.28, housingMat); housing.position.set(0, 0.132, 0.040); g.add(housing);
+  const magSpine = box(0.030, 0.010, 0.27, metal); magSpine.position.set(0, 0.170, 0.040); g.add(magSpine);
+  // front feed throat where the needles drop down into the receiver
+  const throat = box(0.042, 0.026, 0.026, dark); throat.position.set(0, 0.100, -0.078); g.add(throat);
 
-  // ── sights: front post with glow dot + rear notch, short accessory rail ──
-  picRail(g, dark, 0, 0.100, -0.085, 0.055, 0.022);
-  const fsPost = box(0.010, 0.024, 0.010, dark); fsPost.position.set(0, 0.100, -0.215); g.add(fsPost);
-  const fsDot = box(0.005, 0.005, 0.005, energy); fsDot.position.set(0, 0.112, -0.219); g.add(fsDot);
-  const rSight = box(0.026, 0.014, 0.010, dark); rSight.position.set(0, 0.100, 0.170); g.add(rSight);
+  // ── iron sights raised on posts over the magazine spine (sighted over the
+  // top mag, like a real top-fed SMG) ──
+  const fsWing = box(0.016, 0.018, 0.010, dark); fsWing.position.set(0, 0.182, -0.090); g.add(fsWing);
+  const fsPost = box(0.005, 0.014, 0.006, dark); fsPost.position.set(0, 0.190, -0.090); g.add(fsPost);
+  const fsDot  = box(0.004, 0.004, 0.004, energy); fsDot.position.set(0, 0.197, -0.093); g.add(fsDot);
+  const rsBase = box(0.024, 0.016, 0.014, dark); rsBase.position.set(0, 0.181, 0.150); g.add(rsBase);
+  const rsNotch = box(0.006, 0.012, 0.008, dark); rsNotch.position.set(0, 0.189, 0.150); g.add(rsNotch);
+  for (const sx of [-1, 1]) { const d = box(0.004, 0.004, 0.004, energy); d.position.set(sx * 0.008, 0.191, 0.153); g.add(d); }
 
   // ── barrel group: shroud with glowing vents, exposed barrel, needle head ──
   // a collar fairs the receiver into the slimmer shroud
