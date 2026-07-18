@@ -84,52 +84,67 @@ def add_torus(name, loc, major, minor, material, rot=(0,0,0)):
 
 parts = []
 # Orientation: -Y = muzzle forward, +Z = up, +X = right. (glTF export makes -Y -> -Z forward.)
+# Target: the reference — LONG sleek slide, barrel protruding, ANGULAR trigger
+# guard, sharply faceted grip + rear frame, glowing cyan panels. Crisp small
+# chamfers (bevel ~0.004, 1-2 segs) so facets stay hard, not pillowy.
+ZB = 0.072   # bore line
 
-# ── SLIDE: long block, chamfered top, angled nose ──
-slide = add_box("slide", (0, -0.02, 0.075), (0.052, 0.34, 0.055), M_body, bevel=0.010, seg=3); parts.append(slide)
-# top rib
-parts.append(add_box("rib", (0, -0.02, 0.107), (0.024, 0.30, 0.014), M_body, bevel=0.005))
-# angled nose cap
-parts.append(add_box("nose", (0, -0.205, 0.070), (0.050, 0.05, 0.050), M_body, bevel=0.010, rot=(math.radians(-12),0,0)))
-# ejection port (dark inset) + cutter
-parts.append(add_box("ejport", (0.028, -0.06, 0.088), (0.010, 0.075, 0.030), M_dark, bevel=0.003))
-# cocking serrations (rear)
-for i in range(6):
-    parts.append(add_box(f"ser{i}", (0, 0.075 - i*0.016, 0.075), (0.056, 0.006, 0.05), M_dark, bevel=0.001, smooth=False))
+def bx(name, loc, dim, m, bevel=0.004, seg=1, rot=(0,0,0)):
+    parts.append(add_box(name, loc, dim, m, bevel=bevel, seg=seg, rot=rot)); return parts[-1]
 
-# ── FRAME under the slide ──
-frame = add_box("frame", (0, -0.03, 0.02), (0.048, 0.30, 0.05), M_body, bevel=0.010, seg=3); parts.append(frame)
-# accessory rail underside
-parts.append(add_box("rail", (0, -0.13, -0.012), (0.034, 0.12, 0.014), M_dark, bevel=0.002))
+# ── SLIDE: long, low, flat-topped with a chamfered nose ──
+bx("slide",  (0, -0.02, ZB+0.006), (0.050, 0.40, 0.050), M_body, bevel=0.005, seg=1)
+bx("slidetop",(0, -0.02, ZB+0.030), (0.038, 0.40, 0.008), M_body, bevel=0.004)          # flat top plate
+bx("nose",   (0, -0.212, ZB), (0.048, 0.045, 0.046), M_body, bevel=0.006, rot=(math.radians(-16),0,0))
+bx("ejport", (0.026, -0.05, ZB+0.014), (0.010, 0.075, 0.026), M_dark, bevel=0.002)
+for i in range(6):                                                                       # rear serrations
+    bx(f"ser{i}", (0, 0.10 - i*0.014, ZB+0.004), (0.054, 0.005, 0.046), M_dark, bevel=0)
+for i in range(3):                                                                       # front serrations
+    bx(f"fser{i}", (0, -0.15 + i*0.014, ZB+0.004), (0.052, 0.005, 0.044), M_dark, bevel=0)
 
-# ── GRIP: angled, rounded, sculpted ──
-grip = add_box("grip", (0, 0.10, -0.11), (0.05, 0.10, 0.20), M_body, bevel=0.022, seg=4, rot=(math.radians(12),0,0)); parts.append(grip)
-parts.append(add_box("magbase", (0, 0.135, -0.215), (0.056, 0.10, 0.02), M_dark, bevel=0.006, rot=(math.radians(12),0,0)))
+# ── BARREL protruding past the slide + dark muzzle crown + bore ──
+parts.append(add_cyl("barrel", (0, -0.255, ZB), 0.017, 0.09, M_metal, axis='Y'))
+parts.append(add_cyl("crown",  (0, -0.298, ZB), 0.021, 0.016, M_dark, axis='Y'))
+parts.append(add_cyl("bore",   (0, -0.305, ZB), 0.012, 0.010, M_dark, axis='Y', verts=16))
 
-# ── TRIGGER GUARD: smooth torus loop + trigger ──
-parts.append(add_torus("guard", (0, 0.0, -0.03), 0.038, 0.008, M_body, rot=(0, math.radians(90), 0)))
-parts.append(add_box("trigger", (0, 0.01, -0.03), (0.012, 0.014, 0.04), M_metal, bevel=0.002))
+# ── FRAME: block + faceted rear (beavertail) gem-cut ──
+bx("frame",  (0, -0.03, ZB-0.052), (0.044, 0.34, 0.044), M_body, bevel=0.005)
+bx("dustcov",(0, -0.15, ZB-0.058), (0.034, 0.14, 0.030), M_dark, bevel=0.003)            # rail block under barrel
+bx("beaver", (0, 0.135, ZB-0.028), (0.042, 0.055, 0.060), M_body, bevel=0.006, rot=(math.radians(34),0,0))  # angled beavertail facet
+bx("rframe", (0, 0.115, ZB-0.052), (0.044, 0.09, 0.05), M_body, bevel=0.006)             # rear frame hump
 
-# ── BARREL + dark muzzle + glowing bore ──
-parts.append(add_cyl("barrel", (0, -0.235, 0.070), 0.017, 0.09, M_dark, axis='Y'))
-parts.append(add_cyl("bore",   (0, -0.275, 0.070), 0.011, 0.012, M_energy, axis='Y', verts=16))
+# ── ANGULAR TRIGGER GUARD (square-ish loop from beveled bars) + trigger ──
+bx("gtop",   (0, -0.055, ZB-0.078), (0.030, 0.10, 0.014), M_body, bevel=0.004)           # top of guard
+bx("gfront", (0, -0.10, ZB-0.115), (0.028, 0.014, 0.062), M_body, bevel=0.005, rot=(math.radians(20),0,0)) # angled front strut
+bx("gbot",   (0, -0.035, ZB-0.140), (0.028, 0.115, 0.014), M_body, bevel=0.005)          # bottom bar
+bx("grear",  (0, 0.028, ZB-0.115), (0.030, 0.016, 0.058), M_body, bevel=0.004)           # rear post into grip
+bx("trigger",(0, -0.045, ZB-0.110), (0.012, 0.014, 0.04), M_metal, bevel=0.002)
 
-# ── SIGHTS with glowing dots ──
-parts.append(add_box("rsight", (0, 0.10, 0.115), (0.026, 0.016, 0.016), M_dark, bevel=0.003))
-parts.append(add_box("fsight", (0, -0.185, 0.115), (0.012, 0.016, 0.016), M_dark, bevel=0.003))
-for x in (-0.009, 0.009):
-    parts.append(add_box(f"rdot{x}", (x, 0.105, 0.122), (0.005,0.005,0.006), M_energy, bevel=0, smooth=False))
-parts.append(add_box("fdot", (0, -0.19, 0.122), (0.006,0.006,0.006), M_energy, bevel=0, smooth=False))
-
-# ── CYAN ACCENTS: frame bolt-slash, grip chevron + charge dashes ──
+# ── GRIP: angular block + raised faceted side panels + cyan inset + magwell ──
+GR = math.radians(15)
+bx("grip",   (0, 0.075, ZB-0.185), (0.046, 0.11, 0.215), M_body, bevel=0.006, rot=(GR,0,0))
+bx("gripfront",(0, 0.015, ZB-0.175), (0.040, 0.020, 0.16), M_body, bevel=0.008, rot=(GR,0,0))  # front strap
 for sx in (-1, 1):
-    parts.append(add_box(f"slash1{sx}", (sx*0.026, 0.00, 0.02), (0.006,0.006,0.03), M_energy, bevel=0, rot=(math.radians(40),0,0), smooth=False))
-    parts.append(add_box(f"slash2{sx}", (sx*0.026, 0.03, 0.006), (0.006,0.006,0.026), M_energy, bevel=0, rot=(math.radians(-35),0,0), smooth=False))
-    # chevron mid-grip
-    parts.append(add_box(f"cvU{sx}", (sx*0.026, 0.075, -0.07), (0.006,0.006,0.03), M_energy, bevel=0, rot=(math.radians(50),0,0), smooth=False))
-    parts.append(add_box(f"cvL{sx}", (sx*0.026, 0.10, -0.085), (0.006,0.006,0.03), M_energy, bevel=0, rot=(math.radians(-50),0,0), smooth=False))
-    # base charge dashes
-    parts.append(add_box(f"dash{sx}", (sx*0.026, 0.14, -0.16), (0.006,0.006,0.03), M_energy, bevel=0, rot=(math.radians(12),0,0), smooth=False))
+    bx(f"panel{sx}", (sx*0.024, 0.075, ZB-0.175), (0.012, 0.075, 0.13), M_body, bevel=0.010, rot=(GR,0,0))  # raised bevelled panel
+    # cyan glowing inset inside the panel (the reference's grip glow)
+    parts.append(add_box(f"glowpanel{sx}", (sx*0.031, 0.075, ZB-0.175), (0.005, 0.045, 0.09), M_energy, bevel=0.004, rot=(GR,0,0)))
+bx("magwell",(0, 0.108, ZB-0.295), (0.050, 0.10, 0.022), M_dark, bevel=0.004, rot=(GR,0,0))
+
+# ── SIGHTS with glowing cyan dots ──
+bx("rsight", (0, 0.12, ZB+0.040), (0.026, 0.018, 0.016), M_dark, bevel=0.003)
+bx("fsight", (0, -0.195, ZB+0.040), (0.012, 0.016, 0.014), M_dark, bevel=0.003)
+for x in (-0.009, 0.009):
+    parts.append(add_box(f"rdot{x}", (x, 0.125, ZB+0.048), (0.005,0.006,0.006), M_energy, bevel=0))
+parts.append(add_box("fdot", (0, -0.20, ZB+0.048), (0.006,0.007,0.006), M_energy, bevel=0))
+
+# ── CYAN LIGHTNING BOLT on each frame flank (Z-shape) + small slide nicks ──
+for sx in (-1, 1):
+    parts.append(add_box(f"b1{sx}", (sx*0.023, -0.02, ZB-0.030), (0.005,0.006,0.028), M_energy, bevel=0, rot=(math.radians(55),0,0)))
+    parts.append(add_box(f"b2{sx}", (sx*0.023, 0.01,  ZB-0.048), (0.005,0.006,0.024), M_energy, bevel=0, rot=(math.radians(-40),0,0)))
+    parts.append(add_box(f"b3{sx}", (sx*0.023, 0.045, ZB-0.062), (0.005,0.006,0.022), M_energy, bevel=0, rot=(math.radians(55),0,0)))
+# slide front + rear cyan nicks (top edge accents)
+parts.append(add_box("nickF", (0, -0.20, ZB+0.032), (0.012,0.004,0.012), M_energy, bevel=0))
+parts.append(add_box("nickR", (0, 0.155, ZB+0.028), (0.012,0.004,0.012), M_energy, bevel=0))
 
 # ── join all parts into ONE mesh (absolute coords) named weapon_sidearm ──
 bpy.ops.object.select_all(action='DESELECT')
