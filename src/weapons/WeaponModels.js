@@ -971,21 +971,21 @@ function buildAR10(color) {
   g.add(topRail);
   picRail(g, dark, 0, 0.16, 0.22, 0.88);
 
-  // Red-dot optic (Aimpoint-style)
+  // Red-dot optic (Aimpoint-style) — tube lies along the bore axis
   const base = box(0.052, 0.042, 0.115, dark);
   base.position.set(0, 0.178, 0.03);
   g.add(base);
-  const tube = cyl(0.032, 0.032, 0.105, dark, 16, 0);
+  const tube = cyl(0.032, 0.032, 0.105, dark, 16);
   tube.position.set(0, 0.225, 0.03);
   g.add(tube);
-  const lens1 = cyl(0.028, 0.028, 0.012, glass, 16, 0);
-  lens1.position.set(0, 0.225, -0.045);
+  const lens1 = cyl(0.028, 0.028, 0.012, glass, 16);
+  lens1.position.set(0, 0.225, -0.028);
   g.add(lens1);
-  const lens2 = cyl(0.028, 0.028, 0.012, glass, 16, 0);
-  lens2.position.set(0, 0.225, 0.105);
+  const lens2 = cyl(0.028, 0.028, 0.012, glass, 16);
+  lens2.position.set(0, 0.225, 0.088);
   g.add(lens2);
   const adjKnob = cyl(0.01, 0.01, 0.03, metal, 8, 0);
-  adjKnob.position.set(0, 0.258, 0.03);
+  adjKnob.position.set(0, 0.262, 0.03);
   g.add(adjKnob);
 
   // Barrel (heavier .308 profile)
@@ -1809,14 +1809,16 @@ function buildSciFiHandCannon(color, def = {}) {
   // frame with a cylinder window (front section + rear section) so the fluted
   // cylinder and its glowing chambers stay visible, like a Mateba automag.
   const frame = box(0.048, 0.045, 0.155, body); frame.position.set(0, 0.022, -0.133); g.add(frame);
-  const frameRear = box(0.046, 0.055, 0.055, body); frameRear.position.set(0, 0.008, 0.075); g.add(frameRear);
+  // rear frame block runs from the slide all the way down into the grip so the
+  // back end reads as one piece instead of hanging chunks
+  const frameRear = box(0.046, 0.090, 0.060, body); frameRear.position.set(0, -0.004, 0.072); g.add(frameRear);
   const underCyl = box(0.044, 0.016, 0.11, body); underCyl.position.set(0, -0.008, 0.015); g.add(underCyl);
-  const dust = box(0.040, 0.014, 0.10, dark); dust.position.set(0, -0.004, -0.22); g.add(dust);
-  picRail(g, metal, 0, -0.012, -0.17, 0.09, 0.022);
+  const dust = box(0.040, 0.014, 0.10, dark); dust.position.set(0, -0.002, -0.22); g.add(dust);
+  picRail(g, metal, 0, -0.009, -0.17, 0.09, 0.022);
 
   // hammer spur + beavertail
   const hammer = box(0.014, 0.030, 0.016, metal); hammer.position.set(0, 0.108, 0.100); hammer.rotation.x = -0.5; g.add(hammer);
-  const beaver = box(0.044, 0.014, 0.045, dark); beaver.position.set(0, 0.036, 0.092); g.add(beaver);
+  const beaver = box(0.044, 0.014, 0.045, dark); beaver.position.set(0, 0.030, 0.098); g.add(beaver);
 
   // sights: serrated ramp front with glow dot, notch rear with two dots
   const fs = box(0.012, 0.022, 0.016, dark); fs.position.set(0, 0.118, -0.27); g.add(fs);
@@ -1825,17 +1827,17 @@ function buildSciFiHandCannon(color, def = {}) {
   for (const sx of [-1, 1]) { const d = box(0.005, 0.005, 0.005, energy); d.position.set(sx * 0.011, 0.126, 0.092); g.add(d); }
 
   // grip: stippled panels, finger grooves, lanyard loop, energy cell window
-  // (top of the grip tucks up into the rear frame so they read as one part)
-  const grip = box(0.050, 0.145, 0.060, body); grip.position.set(0, -0.045, 0.070); grip.rotation.x = 0.42; g.add(grip);
-  for (const sx of [-1, 1]) { const panel = box(0.006, 0.100, 0.044, dark); panel.position.set(sx * 0.026, -0.048, 0.073); panel.rotation.x = 0.42; g.add(panel); }
-  for (let i = 0; i < 3; i++) { const groove = box(0.052, 0.008, 0.010, dark); groove.position.set(0, -0.018 - i * 0.036, 0.038 + i * 0.016); g.add(groove); }
-  const cell = box(0.016, 0.070, 0.020, energy); cell.position.set(0, -0.055, 0.102); cell.rotation.x = 0.42; g.add(cell);
-  const lanyard = box(0.010, 0.014, 0.008, metal); lanyard.position.set(0, -0.106, 0.094); g.add(lanyard);
+  // (gentler rake, tucked up into the tall rear frame block)
+  const grip = box(0.050, 0.145, 0.060, body); grip.position.set(0, -0.052, 0.062); grip.rotation.x = 0.34; g.add(grip);
+  for (const sx of [-1, 1]) { const panel = box(0.006, 0.100, 0.044, dark); panel.position.set(sx * 0.026, -0.055, 0.065); panel.rotation.x = 0.34; g.add(panel); }
+  for (let i = 0; i < 3; i++) { const groove = box(0.052, 0.008, 0.010, dark); groove.position.set(0, -0.022 - i * 0.036, 0.032 + i * 0.013); g.add(groove); }
+  const cell = box(0.016, 0.070, 0.020, energy); cell.position.set(0, -0.062, 0.090); cell.rotation.x = 0.34; g.add(cell);
+  const lanyard = box(0.010, 0.014, 0.008, metal); lanyard.position.set(0, -0.118, 0.082); g.add(lanyard);
 
-  // trigger + rounded guard
-  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.008, 0.02); trigger.rotation.x = 0.3; g.add(trigger);
-  const tgB = box(0.034, 0.008, 0.070, dark); tgB.position.set(0, -0.032, 0.005); g.add(tgB);
-  const tgF = box(0.034, 0.034, 0.008, dark); tgF.position.set(0, -0.014, -0.028); g.add(tgF);
+  // trigger + guard bridging the grip front to the frame underside
+  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.016, 0.022); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.034, 0.008, 0.085, dark); tgB.position.set(0, -0.040, 0.012); g.add(tgB);
+  const tgF = box(0.034, 0.036, 0.008, dark); tgF.position.set(0, -0.024, -0.028); g.add(tgF);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.31);
   return { group: g, muzzle };
@@ -1963,11 +1965,12 @@ function buildSciFiScattergun(color, def = {}) {
   const tgF = box(0.034, 0.028, 0.008, dark); tgF.position.set(0, -0.022, 0.062); g.add(tgF);
   const grip = box(0.052, 0.115, 0.060, body); grip.position.set(0, -0.052, 0.165); grip.rotation.x = 0.34; g.add(grip);
   stippleGrip(g, dark, 0, -0.058, 0.140, 0.034, 0.085, 3, 4);
-  const stock = box(0.058, 0.108, 0.19, body); stock.position.set(0, 0.030, 0.30); g.add(stock);
-  const comb = box(0.050, 0.016, 0.17, dark); comb.position.set(0, 0.090, 0.30); g.add(comb);
+  // stock runs forward to meet the receiver so there's no floating gap
+  const stock = box(0.058, 0.108, 0.24, body); stock.position.set(0, 0.030, 0.275); g.add(stock);
+  const comb = box(0.050, 0.016, 0.20, dark); comb.position.set(0, 0.090, 0.285); g.add(comb);
   const pad = box(0.056, 0.112, 0.020, dark); pad.position.set(0, 0.030, 0.40); g.add(pad);
   const stud = cyl(0.006, 0.006, 0.012, metal, 8, 0); stud.position.set(0, -0.028, 0.34); g.add(stud);
-  const cellGlow = box(0.010, 0.050, 0.08, energy); cellGlow.position.set(0, 0.052, 0.30); g.add(cellGlow);
+  const cellGlow = box(0.010, 0.050, 0.08, energy); cellGlow.position.set(0, 0.052, 0.29); g.add(cellGlow);
 
   const muzzle = addMuzzle(g, 0, 0.085, -0.47);
   return { group: g, muzzle };
@@ -1987,7 +1990,7 @@ function buildSciFiPlasma(color, def = {}) {
     { roughness: 0.25, metalness: 0.1, emissive: eCol, emissiveIntensity: 1.3 });
   const topShell = box(0.058, 0.042, 0.56, dark); topShell.position.set(0, 0.112, -0.09); g.add(topShell);
   const topChamfer = box(0.044, 0.014, 0.52, metal); topChamfer.position.set(0, 0.136, -0.09); g.add(topChamfer);
-  const botShell = box(0.058, 0.042, 0.48, body); botShell.position.set(0, 0.028, -0.06); g.add(botShell);
+  const botShell = box(0.058, 0.042, 0.42, body); botShell.position.set(0, 0.028, -0.03); g.add(botShell);
   const core = cyl(0.021, 0.021, 0.36, coreMat, 14); core.position.set(0, 0.070, -0.10); g.add(core);
   for (let i = 0; i < 5; i++) { const clampR = cyl(0.028, 0.028, 0.020, dark, 14); clampR.position.set(0, 0.070, -0.26 + i * 0.08); g.add(clampR);
     const bolt = box(0.008, 0.062, 0.010, metal); bolt.position.set(0, 0.070, -0.26 + i * 0.08); g.add(bolt); }
@@ -2001,11 +2004,13 @@ function buildSciFiPlasma(color, def = {}) {
   // side cooling vents (louvered)
   for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) { const v = box(0.006, 0.020, 0.010, dark); v.position.set(sx * 0.031, 0.112, -0.22 - i * 0.035); g.add(v); }
 
-  // forked emitter: prongs, focus ring, arc gap, tip glow
-  for (const sx of [-1, 1]) { const pr = box(0.012, 0.044, 0.15, metal); pr.position.set(sx * 0.026, 0.082, -0.44); pr.rotation.y = sx * -0.05; g.add(pr); }
-  const focus = cyl(0.024, 0.028, 0.020, dark, 12); focus.position.set(0, 0.075, -0.375); g.add(focus);
-  const arc = box(0.042, 0.016, 0.024, energy); arc.position.set(0, 0.086, -0.495); g.add(arc);
-  const tip = cyl(0.016, 0.021, 0.018, energy, 12); tip.position.set(0, 0.070, -0.465); g.add(tip);
+  // forked emitter: a nose cap closes the shells, then two slim separated
+  // prongs reach forward with the arc glowing in the gap between their tips
+  const noseCap = box(0.052, 0.058, 0.055, dark); noseCap.position.set(0, 0.082, -0.385); g.add(noseCap);
+  const focus = cyl(0.024, 0.028, 0.020, dark, 12); focus.position.set(0, 0.070, -0.372); g.add(focus);
+  for (const sx of [-1, 1]) { const pr = box(0.009, 0.036, 0.13, metal); pr.position.set(sx * 0.030, 0.082, -0.455); pr.rotation.y = sx * -0.06; g.add(pr); }
+  const arc = box(0.048, 0.012, 0.020, energy); arc.position.set(0, 0.082, -0.50); g.add(arc);
+  const tip = cyl(0.013, 0.017, 0.016, energy, 12); tip.position.set(0, 0.082, -0.445); g.add(tip);
 
   // iron sight blades
   const fsight = box(0.008, 0.020, 0.008, dark); fsight.position.set(0, 0.152, -0.33); g.add(fsight);
@@ -2019,10 +2024,10 @@ function buildSciFiPlasma(color, def = {}) {
   const tgF = box(0.032, 0.028, 0.008, dark); tgF.position.set(0, -0.020, 0.015); g.add(tgF);
 
   // rear power-cell drum: knurled ring + glow window + eject lever
-  const chamber = cyl(0.030, 0.030, 0.095, dark, 12); chamber.position.set(0, 0.055, 0.215); g.add(chamber);
-  knurledCollar(g, metal, 0, 0.055, 0.175, 0.033, 10);
-  const chGlow = cyl(0.020, 0.020, 0.100, energy, 12); chGlow.position.set(0, 0.055, 0.215); g.add(chGlow);
-  const lever = box(0.010, 0.024, 0.030, metal); lever.position.set(0.034, 0.070, 0.235); g.add(lever);
+  const chamber = cyl(0.030, 0.030, 0.095, dark, 12); chamber.position.set(0, 0.062, 0.21); g.add(chamber);
+  knurledCollar(g, metal, 0, 0.062, 0.17, 0.030, 10);
+  const chGlow = cyl(0.020, 0.020, 0.100, energy, 12); chGlow.position.set(0, 0.062, 0.21); g.add(chGlow);
+  const lever = box(0.010, 0.024, 0.030, metal); lever.position.set(0.034, 0.076, 0.23); g.add(lever);
 
   const muzzle = addMuzzle(g, 0, 0.070, -0.52);
   return { group: g, muzzle };
@@ -2048,13 +2053,14 @@ function buildNeedler(color, def = {}) {
   // upper spine cowl carrying the spike fan
   const cowl = box(0.034, 0.020, 0.36, body); cowl.position.set(0, 0.098, 0.00); g.add(cowl);
 
-  // crystal spike fan along the spine — 7 needles, tallest mid-back
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const h = 0.055 + Math.sin(t * Math.PI) * 0.055;
+  // crystal spike fan along the spine — 6 needles, tallest mid-back, bases
+  // sunk into the cowl so they grow out of the hull instead of hovering
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const h = 0.055 + Math.sin(t * Math.PI) * 0.050;
     const spike = cone(0.011, h, crystal, 6, 0);
-    spike.position.set(0, 0.10 + h / 2 - 0.005, 0.10 - i * 0.052);
-    spike.rotation.x = -0.25 + t * 0.15;
+    spike.position.set(0, 0.094 + h * 0.40, 0.075 - i * 0.047);
+    spike.rotation.x = -0.10 + t * 0.10;
     g.add(spike);
   }
   // needle feed ridges flanking the fan
@@ -2063,18 +2069,24 @@ function buildNeedler(color, def = {}) {
   // gill vents on the flanks
   for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const gill = box(0.006, 0.030, 0.012, energy); gill.position.set(sx * 0.036, 0.055, -0.10 - i * 0.045); g.add(gill); }
 
-  // launcher mouth: outer ring, inner glow throat
-  const mouthRing = cyl(0.030, 0.034, 0.024, dark, 12); mouthRing.position.set(0, 0.052, -0.29); g.add(mouthRing);
-  const throat = cyl(0.020, 0.024, 0.018, energy, 12); throat.position.set(0, 0.052, -0.30); g.add(throat);
+  // launcher mouth: small recessed glow throat ringed by three petal prongs
+  const mouthRing = cyl(0.021, 0.024, 0.020, dark, 12); mouthRing.position.set(0, 0.052, -0.285); g.add(mouthRing);
+  const throat = cyl(0.011, 0.014, 0.014, energy, 12); throat.position.set(0, 0.052, -0.295); g.add(throat);
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2 + Math.PI / 2;
+    const petal = cone(0.008, 0.040, dark, 6);
+    petal.position.set(Math.cos(a) * 0.018, 0.052 + Math.sin(a) * 0.018, -0.30);
+    petal.rotation.z = a; g.add(petal);
+  }
 
-  // underside: curved grip, trigger, guard, needle-pod magazine
-  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.052, 0.095); grip.rotation.x = 0.40; g.add(grip);
-  stippleGrip(g, dark, 0, -0.058, 0.070, 0.030, 0.080, 3, 4);
-  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.010, 0.045); trigger.rotation.x = 0.3; g.add(trigger);
-  const tgB = box(0.030, 0.008, 0.070, dark); tgB.position.set(0, -0.032, 0.03); g.add(tgB);
-  const tgF = box(0.030, 0.026, 0.008, dark); tgF.position.set(0, -0.019, -0.002); g.add(tgF);
-  const pod = box(0.040, 0.085, 0.070, dark); pod.position.set(0, -0.048, -0.035); pod.rotation.x = -0.15; g.add(pod);
-  const podGlow = box(0.014, 0.060, 0.008, energy); podGlow.position.set(0, -0.045, 0.004); podGlow.rotation.x = -0.15; g.add(podGlow);
+  // underside: grip + needle-pod tucked together under the keel
+  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.040, 0.090); grip.rotation.x = 0.32; g.add(grip);
+  stippleGrip(g, dark, 0, -0.046, 0.066, 0.030, 0.080, 3, 4);
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.006, 0.042); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.030, 0.008, 0.075, dark); tgB.position.set(0, -0.028, 0.020); g.add(tgB);
+  const tgF = box(0.030, 0.030, 0.008, dark); tgF.position.set(0, -0.014, -0.016); g.add(tgF);
+  const pod = box(0.034, 0.062, 0.060, dark); pod.position.set(0, -0.024, -0.048); pod.rotation.x = -0.10; g.add(pod);
+  const podGlow = box(0.012, 0.040, 0.008, energy); podGlow.position.set(0, -0.020, -0.016); podGlow.rotation.x = -0.10; g.add(podGlow);
 
   const muzzle = addMuzzle(g, 0, 0.052, -0.31);
   return { group: g, muzzle };
@@ -2087,11 +2099,11 @@ function buildFuelRod(color, def = {}) {
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
 
-  // main tube with segment rings + rivets
+  // main tube with segment rings + rivets (knurl sunk into the ring surface)
   const tube = cyl(0.045, 0.045, 0.52, body, 16); tube.position.set(0, 0.075, -0.13); g.add(tube);
   for (const z of [-0.34, -0.18, -0.02, 0.10]) {
     const ring = cyl(0.050, 0.050, 0.020, dark, 16); ring.position.set(0, 0.075, z); g.add(ring);
-    knurledCollar(g, metal, 0, 0.075, z, 0.052, 8);
+    knurledCollar(g, metal, 0, 0.075, z, 0.047, 8);
   }
   // flared muzzle bell + inner glow
   const bell = cyl(0.048, 0.062, 0.075, dark, 16); bell.position.set(0, 0.075, -0.435); g.add(bell);
@@ -2108,12 +2120,12 @@ function buildFuelRod(color, def = {}) {
 
   // top carry handle + simple sights
   const handle = box(0.020, 0.014, 0.16, dark); handle.position.set(0, 0.155, -0.04); g.add(handle);
-  for (const z of [-0.11, 0.03]) { const post = box(0.014, 0.026, 0.014, dark); post.position.set(0, 0.132, z); g.add(post); }
-  const fs = box(0.006, 0.016, 0.006, metal); fs.position.set(0, 0.146, -0.30); g.add(fs);
+  for (const z of [-0.11, 0.03]) { const post = box(0.014, 0.032, 0.014, dark); post.position.set(0, 0.134, z); g.add(post); }
+  const fs = box(0.006, 0.020, 0.006, metal); fs.position.set(0, 0.128, -0.30); g.add(fs);
 
   // front vertical grip + rear pistol grip + trigger + shoulder pad
   const fgrip = box(0.036, 0.090, 0.042, body); fgrip.position.set(0, -0.005, -0.25); fgrip.rotation.x = -0.15; g.add(fgrip);
-  for (let i = 0; i < 3; i++) { const gr = box(0.040, 0.007, 0.008, dark); gr.position.set(0, -0.015 - i * 0.022, -0.245 - i * 0.004); g.add(gr); }
+  for (let i = 0; i < 3; i++) { const gr = box(0.040, 0.007, 0.008, dark); gr.position.set(0, -0.008 - i * 0.018, -0.247 - i * 0.003); g.add(gr); }
   const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.025, 0.10); grip.rotation.x = 0.35; g.add(grip);
   const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, 0.012, 0.055); trigger.rotation.x = 0.28; g.add(trigger);
   const tgB = box(0.030, 0.008, 0.070, dark); tgB.position.set(0, -0.010, 0.045); g.add(tgB);
