@@ -12,8 +12,8 @@ import { decalTexture } from './WeaponTextures.js';
 //   decalEmissive — the decal also glows via emissiveMap
 //   shootSound  — overrides the fire SFX ('anime' kawaii pew, 'laser', 'fire')
 //
-// Curated to 15 common / 12 epic / 5 legendary / 3 mythic — one clear pick
-// per visual theme rather than several near-duplicate recolors.
+// Curated to 10 common / 10 epic / 6 legendary / 4 mythic (30 total) — one
+// clear pick per visual theme rather than several near-duplicate recolors.
 
 // Five free common finishes, usable on any gun (commons are auto-owned — see
 // Armory.ownsSkin). Each just recolours the shell or retints the energy glow.
@@ -25,6 +25,11 @@ export const WEAPON_SKINS = [
   { id: 'crimson', name: 'Crimson', rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xff2e3a },
   { id: 'desert',  name: 'Desert',  rarity: 'common', body: 0xb29766, accent: 0x4a3b24, metal: 0xa89878, metalness: 0.40, roughness: 0.55 },
   { id: 'arctic',  name: 'Arctic',  rarity: 'common', body: 0xcdd6dd, accent: 0x5f6a74, metal: 0xb8c2cc, metalness: 0.50, roughness: 0.40, energyColor: 0x8fd8ff },
+  { id: 'solar',       name: 'Solar',       rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xffc93a },
+  { id: 'ultraviolet', name: 'Ultraviolet', rarity: 'common', body: 0x394049, accent: 0x0c0e11, metal: 0x8a929c, metalness: 0.42, roughness: 0.48, energyColor: 0xb44dff },
+  { id: 'woodland',    name: 'Woodland',    rarity: 'common', body: 0x5a6648, accent: 0x2a3220, metal: 0x7a8468, metalness: 0.38, roughness: 0.58 },
+  { id: 'graphite',    name: 'Graphite',    rarity: 'common', body: 0x1c1f24, accent: 0x0a0c0e, metal: 0x4a505a, metalness: 0.55, roughness: 0.35, energyColor: 0xd8ecff },
+  { id: 'copper',      name: 'Copper',      rarity: 'common', body: 0x9a5f38, accent: 0x3a2214, metal: 0xc08050, metalness: 0.70, roughness: 0.35, energyColor: 0xffb070 },
 
   // ── EPIC (5): animated finishes — a glowing pattern on the shell plus a
   // pulsing / cycling emissive. Also auto-owned (see Armory.ownsSkin).
@@ -43,6 +48,21 @@ export const WEAPON_SKINS = [
   { id: 'prismatic', name: 'Prismatic', rarity: 'epic', body: 0x101018, accent: 0x08080c, metal: 0x9aa0ac, metalness: 0.60, roughness: 0.30,
     emissive: 0xffffff, emissiveIntensity: 1.4, decal: 'holographic', decalEmissive: true,
     animated: true, animType: 'rainbow', animSpeed: 0.3, animMin: 1.0,  animMax: 2.0 },
+  { id: 'stormcall',   name: 'Stormcall',    rarity: 'epic', body: 0x1a1f2e, accent: 0x0a0d14, metal: 0x8a92a4, metalness: 0.55, roughness: 0.38,
+    emissive: 0xffe23a, emissiveIntensity: 0.9, energyColor: 0xffe23a, decal: 'lightning', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 9.0, animMin: 0.35, animMax: 1.6 },
+  { id: 'permafrost',  name: 'Permafrost',   rarity: 'epic', body: 0x10202c, accent: 0x081018, metal: 0x9ab4c4, metalness: 0.55, roughness: 0.30,
+    emissive: 0x6ad4ff, emissiveIntensity: 0.9, energyColor: 0x8fe0ff, decal: 'ice', decalEmissive: true,
+    animated: true, animType: 'pulse',   animSpeed: 1.8, animMin: 0.45, animMax: 1.3 },
+  { id: 'cybergrid',   name: 'Cybergrid',    rarity: 'epic', body: 0x140a1e, accent: 0x0a0512, metal: 0x8a86a0, metalness: 0.55, roughness: 0.35,
+    emissive: 0xff3ad4, emissiveIntensity: 0.9, energyColor: 0xff3ad4, decal: 'circuitneon', decalEmissive: true,
+    animated: true, animType: 'pulse',   animSpeed: 3.0, animMin: 0.45, animMax: 1.5 },
+  { id: 'darknet',     name: 'Darknet',      rarity: 'epic', body: 0x061206, accent: 0x030a04, metal: 0x5a7a5e, metalness: 0.50, roughness: 0.40,
+    emissive: 0x30ff5a, emissiveIntensity: 0.9, energyColor: 0x30ff5a, decal: 'matrix', decalEmissive: true,
+    animated: true, animType: 'flicker', animSpeed: 5.0, animMin: 0.40, animMax: 1.4 },
+  { id: 'tigerstrike', name: 'Tiger Strike', rarity: 'epic', body: 0x2e1a08, accent: 0x140b04, metal: 0x9a8266, metalness: 0.50, roughness: 0.45,
+    emissive: 0xff8a1e, emissiveIntensity: 0.8, energyColor: 0xff8a1e, decal: 'tiger', decalEmissive: true,
+    animated: true, animType: 'pulse',   animSpeed: 2.6, animMin: 0.40, animMax: 1.2 },
 
   // ── LEGENDARY (3): total-coverage wraps — the artwork flows over the
   // receiver, barrel and trim too (decalOnMetal/decalOnAccent), with a themed
@@ -59,6 +79,18 @@ export const WEAPON_SKINS = [
     emissive: 0xcfe8ff, emissiveIntensity: 0.8, energyColor: 0xcfe8ff,
     decal: 'skull', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
     animated: true, animType: 'flicker', animSpeed: 4.5, animMin: 0.45, animMax: 1.2 },
+  { id: 'jadedragon', name: 'Jade Dragon 🐉', rarity: 'legendary', body: 0x0e2a1a, accent: 0x06140a, metal: 0x3a8a5a, metalness: 0.65, roughness: 0.32,
+    emissive: 0x3aff9a, emissiveIntensity: 0.8, energyColor: 0x3aff9a,
+    decal: 'dragon', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 1.4, animMin: 0.45, animMax: 1.2 },
+  { id: 'whiteout', name: 'Whiteout ❄️', rarity: 'legendary', body: 0xdce8f0, accent: 0x8aa4b4, metal: 0xf0f6fa, metalness: 0.55, roughness: 0.25,
+    emissive: 0x9adcff, emissiveIntensity: 0.7, energyColor: 0x9adcff,
+    decal: 'frost', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 1.0, animMin: 0.40, animMax: 1.1 },
+  { id: 'shadowops', name: 'Shadow Ops 🎖️', rarity: 'legendary', body: 0x22262c, accent: 0x101318, metal: 0x5a6068, metalness: 0.55, roughness: 0.45,
+    emissive: 0xffa030, emissiveIntensity: 0.7, energyColor: 0xffa030,
+    decal: 'camo_urban', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'flicker', animSpeed: 3.2, animMin: 0.35, animMax: 1.0 },
 
   // ── MYTHIC (2): showpieces — total-coverage wraps plus a custom synthesized
   // shoot sound (see AudioManager.playSkinShot).
@@ -76,6 +108,15 @@ export const WEAPON_SKINS = [
     decal: 'animegirl', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
     animated: true, animType: 'pulse', animSpeed: 2.2, animMin: 0.25, animMax: 0.7,
     shootSound: 'waifu' },
+  { id: 'prismbreak', name: 'Prism Break 🌈', rarity: 'mythic', body: 0x0c0c14, accent: 0x060608, metal: 0x9aa0ac, metalness: 0.70, roughness: 0.25,
+    emissive: 0xffffff, emissiveIntensity: 1.2, decal: 'cyber', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'rainbow', animSpeed: 0.6, animMin: 1.1, animMax: 2.2,
+    shootSound: 'prism' },   // crystalline chime per shot
+  { id: 'k9unit', name: 'K-9 Unit 🐶', rarity: 'mythic', body: 0x3a4038, accent: 0x1a1e18, metal: 0x8a8e80, metalness: 0.50, roughness: 0.50,
+    emissive: 0xffb040, emissiveIntensity: 0.6, energyColor: 0xffb040,
+    decal: 'digicamo', decalEmissive: true, decalOnMetal: true, decalOnAccent: true,
+    animated: true, animType: 'pulse', animSpeed: 2.8, animMin: 0.30, animMax: 0.9,
+    shootSound: 'bark' },    // every shot barks — good boy
 ];
 
 const _hsl = new THREE.Color();

@@ -100,7 +100,8 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   vertical weapon wheel; enemy nameplates; coin-earn popups; Winter-Bishop
   map + map loading screen; Esc opens the full nav GUI mid-match;
   fixed false-positive mobile controls on desktop (pointer-lock now works);
-  **Inventory v2** = real skinned-weapon renders + search + rarity filter chips.
+  **Inventory v2** = real skinned-weapon renders + search + rarity filter chips;
+  gun-skin catalog doubled to 30 (10 common / 10 epic / 6 legendary / 4 mythic).
 
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
