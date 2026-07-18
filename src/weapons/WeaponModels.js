@@ -998,7 +998,7 @@ function buildAR10(color, def = {}) {
   g.add(reticle);
 
   // Barrel (heavier .308 profile)
-  const barrel = cyl(0.021, 0.019, 0.24, metal);
+  const barrel = cyl(0.023, 0.021, 0.24, metal);
   barrel.position.set(0, 0.078, -0.72);
   g.add(barrel);
   // Muzzle brake + energy emitter ring
@@ -1040,8 +1040,8 @@ function buildAR10(color, def = {}) {
   const btube = cyl(0.024, 0.024, 0.22, dark);
   btube.position.set(0, 0.072, 0.36);
   g.add(btube);
-  const stockBody = box(0.064, 0.118, 0.135, dark);
-  stockBody.position.set(0, 0.044, 0.42);
+  const stockBody = box(0.056, 0.086, 0.135, dark);
+  stockBody.position.set(0, 0.062, 0.42);
   g.add(stockBody);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.92);
@@ -1732,13 +1732,13 @@ function buildSciFiAR(color, def = {}) {
   // full-length top rail + optic
   const rail = box(0.036, 0.016, 0.52, metal); rail.position.set(0, 0.126, -0.08); g.add(rail);
   picRail(g, dark, 0, 0.138, 0.16, 0.50);
-  const optBase = box(0.040, 0.024, 0.075, dark); optBase.position.set(0, 0.150, 0.06); g.add(optBase);
-  const optHood = box(0.050, 0.050, 0.062, dark); optHood.position.set(0, 0.186, 0.055); g.add(optHood);
-  const optGlass = box(0.040, 0.040, 0.006, M('special', 0x0a1420, { roughness: 0.05, metalness: 0.2, clearcoat: 1 })); optGlass.position.set(0, 0.186, 0.026); g.add(optGlass);
+  const optBase = box(0.038, 0.020, 0.070, dark); optBase.position.set(0, 0.148, 0.06); g.add(optBase);
+  const optHood = box(0.042, 0.040, 0.056, dark); optHood.position.set(0, 0.178, 0.055); g.add(optHood);
+  const optGlass = box(0.034, 0.032, 0.006, M('special', 0x0a1420, { roughness: 0.05, metalness: 0.2, clearcoat: 1 })); optGlass.position.set(0, 0.178, 0.028); g.add(optGlass);
   // holographic reticle: glowing ring + centre dot floating in the glass
-  const optRing = cyl(0.013, 0.013, 0.005, energy, 12); optRing.position.set(0, 0.186, 0.023); g.add(optRing);
-  const optDot = box(0.006, 0.006, 0.005, energy); optDot.position.set(0, 0.186, 0.021); g.add(optDot);
-  const optKnob = cyl(0.010, 0.010, 0.014, metal, 10, 0); optKnob.rotation.z = Math.PI / 2; optKnob.position.set(0.030, 0.186, 0.055); g.add(optKnob);
+  const optRing = cyl(0.011, 0.011, 0.005, energy, 12); optRing.position.set(0, 0.178, 0.025); g.add(optRing);
+  const optDot = box(0.005, 0.005, 0.005, energy); optDot.position.set(0, 0.178, 0.023); g.add(optDot);
+  const optKnob = cyl(0.009, 0.009, 0.012, metal, 10, 0); optKnob.rotation.z = Math.PI / 2; optKnob.position.set(0.026, 0.178, 0.055); g.add(optKnob);
 
   // M-LOK handguard with slots + thin energy conduits along the top edges
   const hg = box(0.060, 0.074, 0.36, dark); hg.position.set(0, 0.080, -0.33); g.add(hg);
@@ -1755,7 +1755,7 @@ function buildSciFiAR(color, def = {}) {
   const rsRing = cyl(0.009, 0.009, 0.007, metal, 10, 0); rsRing.position.set(0, 0.162, 0.135); g.add(rsRing);
 
   // barrel group: gas block, tube, exposed barrel, birdcage flash hider
-  const brl = cyl(0.015, 0.014, 0.16, metal, 12); brl.position.set(0, 0.078, -0.575); g.add(brl);
+  const brl = cyl(0.017, 0.016, 0.16, metal, 12); brl.position.set(0, 0.078, -0.575); g.add(brl);
   const gasBlock = box(0.028, 0.030, 0.036, dark); gasBlock.position.set(0, 0.082, -0.50); g.add(gasBlock);
   const gasTube = cyl(0.006, 0.006, 0.34, metal, 8); gasTube.position.set(0, 0.108, -0.34); g.add(gasTube);
   const fh = cyl(0.021, 0.016, 0.055, dark, 12); fh.position.set(0, 0.078, -0.665); g.add(fh);
@@ -1763,10 +1763,10 @@ function buildSciFiAR(color, def = {}) {
   const emit = cyl(0.014, 0.017, 0.014, energy, 10); emit.position.set(0, 0.078, -0.690); g.add(emit);
 
   // PMAG: curved polymer, ribs, floorplate, glowing witness strip
-  const mag = box(0.052, 0.20, 0.080, body); mag.position.set(0, -0.135, 0.035); mag.rotation.x = -0.14; g.add(mag);
-  for (let i = 0; i < 3; i++) { const rib = box(0.056, 0.007, 0.070, dark); rib.position.set(0, -0.095 - i * 0.045, 0.042 + i * 0.007); rib.rotation.x = -0.14; g.add(rib); }
-  const magFloor = box(0.058, 0.016, 0.086, dark); magFloor.position.set(0, -0.238, 0.052); magFloor.rotation.x = -0.14; g.add(magFloor);
-  const witness = box(0.014, 0.15, 0.008, energy); witness.position.set(0, -0.130, 0.078); witness.rotation.x = -0.14; g.add(witness);
+  const mag = box(0.048, 0.185, 0.074, body); mag.position.set(0, -0.128, 0.035); mag.rotation.x = -0.14; g.add(mag);
+  for (let i = 0; i < 3; i++) { const rib = box(0.052, 0.007, 0.064, dark); rib.position.set(0, -0.092 - i * 0.042, 0.042 + i * 0.006); rib.rotation.x = -0.14; g.add(rib); }
+  const magFloor = box(0.054, 0.015, 0.080, dark); magFloor.position.set(0, -0.224, 0.050); magFloor.rotation.x = -0.14; g.add(magFloor);
+  const witness = box(0.013, 0.14, 0.008, energy); witness.position.set(0, -0.124, 0.075); witness.rotation.x = -0.14; g.add(witness);
 
   // controls: mag release, selector both sides, bolt catch, trigger + guard
   const magRel = cyl(0.008, 0.008, 0.012, metal, 8, 0); magRel.rotation.z = Math.PI / 2; magRel.position.set(0.040, 0.010, 0.005); g.add(magRel);
@@ -1785,11 +1785,12 @@ function buildSciFiAR(color, def = {}) {
   const btube = cyl(0.023, 0.023, 0.17, dark, 12); btube.position.set(0, 0.062, 0.28); g.add(btube);
   knurledCollar(g, metal, 0, 0.062, 0.205, 0.027, 10);
   for (let i = 0; i < 3; i++) { const notch = box(0.050, 0.006, 0.008, metal); notch.position.set(0, 0.040, 0.24 + i * 0.04); g.add(notch); }
-  const stock = box(0.062, 0.115, 0.115, body); stock.position.set(0, 0.028, 0.375); g.add(stock);
-  const cheek = box(0.052, 0.018, 0.105, dark); cheek.position.set(0, 0.092, 0.375); g.add(cheek);
-  const stockToe = box(0.056, 0.055, 0.060, body); stockToe.position.set(0, -0.020, 0.398); stockToe.rotation.x = 0.35; g.add(stockToe);
-  const buttpad = box(0.060, 0.120, 0.016, dark); buttpad.position.set(0, 0.028, 0.437); g.add(buttpad);
-  const slingLoop = box(0.010, 0.022, 0.008, metal); slingLoop.position.set(0, -0.032, 0.36); g.add(slingLoop);
+  // stock stays in scale with the receiver — comb on the buffer-tube line
+  const stock = box(0.054, 0.082, 0.115, body); stock.position.set(0, 0.046, 0.375); g.add(stock);
+  const cheek = box(0.046, 0.016, 0.105, dark); cheek.position.set(0, 0.092, 0.375); g.add(cheek);
+  const stockToe = box(0.048, 0.042, 0.052, body); stockToe.position.set(0, 0.008, 0.396); stockToe.rotation.x = 0.35; g.add(stockToe);
+  const buttpad = box(0.052, 0.086, 0.016, dark); buttpad.position.set(0, 0.046, 0.437); g.add(buttpad);
+  const slingLoop = box(0.010, 0.020, 0.008, metal); slingLoop.position.set(0, 0.000, 0.36); g.add(slingLoop);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.70);
   return { group: g, muzzle };
@@ -1898,8 +1899,8 @@ function buildSciFiBattleRifle(color, def = {}) {
   for (const sx of [-1, 1]) { const c = box(0.005, 0.008, 0.22, energy); c.position.set(sx * 0.0295, 0.058, -0.35); g.add(c); }
 
   // fluted heavy barrel + target crown muzzle brake with side ports
-  const brl = cyl(0.016, 0.015, 0.24, metal, 12); brl.position.set(0, 0.078, -0.60); g.add(brl);
-  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; const fl = box(0.005, 0.005, 0.20, dark); fl.position.set(Math.cos(a) * 0.015, 0.078 + Math.sin(a) * 0.015, -0.60); g.add(fl); }
+  const brl = cyl(0.018, 0.017, 0.24, metal, 12); brl.position.set(0, 0.078, -0.60); g.add(brl);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; const fl = box(0.005, 0.005, 0.20, dark); fl.position.set(Math.cos(a) * 0.017, 0.078 + Math.sin(a) * 0.017, -0.60); g.add(fl); }
   const brake = box(0.034, 0.034, 0.065, dark); brake.position.set(0, 0.078, -0.715); g.add(brake);
   for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) { const p = box(0.008, 0.016, 0.016, metal); p.position.set(sx * 0.018, 0.078, -0.700 - i * 0.024); g.add(p); }
   const emit = cyl(0.012, 0.015, 0.012, energy, 10); emit.position.set(0, 0.078, -0.752); g.add(emit);
@@ -1930,13 +1931,14 @@ function buildSciFiBattleRifle(color, def = {}) {
   const tgB = box(0.032, 0.008, 0.080, dark); tgB.position.set(0, -0.046, 0.09); g.add(tgB);
   const tgF = box(0.032, 0.030, 0.008, dark); tgF.position.set(0, -0.030, 0.052); g.add(tgF);
 
-  // precision stock: body, adjustable cheek riser with knobs, buttpad, hook
-  const stock = box(0.056, 0.105, 0.185, body); stock.position.set(0, 0.022, 0.285); g.add(stock);
-  const riser = box(0.048, 0.026, 0.110, dark); riser.position.set(0, 0.090, 0.275); g.add(riser);
-  for (const z of [0.235, 0.315]) { const knob = cyl(0.010, 0.010, 0.014, metal, 10, 0); knob.rotation.z = Math.PI / 2; knob.position.set(0.030, 0.068, z); g.add(knob); }
-  const buttpad = box(0.054, 0.110, 0.016, dark); buttpad.position.set(0, 0.022, 0.382); g.add(buttpad);
-  const hook = box(0.030, 0.030, 0.055, dark); hook.position.set(0, -0.042, 0.345); g.add(hook);
-  const stGlow = box(0.010, 0.045, 0.10, energy); stGlow.position.set(0, 0.050, 0.285); g.add(stGlow);
+  // precision stock: body, adjustable cheek riser with knobs, buttpad, hook —
+  // kept at receiver height so the back end doesn't outgrow the gun
+  const stock = box(0.054, 0.082, 0.185, body); stock.position.set(0, 0.038, 0.285); g.add(stock);
+  const riser = box(0.046, 0.022, 0.110, dark); riser.position.set(0, 0.088, 0.275); g.add(riser);
+  for (const z of [0.235, 0.315]) { const knob = cyl(0.009, 0.009, 0.013, metal, 10, 0); knob.rotation.z = Math.PI / 2; knob.position.set(0.029, 0.062, z); g.add(knob); }
+  const buttpad = box(0.052, 0.086, 0.016, dark); buttpad.position.set(0, 0.038, 0.382); g.add(buttpad);
+  const hook = box(0.028, 0.026, 0.050, dark); hook.position.set(0, -0.012, 0.345); g.add(hook);
+  const stGlow = box(0.010, 0.040, 0.10, energy); stGlow.position.set(0, 0.055, 0.285); g.add(stGlow);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.76);
   return { group: g, muzzle };
@@ -1997,12 +1999,12 @@ function buildSciFiScattergun(color, def = {}) {
   const tgF = box(0.032, 0.050, 0.008, dark); tgF.position.set(0, 0.004, 0.062); g.add(tgF);
   const grip = box(0.048, 0.110, 0.056, body); grip.position.set(0, -0.038, 0.165); grip.rotation.x = 0.34; g.add(grip);
   stippleGrip(g, dark, 0, -0.044, 0.140, 0.032, 0.080, 3, 4);
-  // stock runs forward to meet the receiver so there's no floating gap
-  const stock = box(0.058, 0.108, 0.24, body); stock.position.set(0, 0.030, 0.275); g.add(stock);
-  const comb = box(0.050, 0.016, 0.20, dark); comb.position.set(0, 0.090, 0.285); g.add(comb);
-  const pad = box(0.056, 0.112, 0.020, dark); pad.position.set(0, 0.030, 0.40); g.add(pad);
-  const stud = cyl(0.006, 0.006, 0.012, metal, 8, 0); stud.position.set(0, -0.028, 0.34); g.add(stud);
-  const cellGlow = box(0.010, 0.050, 0.08, energy); cellGlow.position.set(0, 0.052, 0.29); g.add(cellGlow);
+  // stock runs forward to meet the receiver, held at receiver height
+  const stock = box(0.054, 0.082, 0.24, body); stock.position.set(0, 0.048, 0.275); g.add(stock);
+  const comb = box(0.046, 0.014, 0.20, dark); comb.position.set(0, 0.092, 0.285); g.add(comb);
+  const pad = box(0.052, 0.086, 0.020, dark); pad.position.set(0, 0.048, 0.40); g.add(pad);
+  const stud = cyl(0.006, 0.006, 0.012, metal, 8, 0); stud.position.set(0, 0.012, 0.34); g.add(stud);
+  const cellGlow = box(0.010, 0.045, 0.08, energy); cellGlow.position.set(0, 0.055, 0.29); g.add(cellGlow);
 
   const muzzle = addMuzzle(g, 0, 0.085, -0.47);
   return { group: g, muzzle };
