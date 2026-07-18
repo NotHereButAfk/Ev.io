@@ -39,7 +39,7 @@ export const WEAPONS = [
     reloadTime: 1.5,
     range: 80,
     recoil: 0.013,
-    color: 0x0c1520
+    color: 0xd9782e
   },
   {
     id: 'levershotgun',
@@ -57,7 +57,7 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 30,
     recoil: 0.05,
-    color: 0x1a0e2e
+    color: 0xd9782e
   },
   {
     id: 'm4',
@@ -75,10 +75,10 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 150,
     recoil: 0.02,
-    color: 0x5c6069,
+    color: 0xd9782e,
     energyColor: 0x2ee6ff,
     sciFi: true,
-    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'm16',
@@ -96,7 +96,7 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 160,
     recoil: 0.02,
-    color: 0x080e1a
+    color: 0xd9782e
   },
   {
     id: 'rifle',
@@ -114,7 +114,7 @@ export const WEAPONS = [
     reloadTime: 1.9,
     range: 140,
     recoil: 0.022,
-    color: 0x0f1a14
+    color: 0xd9782e
   },
   {
     id: 'lmg',
@@ -132,7 +132,7 @@ export const WEAPONS = [
     reloadTime: 4.5,
     range: 160,
     recoil: 0.03,
-    color: 0x0a1018
+    color: 0xd9782e
   },
   {
     id: 'rpg',
@@ -153,7 +153,7 @@ export const WEAPONS = [
     reloadTime: 3.2,
     range: 220,
     recoil: 0.09,
-    color: 0x180a22
+    color: 0xd9782e
   },
   {
     id: 'boltsniper',
@@ -172,7 +172,7 @@ export const WEAPONS = [
     range: 320,
     recoil: 0.06,
     scoped: true,
-    color: 0x050e20
+    color: 0xd9782e
   },
   {
     id: 'knife',
@@ -219,10 +219,10 @@ export const WEAPONS = [
     reloadTime: 1.2,
     range: 120,
     recoil: 0.028,
-    color: 0x54575e,
+    color: 0xd9782e,
     energyColor: 0xffb03a,
     sciFi: true,
-    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'battlerifle',
@@ -241,10 +241,10 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 170,
     recoil: 0.022,
-    color: 0x5d6455,
+    color: 0xd9782e,
     energyColor: 0x39ff9d,
     sciFi: true,
-    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'needler',
@@ -262,7 +262,8 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 55,
     recoil: 0.01,
-    color: 0x4a3f63   // muted violet-grey polymer — reads as a finish, not toy plastic
+    color: 0x4a3f63,        // muted violet-grey polymer — reads as a finish, not toy plastic
+    energyColor: 0xff4dd2   // signature pink needle glow
   },
   {
     id: 'plasmarifle',
@@ -302,7 +303,7 @@ export const WEAPONS = [
     reloadTime: 2.2,
     range: 200,
     recoil: 0.028,
-    color: 0x0a1a10
+    color: 0xd9782e
   },
   {
     id: 'fuelrod',
@@ -323,7 +324,7 @@ export const WEAPONS = [
     reloadTime: 3.5,
     range: 180,
     recoil: 0.12,
-    color: 0x002200
+    color: 0xd9782e
   },
   {
     id: 'concussion',
@@ -362,10 +363,10 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 28,
     recoil: 0.055,
-    color: 0x585e68,
+    color: 0xd9782e,
     energyColor: 0x3a86ff,
     sciFi: true,
-    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'ghammer',

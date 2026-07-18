@@ -77,9 +77,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
 - `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
-  loader + detailed realistic procedural builders; the 5 main guns set
-  `proceduralModel: true` so the high-detail procedural models beat the GLB
-  placeholders, and needler/fuelrod/concussion/dmr have dedicated builders).
+  loader + procedural builders). The arsenal's models are **Blender-authored
+  GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers,
+  `model_arsenal.py` → `public/weapons_authored.glb` with real-firearm
+  silhouettes — Uzi/M1887/M4/M16/AK/M240/RPG-7/AWM/DEagle/G3/P90/SR-25/
+  870/M79/knife; `model_sidearm.py` → `public/sidearm.glb` Glock). Loader
+  precedence: per-id override GLB → authored atlas → legacy weapons.glb →
+  procedural (plasmarifle/concussion/sword/ghammer stay procedural).
+  Furniture = `body` role (orange default via def color), glow = `energy`
+  role (def energyColor) so skins recolor everything as before.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
   (green/cyan/amber bars, coin popups, weapon wheel), `Nameplates.js`,
