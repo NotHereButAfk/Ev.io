@@ -2067,8 +2067,8 @@ function buildSciFiPlasma(color, def = {}) {
   return { group: g, muzzle };
 }
 
-// needler — alien needle SMG: fan of glowing crystal spikes along the spine
-// (its icon), gilled flanks, ring launcher mouth, curved grip. Pink glow.
+// needler — alien needle SMG: a row of big crystal shards along the armoured
+// carapace (its icon), gilled side plates, multi-port needle muzzle. Pink glow.
 function buildNeedler(color, def = {}) {
   const eCol = def.energyColor ?? 0xff4dd2;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
@@ -2076,41 +2076,46 @@ function buildNeedler(color, def = {}) {
     { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 2.2, transparent: true, opacity: 0.85 });
   const g = new THREE.Group();
 
-  // organic teardrop hull: bulbous rear segment tapering through the mid to a
-  // narrow snout — stacked tapered cylinders read as one flowing alien shell.
-  const rear = cyl(0.042, 0.036, 0.16, body, 14); rear.position.set(0, 0.058, 0.09); g.add(rear);
-  const mid  = cyl(0.036, 0.028, 0.18, body, 14); mid.position.set(0, 0.055, -0.075); g.add(mid);
-  const snout = cyl(0.028, 0.020, 0.13, dark, 14); snout.position.set(0, 0.052, -0.225); g.add(snout);
+  // Layered alien hull: a smooth three-step taper wrapped in armour plates so
+  // it reads as a carapaced organism, not a smooth bottle. Bore line y=0.055.
+  const rear = cyl(0.038, 0.033, 0.15, body, 14); rear.position.set(0, 0.055, 0.085); g.add(rear);
+  const rearCap = cyl(0.030, 0.036, 0.03, dark, 14); rearCap.position.set(0, 0.055, 0.172); g.add(rearCap);
+  const mid  = cyl(0.033, 0.027, 0.17, body, 14); mid.position.set(0, 0.055, -0.065); g.add(mid);
+  const nose = cyl(0.027, 0.021, 0.09, dark, 14); nose.position.set(0, 0.055, -0.185); g.add(nose);
   // hull seam collars where the segments meet + a dark belly keel
-  for (const [r, z] of [[0.039, 0.012], [0.030, -0.16]]) { const seam = cyl(r, r, 0.014, dark, 14); seam.position.set(0, 0.056, z); g.add(seam); }
-  const keel = box(0.030, 0.026, 0.30, dark); keel.position.set(0, 0.012, -0.03); g.add(keel);
-  // upper spine cowl carrying the spike fan
-  const cowl = box(0.034, 0.020, 0.36, body); cowl.position.set(0, 0.098, 0.00); g.add(cowl);
+  for (const [r, z] of [[0.036, 0.008], [0.029, -0.145]]) { const seam = cyl(r, r, 0.012, dark, 14); seam.position.set(0, 0.055, z); g.add(seam); }
+  const keel = box(0.028, 0.024, 0.30, dark); keel.position.set(0, 0.014, -0.03); g.add(keel);
 
-  // crystal spike fan along the spine — 6 needles, tallest mid-back, bases
-  // sunk into the cowl so they grow out of the hull instead of hovering
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const h = 0.055 + Math.sin(t * Math.PI) * 0.050;
-    const spike = cone(0.011, h, crystal, 6, 0);
-    spike.position.set(0, 0.094 + h * 0.40, 0.075 - i * 0.047);
-    spike.rotation.x = -0.10 + t * 0.10;
+  // top carapace: two overlapping armour shells the spikes erupt through
+  const cara1 = box(0.042, 0.024, 0.30, body); cara1.position.set(0, 0.090, 0.02); g.add(cara1);
+  const cara2 = box(0.032, 0.014, 0.26, dark); cara2.position.set(0, 0.106, 0.00); g.add(cara2);
+  // side armour plates carrying the glowing gill slits
+  for (const sx of [-1, 1]) {
+    const plate = box(0.008, 0.036, 0.22, dark); plate.position.set(sx * 0.031, 0.062, -0.03); g.add(plate);
+    for (let i = 0; i < 3; i++) { const gill = box(0.005, 0.018, 0.007, energy); gill.position.set(sx * 0.036, 0.062, -0.10 - i * 0.038); g.add(gill); }
+  }
+
+  // crystal shard row — seven BIG translucent blades erupting from the
+  // carapace, tallest mid-back, leaning back harder toward the rear
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const h = 0.075 + Math.sin(t * Math.PI) * 0.042;
+    const spike = cone(0.0125 + 0.004 * Math.sin(t * Math.PI), h, crystal, 6, 0);
+    spike.position.set(0, 0.105 + h * 0.38, 0.115 - i * 0.042);
+    spike.rotation.x = 0.06 + (1 - t) * 0.22;   // lean back, straightening toward the muzzle
     g.add(spike);
   }
-  // needle feed ridges flanking the fan
-  for (const sx of [-1, 1]) { const ridge = box(0.010, 0.018, 0.30, metal); ridge.position.set(sx * 0.028, 0.102, -0.03); g.add(ridge); }
 
-  // gill vents on the flanks
-  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const gill = box(0.006, 0.030, 0.012, energy); gill.position.set(sx * 0.036, 0.055, -0.10 - i * 0.045); g.add(gill); }
-
-  // launcher mouth: small recessed glow throat ringed by three petal prongs
-  const mouthRing = cyl(0.021, 0.024, 0.020, dark, 12); mouthRing.position.set(0, 0.052, -0.285); g.add(mouthRing);
-  const throat = cyl(0.011, 0.014, 0.014, energy, 12); throat.position.set(0, 0.052, -0.295); g.add(throat);
-  for (let i = 0; i < 3; i++) {
-    const a = i / 3 * Math.PI * 2 + Math.PI / 2;
-    const petal = cone(0.008, 0.040, dark, 6);
-    petal.position.set(Math.cos(a) * 0.018, 0.052 + Math.sin(a) * 0.018, -0.30);
-    petal.rotation.z = a; g.add(petal);
+  // multi-port needle muzzle: tapered head with seven tiny glowing launch
+  // tubes (centre + hex ring) — no big glowing disc
+  const head = cyl(0.021, 0.026, 0.045, dark, 12); head.position.set(0, 0.055, -0.255); g.add(head);
+  const face = cyl(0.019, 0.021, 0.010, metal, 12); face.position.set(0, 0.055, -0.280); g.add(face);
+  const port0 = cyl(0.0042, 0.0042, 0.014, energy, 6); port0.position.set(0, 0.055, -0.283); g.add(port0);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const port = cyl(0.0042, 0.0042, 0.014, energy, 6);
+    port.position.set(Math.cos(a) * 0.011, 0.055 + Math.sin(a) * 0.011, -0.283);
+    g.add(port);
   }
 
   // underside: grip + needle-pod tucked together under the keel
