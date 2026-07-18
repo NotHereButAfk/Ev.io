@@ -6,32 +6,49 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // ── Blender GLB weapon loader ─────────────────────────────────────────────────
 let _weaponTemplate = null, _weaponLoading = false;
 
+// Per-weapon override GLBs — a dedicated Blender-authored model that supersedes
+// the shared weapons.glb node for that weapon (smoother than the procedural or
+// placeholder build). Each file has a node named `weapon_<id>`.
+const WEAPON_GLB_OVERRIDES = { sidearm: '/sidearm.glb' };
+const _overrideTemplates = new Map();   // id -> gltf.scene
+
 // Callbacks waiting on the GLB template (e.g. WeaponSystem swaps its
 // procedural viewmodels for the detailed Blender guns once it arrives).
 let _readyCallbacks = [];
+let _allReady = false;
+
+function _fireReady() {
+  _allReady = true;
+  const cbs = _readyCallbacks; _readyCallbacks = [];
+  for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[WeaponGLB] ready cb failed:', e); } }
+}
 
 export function onWeaponModelsReady(cb) {
-  if (_weaponTemplate) { cb(); return; }
+  if (_allReady) { cb(); return; }
   _readyCallbacks.push(cb);
 }
 
 export function preloadWeaponModels() {
   if (_weaponTemplate || _weaponLoading) return;
   _weaponLoading = true;
-  new GLTFLoader().load('/weapons.glb',
-    (gltf) => {
-      _weaponTemplate = gltf.scene;
-      _weaponLoading = false;
-      const cbs = _readyCallbacks; _readyCallbacks = [];
-      for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[WeaponGLB] ready cb failed:', e); } }
-    },
-    undefined,
-    (err) => { console.warn('[WeaponGLB] load failed:', err.message); _weaponLoading = false; }
-  );
+  const loader = new GLTFLoader();
+  // main atlas + every override; fire ready only once all have settled so the
+  // override models are in place before viewmodels rebuild (no placeholder flash)
+  const jobs = [['/weapons.glb', null], ...Object.entries(WEAPON_GLB_OVERRIDES).map(([id, url]) => [url, id])];
+  let pending = jobs.length;
+  const done = () => { if (--pending === 0) { _weaponLoading = false; _fireReady(); } };
+  for (const [url, id] of jobs) {
+    loader.load(url,
+      (gltf) => { if (id) _overrideTemplates.set(id, gltf.scene); else _weaponTemplate = gltf.scene; done(); },
+      undefined,
+      (err) => { console.warn(`[WeaponGLB] load failed (${url}):`, err.message); done(); }
+    );
+  }
 }
 
 function _buildFromGLB(weaponDef) {
-  const weaponRoot = _weaponTemplate?.getObjectByName(`weapon_${weaponDef.id}`);
+  const override = _overrideTemplates.get(weaponDef.id);
+  const weaponRoot = (override || _weaponTemplate)?.getObjectByName(`weapon_${weaponDef.id}`);
   if (!weaponRoot) return null;
 
   const cloned = weaponRoot.clone(true);
