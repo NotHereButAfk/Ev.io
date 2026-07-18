@@ -942,13 +942,18 @@ function buildM4(color) {
 }
 
 // AR-10 .308 — beefier M4 variant, 20-rd PMAG, red dot optic.
-function buildAR10(color) {
+function buildAR10(color, def = {}) {
   const g = new THREE.Group();
   const body  = M('body',   color,    { roughness: 0.55, metalness: 0.3  });
   const dark  = M('accent', 0x0f1116, { roughness: 0.6,  metalness: 0.22 });
   const metal = M('metal',  0x7c8289, { metalness: 0.76, roughness: 0.3  });
   const glass = M('special', 0x163b2a, { metalness: 0.15, roughness: 0.1,
                                          emissive: 0x0a2a1c, emissiveIntensity: 0.2 });
+  // sci-fi energy accents (the DMR uses this builder — it lives in a sci-fi
+  // arsenal, so it carries glowing tech details like the rest)
+  const eCol = def.energyColor ?? 0x2ee6ff;
+  const energy = M('energy', new THREE.Color(eCol).multiplyScalar(0.12).getHex(),
+    { roughness: 0.2, metalness: 0.1, emissive: eCol, emissiveIntensity: 3.0 });
 
   // Upper + lower receivers
   const upper = box(0.092, 0.085, 0.4, dark);
@@ -987,12 +992,16 @@ function buildAR10(color) {
   const adjKnob = cyl(0.01, 0.01, 0.03, metal, 8, 0);
   adjKnob.position.set(0, 0.262, 0.03);
   g.add(adjKnob);
+  // glowing holo reticle visible in the rear lens
+  const reticle = cyl(0.012, 0.012, 0.006, energy, 10);
+  reticle.position.set(0, 0.225, 0.082);
+  g.add(reticle);
 
   // Barrel (heavier .308 profile)
   const barrel = cyl(0.021, 0.019, 0.24, metal);
   barrel.position.set(0, 0.078, -0.72);
   g.add(barrel);
-  // Muzzle brake
+  // Muzzle brake + energy emitter ring
   const mbBody = cyl(0.032, 0.028, 0.076, dark);
   mbBody.position.set(0, 0.078, -0.878);
   g.add(mbBody);
@@ -1001,8 +1010,13 @@ function buildAR10(color) {
     port.position.set(Math.cos(i / 3 * Math.PI * 2) * 0.028, 0.078 + Math.sin(i / 3 * Math.PI * 2) * 0.028, -0.87);
     g.add(port);
   }
+  const mbEmit = cyl(0.018, 0.022, 0.014, energy, 12);
+  mbEmit.position.set(0, 0.078, -0.912);
+  g.add(mbEmit);
+  // energy conduits along the handguard sides
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.008, 0.42, energy); c.position.set(sx * 0.042, 0.118, -0.34); g.add(c); }
 
-  // Magazine — 20-rd PMAG
+  // Magazine — 20-rd PMAG with a glowing witness strip
   const mag = box(0.059, 0.305, 0.094, body);
   mag.position.set(0, -0.16, 0.04);
   mag.rotation.x = -0.1;
@@ -1010,6 +1024,10 @@ function buildAR10(color) {
   const magFloor = box(0.063, 0.022, 0.098, dark);
   magFloor.position.set(0, -0.318, 0.04);
   g.add(magFloor);
+  const witness = box(0.014, 0.22, 0.008, energy);
+  witness.position.set(0, -0.15, 0.090);
+  witness.rotation.x = -0.1;
+  g.add(witness);
 
   // Pistol grip
   const grip = box(0.073, 0.176, 0.086, dark);
@@ -1717,7 +1735,9 @@ function buildSciFiAR(color, def = {}) {
   const optBase = box(0.040, 0.024, 0.075, dark); optBase.position.set(0, 0.150, 0.06); g.add(optBase);
   const optHood = box(0.050, 0.050, 0.062, dark); optHood.position.set(0, 0.186, 0.055); g.add(optHood);
   const optGlass = box(0.040, 0.040, 0.006, M('special', 0x0a1420, { roughness: 0.05, metalness: 0.2, clearcoat: 1 })); optGlass.position.set(0, 0.186, 0.026); g.add(optGlass);
-  const optDot = box(0.008, 0.008, 0.005, energy); optDot.position.set(0, 0.186, 0.023); g.add(optDot);
+  // holographic reticle: glowing ring + centre dot floating in the glass
+  const optRing = cyl(0.013, 0.013, 0.005, energy, 12); optRing.position.set(0, 0.186, 0.023); g.add(optRing);
+  const optDot = box(0.006, 0.006, 0.005, energy); optDot.position.set(0, 0.186, 0.021); g.add(optDot);
   const optKnob = cyl(0.010, 0.010, 0.014, metal, 10, 0); optKnob.rotation.z = Math.PI / 2; optKnob.position.set(0.030, 0.186, 0.055); g.add(optKnob);
 
   // M-LOK handguard with slots + thin energy conduits along the top edges
@@ -1725,7 +1745,9 @@ function buildSciFiAR(color, def = {}) {
   railSlats(g, metal, 4, 0.032, 0.070, -0.20, 0.088, 0.007, 0.034);
   railSlats(g, metal, 4, -0.032, 0.070, -0.20, 0.088, 0.007, 0.034);
   railSlats(g, metal, 4, 0, 0.040, -0.20, 0.088, 0.040, 0.010);
-  for (const sx of [-1, 1]) { const c = box(0.005, 0.006, 0.30, energy); c.position.set(sx * 0.030, 0.114, -0.31); g.add(c); }
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.010, 0.30, energy); c.position.set(sx * 0.030, 0.114, -0.31); g.add(c); }
+  // glowing status strip on the receiver flank (ammo readout)
+  const status = box(0.005, 0.010, 0.085, energy); status.position.set(-0.039, 0.096, 0.03); g.add(status);
   // angled foregrip at the front of the handguard
   const afg = box(0.034, 0.062, 0.040, body); afg.position.set(0, 0.026, -0.44); afg.rotation.x = -0.55; g.add(afg);
   // flip-up rear sight aperture on the rail
@@ -1738,7 +1760,7 @@ function buildSciFiAR(color, def = {}) {
   const gasTube = cyl(0.006, 0.006, 0.34, metal, 8); gasTube.position.set(0, 0.108, -0.34); g.add(gasTube);
   const fh = cyl(0.021, 0.016, 0.055, dark, 12); fh.position.set(0, 0.078, -0.665); g.add(fh);
   for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; const slot = box(0.005, 0.011, 0.038, metal); slot.position.set(Math.cos(a) * 0.019, 0.078 + Math.sin(a) * 0.019, -0.665); g.add(slot); }
-  const emit = cyl(0.011, 0.014, 0.012, energy, 10); emit.position.set(0, 0.078, -0.688); g.add(emit);
+  const emit = cyl(0.014, 0.017, 0.014, energy, 10); emit.position.set(0, 0.078, -0.690); g.add(emit);
 
   // PMAG: curved polymer, ribs, floorplate, glowing witness strip
   const mag = box(0.052, 0.20, 0.080, body); mag.position.set(0, -0.135, 0.035); mag.rotation.x = -0.14; g.add(mag);
@@ -1789,9 +1811,10 @@ function buildSciFiHandCannon(color, def = {}) {
   for (let i = 0; i < 3; i++) { const s = box(0.056, 0.036, 0.005, metal); s.position.set(0, 0.086, -0.145 - i * 0.013); g.add(s); }
   const eport = box(0.006, 0.024, 0.060, metal); eport.position.set(0.028, 0.090, -0.03); g.add(eport);
 
-  // ported barrel shroud + exposed match barrel + recessed crown
+  // ported barrel shroud + exposed match barrel + recessed crown — the middle
+  // port on each side glows (energy bleed-off vents)
   const shroud = box(0.050, 0.052, 0.115, body); shroud.position.set(0, 0.078, -0.245); g.add(shroud);
-  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const p = box(0.006, 0.018, 0.022, dark); p.position.set(sx * 0.026, 0.092, -0.21 - i * 0.032); g.add(p); }
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const p = box(0.006, 0.018, 0.022, i === 1 ? energy : dark); p.position.set(sx * 0.026, 0.092, -0.21 - i * 0.032); g.add(p); }
   const brl = cyl(0.017, 0.017, 0.06, metal, 12); brl.position.set(0, 0.078, -0.285); g.add(brl);
   const crown = cyl(0.019, 0.021, 0.014, dark, 12); crown.position.set(0, 0.078, -0.292); g.add(crown);
   const emit = cyl(0.011, 0.013, 0.010, energy, 10); emit.position.set(0, 0.078, -0.298); g.add(emit);
@@ -1805,6 +1828,8 @@ function buildSciFiHandCannon(color, def = {}) {
   }
   const crane = box(0.010, 0.030, 0.060, metal); crane.position.set(-0.030, 0.020, 0.015); g.add(crane);
   const cylLatch = box(0.008, 0.014, 0.030, metal); cylLatch.position.set(-0.030, 0.052, 0.075); g.add(cylLatch);
+  // glowing energy seam ring on the cylinder face
+  const cylSeam = cyl(0.030, 0.030, 0.006, energy, 12); cylSeam.position.set(0, 0.038, -0.036); g.add(cylSeam);
 
   // frame with a cylinder window (front section + rear section) so the fluted
   // cylinder and its glowing chambers stay visible, like a Mateba automag.
@@ -1867,7 +1892,8 @@ function buildSciFiBattleRifle(color, def = {}) {
   railSlats(g, metal, 4, 0.031, 0.066, -0.26, 0.082, 0.007, 0.030);
   railSlats(g, metal, 4, -0.031, 0.066, -0.26, 0.082, 0.007, 0.030);
   picRail(g, metal, 0, 0.038, -0.44, 0.09, 0.024);
-  for (const sx of [-1, 1]) { const c = box(0.005, 0.005, 0.28, energy); c.position.set(sx * 0.029, 0.106, -0.36); g.add(c); }
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.009, 0.28, energy); c.position.set(sx * 0.029, 0.106, -0.36); g.add(c); }
+  for (const sx of [-1, 1]) { const c = box(0.005, 0.008, 0.22, energy); c.position.set(sx * 0.0295, 0.058, -0.35); g.add(c); }
 
   // fluted heavy barrel + target crown muzzle brake with side ports
   const brl = cyl(0.016, 0.015, 0.24, metal, 12); brl.position.set(0, 0.078, -0.60); g.add(brl);
@@ -1881,6 +1907,7 @@ function buildSciFiBattleRifle(color, def = {}) {
   const tube = cyl(0.024, 0.024, 0.26, dark, 14); tube.position.set(0, 0.168, 0.05); g.add(tube);
   const bell = cyl(0.034, 0.026, 0.055, dark, 14); bell.position.set(0, 0.168, -0.10); g.add(bell);
   const shade = cyl(0.035, 0.035, 0.035, metal, 14); shade.position.set(0, 0.168, -0.145); g.add(shade);
+  const objGlow = cyl(0.019, 0.019, 0.006, energy, 14); objGlow.position.set(0, 0.168, -0.158); g.add(objGlow);
   const ocular = cyl(0.028, 0.024, 0.045, dark, 14); ocular.position.set(0, 0.168, 0.195); g.add(ocular);
   const magRing = cyl(0.026, 0.026, 0.018, metal, 14); magRing.position.set(0, 0.168, 0.165); g.add(magRing);
   const lens = cyl(0.020, 0.020, 0.008, energy, 14); lens.position.set(0, 0.168, 0.220); g.add(lens);
@@ -1933,6 +1960,9 @@ function buildSciFiScattergun(color, def = {}) {
   const brl = cyl(0.020, 0.020, 0.34, metal, 14); brl.position.set(0, 0.085, -0.29); g.add(brl);
   const shield = box(0.052, 0.030, 0.30, dark); shield.position.set(0, 0.104, -0.27); g.add(shield);
   railSlats(g, metal, 6, 0, 0.121, -0.15, 0.048, 0.036, 0.008);
+  // energy bleed lines along the heat-shield flanks + mag-tube charge ring
+  for (const sx of [-1, 1]) { const c = box(0.005, 0.008, 0.27, energy); c.position.set(sx * 0.028, 0.104, -0.27); g.add(c); }
+  const tubeEmit = cyl(0.011, 0.013, 0.010, energy, 10); tubeEmit.position.set(0, 0.048, -0.443); g.add(tubeEmit);
   const fsHousing = box(0.020, 0.022, 0.024, dark); fsHousing.position.set(0, 0.120, -0.435); g.add(fsHousing);
   const bead = cyl(0.006, 0.006, 0.010, energy, 8, 0); bead.position.set(0, 0.138, -0.435); g.add(bead);
   const bore = cyl(0.013, 0.016, 0.012, energy, 12); bore.position.set(0, 0.085, -0.462); g.add(bore);
@@ -2104,6 +2134,7 @@ function buildFuelRod(color, def = {}) {
   for (const z of [-0.34, -0.18, -0.02, 0.10]) {
     const ring = cyl(0.050, 0.050, 0.020, dark, 16); ring.position.set(0, 0.075, z); g.add(ring);
     knurledCollar(g, metal, 0, 0.075, z, 0.047, 8);
+    const seam = cyl(0.0465, 0.0465, 0.007, energy, 16); seam.position.set(0, 0.075, z + 0.016); g.add(seam);
   }
   // flared muzzle bell + inner glow
   const bell = cyl(0.048, 0.062, 0.075, dark, 16); bell.position.set(0, 0.075, -0.435); g.add(bell);
