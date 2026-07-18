@@ -2067,8 +2067,10 @@ function buildSciFiPlasma(color, def = {}) {
   return { group: g, muzzle };
 }
 
-// needler — alien needle SMG: a row of big crystal shards along the armoured
-// carapace (its icon), gilled side plates, multi-port needle muzzle. Pink glow.
+// needler — needle SMG built like a REAL firearm: boxy railed receiver,
+// barrel shroud + multi-port needle muzzle, front/rear sights, curved energy
+// magazine, stippled grip, skeleton stock — the crystal shard row rides in a
+// top-mounted ammo rack like a transparent magazine. Pink glow.
 function buildNeedler(color, def = {}) {
   const eCol = def.energyColor ?? 0xff4dd2;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
@@ -2076,58 +2078,69 @@ function buildNeedler(color, def = {}) {
     { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 2.2, transparent: true, opacity: 0.85 });
   const g = new THREE.Group();
 
-  // Layered alien hull: a smooth three-step taper wrapped in armour plates so
-  // it reads as a carapaced organism, not a smooth bottle. Bore line y=0.055.
-  const rear = cyl(0.038, 0.033, 0.15, body, 14); rear.position.set(0, 0.055, 0.085); g.add(rear);
-  const rearCap = cyl(0.030, 0.036, 0.03, dark, 14); rearCap.position.set(0, 0.055, 0.172); g.add(rearCap);
-  const mid  = cyl(0.033, 0.027, 0.17, body, 14); mid.position.set(0, 0.055, -0.065); g.add(mid);
-  const nose = cyl(0.027, 0.021, 0.09, dark, 14); nose.position.set(0, 0.055, -0.185); g.add(nose);
-  // hull seam collars where the segments meet + a dark belly keel
-  for (const [r, z] of [[0.036, 0.008], [0.029, -0.145]]) { const seam = cyl(r, r, 0.012, dark, 14); seam.position.set(0, 0.055, z); g.add(seam); }
-  const keel = box(0.028, 0.024, 0.30, dark); keel.position.set(0, 0.014, -0.03); g.add(keel);
-
-  // top carapace: two overlapping armour shells the spikes erupt through
-  const cara1 = box(0.042, 0.024, 0.30, body); cara1.position.set(0, 0.090, 0.02); g.add(cara1);
-  const cara2 = box(0.032, 0.014, 0.26, dark); cara2.position.set(0, 0.106, 0.00); g.add(cara2);
-  // side armour plates carrying the glowing gill slits
-  for (const sx of [-1, 1]) {
-    const plate = box(0.008, 0.036, 0.22, dark); plate.position.set(sx * 0.031, 0.062, -0.03); g.add(plate);
-    for (let i = 0; i < 3; i++) { const gill = box(0.005, 0.018, 0.007, energy); gill.position.set(sx * 0.036, 0.062, -0.10 - i * 0.038); g.add(gill); }
+  // ── receiver: boxy SMG body with a bottom accent plate and rear cap ──
+  const receiver = box(0.058, 0.068, 0.30, body); receiver.position.set(0, 0.058, 0.03); g.add(receiver);
+  const belly = box(0.050, 0.012, 0.26, dark); belly.position.set(0, 0.020, 0.02); g.add(belly);
+  const rearCap = box(0.050, 0.060, 0.020, dark); rearCap.position.set(0, 0.058, 0.185); g.add(rearCap);
+  // glowing feed slits on the receiver flanks
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const slit = box(0.005, 0.016, 0.007, energy); slit.position.set(sx * 0.030, 0.060, 0.00 + i * 0.05); g.add(slit);
   }
 
-  // crystal shard row — seven BIG translucent blades erupting from the
-  // carapace, tallest mid-back, leaning back harder toward the rear
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const h = 0.075 + Math.sin(t * Math.PI) * 0.042;
-    const spike = cone(0.0125 + 0.004 * Math.sin(t * Math.PI), h, crystal, 6, 0);
-    spike.position.set(0, 0.105 + h * 0.38, 0.115 - i * 0.042);
-    spike.rotation.x = 0.06 + (1 - t) * 0.22;   // lean back, straightening toward the muzzle
+  // ── top ammo rack: an open channel the crystal shards seat into ──
+  const rackFloor = box(0.036, 0.010, 0.26, dark); rackFloor.position.set(0, 0.096, 0.045); g.add(rackFloor);
+  for (const sx of [-1, 1]) { const wall = box(0.008, 0.026, 0.26, dark); wall.position.set(sx * 0.020, 0.104, 0.045); g.add(wall); }
+  // six crystal shards — the visible needle ammunition
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const h = 0.048 + Math.sin(t * Math.PI) * 0.032;
+    const spike = cone(0.010 + 0.003 * Math.sin(t * Math.PI), h, crystal, 6, 0);
+    spike.position.set(0, 0.098 + h * 0.42, 0.145 - i * 0.042);
+    spike.rotation.x = 0.05 + (1 - t) * 0.14;
     g.add(spike);
   }
 
-  // multi-port needle muzzle: tapered head with seven tiny glowing launch
-  // tubes (centre + hex ring) — no big glowing disc
-  const head = cyl(0.021, 0.026, 0.045, dark, 12); head.position.set(0, 0.055, -0.255); g.add(head);
-  const face = cyl(0.019, 0.021, 0.010, metal, 12); face.position.set(0, 0.055, -0.280); g.add(face);
-  const port0 = cyl(0.0042, 0.0042, 0.014, energy, 6); port0.position.set(0, 0.055, -0.283); g.add(port0);
+  // ── sights: front post with glow dot + rear notch, short accessory rail ──
+  picRail(g, dark, 0, 0.100, -0.085, 0.055, 0.022);
+  const fsPost = box(0.010, 0.024, 0.010, dark); fsPost.position.set(0, 0.100, -0.215); g.add(fsPost);
+  const fsDot = box(0.005, 0.005, 0.005, energy); fsDot.position.set(0, 0.112, -0.219); g.add(fsDot);
+  const rSight = box(0.026, 0.014, 0.010, dark); rSight.position.set(0, 0.100, 0.170); g.add(rSight);
+
+  // ── barrel group: shroud with glowing vents, exposed barrel, needle head ──
+  const shroud = box(0.046, 0.050, 0.13, dark); shroud.position.set(0, 0.058, -0.185); g.add(shroud);
+  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
+    const v = box(0.005, 0.014, 0.020, energy); v.position.set(sx * 0.024, 0.058, -0.150 - i * 0.045); g.add(v);
+  }
+  const brl = cyl(0.014, 0.014, 0.06, metal, 12); brl.position.set(0, 0.058, -0.275); g.add(brl);
+  // multi-port needle muzzle: tapered head, steel face, seven glowing tubes
+  const head = cyl(0.019, 0.023, 0.040, dark, 12); head.position.set(0, 0.058, -0.318); g.add(head);
+  const face = cyl(0.017, 0.019, 0.010, metal, 12); face.position.set(0, 0.058, -0.340); g.add(face);
+  const port0 = cyl(0.0040, 0.0040, 0.013, energy, 6); port0.position.set(0, 0.058, -0.343); g.add(port0);
   for (let i = 0; i < 6; i++) {
     const a = i / 6 * Math.PI * 2;
-    const port = cyl(0.0042, 0.0042, 0.014, energy, 6);
-    port.position.set(Math.cos(a) * 0.011, 0.055 + Math.sin(a) * 0.011, -0.283);
+    const port = cyl(0.0040, 0.0040, 0.013, energy, 6);
+    port.position.set(Math.cos(a) * 0.010, 0.058 + Math.sin(a) * 0.010, -0.343);
     g.add(port);
   }
 
-  // underside: grip + needle-pod tucked together under the keel
-  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.040, 0.090); grip.rotation.x = 0.32; g.add(grip);
-  stippleGrip(g, dark, 0, -0.046, 0.066, 0.030, 0.080, 3, 4);
-  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.006, 0.042); trigger.rotation.x = 0.3; g.add(trigger);
-  const tgB = box(0.030, 0.008, 0.075, dark); tgB.position.set(0, -0.028, 0.020); g.add(tgB);
-  const tgF = box(0.030, 0.030, 0.008, dark); tgF.position.set(0, -0.014, -0.016); g.add(tgF);
-  const pod = box(0.034, 0.062, 0.060, dark); pod.position.set(0, -0.024, -0.048); pod.rotation.x = -0.10; g.add(pod);
-  const podGlow = box(0.012, 0.040, 0.008, energy); podGlow.position.set(0, -0.020, -0.016); podGlow.rotation.x = -0.10; g.add(podGlow);
+  // ── curved energy magazine ahead of the trigger guard ──
+  const mag = box(0.040, 0.130, 0.056, dark); mag.position.set(0, -0.042, -0.030); mag.rotation.x = -0.14; g.add(mag);
+  const magFloor = box(0.044, 0.012, 0.060, metal); magFloor.position.set(0, -0.108, -0.040); magFloor.rotation.x = -0.14; g.add(magFloor);
+  const witness = box(0.011, 0.095, 0.007, energy); witness.position.set(0, -0.040, -0.001); witness.rotation.x = -0.14; g.add(witness);
 
-  const muzzle = addMuzzle(g, 0, 0.052, -0.31);
+  // ── grip, trigger + guard bridging up to the receiver ──
+  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.038, 0.100); grip.rotation.x = 0.32; g.add(grip);
+  stippleGrip(g, dark, 0, -0.044, 0.076, 0.030, 0.080, 3, 4);
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.002, 0.052); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.030, 0.008, 0.080, dark); tgB.position.set(0, -0.026, 0.032); g.add(tgB);
+  const tgF = box(0.030, 0.034, 0.008, dark); tgF.position.set(0, -0.006, -0.004); g.add(tgF);
+
+  // ── skeleton stock: strut + cheek brace + shoulder pad at receiver height ──
+  const strut = cyl(0.013, 0.013, 0.10, dark, 10); strut.position.set(0, 0.058, 0.245); g.add(strut);
+  const brace = box(0.034, 0.014, 0.085, dark); brace.position.set(0, 0.082, 0.255); g.add(brace);
+  const pad = box(0.044, 0.072, 0.018, body); pad.position.set(0, 0.050, 0.302); g.add(pad);
+
+  const muzzle = addMuzzle(g, 0, 0.058, -0.35);
   return { group: g, muzzle };
 }
 
