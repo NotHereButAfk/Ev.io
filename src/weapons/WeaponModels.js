@@ -2099,31 +2099,29 @@ function buildNeedler(color, def = {}) {
   // ── top-mounted needle magazine: a translucent box mag (like a P90's) with
   // the glowing needle rounds stacked visibly inside — reads as real ammo in a
   // real container, not exposed spikes ──
-  // clear smoked-glass housing (barely tinted so the rounds read through it)
-  const housingMat = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(eCol).multiplyScalar(0.6), roughness: 0.05, metalness: 0.0,
-    transmission: 0.85, thickness: 0.2, transparent: true, opacity: 0.22,
-    clearcoat: 1.0, clearcoatRoughness: 0.04, ior: 1.4,
-  });
-  housingMat.userData.role = 'special';
-  // brighter needle rounds so they punch through the glass
-  const round = M('energy', new THREE.Color(eCol).multiplyScalar(0.3).getHex(),
-    { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 3.0 });
-  // steel end caps + a spine rib bolting the magazine to the receiver
-  const capF = box(0.048, 0.058, 0.020, dark); capF.position.set(0, 0.130, -0.088); g.add(capF);
-  const capR = box(0.048, 0.058, 0.020, dark); capR.position.set(0, 0.130, 0.166); g.add(capR);
-  const clampBar = box(0.052, 0.012, 0.030, dark); clampBar.position.set(0, 0.097, 0.040); g.add(clampBar);
-  // needle rounds inside — a dense row of diagonal cartridges under the glass
-  for (let i = 0; i < 11; i++) {
-    const t = i / 10;
-    const spike = cone(0.0075, 0.070, round, 6, 0);
-    spike.position.set(0, 0.140, 0.150 - i * 0.026);
-    spike.rotation.x = 0.42;    // all leaning forward, like stacked rounds
-    g.add(spike);
+  // ── top-mounted needle magazine: a SOLID armoured pod (matches the gun body,
+  // recolours with skins) with a glowing energy charge-window down each flank
+  // showing the needle reserve — clean sci-fi tech, not a clear plastic box ──
+  const magBody = box(0.046, 0.064, 0.29, body); magBody.position.set(0, 0.126, 0.040); g.add(magBody);
+  const magTop  = box(0.034, 0.016, 0.29, dark); magTop.position.set(0, 0.166, 0.040); g.add(magTop);
+  const capF = box(0.050, 0.068, 0.016, dark); capF.position.set(0, 0.126, -0.092); g.add(capF);
+  const capR = box(0.050, 0.068, 0.016, dark); capR.position.set(0, 0.126, 0.172); g.add(capR);
+  // horizontal seam + retaining screws on the pod body (machined detail)
+  const magSeam = box(0.0472, 0.004, 0.26, dark); magSeam.position.set(0, 0.146, 0.040); g.add(magSeam);
+  for (const sx of [-1, 1]) for (const pz of [-0.05, 0.13]) {
+    const s = cyl(0.003, 0.003, 0.005, metal, 8, 0); s.rotation.z = Math.PI / 2; s.position.set(sx * 0.0236, 0.104, pz); g.add(s);
   }
-  // the clear housing shell over the rounds (slimmer, lower)
-  const housing = box(0.044, 0.070, 0.28, housingMat); housing.position.set(0, 0.132, 0.040); g.add(housing);
-  const magSpine = box(0.030, 0.010, 0.27, metal); magSpine.position.set(0, 0.170, 0.040); g.add(magSpine);
+  // glowing charge window down each flank, segmented into discrete needle cells
+  for (const sx of [-1, 1]) {
+    const frame = box(0.006, 0.036, 0.24, dark); frame.position.set(sx * 0.023, 0.122, 0.040); g.add(frame);
+    const win   = box(0.004, 0.028, 0.225, energy); win.position.set(sx * 0.0255, 0.122, 0.040); g.add(win);
+    for (let i = 0; i < 8; i++) { const tick = box(0.005, 0.030, 0.005, dark); tick.position.set(sx * 0.0256, 0.122, -0.070 + i * 0.030); g.add(tick); }
+  }
+  // three crystal needle tips just breaking the front feed lip (identity accent)
+  for (let i = 0; i < 3; i++) {
+    const tip = cone(0.0075, 0.028, crystal, 6, 0);
+    tip.position.set(0, 0.170, -0.068 + i * 0.026); tip.rotation.x = -0.25; g.add(tip);
+  }
   // front feed throat where the needles drop down into the receiver
   const throat = box(0.042, 0.026, 0.026, dark); throat.position.set(0, 0.100, -0.078); g.add(throat);
 
