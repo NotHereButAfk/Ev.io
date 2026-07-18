@@ -1680,10 +1680,12 @@ function buildKnife(color) {
 // Shared sci-fi material set for the main guns. Roles body / accent / metal /
 // energy; the energy parts glow in the weapon's signature `energyColor`.
 function _sciFiMats(color, eCol) {
+  // Tuned for tonal separation: mid-tone polymer furniture (def.color), hard
+  // anodized receiver parts that still catch light, bright brushed steel.
   return {
-    body:   M('body',   color,    { roughness: 0.48, metalness: 0.42 }),
-    dark:   M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 }),
-    metal:  M('metal',  0x8a929c, { metalness: 0.94, roughness: 0.20 }),
+    body:   M('body',   color,    { roughness: 0.46, metalness: 0.35 }),
+    dark:   M('accent', 0x1a1e24, { roughness: 0.38, metalness: 0.62 }),
+    metal:  M('metal',  0x9aa3ad, { metalness: 0.92, roughness: 0.22 }),
     energy: M('energy', eCol,     { roughness: 0.20, metalness: 0.10, emissive: eCol, emissiveIntensity: 3.2 }),
   };
 }
@@ -1724,6 +1726,11 @@ function buildSciFiAR(color, def = {}) {
   railSlats(g, metal, 4, -0.032, 0.070, -0.20, 0.088, 0.007, 0.034);
   railSlats(g, metal, 4, 0, 0.040, -0.20, 0.088, 0.040, 0.010);
   for (const sx of [-1, 1]) { const c = box(0.005, 0.006, 0.30, energy); c.position.set(sx * 0.030, 0.114, -0.31); g.add(c); }
+  // angled foregrip at the front of the handguard
+  const afg = box(0.034, 0.062, 0.040, body); afg.position.set(0, 0.026, -0.44); afg.rotation.x = -0.55; g.add(afg);
+  // flip-up rear sight aperture on the rail
+  const rsBase = box(0.030, 0.016, 0.026, dark); rsBase.position.set(0, 0.144, 0.135); g.add(rsBase);
+  const rsRing = cyl(0.009, 0.009, 0.007, metal, 10, 0); rsRing.position.set(0, 0.162, 0.135); g.add(rsRing);
 
   // barrel group: gas block, tube, exposed barrel, birdcage flash hider
   const brl = cyl(0.015, 0.014, 0.16, metal, 12); brl.position.set(0, 0.078, -0.575); g.add(brl);
@@ -1758,6 +1765,7 @@ function buildSciFiAR(color, def = {}) {
   for (let i = 0; i < 3; i++) { const notch = box(0.050, 0.006, 0.008, metal); notch.position.set(0, 0.040, 0.24 + i * 0.04); g.add(notch); }
   const stock = box(0.062, 0.115, 0.115, body); stock.position.set(0, 0.028, 0.375); g.add(stock);
   const cheek = box(0.052, 0.018, 0.105, dark); cheek.position.set(0, 0.092, 0.375); g.add(cheek);
+  const stockToe = box(0.056, 0.055, 0.060, body); stockToe.position.set(0, -0.020, 0.398); stockToe.rotation.x = 0.35; g.add(stockToe);
   const buttpad = box(0.060, 0.120, 0.016, dark); buttpad.position.set(0, 0.028, 0.437); g.add(buttpad);
   const slingLoop = box(0.010, 0.022, 0.008, metal); slingLoop.position.set(0, -0.032, 0.36); g.add(slingLoop);
 
@@ -1775,6 +1783,8 @@ function buildSciFiHandCannon(color, def = {}) {
 
   // slide with front + rear cocking serrations and ejection port
   const slide = box(0.052, 0.070, 0.30, dark); slide.position.set(0, 0.078, -0.05); g.add(slide);
+  // brushed-steel sight rib along the slide top — breaks up the black slab
+  const sightRib = box(0.028, 0.008, 0.29, metal); sightRib.position.set(0, 0.115, -0.05); g.add(sightRib);
   for (let i = 0; i < 5; i++) { const s = box(0.056, 0.036, 0.005, metal); s.position.set(0, 0.086, 0.055 + i * 0.013); g.add(s); }
   for (let i = 0; i < 3; i++) { const s = box(0.056, 0.036, 0.005, metal); s.position.set(0, 0.086, -0.145 - i * 0.013); g.add(s); }
   const eport = box(0.006, 0.024, 0.060, metal); eport.position.set(0.028, 0.090, -0.03); g.add(eport);
@@ -1921,7 +1931,8 @@ function buildSciFiScattergun(color, def = {}) {
   const brl = cyl(0.020, 0.020, 0.34, metal, 14); brl.position.set(0, 0.085, -0.29); g.add(brl);
   const shield = box(0.052, 0.030, 0.30, dark); shield.position.set(0, 0.104, -0.27); g.add(shield);
   railSlats(g, metal, 6, 0, 0.121, -0.15, 0.048, 0.036, 0.008);
-  const bead = cyl(0.006, 0.006, 0.010, energy, 8, 0); bead.position.set(0, 0.128, -0.435); g.add(bead);
+  const fsHousing = box(0.020, 0.022, 0.024, dark); fsHousing.position.set(0, 0.120, -0.435); g.add(fsHousing);
+  const bead = cyl(0.006, 0.006, 0.010, energy, 8, 0); bead.position.set(0, 0.138, -0.435); g.add(bead);
   const bore = cyl(0.013, 0.016, 0.012, energy, 12); bore.position.set(0, 0.085, -0.462); g.add(bore);
   const choke = cyl(0.022, 0.024, 0.020, dark, 14); choke.position.set(0, 0.085, -0.452); g.add(choke);
 
@@ -1977,9 +1988,9 @@ function buildSciFiPlasma(color, def = {}) {
   const topShell = box(0.058, 0.042, 0.56, dark); topShell.position.set(0, 0.112, -0.09); g.add(topShell);
   const topChamfer = box(0.044, 0.014, 0.52, metal); topChamfer.position.set(0, 0.136, -0.09); g.add(topChamfer);
   const botShell = box(0.058, 0.042, 0.48, body); botShell.position.set(0, 0.028, -0.06); g.add(botShell);
-  const core = cyl(0.026, 0.026, 0.36, coreMat, 14); core.position.set(0, 0.070, -0.10); g.add(core);
-  for (let i = 0; i < 5; i++) { const clampR = cyl(0.032, 0.032, 0.018, dark, 14); clampR.position.set(0, 0.070, -0.26 + i * 0.08); g.add(clampR);
-    const bolt = box(0.008, 0.070, 0.010, metal); bolt.position.set(0, 0.070, -0.26 + i * 0.08); g.add(bolt); }
+  const core = cyl(0.021, 0.021, 0.36, coreMat, 14); core.position.set(0, 0.070, -0.10); g.add(core);
+  for (let i = 0; i < 5; i++) { const clampR = cyl(0.028, 0.028, 0.020, dark, 14); clampR.position.set(0, 0.070, -0.26 + i * 0.08); g.add(clampR);
+    const bolt = box(0.008, 0.062, 0.010, metal); bolt.position.set(0, 0.070, -0.26 + i * 0.08); g.add(bolt); }
 
   // heat-sink fin stack on the top rear + coolant line down the left side
   for (let i = 0; i < 6; i++) { const fin = box(0.050, 0.022, 0.006, metal); fin.position.set(0, 0.150, 0.02 + i * 0.016); g.add(fin); }
@@ -2026,10 +2037,16 @@ function buildNeedler(color, def = {}) {
     { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 2.2, transparent: true, opacity: 0.85 });
   const g = new THREE.Group();
 
-  // organic teardrop body: fat rear tapering to the launcher mouth
-  const bodyMain = box(0.070, 0.085, 0.30, body); bodyMain.position.set(0, 0.055, 0.01); g.add(bodyMain);
-  const bodyNose = box(0.056, 0.062, 0.16, dark); bodyNose.position.set(0, 0.052, -0.20); g.add(bodyNose);
-  const belly = box(0.058, 0.030, 0.24, dark); belly.position.set(0, 0.006, -0.04); g.add(belly);
+  // organic teardrop hull: bulbous rear segment tapering through the mid to a
+  // narrow snout — stacked tapered cylinders read as one flowing alien shell.
+  const rear = cyl(0.042, 0.036, 0.16, body, 14); rear.position.set(0, 0.058, 0.09); g.add(rear);
+  const mid  = cyl(0.036, 0.028, 0.18, body, 14); mid.position.set(0, 0.055, -0.075); g.add(mid);
+  const snout = cyl(0.028, 0.020, 0.13, dark, 14); snout.position.set(0, 0.052, -0.225); g.add(snout);
+  // hull seam collars where the segments meet + a dark belly keel
+  for (const [r, z] of [[0.039, 0.012], [0.030, -0.16]]) { const seam = cyl(r, r, 0.014, dark, 14); seam.position.set(0, 0.056, z); g.add(seam); }
+  const keel = box(0.030, 0.026, 0.30, dark); keel.position.set(0, 0.012, -0.03); g.add(keel);
+  // upper spine cowl carrying the spike fan
+  const cowl = box(0.034, 0.020, 0.36, body); cowl.position.set(0, 0.098, 0.00); g.add(cowl);
 
   // crystal spike fan along the spine — 7 needles, tallest mid-back
   for (let i = 0; i < 7; i++) {
