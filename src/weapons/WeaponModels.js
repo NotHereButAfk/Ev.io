@@ -2082,9 +2082,18 @@ function buildNeedler(color, def = {}) {
   const receiver = box(0.058, 0.068, 0.30, body); receiver.position.set(0, 0.058, 0.03); g.add(receiver);
   const belly = box(0.050, 0.012, 0.26, dark); belly.position.set(0, 0.020, 0.02); g.add(belly);
   const rearCap = box(0.050, 0.060, 0.020, dark); rearCap.position.set(0, 0.058, 0.185); g.add(rearCap);
+  // machined detail: panel seam lines, retaining screws, ejection port with a
+  // steel rim, charging handle on the left — a manufactured receiver, not a slab
+  for (const y of [0.038, 0.080]) { const seam = box(0.0592, 0.004, 0.27, dark); seam.position.set(0, y, 0.03); g.add(seam); }
+  const vseam = box(0.0592, 0.048, 0.004, dark); vseam.position.set(0, 0.058, 0.135); g.add(vseam);
+  for (const sx of [-1, 1]) for (const [py, pz] of [[0.074, -0.085], [0.074, 0.155], [0.042, -0.085], [0.042, 0.155]]) {
+    const screw = cyl(0.0035, 0.0035, 0.004, metal, 8, 0); screw.rotation.z = Math.PI / 2; screw.position.set(sx * 0.0296, py, pz); g.add(screw);
+  }
+  const eject = box(0.006, 0.020, 0.055, metal); eject.position.set(0.0295, 0.066, -0.045); g.add(eject);
+  const chandle = box(0.020, 0.010, 0.030, metal); chandle.position.set(-0.036, 0.076, 0.10); g.add(chandle);
   // glowing feed slits on the receiver flanks
   for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) {
-    const slit = box(0.005, 0.016, 0.007, energy); slit.position.set(sx * 0.030, 0.060, 0.00 + i * 0.05); g.add(slit);
+    const slit = box(0.005, 0.016, 0.007, energy); slit.position.set(sx * 0.030, 0.058, 0.005 + i * 0.05); g.add(slit);
   }
 
   // ── top ammo rack: an open channel the crystal shards seat into ──
@@ -2107,6 +2116,8 @@ function buildNeedler(color, def = {}) {
   const rSight = box(0.026, 0.014, 0.010, dark); rSight.position.set(0, 0.100, 0.170); g.add(rSight);
 
   // ── barrel group: shroud with glowing vents, exposed barrel, needle head ──
+  // a collar fairs the receiver into the slimmer shroud
+  const collar = box(0.052, 0.058, 0.026, dark); collar.position.set(0, 0.058, -0.118); g.add(collar);
   const shroud = box(0.046, 0.050, 0.13, dark); shroud.position.set(0, 0.058, -0.185); g.add(shroud);
   for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
     const v = box(0.005, 0.014, 0.020, energy); v.position.set(sx * 0.024, 0.058, -0.150 - i * 0.045); g.add(v);
@@ -2124,9 +2135,10 @@ function buildNeedler(color, def = {}) {
   }
 
   // ── curved energy magazine ahead of the trigger guard ──
-  const mag = box(0.040, 0.130, 0.056, dark); mag.position.set(0, -0.042, -0.030); mag.rotation.x = -0.14; g.add(mag);
-  const magFloor = box(0.044, 0.012, 0.060, metal); magFloor.position.set(0, -0.108, -0.040); magFloor.rotation.x = -0.14; g.add(magFloor);
-  const witness = box(0.011, 0.095, 0.007, energy); witness.position.set(0, -0.040, -0.001); witness.rotation.x = -0.14; g.add(witness);
+  const mag = box(0.044, 0.155, 0.062, dark); mag.position.set(0, -0.052, -0.032); mag.rotation.x = -0.14; g.add(mag);
+  for (let i = 0; i < 2; i++) { const rib = box(0.048, 0.006, 0.054, metal); rib.position.set(0, -0.030 - i * 0.045, -0.028 - i * 0.006); rib.rotation.x = -0.14; g.add(rib); }
+  const magFloor = box(0.048, 0.013, 0.066, metal); magFloor.position.set(0, -0.128, -0.044); magFloor.rotation.x = -0.14; g.add(magFloor);
+  const witness = box(0.011, 0.115, 0.007, energy); witness.position.set(0, -0.048, 0.000); witness.rotation.x = -0.14; g.add(witness);
 
   // ── grip, trigger + guard bridging up to the receiver ──
   const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.038, 0.100); grip.rotation.x = 0.32; g.add(grip);
@@ -2135,10 +2147,11 @@ function buildNeedler(color, def = {}) {
   const tgB = box(0.030, 0.008, 0.080, dark); tgB.position.set(0, -0.026, 0.032); g.add(tgB);
   const tgF = box(0.030, 0.034, 0.008, dark); tgF.position.set(0, -0.006, -0.004); g.add(tgF);
 
-  // ── skeleton stock: strut + cheek brace + shoulder pad at receiver height ──
-  const strut = cyl(0.013, 0.013, 0.10, dark, 10); strut.position.set(0, 0.058, 0.245); g.add(strut);
-  const brace = box(0.034, 0.014, 0.085, dark); brace.position.set(0, 0.082, 0.255); g.add(brace);
-  const pad = box(0.044, 0.072, 0.018, body); pad.position.set(0, 0.050, 0.302); g.add(pad);
+  // ── solid skeleton stock: twin struts framing an open window, ribbed pad ──
+  const strutTop = box(0.022, 0.018, 0.115, dark); strutTop.position.set(0, 0.076, 0.245); g.add(strutTop);
+  const strutLow = box(0.018, 0.014, 0.108, dark); strutLow.position.set(0, 0.032, 0.245); strutLow.rotation.x = -0.16; g.add(strutLow);
+  const pad = box(0.046, 0.085, 0.020, body); pad.position.set(0, 0.052, 0.305); g.add(pad);
+  const padRib = box(0.048, 0.088, 0.006, dark); padRib.position.set(0, 0.052, 0.317); g.add(padRib);
 
   const muzzle = addMuzzle(g, 0, 0.058, -0.35);
   return { group: g, muzzle };

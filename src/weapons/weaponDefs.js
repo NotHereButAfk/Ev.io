@@ -261,7 +261,7 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 55,
     recoil: 0.01,
-    color: 0x6600aa
+    color: 0x4a3f63   // muted violet-grey polymer — reads as a finish, not toy plastic
   },
   {
     id: 'plasmarifle',
