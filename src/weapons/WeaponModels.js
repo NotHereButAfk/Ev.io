@@ -956,45 +956,45 @@ function buildAR10(color, def = {}) {
     { roughness: 0.2, metalness: 0.1, emissive: eCol, emissiveIntensity: 3.0 });
 
   // Upper + lower receivers
-  const upper = box(0.092, 0.085, 0.4, dark);
-  upper.position.set(0, 0.095, 0.06);
+  const upper = box(0.078, 0.070, 0.4, dark);
+  upper.position.set(0, 0.098, 0.06);
   g.add(upper);
-  const lower = box(0.092, 0.075, 0.38, body);
-  lower.position.set(0, 0.022, 0.06);
+  const lower = box(0.078, 0.062, 0.38, body);
+  lower.position.set(0, 0.032, 0.06);
   g.add(lower);
 
   // M-LOK handguard (longer/beefier)
-  const hg = box(0.082, 0.092, 0.52, dark);
-  hg.position.set(0, 0.078, -0.36);
+  const hg = box(0.070, 0.078, 0.52, dark);
+  hg.position.set(0, 0.084, -0.36);
   g.add(hg);
-  railSlats(g, metal, 7, 0, 0.13, -0.16, 0.068, 0.09);
-  railSlats(g, metal, 5, 0.043, 0.072, -0.18, 0.086, 0.007, 0.04);
+  railSlats(g, metal, 7, 0, 0.126, -0.16, 0.058, 0.09);
+  railSlats(g, metal, 5, 0.037, 0.078, -0.18, 0.086, 0.007, 0.04);
 
   // Top rail
-  const topRail = box(0.042, 0.022, 0.88, metal);
-  topRail.position.set(0, 0.148, -0.19);
+  const topRail = box(0.040, 0.020, 0.88, metal);
+  topRail.position.set(0, 0.142, -0.19);
   g.add(topRail);
-  picRail(g, dark, 0, 0.16, 0.22, 0.88);
+  picRail(g, dark, 0, 0.155, 0.22, 0.88);
 
   // Red-dot optic (Aimpoint-style) — tube lies along the bore axis
   const base = box(0.052, 0.042, 0.115, dark);
-  base.position.set(0, 0.178, 0.03);
+  base.position.set(0, 0.172, 0.03);
   g.add(base);
   const tube = cyl(0.032, 0.032, 0.105, dark, 16);
-  tube.position.set(0, 0.225, 0.03);
+  tube.position.set(0, 0.216, 0.03);
   g.add(tube);
   const lens1 = cyl(0.028, 0.028, 0.012, glass, 16);
-  lens1.position.set(0, 0.225, -0.028);
+  lens1.position.set(0, 0.216, -0.028);
   g.add(lens1);
   const lens2 = cyl(0.028, 0.028, 0.012, glass, 16);
-  lens2.position.set(0, 0.225, 0.088);
+  lens2.position.set(0, 0.216, 0.088);
   g.add(lens2);
   const adjKnob = cyl(0.01, 0.01, 0.03, metal, 8, 0);
-  adjKnob.position.set(0, 0.262, 0.03);
+  adjKnob.position.set(0, 0.252, 0.03);
   g.add(adjKnob);
   // glowing holo reticle visible in the rear lens
   const reticle = cyl(0.012, 0.012, 0.006, energy, 10);
-  reticle.position.set(0, 0.225, 0.082);
+  reticle.position.set(0, 0.216, 0.082);
   g.add(reticle);
 
   // Barrel (heavier .308 profile)
@@ -1014,34 +1014,34 @@ function buildAR10(color, def = {}) {
   mbEmit.position.set(0, 0.078, -0.912);
   g.add(mbEmit);
   // energy conduits along the handguard sides
-  for (const sx of [-1, 1]) { const c = box(0.006, 0.008, 0.42, energy); c.position.set(sx * 0.042, 0.118, -0.34); g.add(c); }
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.008, 0.42, energy); c.position.set(sx * 0.0365, 0.116, -0.34); g.add(c); }
 
   // Magazine — 20-rd PMAG with a glowing witness strip
-  const mag = box(0.059, 0.305, 0.094, body);
+  const mag = box(0.052, 0.285, 0.086, body);
   mag.position.set(0, -0.16, 0.04);
   mag.rotation.x = -0.1;
   g.add(mag);
-  const magFloor = box(0.063, 0.022, 0.098, dark);
-  magFloor.position.set(0, -0.318, 0.04);
+  const magFloor = box(0.056, 0.020, 0.090, dark);
+  magFloor.position.set(0, -0.300, 0.04);
   g.add(magFloor);
-  const witness = box(0.014, 0.22, 0.008, energy);
-  witness.position.set(0, -0.15, 0.090);
+  const witness = box(0.013, 0.20, 0.008, energy);
+  witness.position.set(0, -0.145, 0.086);
   witness.rotation.x = -0.1;
   g.add(witness);
 
   // Pistol grip
-  const grip = box(0.073, 0.176, 0.086, dark);
-  grip.position.set(0, -0.098, 0.22);
+  const grip = box(0.062, 0.150, 0.072, dark);
+  grip.position.set(0, -0.082, 0.22);
   grip.rotation.x = 0.3;
   g.add(grip);
-  stippleGrip(g, metal, 0.038, -0.095, 0.088, 0.0, 0.14, 4, 5);
+  stippleGrip(g, metal, 0.032, -0.080, 0.088, 0.0, 0.12, 4, 5);
 
   // Buffer tube + collapsible stock
-  const btube = cyl(0.027, 0.027, 0.22, dark);
-  btube.position.set(0, 0.065, 0.36);
+  const btube = cyl(0.024, 0.024, 0.22, dark);
+  btube.position.set(0, 0.072, 0.36);
   g.add(btube);
-  const stockBody = box(0.075, 0.14, 0.135, dark);
-  stockBody.position.set(0, 0.034, 0.42);
+  const stockBody = box(0.064, 0.118, 0.135, dark);
+  stockBody.position.set(0, 0.044, 0.42);
   g.add(stockBody);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.92);
@@ -1803,68 +1803,70 @@ function buildSciFiHandCannon(color, def = {}) {
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
 
+  // Proportions follow a real large-frame pistol: slim slide riding a shallow
+  // frame, everything hung off one bore line (y=0.072).
   // slide with front + rear cocking serrations and ejection port
-  const slide = box(0.052, 0.070, 0.30, dark); slide.position.set(0, 0.078, -0.05); g.add(slide);
+  const slide = box(0.048, 0.052, 0.30, dark); slide.position.set(0, 0.072, -0.05); g.add(slide);
   // brushed-steel sight rib along the slide top — breaks up the black slab
-  const sightRib = box(0.028, 0.008, 0.29, metal); sightRib.position.set(0, 0.115, -0.05); g.add(sightRib);
-  for (let i = 0; i < 5; i++) { const s = box(0.056, 0.036, 0.005, metal); s.position.set(0, 0.086, 0.055 + i * 0.013); g.add(s); }
-  for (let i = 0; i < 3; i++) { const s = box(0.056, 0.036, 0.005, metal); s.position.set(0, 0.086, -0.145 - i * 0.013); g.add(s); }
-  const eport = box(0.006, 0.024, 0.060, metal); eport.position.set(0.028, 0.090, -0.03); g.add(eport);
+  const sightRib = box(0.026, 0.007, 0.29, metal); sightRib.position.set(0, 0.101, -0.05); g.add(sightRib);
+  for (let i = 0; i < 5; i++) { const s = box(0.052, 0.028, 0.005, metal); s.position.set(0, 0.078, 0.055 + i * 0.013); g.add(s); }
+  for (let i = 0; i < 3; i++) { const s = box(0.052, 0.028, 0.005, metal); s.position.set(0, 0.078, -0.145 - i * 0.013); g.add(s); }
+  const eport = box(0.006, 0.020, 0.060, metal); eport.position.set(0.025, 0.076, -0.03); g.add(eport);
 
   // ported barrel shroud + exposed match barrel + recessed crown — the middle
   // port on each side glows (energy bleed-off vents)
-  const shroud = box(0.050, 0.052, 0.115, body); shroud.position.set(0, 0.078, -0.245); g.add(shroud);
-  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const p = box(0.006, 0.018, 0.022, i === 1 ? energy : dark); p.position.set(sx * 0.026, 0.092, -0.21 - i * 0.032); g.add(p); }
-  const brl = cyl(0.017, 0.017, 0.06, metal, 12); brl.position.set(0, 0.078, -0.285); g.add(brl);
-  const crown = cyl(0.019, 0.021, 0.014, dark, 12); crown.position.set(0, 0.078, -0.292); g.add(crown);
-  const emit = cyl(0.011, 0.013, 0.010, energy, 10); emit.position.set(0, 0.078, -0.298); g.add(emit);
+  const shroud = box(0.044, 0.044, 0.115, body); shroud.position.set(0, 0.072, -0.245); g.add(shroud);
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const p = box(0.006, 0.014, 0.022, i === 1 ? energy : dark); p.position.set(sx * 0.023, 0.082, -0.21 - i * 0.032); g.add(p); }
+  const brl = cyl(0.015, 0.015, 0.06, metal, 12); brl.position.set(0, 0.072, -0.285); g.add(brl);
+  const crown = cyl(0.017, 0.019, 0.014, dark, 12); crown.position.set(0, 0.072, -0.292); g.add(crown);
+  const emit = cyl(0.010, 0.012, 0.010, energy, 10); emit.position.set(0, 0.072, -0.298); g.add(emit);
 
   // fluted six-shot cylinder on a crane, chambers glow
-  const cylC = cyl(0.034, 0.034, 0.095, dark, 12); cylC.position.set(0, 0.038, 0.015); g.add(cylC);
+  const cylC = cyl(0.032, 0.032, 0.095, dark, 12); cylC.position.set(0, 0.034, 0.015); g.add(cylC);
   for (let i = 0; i < 6; i++) {
     const a = i / 6 * Math.PI * 2;
-    const flute = box(0.008, 0.008, 0.080, metal); flute.position.set(Math.cos(a) * 0.034, 0.038 + Math.sin(a) * 0.034, 0.015); flute.rotation.z = a; g.add(flute);
-    const ch = cyl(0.006, 0.006, 0.098, energy, 6); ch.position.set(Math.cos(a + 0.5) * 0.021, 0.038 + Math.sin(a + 0.5) * 0.021, 0.015); g.add(ch);
+    const flute = box(0.008, 0.008, 0.080, metal); flute.position.set(Math.cos(a) * 0.032, 0.034 + Math.sin(a) * 0.032, 0.015); flute.rotation.z = a; g.add(flute);
+    const ch = cyl(0.006, 0.006, 0.098, energy, 6); ch.position.set(Math.cos(a + 0.5) * 0.019, 0.034 + Math.sin(a + 0.5) * 0.019, 0.015); g.add(ch);
   }
-  const crane = box(0.010, 0.030, 0.060, metal); crane.position.set(-0.030, 0.020, 0.015); g.add(crane);
-  const cylLatch = box(0.008, 0.014, 0.030, metal); cylLatch.position.set(-0.030, 0.052, 0.075); g.add(cylLatch);
+  const crane = box(0.010, 0.028, 0.060, metal); crane.position.set(-0.028, 0.018, 0.015); g.add(crane);
+  const cylLatch = box(0.008, 0.013, 0.028, metal); cylLatch.position.set(-0.027, 0.048, 0.075); g.add(cylLatch);
   // glowing energy seam ring on the cylinder face
-  const cylSeam = cyl(0.030, 0.030, 0.006, energy, 12); cylSeam.position.set(0, 0.038, -0.036); g.add(cylSeam);
+  const cylSeam = cyl(0.026, 0.026, 0.006, energy, 12); cylSeam.position.set(0, 0.034, -0.036); g.add(cylSeam);
 
   // frame with a cylinder window (front section + rear section) so the fluted
   // cylinder and its glowing chambers stay visible, like a Mateba automag.
-  const frame = box(0.048, 0.045, 0.155, body); frame.position.set(0, 0.022, -0.133); g.add(frame);
+  const frame = box(0.044, 0.038, 0.155, body); frame.position.set(0, 0.022, -0.133); g.add(frame);
   // rear frame block runs from the slide all the way down into the grip so the
   // back end reads as one piece instead of hanging chunks
-  const frameRear = box(0.046, 0.090, 0.060, body); frameRear.position.set(0, -0.004, 0.072); g.add(frameRear);
-  const underCyl = box(0.044, 0.016, 0.11, body); underCyl.position.set(0, -0.008, 0.015); g.add(underCyl);
-  const dust = box(0.040, 0.014, 0.10, dark); dust.position.set(0, -0.002, -0.22); g.add(dust);
-  picRail(g, metal, 0, -0.009, -0.17, 0.09, 0.022);
+  const frameRear = box(0.042, 0.088, 0.058, body); frameRear.position.set(0, 0.002, 0.072); g.add(frameRear);
+  const underCyl = box(0.040, 0.014, 0.11, body); underCyl.position.set(0, -0.004, 0.015); g.add(underCyl);
+  const dust = box(0.038, 0.012, 0.10, dark); dust.position.set(0, 0.000, -0.22); g.add(dust);
+  picRail(g, metal, 0, -0.008, -0.17, 0.09, 0.022);
 
   // hammer spur + beavertail
-  const hammer = box(0.014, 0.030, 0.016, metal); hammer.position.set(0, 0.108, 0.100); hammer.rotation.x = -0.5; g.add(hammer);
-  const beaver = box(0.044, 0.014, 0.045, dark); beaver.position.set(0, 0.030, 0.098); g.add(beaver);
+  const hammer = box(0.013, 0.028, 0.015, metal); hammer.position.set(0, 0.094, 0.098); hammer.rotation.x = -0.5; g.add(hammer);
+  const beaver = box(0.040, 0.013, 0.042, dark); beaver.position.set(0, 0.026, 0.096); g.add(beaver);
 
   // sights: serrated ramp front with glow dot, notch rear with two dots
-  const fs = box(0.012, 0.022, 0.016, dark); fs.position.set(0, 0.118, -0.27); g.add(fs);
-  const fsDot = box(0.006, 0.006, 0.005, energy); fsDot.position.set(0, 0.126, -0.276); g.add(fsDot);
-  const rs = box(0.034, 0.018, 0.016, dark); rs.position.set(0, 0.120, 0.085); g.add(rs);
-  for (const sx of [-1, 1]) { const d = box(0.005, 0.005, 0.005, energy); d.position.set(sx * 0.011, 0.126, 0.092); g.add(d); }
+  const fs = box(0.011, 0.020, 0.015, dark); fs.position.set(0, 0.100, -0.27); g.add(fs);
+  const fsDot = box(0.006, 0.006, 0.005, energy); fsDot.position.set(0, 0.108, -0.276); g.add(fsDot);
+  const rs = box(0.030, 0.016, 0.015, dark); rs.position.set(0, 0.104, 0.085); g.add(rs);
+  for (const sx of [-1, 1]) { const d = box(0.005, 0.005, 0.005, energy); d.position.set(sx * 0.010, 0.110, 0.092); g.add(d); }
 
   // grip: stippled panels, finger grooves, lanyard loop, energy cell window
-  // (gentler rake, tucked up into the tall rear frame block)
-  const grip = box(0.050, 0.145, 0.060, body); grip.position.set(0, -0.052, 0.062); grip.rotation.x = 0.34; g.add(grip);
-  for (const sx of [-1, 1]) { const panel = box(0.006, 0.100, 0.044, dark); panel.position.set(sx * 0.026, -0.055, 0.065); panel.rotation.x = 0.34; g.add(panel); }
-  for (let i = 0; i < 3; i++) { const groove = box(0.052, 0.008, 0.010, dark); groove.position.set(0, -0.022 - i * 0.036, 0.032 + i * 0.013); g.add(groove); }
-  const cell = box(0.016, 0.070, 0.020, energy); cell.position.set(0, -0.062, 0.090); cell.rotation.x = 0.34; g.add(cell);
-  const lanyard = box(0.010, 0.014, 0.008, metal); lanyard.position.set(0, -0.118, 0.082); g.add(lanyard);
+  // (gentler rake, tucked up into the rear frame block)
+  const grip = box(0.046, 0.140, 0.056, body); grip.position.set(0, -0.055, 0.062); grip.rotation.x = 0.34; g.add(grip);
+  for (const sx of [-1, 1]) { const panel = box(0.006, 0.095, 0.042, dark); panel.position.set(sx * 0.024, -0.058, 0.065); panel.rotation.x = 0.34; g.add(panel); }
+  for (let i = 0; i < 3; i++) { const groove = box(0.048, 0.008, 0.010, dark); groove.position.set(0, -0.025 - i * 0.035, 0.030 + i * 0.013); g.add(groove); }
+  const cell = box(0.015, 0.065, 0.018, energy); cell.position.set(0, -0.065, 0.088); cell.rotation.x = 0.34; g.add(cell);
+  const lanyard = box(0.010, 0.013, 0.008, metal); lanyard.position.set(0, -0.118, 0.078); g.add(lanyard);
 
   // trigger + guard bridging the grip front to the frame underside
-  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.016, 0.022); trigger.rotation.x = 0.3; g.add(trigger);
-  const tgB = box(0.034, 0.008, 0.085, dark); tgB.position.set(0, -0.040, 0.012); g.add(tgB);
-  const tgF = box(0.034, 0.036, 0.008, dark); tgF.position.set(0, -0.024, -0.028); g.add(tgF);
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.018, 0.020); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.085, dark); tgB.position.set(0, -0.042, 0.010); g.add(tgB);
+  const tgF = box(0.032, 0.034, 0.008, dark); tgF.position.set(0, -0.026, -0.028); g.add(tgF);
 
-  const muzzle = addMuzzle(g, 0, 0.078, -0.31);
+  const muzzle = addMuzzle(g, 0, 0.072, -0.31);
   return { group: g, muzzle };
 }
 
@@ -1950,11 +1952,11 @@ function buildSciFiScattergun(color, def = {}) {
   const shellRed = M('accent', 0x8a2a22, { roughness: 0.6, metalness: 0.1 });
   const brass    = M('metal', 0xb8963a, { metalness: 0.9, roughness: 0.3 });
 
-  // receiver with ejection + loading ports and a bolt block
-  const rec = box(0.078, 0.085, 0.26, body); rec.position.set(0, 0.052, 0.03); g.add(rec);
-  const eport = box(0.006, 0.032, 0.085, metal); eport.position.set(0.040, 0.062, -0.01); g.add(eport);
-  const bolt = box(0.014, 0.026, 0.055, metal); bolt.position.set(0.038, 0.062, 0.045); g.add(bolt);
-  const lport = box(0.030, 0.006, 0.070, dark); lport.position.set(0, 0.008, 0.02); g.add(lport);
+  // receiver — slim, barely taller than the barrel line, like a real shotgun
+  const rec = box(0.062, 0.066, 0.26, body); rec.position.set(0, 0.062, 0.03); g.add(rec);
+  const eport = box(0.006, 0.028, 0.085, metal); eport.position.set(0.032, 0.068, -0.01); g.add(eport);
+  const bolt = box(0.012, 0.022, 0.055, metal); bolt.position.set(0.031, 0.068, 0.045); g.add(bolt);
+  const lport = box(0.028, 0.006, 0.070, dark); lport.position.set(0, 0.032, 0.02); g.add(lport);
 
   // barrel + vented heat shield + bead sight; the bore glows faintly (energy)
   const brl = cyl(0.020, 0.020, 0.34, metal, 14); brl.position.set(0, 0.085, -0.29); g.add(brl);
@@ -1979,22 +1981,22 @@ function buildSciFiScattergun(color, def = {}) {
   for (const sx of [-1, 1]) { const bar = box(0.006, 0.012, 0.16, metal); bar.position.set(sx * 0.030, 0.058, -0.10); g.add(bar); }
 
   // side-saddle shell carrier with four visible shells (brass heads down)
-  const saddle = box(0.012, 0.062, 0.13, dark); saddle.position.set(-0.048, 0.055, 0.045); g.add(saddle);
+  const saddle = box(0.012, 0.058, 0.13, dark); saddle.position.set(-0.040, 0.062, 0.045); g.add(saddle);
   for (let i = 0; i < 4; i++) {
-    const sh = cyl(0.009, 0.009, 0.048, shellRed, 8, 0); sh.position.set(-0.056, 0.058, -0.005 + i * 0.032); g.add(sh);
-    const bh = cyl(0.010, 0.010, 0.010, brass, 8, 0); bh.position.set(-0.056, 0.030, -0.005 + i * 0.032); g.add(bh);
+    const sh = cyl(0.009, 0.009, 0.046, shellRed, 8, 0); sh.position.set(-0.048, 0.066, -0.005 + i * 0.032); g.add(sh);
+    const bh = cyl(0.010, 0.010, 0.010, brass, 8, 0); bh.position.set(-0.048, 0.040, -0.005 + i * 0.032); g.add(bh);
   }
 
   // ghost ring rear sight + short rail
-  const rail = box(0.032, 0.012, 0.14, metal); rail.position.set(0, 0.102, 0.05); g.add(rail);
-  const ghost = cyl(0.011, 0.011, 0.008, dark, 12); ghost.rotation.x = 0; ghost.position.set(0, 0.122, 0.09); g.add(ghost);
+  const rail = box(0.030, 0.010, 0.14, metal); rail.position.set(0, 0.100, 0.05); g.add(rail);
+  const ghost = cyl(0.011, 0.011, 0.008, dark, 12); ghost.rotation.x = 0; ghost.position.set(0, 0.110, 0.09); g.add(ghost);
 
-  // trigger group, grip and stock with rubber recoil pad + sling studs
-  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.014, 0.115); trigger.rotation.x = 0.25; g.add(trigger);
-  const tgB = box(0.034, 0.008, 0.080, dark); tgB.position.set(0, -0.036, 0.10); g.add(tgB);
-  const tgF = box(0.034, 0.028, 0.008, dark); tgF.position.set(0, -0.022, 0.062); g.add(tgF);
-  const grip = box(0.052, 0.115, 0.060, body); grip.position.set(0, -0.052, 0.165); grip.rotation.x = 0.34; g.add(grip);
-  stippleGrip(g, dark, 0, -0.058, 0.140, 0.034, 0.085, 3, 4);
+  // trigger group hangs directly off the receiver underside into the grip
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, 0.008, 0.115); trigger.rotation.x = 0.25; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.090, dark); tgB.position.set(0, -0.018, 0.105); g.add(tgB);
+  const tgF = box(0.032, 0.050, 0.008, dark); tgF.position.set(0, 0.004, 0.062); g.add(tgF);
+  const grip = box(0.048, 0.110, 0.056, body); grip.position.set(0, -0.038, 0.165); grip.rotation.x = 0.34; g.add(grip);
+  stippleGrip(g, dark, 0, -0.044, 0.140, 0.032, 0.080, 3, 4);
   // stock runs forward to meet the receiver so there's no floating gap
   const stock = box(0.058, 0.108, 0.24, body); stock.position.set(0, 0.030, 0.275); g.add(stock);
   const comb = box(0.050, 0.016, 0.20, dark); comb.position.set(0, 0.090, 0.285); g.add(comb);
@@ -2018,33 +2020,33 @@ function buildSciFiPlasma(color, def = {}) {
   // The core gets its own dimmer emissive so it doesn't blow out to white.
   const coreMat = M('energy', new THREE.Color(eCol).multiplyScalar(0.15).getHex(),
     { roughness: 0.25, metalness: 0.1, emissive: eCol, emissiveIntensity: 1.3 });
-  const topShell = box(0.058, 0.042, 0.56, dark); topShell.position.set(0, 0.112, -0.09); g.add(topShell);
-  const topChamfer = box(0.044, 0.014, 0.52, metal); topChamfer.position.set(0, 0.136, -0.09); g.add(topChamfer);
-  const botShell = box(0.058, 0.042, 0.42, body); botShell.position.set(0, 0.028, -0.03); g.add(botShell);
+  const topShell = box(0.050, 0.034, 0.56, dark); topShell.position.set(0, 0.104, -0.09); g.add(topShell);
+  const topChamfer = box(0.038, 0.012, 0.52, metal); topChamfer.position.set(0, 0.124, -0.09); g.add(topChamfer);
+  const botShell = box(0.050, 0.034, 0.42, body); botShell.position.set(0, 0.036, -0.03); g.add(botShell);
   const core = cyl(0.021, 0.021, 0.36, coreMat, 14); core.position.set(0, 0.070, -0.10); g.add(core);
   for (let i = 0; i < 5; i++) { const clampR = cyl(0.028, 0.028, 0.020, dark, 14); clampR.position.set(0, 0.070, -0.26 + i * 0.08); g.add(clampR);
     const bolt = box(0.008, 0.062, 0.010, metal); bolt.position.set(0, 0.070, -0.26 + i * 0.08); g.add(bolt); }
 
   // heat-sink fin stack on the top rear + coolant line down the left side
-  for (let i = 0; i < 6; i++) { const fin = box(0.050, 0.022, 0.006, metal); fin.position.set(0, 0.150, 0.02 + i * 0.016); g.add(fin); }
-  const pipeA = cyl(0.006, 0.006, 0.30, metal, 8); pipeA.position.set(-0.034, 0.100, -0.12); g.add(pipeA);
-  const pipeB = cyl(0.006, 0.006, 0.10, metal, 8, 0); pipeB.position.set(-0.034, 0.055, 0.035); g.add(pipeB);
-  const pipeJoint = cyl(0.009, 0.009, 0.016, dark, 8); pipeJoint.position.set(-0.034, 0.100, 0.03); g.add(pipeJoint);
+  for (let i = 0; i < 6; i++) { const fin = box(0.044, 0.020, 0.006, metal); fin.position.set(0, 0.130, 0.02 + i * 0.016); g.add(fin); }
+  const pipeA = cyl(0.006, 0.006, 0.30, metal, 8); pipeA.position.set(-0.030, 0.094, -0.12); g.add(pipeA);
+  const pipeB = cyl(0.006, 0.006, 0.10, metal, 8, 0); pipeB.position.set(-0.030, 0.055, 0.035); g.add(pipeB);
+  const pipeJoint = cyl(0.009, 0.009, 0.016, dark, 8); pipeJoint.position.set(-0.030, 0.094, 0.03); g.add(pipeJoint);
 
   // side cooling vents (louvered)
-  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) { const v = box(0.006, 0.020, 0.010, dark); v.position.set(sx * 0.031, 0.112, -0.22 - i * 0.035); g.add(v); }
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) { const v = box(0.006, 0.018, 0.010, dark); v.position.set(sx * 0.027, 0.104, -0.22 - i * 0.035); g.add(v); }
 
   // forked emitter: a nose cap closes the shells, then two slim separated
   // prongs reach forward with the arc glowing in the gap between their tips
-  const noseCap = box(0.052, 0.058, 0.055, dark); noseCap.position.set(0, 0.082, -0.385); g.add(noseCap);
+  const noseCap = box(0.046, 0.048, 0.055, dark); noseCap.position.set(0, 0.076, -0.385); g.add(noseCap);
   const focus = cyl(0.024, 0.028, 0.020, dark, 12); focus.position.set(0, 0.070, -0.372); g.add(focus);
-  for (const sx of [-1, 1]) { const pr = box(0.009, 0.036, 0.13, metal); pr.position.set(sx * 0.030, 0.082, -0.455); pr.rotation.y = sx * -0.06; g.add(pr); }
-  const arc = box(0.048, 0.012, 0.020, energy); arc.position.set(0, 0.082, -0.50); g.add(arc);
-  const tip = cyl(0.013, 0.017, 0.016, energy, 12); tip.position.set(0, 0.082, -0.445); g.add(tip);
+  for (const sx of [-1, 1]) { const pr = box(0.009, 0.032, 0.13, metal); pr.position.set(sx * 0.027, 0.076, -0.455); pr.rotation.y = sx * -0.06; g.add(pr); }
+  const arc = box(0.044, 0.012, 0.020, energy); arc.position.set(0, 0.076, -0.50); g.add(arc);
+  const tip = cyl(0.013, 0.017, 0.016, energy, 12); tip.position.set(0, 0.076, -0.445); g.add(tip);
 
   // iron sight blades
-  const fsight = box(0.008, 0.020, 0.008, dark); fsight.position.set(0, 0.152, -0.33); g.add(fsight);
-  const rsight = box(0.024, 0.016, 0.008, dark); rsight.position.set(0, 0.150, 0.115); g.add(rsight);
+  const fsight = box(0.008, 0.018, 0.008, dark); fsight.position.set(0, 0.130, -0.33); g.add(fsight);
+  const rsight = box(0.022, 0.014, 0.008, dark); rsight.position.set(0, 0.128, 0.115); g.add(rsight);
 
   // grip with stipple, trigger + guard
   const grip = box(0.048, 0.125, 0.058, body); grip.position.set(0, -0.055, 0.105); grip.rotation.x = 0.32; g.add(grip);
