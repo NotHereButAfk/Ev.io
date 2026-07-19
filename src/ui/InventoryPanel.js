@@ -197,6 +197,9 @@ export class InventoryPanel {
       this._equipWeapon(gun, null);
     }));
 
+    // Skins are a MAIN-weapon feature — extras and melee only show Default.
+    if (!Armory.canSkin(gun.id)) return;
+
     // Only the skins the player OWNS for this weapon. New accounts have
     // none — the tab shows just Default until skins are earned/bought.
     const allSkins = isMelee ? SWORD_SKINS : WEAPON_SKINS;
