@@ -95,23 +95,39 @@ class Gun:
             loc = (center[0] + math.cos(a) * radius, center[1], center[2] + math.sin(a) * radius)
             self.box(loc, size, mat, bevel=0, rot=(0, ry, -a))
 
-    def _audit(self, gun_id, eps=0.0015):
+    def _audit(self, gun_id, eps=0.0008):
         # Connectivity audit: every part must (transitively) touch the largest
-        # component. AABB overlap with a small epsilon approximates contact.
+        # component with REAL geometry — BVH face-overlap, not AABB proximity.
+        # (AABBs inflate on rotated parts and let visible gaps pass.) A part
+        # whose AABB is fully inside another's counts as connected (buried).
+        import bmesh
+        from mathutils.bvhtree import BVHTree
         def bb(o):
             xs = [v[0] for v in o.bound_box]; ys = [v[1] for v in o.bound_box]; zs = [v[2] for v in o.bound_box]
-            return (min(xs)-eps, max(xs)+eps, min(ys)-eps, max(ys)+eps, min(zs)-eps, max(zs)+eps)
+            return (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
+        def tree(o):
+            bm = bmesh.new(); bm.from_mesh(o.data)
+            t = BVHTree.FromBMesh(bm, epsilon=eps); bm.free()
+            return t
         boxes = [bb(o) for o in self.parts]
+        trees = [tree(o) for o in self.parts]
         n = len(boxes)
-        def hit(a, b):
-            return (a[0] <= b[1] and b[0] <= a[1] and a[2] <= b[3] and b[2] <= a[3] and a[4] <= b[5] and b[4] <= a[5])
+        m = eps * 2
+        def aabb_near(a, b):   # cheap prefilter before the exact test
+            return (a[0]-m <= b[1] and b[0]-m <= a[1] and a[2]-m <= b[3] and
+                    b[2]-m <= a[3] and a[4]-m <= b[5] and b[4]-m <= a[5])
+        def inside(a, b):      # a fully contained in b
+            return (a[0] >= b[0]-m and a[1] <= b[1]+m and a[2] >= b[2]-m and
+                    a[3] <= b[3]+m and a[4] >= b[4]-m and a[5] <= b[5]+m)
         parent = list(range(n))
         def find(i):
             while parent[i] != i: parent[i] = parent[parent[i]]; i = parent[i]
             return i
         for i in range(n):
             for j in range(i+1, n):
-                if hit(boxes[i], boxes[j]):
+                if not aabb_near(boxes[i], boxes[j]): continue
+                if inside(boxes[i], boxes[j]) or inside(boxes[j], boxes[i]) \
+                   or trees[i].overlap(trees[j]):
                     parent[find(i)] = find(j)
         comps = {}
         for i in range(n): comps.setdefault(find(i), []).append(i)

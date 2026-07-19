@@ -141,7 +141,7 @@ bx("gtop",   (0, -0.045, ZB-0.070), (0.028, 0.09, 0.012), M_dark, bevel=0.004)
 bx("gfront", (0, -0.085, ZB-0.100), (0.026, 0.014, 0.055), M_dark, bevel=0.005, rot=(math.radians(18),0,0))
 bx("gbot",   (0, -0.028, ZB-0.122), (0.026, 0.105, 0.012), M_dark, bevel=0.005)
 bx("grear",  (0, 0.024, ZB-0.100), (0.028, 0.014, 0.050), M_dark, bevel=0.004)
-bx("trigger",(0, -0.038, ZB-0.095), (0.011, 0.013, 0.036), M_metal, bevel=0.002)
+bx("trigger",(0, -0.038, ZB-0.090), (0.011, 0.013, 0.044), M_metal, bevel=0.002)
 
 # ── SIGHTS with green dots ──
 bx("rsight", (0, 0.115, ZB+0.038), (0.024, 0.016, 0.014), M_dark, bevel=0.003)
@@ -150,20 +150,29 @@ for x in (-0.008, 0.008):
     parts.append(add_box(f"rdot{x}", (x, 0.12, ZB+0.046), (0.004,0.005,0.005), M_energy, bevel=0))
 parts.append(add_box("fdot", (0, -0.144, ZB+0.045), (0.005,0.006,0.005), M_energy, bevel=0))
 
-# ── connectivity audit: every part must touch the main component ──
-def _audit(parts, eps=0.0015):
+# ── connectivity audit: BVH face-overlap (real contact), not AABB proximity ──
+def _audit(parts, eps=0.0008):
+    from mathutils.bvhtree import BVHTree
     def bb(o):
         xs=[v[0] for v in o.bound_box]; ys=[v[1] for v in o.bound_box]; zs=[v[2] for v in o.bound_box]
-        return (min(xs)-eps,max(xs)+eps,min(ys)-eps,max(ys)+eps,min(zs)-eps,max(zs)+eps)
-    boxes=[bb(o) for o in parts]; n=len(boxes)
-    hit=lambda a,b:(a[0]<=b[1] and b[0]<=a[1] and a[2]<=b[3] and b[2]<=a[3] and a[4]<=b[5] and b[4]<=a[5])
+        return (min(xs),max(xs),min(ys),max(ys),min(zs),max(zs))
+    def tree(o):
+        bm=bmesh.new(); bm.from_mesh(o.data)
+        t=BVHTree.FromBMesh(bm, epsilon=eps); bm.free()
+        return t
+    boxes=[bb(o) for o in parts]; trees=[tree(o) for o in parts]; n=len(boxes)
+    m=eps*2
+    near=lambda a,b:(a[0]-m<=b[1] and b[0]-m<=a[1] and a[2]-m<=b[3] and b[2]-m<=a[3] and a[4]-m<=b[5] and b[4]-m<=a[5])
+    inside=lambda a,b:(a[0]>=b[0]-m and a[1]<=b[1]+m and a[2]>=b[2]-m and a[3]<=b[3]+m and a[4]>=b[4]-m and a[5]<=b[5]+m)
     par=list(range(n))
     def find(i):
         while par[i]!=i: par[i]=par[par[i]]; i=par[i]
         return i
     for i in range(n):
         for j in range(i+1,n):
-            if hit(boxes[i],boxes[j]): par[find(i)]=find(j)
+            if not near(boxes[i],boxes[j]): continue
+            if inside(boxes[i],boxes[j]) or inside(boxes[j],boxes[i]) or trees[i].overlap(trees[j]):
+                par[find(i)]=find(j)
     comps={}
     for i in range(n): comps.setdefault(find(i),[]).append(i)
     main=max(comps.values(),key=len)
