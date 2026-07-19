@@ -113,6 +113,36 @@ class Gun:
         self.parts.append(obj)
         return obj
 
+    def _boolean_cut(self, target, cutter):
+        bpy.ops.object.select_all(action='DESELECT')
+        target.select_set(True); bpy.context.view_layer.objects.active = target
+        mod = target.modifiers.new("cut", 'BOOLEAN')
+        mod.operation = 'DIFFERENCE'; mod.object = cutter; mod.solver = 'EXACT'
+        bpy.ops.object.modifier_apply(modifier="cut")
+        bpy.data.objects.remove(cutter, do_unlink=True)
+
+    def hole_ellipse(self, target, cy, cz, ry, rz):
+        # punch an elliptical hole through `target` along X (side-view hole)
+        bpy.ops.mesh.primitive_cylinder_add(radius=1.0, depth=0.3, location=(0, cy, cz), vertices=36)
+        h = bpy.context.active_object
+        h.rotation_euler = (0, math.radians(90), 0)
+        h.scale = (rz, ry, 1.0)
+        bpy.ops.object.transform_apply(rotation=True, scale=True)
+        self._boolean_cut(target, h)
+
+    def hole_rect(self, target, cy, cz, hy, hz, bevel=0.015):
+        # punch a rounded-rectangle hole through `target` along X
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, cy, cz))
+        h = bpy.context.active_object
+        h.scale = (0.3, hy, hz)
+        bpy.ops.object.transform_apply(scale=True)
+        if bevel > 0:
+            b = h.modifiers.new("bev", 'BEVEL'); b.width = bevel; b.segments = 4
+            b.limit_method = 'ANGLE'; b.angle_limit = math.radians(40)
+            bpy.context.view_layer.objects.active = h
+            bpy.ops.object.modifier_apply(modifier="bev")
+        self._boolean_cut(target, h)
+
     def row(self, start, step, count, dim, mat, rot=(0, 0, 0), bevel=0.0):
         # a row of identical small boxes (serrations, ribs, checkering, belt links)
         for i in range(count):

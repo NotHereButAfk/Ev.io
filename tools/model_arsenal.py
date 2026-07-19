@@ -448,52 +448,47 @@ g.finish('battlerifle', (0, -0.505, Z+0.012), scale=1.35)
 # FN P90 (needler) — molded shell, translucent top mag w/ rounds, sight bridge
 # ═════════════════════════════════════════════════════════════════════════════
 g = Gun(MATS)
-# Body = ONE extruded side-view silhouette traced from the chart: flat top
-# under the mag, blunt nose with the 45° slope, flowing belly, tall flat butt.
-# Crisp flat sides + smooth outline — the illustrated look.
-g.profile([
-    (0.250, Z+0.048),                       # rear top
-    (0.258, Z+0.030),                       # rear-top round-off
-    (0.258, Z-0.050),                       # flat butt face
-    (0.248, Z-0.066),                       # rear-bottom round-off
-    (-0.110, Z-0.066),                      # belly
-    (-0.180, Z-0.046),                      # belly rises toward the nose
-    (-0.242, Z-0.008),                      # nose bottom
-    (-0.252, Z+0.012),                      # nose tip lower
-    (-0.246, Z+0.028),                      # blunt muzzle face
-    (-0.145, Z+0.048),                      # top of the 45° slope
+# The chart P90 is ONE tall body slab with the trigger holes PUNCHED THROUGH
+# it: flat top (mag inset flush into the top-front), tall flat butt, belly
+# sweeping up into the curved hook under the muzzle, near-vertical front face.
+body = g.profile([
+    (0.248, Z+0.058), (0.256, Z+0.044),     # rear-top rounded corner
+    (0.256, Z-0.078), (0.246, Z-0.094),     # tall flat butt, rounded bottom
+    (0.02,  Z-0.100),                       # flat belly
+    (-0.06, Z-0.092),                       # sweep begins
+    (-0.115, Z-0.062),
+    (-0.15, Z-0.030),
+    (-0.172, Z-0.006),                      # hook underside
+    (-0.19, Z+0.020),                       # hook tip / front face bottom
+    (-0.192, Z+0.048),                      # near-vertical front face
+    (-0.178, Z+0.058),                      # front-top round-off
 ], 0.056, 'dark', bevel=0.006, seg=2)
-# BIG orange rear side panels — the chart's lower-rear orange block
-g.box((0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.062), 'body', bevel=0.006, seg=2)
-g.box((-0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.062), 'body', bevel=0.006, seg=2)
-# lower frame loop: divider + low bottom bar + rear column leave the two TALL
-# cutouts (small trigger loop front, big thumbhole rear)
-g.box((0, 0.015, Z-0.072), (0.034, 0.028, 0.095), 'dark', bevel=0.010, seg=3)  # divider column
-g.box((0, 0.03, Z-0.115), (0.030, 0.24, 0.013), 'dark', bevel=0.005, seg=2)    # bottom bar
-g.box((0, 0.125, Z-0.082), (0.040, 0.06, 0.10), 'dark', bevel=0.012, seg=3)    # rear column
-g.box((0, -0.07, Z-0.075), (0.04, 0.045, 0.075), 'dark', bevel=0.012, seg=3, rot=(R(12), 0, 0))  # front grip post
-g.box((0, -0.018, Z-0.048), (0.010, 0.012, 0.03), 'metal')                   # trigger (inside the front loop)
-# ORANGE top magazine lying along the body top (chart), pink needle slit
-g.box((0, 0.02, Z+0.052), (0.044, 0.30, 0.024), 'body', bevel=0.010, seg=3)  # mag body
-g.box((0, 0.02, Z+0.066), (0.008, 0.24, 0.005), 'energy', bevel=0.002)       # needle-glow slit
-g.row((0, -0.10, Z+0.066), (0, 0.024, 0), 10, (0.033, 0.004, 0.009), 'body') # orange mag ribs
-g.box((0, -0.125, Z+0.050), (0.040, 0.02, 0.022), 'dark', bevel=0.006, seg=2)  # mag front latch
-g.box((0, 0.17, Z+0.050), (0.040, 0.02, 0.022), 'dark', bevel=0.006, seg=2)    # mag rear latch
-# barrel exits at the TOP of the nose slope (chart)
-g.cyl((0, -0.23, Z+0.030), 0.012, 0.07, 'metal')                             # stub barrel
-g.cyl((0, -0.262, Z+0.030), 0.016, 0.025, 'dark')                            # muzzle ring
-g.row((0.0155, -0.259, Z+0.030), (0, 0.008, 0), 2, (0.002, 0.004, 0.012), 'metal')
-g.row((0, 0.246, Z-0.05), (0, 0, 0.026), 4, (0.044, 0.004, 0.007), 'metal')  # butt ribs (on the rounded butt)
-# LONG sight-rail bridge with open centre: front block, diagonal rear strut,
-# long top bar, sight nubs front + rear (chart)
-g.box((0, 0.005, Z+0.078), (0.020, 0.035, 0.030), 'dark', bevel=0.008, seg=2)  # front block
-g.box((0, 0.10, Z+0.078), (0.016, 0.05, 0.026), 'dark', bevel=0.008, seg=2, rot=(R(35), 0, 0))  # rear diagonal strut
-g.box((0, 0.05, Z+0.100), (0.036, 0.135, 0.014), 'dark', bevel=0.006, seg=3)   # bridge top bar
-g.box((0, -0.005, Z+0.112), (0.014, 0.02, 0.012), 'dark', bevel=0.004)       # front sight nub
-g.box((0, 0.098, Z+0.110), (0.016, 0.014, 0.010), 'dark', bevel=0.004)       # rear sight nub
-g.cyl((0.028, 0.0, Z-0.03), 0.004, 0.005, 'metal', axis='X')                 # shell screw
-g.cyl((0.030, 0.16, Z-0.02), 0.004, 0.005, 'metal', axis='X')                # panel screw (chart dot)
-g.finish('needler', (0, -0.275, Z+0.030), scale=1.45)
+# the two signature holes, punched straight through the body (chart):
+g.hole_rect(body, 0.015, Z-0.052, 0.095, 0.058, bevel=0.018)   # big rounded thumbhole
+g.hole_ellipse(body, -0.095, Z-0.030, 0.026, 0.026)            # round trigger hole
+g.box((0, -0.088, Z-0.019), (0.009, 0.010, 0.042), 'metal')    # trigger (anchored above the hole)
+# ORANGE magazine inset FLUSH with the body top line, slightly proud of the
+# sides so the orange reads in profile (chart); thin pink needle slit on top
+g.box((0, -0.04, Z+0.0475), (0.058, 0.27, 0.021), 'body', bevel=0.006, seg=2)
+g.box((0, -0.04, Z+0.059), (0.010, 0.22, 0.004), 'energy')
+# BIG orange rear side panels with screw dots (chart lower-left block)
+g.box((0.0285, 0.175, Z-0.055), (0.004, 0.155, 0.082), 'body', bevel=0.006, seg=2)
+g.box((-0.0285, 0.175, Z-0.055), (0.004, 0.155, 0.082), 'body', bevel=0.006, seg=2)
+# sight bridge over the FRONT half (chart): diagonal rear leg rising forward,
+# long top bar, front leg landing above the muzzle — triangular opening under
+g.box((0, 0.005, Z+0.082), (0.018, 0.016, 0.062), 'dark', bevel=0.005, rot=(R(38), 0, 0))  # rear leg
+g.box((0, -0.085, Z+0.106), (0.030, 0.16, 0.013), 'dark', bevel=0.005)       # top bar
+g.box((0, -0.168, Z+0.085), (0.018, 0.014, 0.05), 'dark', bevel=0.005)       # front leg
+g.box((0, -0.01, Z+0.118), (0.014, 0.014, 0.014), 'dark', bevel=0.004)       # rear sight blade
+g.box((0, -0.168, Z+0.114), (0.010, 0.012, 0.014), 'dark', bevel=0.004)      # front nub
+# stub barrel + rectangular muzzle block out the front face at mid height
+g.cyl((0, -0.21, Z+0.032), 0.011, 0.05, 'metal')
+g.box((0, -0.235, Z+0.032), (0.024, 0.026, 0.026), 'dark', bevel=0.005)
+# screw dots (chart): one on the upper body, two on the orange panel
+g.cyl((0.0285, 0.10, Z+0.030), 0.004, 0.005, 'metal', axis='X')
+g.cyl((0.031, 0.135, Z-0.03), 0.004, 0.005, 'metal', axis='X')
+g.cyl((0.031, 0.23, Z-0.03), 0.004, 0.005, 'metal', axis='X')
+g.finish('needler', (0, -0.25, Z+0.032), scale=1.45)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Remington 870 — action bars, loading port, checkered stock, barrel ring
