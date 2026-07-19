@@ -95,13 +95,19 @@ g.box((0, 0.20, Z-0.03), (0.044, 0.22, 0.075), 'body', bevel=0.010, rot=(R(14), 
 g.box((0, 0.13, Z-0.055), (0.040, 0.075, 0.055), 'body', bevel=0.010, rot=(R(28), 0, 0))# wrist curve
 g.box((0, 0.315, Z-0.065), (0.05, 0.02, 0.085), 'dark', rot=(R(14), 0, 0))   # butt plate
 g.row((0, 0.322, Z-0.10), (0, 0.004, 0.022), 3, (0.044, 0.003, 0.007), 'metal')  # plate ribs
-# lever loop — BIG prominent ORANGE D-loop (chart)
-g.box((0, 0.02, Z-0.048), (0.024, 0.11, 0.016), 'body')
-g.box((0, 0.082, Z-0.090), (0.024, 0.016, 0.100), 'body', rot=(R(18), 0, 0))
-g.box((0, -0.042, Z-0.095), (0.024, 0.014, 0.090), 'body', rot=(R(-16), 0, 0))
-g.box((0, 0.022, Z-0.135), (0.024, 0.16, 0.014), 'body')
-g.cyl((0.014, 0.072, Z-0.046), 0.005, 0.028, 'metal', axis='X')              # lever pivot pin
-g.box((0, -0.012, Z-0.02), (0.010, 0.012, 0.035), 'metal')                   # trigger
+# lever loop — ONE orange plate with the loop opening punched through (chart)
+lever = g.profile([
+    (0.105, Z-0.038),                          # rear top (into the receiver)
+    (0.112, Z-0.100),                          # rear edge down
+    (0.098, Z-0.138),                          # rear-bottom round
+    (-0.045, Z-0.142),                         # bottom run forward
+    (-0.064, Z-0.108),                         # front-bottom round
+    (-0.058, Z-0.055),                         # front edge rising
+    (-0.045, Z-0.038),                         # front top (into the receiver)
+], 0.020, 'body', bevel=0.004, seg=2)
+g.hole_rect(lever, 0.024, Z-0.094, 0.118, 0.058, bevel=0.020)    # the D-loop opening
+g.cyl((0.014, 0.085, Z-0.046), 0.005, 0.028, 'metal', axis='X')  # lever pivot pin
+g.box((0, -0.012, Z-0.060), (0.010, 0.012, 0.045), 'metal')      # trigger (hangs into the loop)
 g.box((0, -0.545, Z+0.038), (0.008, 0.010, 0.014), 'metal')                  # bead base
 g.cyl((0, -0.548, Z+0.048), 0.004, 0.008, 'energy', axis='Z', verts=10)      # glowing bead
 g.finish('levershotgun', (0, -0.565, Z+0.02), scale=1.2)
