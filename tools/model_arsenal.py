@@ -95,11 +95,11 @@ g.box((0, 0.20, Z-0.03), (0.044, 0.22, 0.075), 'body', bevel=0.010, rot=(R(14), 
 g.box((0, 0.13, Z-0.055), (0.040, 0.075, 0.055), 'body', bevel=0.010, rot=(R(28), 0, 0))# wrist curve
 g.box((0, 0.315, Z-0.065), (0.05, 0.02, 0.085), 'dark', rot=(R(14), 0, 0))   # butt plate
 g.row((0, 0.322, Z-0.10), (0, 0.004, 0.022), 3, (0.044, 0.003, 0.007), 'metal')  # plate ribs
-# lever loop — proper D-loop from five bars
-g.box((0, 0.02, Z-0.048), (0.024, 0.11, 0.014), 'metal')
-g.box((0, 0.076, Z-0.085), (0.024, 0.014, 0.085), 'metal', rot=(R(16), 0, 0))
-g.box((0, -0.038, Z-0.090), (0.024, 0.012, 0.075), 'metal', rot=(R(-14), 0, 0))
-g.box((0, 0.026, Z-0.122), (0.024, 0.105, 0.012), 'metal')
+# lever loop — BIG prominent D-loop (chart)
+g.box((0, 0.02, Z-0.048), (0.024, 0.11, 0.016), 'metal')
+g.box((0, 0.082, Z-0.090), (0.024, 0.016, 0.100), 'metal', rot=(R(18), 0, 0))
+g.box((0, -0.042, Z-0.095), (0.024, 0.014, 0.090), 'metal', rot=(R(-16), 0, 0))
+g.box((0, 0.026, Z-0.135), (0.024, 0.115, 0.014), 'metal')
 g.cyl((0.014, 0.072, Z-0.046), 0.005, 0.028, 'metal', axis='X')              # lever pivot pin
 g.box((0, -0.012, Z-0.02), (0.010, 0.012, 0.035), 'metal')                   # trigger
 g.box((0, -0.545, Z+0.038), (0.008, 0.010, 0.014), 'metal')                  # bead base
@@ -226,11 +226,14 @@ g.box((0, -0.405, Z+0.030), (0.010, 0.010, 0.026), 'dark')                   # t
 g.box((0, -0.405, Z+0.052), (0.005, 0.006, 0.018), 'metal')                  # post
 g.box((0.011, -0.405, Z+0.048), (0.003, 0.010, 0.026), 'dark')               # ear R
 g.box((-0.011, -0.405, Z+0.048), (0.003, 0.010, 0.026), 'dark')              # ear L
-# banana mag (overlapping sweep, dark grey like the chart) + ribs
-g.box((0, -0.005, Z-0.058), (0.038, 0.052, 0.090), 'dark', bevel=0.004, rot=(R(-12), 0, 0))
-g.box((0, 0.014, Z-0.115), (0.038, 0.052, 0.080), 'dark', bevel=0.004, rot=(R(-32), 0, 0))
-g.box((0, 0.048, Z-0.160), (0.038, 0.052, 0.072), 'dark', bevel=0.004, rot=(R(-52), 0, 0))
-g.row((0, -0.022, Z-0.075), (0, 0.014, -0.020), 3, (0.040, 0.005, 0.010), 'dark', rot=(R(-16), 0, 0))
+# banana mag — five short segments sweep a SMOOTH, gentle curve (chart)
+g.box((0, -0.008, Z-0.050), (0.038, 0.054, 0.075), 'dark', bevel=0.005, rot=(R(-8), 0, 0))
+g.box((0, 0.000, Z-0.086), (0.038, 0.054, 0.068), 'dark', bevel=0.005, rot=(R(-17), 0, 0))
+g.box((0, 0.012, Z-0.120), (0.038, 0.054, 0.064), 'dark', bevel=0.005, rot=(R(-26), 0, 0))
+g.box((0, 0.028, Z-0.151), (0.038, 0.054, 0.060), 'dark', bevel=0.005, rot=(R(-35), 0, 0))
+g.box((0, 0.048, Z-0.178), (0.038, 0.054, 0.058), 'dark', bevel=0.005, rot=(R(-44), 0, 0))
+g.box((0, 0.064, Z-0.200), (0.041, 0.056, 0.012), 'dark', rot=(R(-48), 0, 0))   # floorplate
+g.row((0, -0.020, Z-0.062), (0, 0.012, -0.022), 3, (0.040, 0.005, 0.010), 'dark', rot=(R(-14), 0, 0))
 g.box((0, 0.12, Z-0.075), (0.04, 0.05, 0.085), 'body', bevel=0.008, rot=(R(22), 0, 0))   # grip
 g.row((0, 0.148, Z-0.098), (0, 0.006, 0.016), 3, (0.042, 0.004, 0.007), 'dark')          # grip grooves
 g.box((0, 0.06, Z-0.095), (0.026, 0.08, 0.012), 'dark')                      # guard
@@ -333,19 +336,24 @@ g.box((0, 0.27, Z+0.030), (0.046, 0.17, 0.045), 'body', bevel=0.008)         # c
 g.box((0, 0.33, Z-0.02), (0.046, 0.05, 0.13), 'body', bevel=0.008)           # rear upright
 g.box((0, 0.27, Z-0.065), (0.046, 0.17, 0.035), 'body', bevel=0.008)         # toe bar (bottom)
 g.box((0, 0.27, Z+0.056), (0.038, 0.10, 0.014), 'dark')                      # grey comb strip (chart)
+# darker checkering dashes on the stock flanks (chart texture)
+g.row((0.0235, 0.215, Z+0.026), (0, 0.032, 0), 4, (0.002, 0.018, 0.016), 'dark')
+g.row((-0.0235, 0.215, Z+0.026), (0, 0.032, 0), 4, (0.002, 0.018, 0.016), 'dark')
+g.row((0.0235, 0.215, Z-0.062), (0, 0.032, 0), 4, (0.002, 0.018, 0.014), 'dark')
+g.row((-0.0235, 0.215, Z-0.062), (0, 0.032, 0), 4, (0.002, 0.018, 0.014), 'dark')
 g.box((0, 0.362, Z+0.0), (0.05, 0.016, 0.14), 'dark')                        # butt pad
 # ORANGE forend panel running forward under the barrel (chart)
 g.box((0, -0.16, Z-0.005), (0.044, 0.20, 0.05), 'body', bevel=0.008)
 g.box((0.0225, -0.16, Z-0.002), (0.002, 0.14, 0.022), 'dark')                # forend inset R
 g.box((-0.0225, -0.16, Z-0.002), (0.002, 0.14, 0.022), 'dark')               # forend inset L
 g.box((0, -0.06, Z+0.012), (0.046, 0.16, 0.055), 'dark', bevel=0.005)        # action
-g.cyl((0, -0.34, Z+0.012), 0.012, 0.42, 'metal')                             # barrel
-g.row((0, -0.30, Z+0.0255), (0, 0.05, 0), 6, (0.003, 0.036, 0.003), 'dark')  # fluting top
-g.row((0.0125, -0.30, Z+0.019), (0, 0.05, 0), 6, (0.003, 0.036, 0.003), 'dark')  # fluting R
+g.cyl((0, -0.34, Z+0.012), 0.016, 0.42, 'metal')                             # barrel (heavy profile, chart)
+g.row((0, -0.30, Z+0.0295), (0, 0.05, 0), 6, (0.003, 0.036, 0.003), 'dark')  # fluting top
+g.row((0.0165, -0.30, Z+0.019), (0, 0.05, 0), 6, (0.003, 0.036, 0.003), 'dark')  # fluting R
 # cylindrical ribbed muzzle brake (chart)
-g.cyl((0, -0.545, Z+0.012), 0.017, 0.05, 'dark')
-g.ring((0, -0.532, Z+0.012), 0.018, 0.0025, 'metal')                         # brake ring F
-g.ring((0, -0.556, Z+0.012), 0.018, 0.0025, 'metal')                         # brake ring R
+g.cyl((0, -0.545, Z+0.012), 0.020, 0.05, 'dark')
+g.ring((0, -0.532, Z+0.012), 0.021, 0.0025, 'metal')                         # brake ring F
+g.ring((0, -0.556, Z+0.012), 0.021, 0.0025, 'metal')                         # brake ring R
 g.box((0.035, 0.02, Z+0.02), (0.022, 0.014, 0.014), 'metal', rot=(0, R(-30), 0))    # bolt handle
 g.cyl((0.048, 0.035, Z+0.005), 0.009, 0.025, 'metal', axis='X')              # bolt knob
 g.cyl((0, 0.10, Z+0.012), 0.012, 0.05, 'metal')                              # bolt shroud
@@ -375,8 +383,8 @@ g.box((0, -0.01, Z+0.02), (0.052, 0.30, 0.06), 'dark', bevel=0.006)          # s
 g.box((0, -0.01, Z+0.055), (0.032, 0.28, 0.014), 'metal')                    # top rib
 g.row((0, -0.115, Z+0.0625), (0, 0.02, 0), 12, (0.028, 0.008, 0.003), 'dark')# rib cuts
 # long ORANGE stripe panel along the lower slide flank (chart signature)
-g.box((0.0265, -0.02, Z+0.004), (0.002, 0.22, 0.018), 'body')
-g.box((-0.0265, -0.02, Z+0.004), (0.002, 0.22, 0.018), 'body')
+g.box((0.0265, -0.02, Z+0.004), (0.002, 0.24, 0.026), 'body')
+g.box((-0.0265, -0.02, Z+0.004), (0.002, 0.24, 0.026), 'body')
 g.row((0, 0.10, Z+0.02), (0, -0.014, 0), 4, (0.056, 0.005, 0.05), 'dark')    # rear serrations
 g.row((0, -0.125, Z+0.02), (0, 0.014, 0), 3, (0.056, 0.005, 0.045), 'dark')  # front serrations
 g.box((0.027, -0.04, Z+0.028), (0.004, 0.05, 0.024), 'metal')                # ejection port
@@ -443,7 +451,12 @@ g.box((0, 0.09, Z-0.01), (0.055, 0.30, 0.10), 'dark', bevel=0.020, seg=2)    # r
 g.box((0.0285, 0.16, Z-0.02), (0.004, 0.13, 0.062), 'body', bevel=0.004)     # big orange rear panel R (chart)
 g.box((-0.0285, 0.16, Z-0.02), (0.004, 0.13, 0.062), 'body', bevel=0.004)    # big orange rear panel L
 g.box((0, -0.10, Z+0.006), (0.052, 0.14, 0.075), 'dark', bevel=0.014, seg=2) # front shell
-g.box((0, 0.05, Z-0.055), (0.05, 0.08, 0.03), 'dark', bevel=0.012)           # shell belly bridge
+# lower frame built as a loop: divider column + long bottom bar + rear column
+# leave TWO real cutouts — trigger loop (front) and thumbhole (rear), the
+# P90's signature silhouette in the chart
+g.box((0, 0.015, Z-0.062), (0.034, 0.028, 0.075), 'dark', bevel=0.008)       # divider column
+g.box((0, 0.03, Z-0.100), (0.030, 0.24, 0.014), 'dark', bevel=0.006)         # bottom bar
+g.box((0, 0.125, Z-0.075), (0.040, 0.06, 0.080), 'dark', bevel=0.010)        # rear column
 g.box((0, 0.0, Z+0.052), (0.044, 0.34, 0.024), 'body', bevel=0.006)          # top mag body (ORANGE, chart)
 g.box((0, 0.0, Z+0.066), (0.008, 0.28, 0.005), 'energy', bevel=0.002)        # thin needle-glow slit
 g.row((0, -0.12, Z+0.066), (0, 0.024, 0), 11, (0.033, 0.004, 0.009), 'body') # orange mag ribs
@@ -454,9 +467,7 @@ g.cyl((0, -0.228, Z+0.012), 0.016, 0.025, 'dark')                            # m
 g.row((0.0165, -0.225, Z+0.012), (0, 0.008, 0), 2, (0.002, 0.004, 0.012), 'metal')
 g.box((0, -0.07, Z-0.062), (0.04, 0.045, 0.055), 'body', bevel=0.012, rot=(R(12), 0, 0))  # front grip hump
 g.box((0, -0.10, Z-0.030), (0.036, 0.03, 0.03), 'body', bevel=0.010)         # hump fairing
-g.box((0, 0.02, Z-0.075), (0.026, 0.10, 0.012), 'dark')                      # guard bar
-g.box((0, -0.015, Z-0.05), (0.010, 0.012, 0.03), 'metal')                    # trigger
-g.box((0, 0.075, Z-0.068), (0.04, 0.05, 0.05), 'body', bevel=0.012)          # rear grip block
+g.box((0, -0.018, Z-0.048), (0.010, 0.012, 0.03), 'metal')                   # trigger (inside the front loop)
 g.box((0, 0.235, Z-0.005), (0.05, 0.016, 0.095), 'body')                     # butt plate (orange)
 g.row((0, 0.243, Z-0.04), (0, 0, 0.022), 4, (0.044, 0.004, 0.007), 'metal')  # butt ribs
 # sight bridge with tiny reflex block
@@ -478,9 +489,9 @@ g.box((0.0245, 0.03, Z+0.002), (0.002, 0.12, 0.016), 'metal')                # r
 g.box((-0.0245, 0.03, Z+0.002), (0.002, 0.12, 0.016), 'metal')               # receiver side band L
 g.box((0.025, 0.02, Z+0.012), (0.004, 0.05, 0.026), 'metal')                 # ejection port
 g.box((0, 0.05, Z-0.036), (0.026, 0.05, 0.006), 'metal')                     # loading port plate
-g.cyl((0, -0.27, Z+0.018), 0.0135, 0.44, 'metal')                            # barrel
-g.cyl((0, -0.24, Z-0.018), 0.011, 0.36, 'metal')                             # mag tube
-g.cyl((0, -0.415, Z-0.018), 0.0125, 0.014, 'dark')                           # tube cap
+g.cyl((0, -0.27, Z+0.018), 0.0155, 0.44, 'metal')                            # barrel (thicker, chart)
+g.cyl((0, -0.24, Z-0.018), 0.012, 0.36, 'metal')                             # mag tube
+g.cyl((0, -0.415, Z-0.018), 0.0135, 0.014, 'dark')                           # tube cap
 g.box((0, -0.38, Z), (0.006, 0.014, 0.038), 'metal')                         # barrel ring strap
 g.box((0, -0.19, Z-0.018), (0.058, 0.13, 0.056), 'body', bevel=0.014)        # pump (chunky, chart)
 g.row((0, -0.145, Z-0.018), (0, -0.022, 0), 5, (0.060, 0.006, 0.044), 'dark')# pump ribs (vertical, chart)
@@ -520,11 +531,11 @@ g.box((0, 0.315, Z-0.055), (0.05, 0.02, 0.085), 'dark', rot=(R(13), 0, 0))   # b
 g.row((0, 0.324, Z-0.088), (0, 0.004, 0.022), 3, (0.044, 0.003, 0.007), 'metal')
 g.box((0, 0.055, Z-0.042), (0.026, 0.09, 0.014), 'dark')                     # guard
 g.box((0, 0.065, Z-0.022), (0.010, 0.012, 0.03), 'metal')                    # trigger
-# big flip-up ladder sight standing at the breech end of the barrel (chart)
-g.box((0, -0.10, Z+0.048), (0.032, 0.008, 0.014), 'dark')                    # sight base
-g.box((0.014, -0.10, Z+0.082), (0.004, 0.004, 0.058), 'metal')               # ladder rail R
-g.box((-0.014, -0.10, Z+0.082), (0.004, 0.004, 0.058), 'metal')              # ladder rail L
-g.row((0, -0.10, Z+0.066), (0, 0, 0.016), 4, (0.026, 0.003, 0.003), 'metal') # ladder rungs
+# big flip-up leaf sight standing at the breech end of the barrel (chart)
+g.box((0, -0.10, Z+0.048), (0.036, 0.010, 0.016), 'dark')                    # sight base
+g.box((0, -0.10, Z+0.085), (0.030, 0.005, 0.062), 'metal')                   # leaf plate
+g.box((0, -0.10, Z+0.118), (0.034, 0.008, 0.008), 'dark')                    # leaf top edge
+g.row((0, -0.10, Z+0.068), (0, 0, 0.018), 3, (0.032, 0.0065, 0.004), 'dark') # graduation bars
 g.box((0, -0.345, Z+0.052), (0.006, 0.008, 0.018), 'metal')                  # front sight blade
 g.box((0, 0.09, Z+0.048), (0.016, 0.012, 0.016), 'dark')                     # rear notch
 g.finish('fuelrod', (0, -0.375, Z+0.01), scale=1.25)
@@ -537,6 +548,8 @@ g.box((0, -0.13, Z), (0.008, 0.20, 0.038), 'energy', bevel=0.004)            # c
 g.box((0, -0.12, Z+0.004), (0.0085, 0.16, 0.008), 'dark')                    # fuller groove
 g.cone((0, -0.26, Z+0.004), 0.019, 0.07, 'energy', rot=(0, R(45), 0), verts=4)  # tip
 g.box((0, -0.10, Z+0.024), (0.006, 0.14, 0.010), 'metal')                    # spine
+g.box((0, -0.175, Z+0.026), (0.007, 0.012, 0.010), 'dark', rot=(R(45), 0, 0))   # spine notch 1 (chart)
+g.box((0, -0.150, Z+0.026), (0.007, 0.012, 0.010), 'dark', rot=(R(45), 0, 0))   # spine notch 2
 g.box((0, -0.06, Z-0.020), (0.007, 0.09, 0.006), 'metal', rot=(R(-4), 0, 0)) # edge bevel line
 g.box((0, -0.025, Z), (0.026, 0.018, 0.055), 'body', bevel=0.004)            # guard (orange, chart)
 g.box((0, -0.025, Z+0.034), (0.012, 0.014, 0.014), 'body', rot=(R(30), 0, 0))    # quillon up

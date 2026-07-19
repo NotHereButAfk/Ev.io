@@ -87,9 +87,11 @@ function _buildFromGLB(weaponDef) {
     : M('metal', 0xaab1b9, { metalness: 0.28, roughness: 0.45 });
   // "dark" parts read as MEDIUM GREY (reference-chart gunmetal), not black —
   // this is what makes the guns read grey+orange instead of black+orange.
+  // A notch darker than 'metal' so receivers/mags/scopes separate from the
+  // light barrels the way the chart's two greys do.
   const dark  = sci
-    ? M('accent', 0x8a9199, { roughness: 0.55, metalness: 0.15 })
-    : M('accent', 0x8a9199, { roughness: 0.58, metalness: 0.12 });
+    ? M('accent', 0x757c85, { roughness: 0.55, metalness: 0.15 })
+    : M('accent', 0x757c85, { roughness: 0.58, metalness: 0.12 });
   const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
   const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
                                         clearcoat: 0.8, clearcoatRoughness: 0.08 });

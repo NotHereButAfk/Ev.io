@@ -125,16 +125,16 @@ parts.append(add_cyl("pin", (0, 0.02, ZB-0.045), 0.0035, 0.048, M_dark, axis='X'
 
 # ── GRIP: orange (body), Glock rake, finger grooves + backstrap + magwell ──
 GR = math.radians(14)
-bx("grip",   (0, 0.075, ZB-0.165), (0.046, 0.10, 0.19), M_body, bevel=0.010, seg=2, rot=(GR,0,0))
-bx("gripfront",(0, 0.022, ZB-0.155), (0.040, 0.022, 0.15), M_body, bevel=0.010, rot=(GR,0,0))
+bx("grip",   (0, 0.072, ZB-0.148), (0.046, 0.10, 0.165), M_body, bevel=0.010, seg=2, rot=(GR,0,0))
+bx("gripfront",(0, 0.022, ZB-0.140), (0.040, 0.022, 0.13), M_body, bevel=0.010, rot=(GR,0,0))
 for i in range(3):                                                   # finger grooves
-    bx(f"fg{i}", (0, 0.012 + i*0.005, ZB-0.115 - i*0.038), (0.042, 0.010, 0.008), M_dark, bevel=0, rot=(GR,0,0))
+    bx(f"fg{i}", (0, 0.012 + i*0.005, ZB-0.105 - i*0.033), (0.042, 0.010, 0.008), M_dark, bevel=0, rot=(GR,0,0))
 bx("beaver", (0, 0.125, ZB-0.075), (0.044, 0.05, 0.035), M_body, bevel=0.008, rot=(math.radians(30),0,0))
-bx("magwell",(0, 0.105, ZB-0.262), (0.048, 0.095, 0.020), M_dark, bevel=0.004, rot=(GR,0,0))
+bx("magwell",(0, 0.100, ZB-0.230), (0.048, 0.095, 0.020), M_dark, bevel=0.004, rot=(GR,0,0))
 # stipple texture dots on the grip sides
 for sx in (-1, 1):
     for i in range(3):
-        bx(f"st{sx}{i}", (sx*0.0235, 0.065 + i*0.022, ZB-0.16 - i*0.006), (0.002, 0.012, 0.05), M_dark, bevel=0, rot=(GR,0,0))
+        bx(f"st{sx}{i}", (sx*0.0235, 0.062 + i*0.022, ZB-0.145 - i*0.005), (0.002, 0.012, 0.045), M_dark, bevel=0, rot=(GR,0,0))
 
 # ── ANGULAR TRIGGER GUARD (grey, like the chart) + trigger ──
 bx("gtop",   (0, -0.045, ZB-0.070), (0.028, 0.09, 0.012), M_dark, bevel=0.004)
