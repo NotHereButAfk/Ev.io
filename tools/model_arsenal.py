@@ -467,10 +467,19 @@ body = g.profile([
 g.hole_rect(body, 0.015, Z-0.052, 0.095, 0.058, bevel=0.018)   # big rounded thumbhole
 g.hole_ellipse(body, -0.095, Z-0.030, 0.026, 0.026)            # round trigger hole
 g.box((0, -0.088, Z-0.019), (0.009, 0.010, 0.042), 'metal')    # trigger (anchored above the hole)
+g.box((0, 0.042, Z-0.026), (0.012, 0.026, 0.016), 'dark', bevel=0.004)  # mag-release tab hanging into the thumbhole
+# lighter belly edge along the lower rear body (the chart's two-tone underside)
+g.box((0.0285, 0.16, Z-0.088), (0.002, 0.17, 0.016), 'metal')
+g.box((-0.0285, 0.16, Z-0.088), (0.002, 0.17, 0.016), 'metal')
+# dual charging-handle tabs on the body sides at the front (P90 hardware)
+g.box((0.0295, -0.145, Z+0.030), (0.003, 0.030, 0.012), 'dark', bevel=0.002)
+g.box((-0.0295, -0.145, Z+0.030), (0.003, 0.030, 0.012), 'dark', bevel=0.002)
 # ORANGE magazine inset FLUSH with the body top line, slightly proud of the
 # sides so the orange reads in profile (chart); thin pink needle slit on top
 g.box((0, -0.04, Z+0.0475), (0.058, 0.27, 0.021), 'body', bevel=0.006, seg=2)
 g.box((0, -0.04, Z+0.059), (0.010, 0.22, 0.004), 'energy')
+g.box((0.0295, -0.04, Z+0.047), (0.002, 0.23, 0.003), 'dark')   # mag seam line R
+g.box((-0.0295, -0.04, Z+0.047), (0.002, 0.23, 0.003), 'dark')  # mag seam line L
 # BIG orange rear side panels with screw dots (chart lower-left block)
 g.box((0.0285, 0.175, Z-0.055), (0.004, 0.155, 0.082), 'body', bevel=0.006, seg=2)
 g.box((-0.0285, 0.175, Z-0.055), (0.004, 0.155, 0.082), 'body', bevel=0.006, seg=2)
@@ -484,8 +493,10 @@ g.box((0, -0.168, Z+0.114), (0.010, 0.012, 0.014), 'dark', bevel=0.004)      # f
 # stub barrel + rectangular muzzle block out the front face at mid height
 g.cyl((0, -0.21, Z+0.032), 0.011, 0.05, 'metal')
 g.box((0, -0.235, Z+0.032), (0.024, 0.026, 0.026), 'dark', bevel=0.005)
-# screw dots (chart): one on the upper body, two on the orange panel
+g.cyl((0, -0.2495, Z+0.032), 0.005, 0.006, 'energy')             # glowing needle bore
+# screw dots (chart): two on the upper body, two on the orange panel
 g.cyl((0.0285, 0.10, Z+0.030), 0.004, 0.005, 'metal', axis='X')
+g.cyl((0.0285, 0.19, Z+0.025), 0.004, 0.005, 'metal', axis='X')
 g.cyl((0.031, 0.135, Z-0.03), 0.004, 0.005, 'metal', axis='X')
 g.cyl((0.031, 0.23, Z-0.03), 0.004, 0.005, 'metal', axis='X')
 g.finish('needler', (0, -0.25, Z+0.032), scale=1.45)
