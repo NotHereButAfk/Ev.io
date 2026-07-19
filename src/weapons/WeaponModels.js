@@ -82,9 +82,11 @@ function _buildFromGLB(weaponDef) {
   const metal = sci
     ? M('metal', 0x8a929c, { metalness: 0.94, roughness: 0.20 })
     : M('metal', 0x808890, { metalness: 0.92, roughness: 0.18 });
+  // "dark" parts read as MEDIUM GREY (reference-chart gunmetal), not black —
+  // this is what makes the guns read grey+orange instead of black+orange.
   const dark  = sci
-    ? M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 })
-    : M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
+    ? M('accent', 0x565d66, { roughness: 0.45, metalness: 0.55 })
+    : M('accent', 0x565d66, { roughness: 0.48, metalness: 0.5 });
   const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
   const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
                                         clearcoat: 0.8, clearcoatRoughness: 0.08 });

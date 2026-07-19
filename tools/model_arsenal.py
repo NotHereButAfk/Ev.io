@@ -47,6 +47,8 @@ g.knurl((0, -0.158, Z), 0.021, 10, (0.006, 0.020, 0.006), 'metal')           # n
 g.box((0, -0.145, Z+0.048), (0.006, 0.010, 0.024), 'metal')
 g.box((0.012, -0.145, Z+0.046), (0.004, 0.014, 0.028), 'dark')
 g.box((-0.012, -0.145, Z+0.046), (0.004, 0.014, 0.028), 'dark')
+g.box((0.028, -0.02, Z+0.018), (0.002, 0.14, 0.008), 'energy')               # green side strip R
+g.box((-0.028, -0.02, Z+0.018), (0.002, 0.14, 0.008), 'energy')              # green side strip L
 g.box((0, 0.13, Z+0.044), (0.026, 0.014, 0.010), 'dark')                     # rear sight frame
 g.box((0, 0.13, Z+0.052), (0.008, 0.012, 0.010), 'metal')                    # aperture blade
 # folding stock: twin bars, hinge blocks, butt plate w/ ribs
@@ -74,6 +76,9 @@ g.cyl((0.026, -0.01, Z+0.012), 0.004, 0.006, 'metal', axis='X')              # p
 g.cyl((0.026, 0.05, Z+0.012), 0.004, 0.006, 'metal', axis='X')               # pin 2
 g.box((0.024, -0.045, Z+0.018), (0.004, 0.03, 0.022), 'metal')               # loading gate
 g.box((0, -0.02, Z+0.052), (0.03, 0.08, 0.012), 'dark')                      # top flat
+g.box((0.0238, -0.03, Z+0.032), (0.002, 0.08, 0.010), 'energy')              # green receiver window R
+g.box((-0.0238, -0.03, Z+0.032), (0.002, 0.08, 0.010), 'energy')             # green receiver window L
+g.cyl((0, -0.50, Z+0.02), 0.0155, 0.010, 'energy')                           # green barrel ring
 g.box((0, 0.095, Z+0.024), (0.012, 0.028, 0.03), 'metal', rot=(R(-35), 0, 0))# hammer spur
 g.row((0, 0.108, Z+0.042), (0, 0.006, 0.004), 3, (0.014, 0.003, 0.004), 'dark')  # hammer serrations
 g.box((0, -0.24, Z-0.012), (0.048, 0.13, 0.045), 'body', bevel=0.012)        # wood forend
@@ -183,6 +188,8 @@ g = Gun(MATS)
 g.box((0, 0.02, Z), (0.05, 0.24, 0.06), 'dark', bevel=0.006)                 # receiver
 g.box((0, -0.005, Z+0.036), (0.044, 0.19, 0.018), 'metal', bevel=0.004)      # dust cover
 g.row((0, 0.055, Z+0.046), (0, 0.014, 0), 5, (0.040, 0.005, 0.003), 'dark')  # cover ribs
+g.box((0, -0.005, Z+0.0468), (0.030, 0.16, 0.004), 'energy')                 # green cover stripe
+g.row((0.0196, -0.015, Z-0.075), (0, 0.018, -0.014), 3, (0.003, 0.007, 0.007), 'energy', rot=(R(-16), 0, 0))  # mag seam dots
 g.cyl((0.027, -0.03, Z+0.008), 0.004, 0.006, 'metal', axis='X')              # rivet 1
 g.cyl((0.027, 0.05, Z+0.008), 0.004, 0.006, 'metal', axis='X')               # rivet 2
 g.cyl((0.027, 0.10, Z+0.008), 0.004, 0.006, 'metal', axis='X')               # rivet 3
@@ -230,6 +237,8 @@ g.box((0, -0.05, Z+0.055), (0.05, 0.20, 0.022), 'metal', bevel=0.004)        # f
 g.box((0.027, -0.11, Z+0.055), (0.006, 0.02, 0.014), 'dark')                 # cover latch F
 g.box((0.027, 0.02, Z+0.055), (0.006, 0.02, 0.014), 'dark')                  # cover latch R
 g.row((0, -0.10, Z+0.068), (0, 0.03, 0), 6, (0.040, 0.006, 0.004), 'dark')   # cover ribs
+g.box((0.0253, -0.05, Z+0.055), (0.002, 0.18, 0.012), 'energy')              # green cover stripe R
+g.box((-0.0253, -0.05, Z+0.055), (0.002, 0.18, 0.012), 'energy')             # green cover stripe L
 # visible ammo belt feeding in from the left
 g.row((-0.038, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.014, 0.007, 0.02), 'metal')
 g.row((-0.048, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.006, 0.012, 0.014), 'body')  # brass-ish tips
@@ -253,7 +262,8 @@ g.box((0, 0.26, Z+0.005), (0.046, 0.14, 0.075), 'body', bevel=0.008)         # s
 g.box((0, 0.245, Z+0.052), (0.04, 0.09, 0.016), 'body')                      # stock hump
 g.box((0, 0.33, Z+0.005), (0.05, 0.016, 0.085), 'dark')                      # butt pad
 g.box((0.01, 0.0, Z-0.10), (0.06, 0.10, 0.075), 'dark', bevel=0.006)         # ammo box
-g.box((0.042, 0.0, Z-0.10), (0.004, 0.07, 0.05), 'energy', bevel=0.002)      # glowing ammo window
+g.box((0.042, 0.0, Z-0.10), (0.004, 0.075, 0.055), 'energy', bevel=0.002)    # glowing ammo window R
+g.box((-0.022, 0.0, Z-0.10), (0.004, 0.075, 0.055), 'energy', bevel=0.002)   # glowing ammo window L
 g.box((0, -0.055, Z-0.062), (0.05, 0.012, 0.008), 'metal')                   # box latch
 g.box((0, -0.13, Z+0.055), (0.012, 0.012, 0.022), 'dark')                    # front sight
 g.finish('lmg', (0, -0.48, Z+0.01), scale=1.4)
@@ -396,9 +406,9 @@ g.finish('battlerifle', (0, -0.505, Z+0.012), scale=1.35)
 # FN P90 (needler) — molded shell, translucent top mag w/ rounds, sight bridge
 # ═════════════════════════════════════════════════════════════════════════════
 g = Gun(MATS)
-g.box((0, 0.09, Z-0.01), (0.055, 0.30, 0.10), 'body', bevel=0.020, seg=2)    # rear shell (molded)
+g.box((0, 0.09, Z-0.01), (0.055, 0.30, 0.10), 'dark', bevel=0.020, seg=2)    # rear shell (grey, like the chart)
 g.box((0, -0.10, Z+0.006), (0.052, 0.14, 0.075), 'dark', bevel=0.014, seg=2) # front shell
-g.box((0, 0.05, Z-0.055), (0.05, 0.08, 0.03), 'body', bevel=0.012)           # shell belly bridge
+g.box((0, 0.05, Z-0.055), (0.05, 0.08, 0.03), 'dark', bevel=0.012)           # shell belly bridge
 g.box((0, 0.0, Z+0.052), (0.044, 0.34, 0.024), 'metal', bevel=0.006)         # top mag body
 g.box((0, 0.0, Z+0.068), (0.030, 0.30, 0.010), 'energy', bevel=0.003)        # glowing rounds strip
 g.row((0, -0.12, Z+0.068), (0, 0.024, 0), 11, (0.033, 0.004, 0.011), 'dark') # mag ribs over glow
@@ -412,7 +422,7 @@ g.box((0, -0.10, Z-0.030), (0.036, 0.03, 0.03), 'body', bevel=0.010)         # h
 g.box((0, 0.02, Z-0.075), (0.026, 0.10, 0.012), 'dark')                      # guard bar
 g.box((0, -0.015, Z-0.05), (0.010, 0.012, 0.03), 'metal')                    # trigger
 g.box((0, 0.075, Z-0.068), (0.04, 0.05, 0.05), 'body', bevel=0.012)          # rear grip block
-g.box((0, 0.235, Z-0.005), (0.05, 0.016, 0.095), 'dark')                     # butt plate
+g.box((0, 0.235, Z-0.005), (0.05, 0.016, 0.095), 'body')                     # butt plate (orange)
 g.row((0, 0.243, Z-0.04), (0, 0, 0.022), 4, (0.044, 0.004, 0.007), 'metal')  # butt ribs
 # sight bridge with tiny reflex block
 g.box((0.014, 0.05, Z+0.076), (0.008, 0.05, 0.026), 'dark')                  # bridge leg R

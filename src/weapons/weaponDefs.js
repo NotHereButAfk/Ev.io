@@ -20,8 +20,8 @@ export const WEAPONS = [
     reloadTime: 1.4,
     range: 140,
     recoil: 0.035,
-    color: 0xd2cdc3,        // clean light-grey polymer default finish
-    energyColor: 0x50d4ff   // cyan energy accents (Blender model in public/sidearm.glb)
+    color: 0xd9782e,        // orange grip/guard (reference-chart Glock)
+    energyColor: 0x86ff2e   // neon-green slide windows + sight dots
   },
   {
     id: 'uzi',
@@ -39,7 +39,8 @@ export const WEAPONS = [
     reloadTime: 1.5,
     range: 80,
     recoil: 0.013,
-    color: 0xd9782e
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'levershotgun',
@@ -57,7 +58,8 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 30,
     recoil: 0.05,
-    color: 0xd9782e
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'm4',
@@ -114,7 +116,8 @@ export const WEAPONS = [
     reloadTime: 1.9,
     range: 140,
     recoil: 0.022,
-    color: 0xd9782e
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'lmg',
@@ -132,7 +135,8 @@ export const WEAPONS = [
     reloadTime: 4.5,
     range: 160,
     recoil: 0.03,
-    color: 0xd9782e
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'rpg',
@@ -188,7 +192,8 @@ export const WEAPONS = [
     throwDamage: 9999,     // one-hit kill on throw
     throwCooldown: 0.85,   // seconds before you pull a fresh knife
     throwRewardMult: 3,    // 3x coins/score/xp — only on a thrown kill
-    color: 0x00aaff
+    color: 0xd9782e,       // orange wrapped handle (reference chart)
+    energyColor: 0x35e0ff  // cyan crystal blade
   },
   {
     id: 'sword',
@@ -262,7 +267,7 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 55,
     recoil: 0.01,
-    color: 0x4a3f63,        // muted violet-grey polymer — reads as a finish, not toy plastic
+    color: 0xd9782e,        // orange furniture (reference-chart P90; shells are grey)
     energyColor: 0xff4dd2   // signature pink needle glow
   },
   {

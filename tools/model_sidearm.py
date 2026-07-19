@@ -83,68 +83,62 @@ def add_torus(name, loc, major, minor, material, rot=(0,0,0)):
     return o
 
 parts = []
-# Orientation: -Y = muzzle forward, +Z = up, +X = right. (glTF export makes -Y -> -Z forward.)
-# Target: the reference — LONG sleek slide, barrel protruding, ANGULAR trigger
-# guard, sharply faceted grip + rear frame, glowing cyan panels. Crisp small
-# chamfers (bevel ~0.004, 1-2 segs) so facets stay hard, not pillowy.
+# Orientation: -Y = muzzle forward, +Z = up, +X = right.
+# Reference-chart Glock 17: COMPACT proportions, GREY slide with neon-green
+# glowing slide windows + top stripe, ORANGE grip (body role -> def.color),
+# angular trigger guard. Crisp chamfers.
 ZB = 0.072   # bore line
 
 def bx(name, loc, dim, m, bevel=0.004, seg=1, rot=(0,0,0)):
     parts.append(add_box(name, loc, dim, m, bevel=bevel, seg=seg, rot=rot)); return parts[-1]
 
-# ── SLIDE: long, low, flat-topped with a chamfered nose ──
-bx("slide",  (0, -0.02, ZB+0.006), (0.050, 0.40, 0.050), M_body, bevel=0.005, seg=1)
-bx("slidetop",(0, -0.02, ZB+0.030), (0.038, 0.40, 0.008), M_body, bevel=0.004)          # flat top plate
-bx("nose",   (0, -0.212, ZB), (0.048, 0.045, 0.046), M_body, bevel=0.006, rot=(math.radians(-16),0,0))
-bx("ejport", (0.026, -0.05, ZB+0.014), (0.010, 0.075, 0.026), M_dark, bevel=0.002)
-for i in range(6):                                                                       # rear serrations
-    bx(f"ser{i}", (0, 0.10 - i*0.014, ZB+0.004), (0.054, 0.005, 0.046), M_dark, bevel=0)
-for i in range(3):                                                                       # front serrations
-    bx(f"fser{i}", (0, -0.15 + i*0.014, ZB+0.004), (0.052, 0.005, 0.044), M_dark, bevel=0)
-
-# ── BARREL protruding past the slide + dark muzzle crown + bore ──
-parts.append(add_cyl("barrel", (0, -0.255, ZB), 0.017, 0.09, M_metal, axis='Y'))
-parts.append(add_cyl("crown",  (0, -0.298, ZB), 0.021, 0.016, M_dark, axis='Y'))
-parts.append(add_cyl("bore",   (0, -0.305, ZB), 0.012, 0.010, M_dark, axis='Y', verts=16))
-
-# ── FRAME: block + faceted rear (beavertail) gem-cut ──
-bx("frame",  (0, -0.03, ZB-0.052), (0.044, 0.34, 0.044), M_body, bevel=0.005)
-bx("dustcov",(0, -0.15, ZB-0.058), (0.034, 0.14, 0.030), M_dark, bevel=0.003)            # rail block under barrel
-bx("beaver", (0, 0.135, ZB-0.028), (0.042, 0.055, 0.060), M_body, bevel=0.006, rot=(math.radians(34),0,0))  # angled beavertail facet
-bx("rframe", (0, 0.115, ZB-0.052), (0.044, 0.09, 0.05), M_body, bevel=0.006)             # rear frame hump
-
-# ── ANGULAR TRIGGER GUARD (square-ish loop from beveled bars) + trigger ──
-bx("gtop",   (0, -0.055, ZB-0.078), (0.030, 0.10, 0.014), M_body, bevel=0.004)           # top of guard
-bx("gfront", (0, -0.10, ZB-0.115), (0.028, 0.014, 0.062), M_body, bevel=0.005, rot=(math.radians(20),0,0)) # angled front strut
-bx("gbot",   (0, -0.035, ZB-0.140), (0.028, 0.115, 0.014), M_body, bevel=0.005)          # bottom bar
-bx("grear",  (0, 0.028, ZB-0.115), (0.030, 0.016, 0.058), M_body, bevel=0.004)           # rear post into grip
-bx("trigger",(0, -0.045, ZB-0.110), (0.012, 0.014, 0.04), M_metal, bevel=0.002)
-
-# ── GRIP: angular block + raised faceted side panels + cyan inset + magwell ──
-GR = math.radians(15)
-bx("grip",   (0, 0.075, ZB-0.185), (0.046, 0.11, 0.215), M_body, bevel=0.006, rot=(GR,0,0))
-bx("gripfront",(0, 0.015, ZB-0.175), (0.040, 0.020, 0.16), M_body, bevel=0.008, rot=(GR,0,0))  # front strap
+# ── SLIDE: compact grey block, flat top, short nose chamfer ──
+bx("slide",  (0, -0.015, ZB+0.006), (0.050, 0.30, 0.052), M_dark, bevel=0.005)
+bx("slidetop",(0, -0.015, ZB+0.031), (0.036, 0.28, 0.008), M_dark, bevel=0.003)
+bx("nose",   (0, -0.155, ZB+0.002), (0.048, 0.035, 0.046), M_dark, bevel=0.006, rot=(math.radians(-14),0,0))
+bx("ejport", (0.0255, -0.03, ZB+0.014), (0.006, 0.07, 0.024), M_metal, bevel=0.002)
+for i in range(5):                                                   # rear serrations
+    bx(f"ser{i}", (0, 0.085 - i*0.013, ZB+0.004), (0.053, 0.005, 0.044), M_metal, bevel=0)
+# neon-green glowing slide windows (3 slits per side) + top glow stripe
 for sx in (-1, 1):
-    bx(f"panel{sx}", (sx*0.024, 0.075, ZB-0.175), (0.012, 0.075, 0.13), M_body, bevel=0.010, rot=(GR,0,0))  # raised bevelled panel
-    # cyan glowing inset inside the panel (the reference's grip glow)
-    parts.append(add_box(f"glowpanel{sx}", (sx*0.031, 0.075, ZB-0.175), (0.005, 0.045, 0.09), M_energy, bevel=0.004, rot=(GR,0,0)))
-bx("magwell",(0, 0.108, ZB-0.295), (0.050, 0.10, 0.022), M_dark, bevel=0.004, rot=(GR,0,0))
+    for i in range(3):
+        parts.append(add_box(f"win{sx}{i}", (sx*0.0252, -0.10 + i*0.028, ZB+0.010), (0.004, 0.012, 0.030), M_energy, bevel=0))
+parts.append(add_box("topstripe", (0, -0.08, ZB+0.036), (0.010, 0.10, 0.005), M_energy, bevel=0))
+# muzzle + glowing bore
+parts.append(add_cyl("crown", (0, -0.176, ZB+0.002), 0.017, 0.014, M_metal, axis='Y'))
+parts.append(add_cyl("bore",  (0, -0.183, ZB+0.002), 0.010, 0.008, M_energy, axis='Y', verts=14))
 
-# ── SIGHTS with glowing cyan dots ──
-bx("rsight", (0, 0.12, ZB+0.040), (0.026, 0.018, 0.016), M_dark, bevel=0.003)
-bx("fsight", (0, -0.195, ZB+0.040), (0.012, 0.016, 0.014), M_dark, bevel=0.003)
-for x in (-0.009, 0.009):
-    parts.append(add_box(f"rdot{x}", (x, 0.125, ZB+0.048), (0.005,0.006,0.006), M_energy, bevel=0))
-parts.append(add_box("fdot", (0, -0.20, ZB+0.048), (0.006,0.007,0.006), M_energy, bevel=0))
+# ── FRAME: grey steel block + rail ──
+bx("frame",  (0, -0.02, ZB-0.048), (0.044, 0.28, 0.040), M_metal, bevel=0.005)
+bx("rail",   (0, -0.12, ZB-0.070), (0.034, 0.10, 0.016), M_dark, bevel=0.003)
+parts.append(add_cyl("pin", (0, 0.02, ZB-0.045), 0.0035, 0.048, M_dark, axis='X'))
 
-# ── CYAN LIGHTNING BOLT on each frame flank (Z-shape) + small slide nicks ──
+# ── GRIP: orange (body), Glock rake, finger grooves + backstrap + magwell ──
+GR = math.radians(14)
+bx("grip",   (0, 0.075, ZB-0.165), (0.046, 0.10, 0.19), M_body, bevel=0.010, seg=2, rot=(GR,0,0))
+bx("gripfront",(0, 0.022, ZB-0.155), (0.040, 0.022, 0.15), M_body, bevel=0.010, rot=(GR,0,0))
+for i in range(3):                                                   # finger grooves
+    bx(f"fg{i}", (0, 0.012 + i*0.005, ZB-0.115 - i*0.038), (0.042, 0.010, 0.008), M_dark, bevel=0, rot=(GR,0,0))
+bx("beaver", (0, 0.125, ZB-0.075), (0.044, 0.05, 0.035), M_body, bevel=0.008, rot=(math.radians(30),0,0))
+bx("magwell",(0, 0.105, ZB-0.262), (0.048, 0.095, 0.020), M_dark, bevel=0.004, rot=(GR,0,0))
+# stipple texture dots on the grip sides
 for sx in (-1, 1):
-    parts.append(add_box(f"b1{sx}", (sx*0.023, -0.02, ZB-0.030), (0.005,0.006,0.028), M_energy, bevel=0, rot=(math.radians(55),0,0)))
-    parts.append(add_box(f"b2{sx}", (sx*0.023, 0.01,  ZB-0.048), (0.005,0.006,0.024), M_energy, bevel=0, rot=(math.radians(-40),0,0)))
-    parts.append(add_box(f"b3{sx}", (sx*0.023, 0.045, ZB-0.062), (0.005,0.006,0.022), M_energy, bevel=0, rot=(math.radians(55),0,0)))
-# slide front + rear cyan nicks (top edge accents)
-parts.append(add_box("nickF", (0, -0.20, ZB+0.032), (0.012,0.004,0.012), M_energy, bevel=0))
-parts.append(add_box("nickR", (0, 0.155, ZB+0.028), (0.012,0.004,0.012), M_energy, bevel=0))
+    for i in range(3):
+        bx(f"st{sx}{i}", (sx*0.0235, 0.065 + i*0.022, ZB-0.16 - i*0.006), (0.002, 0.012, 0.05), M_dark, bevel=0, rot=(GR,0,0))
+
+# ── ANGULAR TRIGGER GUARD (orange, like the chart) + trigger ──
+bx("gtop",   (0, -0.045, ZB-0.070), (0.028, 0.09, 0.012), M_body, bevel=0.004)
+bx("gfront", (0, -0.085, ZB-0.100), (0.026, 0.014, 0.055), M_body, bevel=0.005, rot=(math.radians(18),0,0))
+bx("gbot",   (0, -0.028, ZB-0.122), (0.026, 0.105, 0.012), M_body, bevel=0.005)
+bx("grear",  (0, 0.024, ZB-0.100), (0.028, 0.014, 0.050), M_body, bevel=0.004)
+bx("trigger",(0, -0.038, ZB-0.095), (0.011, 0.013, 0.036), M_metal, bevel=0.002)
+
+# ── SIGHTS with green dots ──
+bx("rsight", (0, 0.115, ZB+0.038), (0.024, 0.016, 0.014), M_dark, bevel=0.003)
+bx("fsight", (0, -0.14, ZB+0.038), (0.010, 0.014, 0.012), M_dark, bevel=0.003)
+for x in (-0.008, 0.008):
+    parts.append(add_box(f"rdot{x}", (x, 0.12, ZB+0.046), (0.004,0.005,0.005), M_energy, bevel=0))
+parts.append(add_box("fdot", (0, -0.144, ZB+0.045), (0.005,0.006,0.005), M_energy, bevel=0))
 
 # ── join all parts into ONE mesh (absolute coords) named weapon_sidearm ──
 bpy.ops.object.select_all(action='DESELECT')
@@ -155,7 +149,7 @@ bpy.ops.object.join()
 gun = bpy.context.active_object
 gun.name = "weapon_sidearm"
 # normalise to pistol size (the first export came out nearly carbine-length)
-S = 0.75
+S = 0.92
 gun.scale = (S, S, S)
 bpy.ops.object.select_all(action='DESELECT')
 gun.select_set(True); bpy.context.view_layer.objects.active = gun
