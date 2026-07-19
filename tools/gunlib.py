@@ -95,7 +95,41 @@ class Gun:
             loc = (center[0] + math.cos(a) * radius, center[1], center[2] + math.sin(a) * radius)
             self.box(loc, size, mat, bevel=0, rot=(0, ry, -a))
 
+    def _audit(self, gun_id, eps=0.0015):
+        # Connectivity audit: every part must (transitively) touch the largest
+        # component. AABB overlap with a small epsilon approximates contact.
+        def bb(o):
+            xs = [v[0] for v in o.bound_box]; ys = [v[1] for v in o.bound_box]; zs = [v[2] for v in o.bound_box]
+            return (min(xs)-eps, max(xs)+eps, min(ys)-eps, max(ys)+eps, min(zs)-eps, max(zs)+eps)
+        boxes = [bb(o) for o in self.parts]
+        n = len(boxes)
+        def hit(a, b):
+            return (a[0] <= b[1] and b[0] <= a[1] and a[2] <= b[3] and b[2] <= a[3] and a[4] <= b[5] and b[4] <= a[5])
+        parent = list(range(n))
+        def find(i):
+            while parent[i] != i: parent[i] = parent[parent[i]]; i = parent[i]
+            return i
+        for i in range(n):
+            for j in range(i+1, n):
+                if hit(boxes[i], boxes[j]):
+                    parent[find(i)] = find(j)
+        comps = {}
+        for i in range(n): comps.setdefault(find(i), []).append(i)
+        main = max(comps.values(), key=len)
+        ok = True
+        for comp in comps.values():
+            if comp is main: continue
+            ok = False
+            for i in comp:
+                b = boxes[i]
+                c = (round((b[0]+b[1])/2, 3), round((b[2]+b[3])/2, 3), round((b[4]+b[5])/2, 3))
+                print(f"FLOATING [{gun_id}]: {self.parts[i].name} center={c}")
+        if ok:
+            print(f"AUDIT OK [{gun_id}]: {n} parts, 1 component")
+        return ok
+
     def finish(self, gun_id, muzzle, scale=1.0):
+        self._audit(gun_id)
         bpy.ops.object.select_all(action='DESELECT')
         for p in self.parts: p.select_set(True)
         bpy.context.view_layer.objects.active = self.parts[0]

@@ -109,7 +109,7 @@ parts.append(add_cyl("crown", (0, -0.176, ZB+0.002), 0.017, 0.014, M_metal, axis
 parts.append(add_cyl("bore",  (0, -0.183, ZB+0.002), 0.010, 0.008, M_energy, axis='Y', verts=14))
 
 # ── FRAME: grey steel block + rail ──
-bx("frame",  (0, -0.02, ZB-0.048), (0.044, 0.28, 0.040), M_metal, bevel=0.005)
+bx("frame",  (0, -0.02, ZB-0.040), (0.044, 0.28, 0.048), M_metal, bevel=0.005)   # taller: welds slide to lower half
 bx("rail",   (0, -0.12, ZB-0.070), (0.034, 0.10, 0.016), M_dark, bevel=0.003)
 parts.append(add_cyl("pin", (0, 0.02, ZB-0.045), 0.0035, 0.048, M_dark, axis='X'))
 
@@ -139,6 +139,31 @@ bx("fsight", (0, -0.14, ZB+0.038), (0.010, 0.014, 0.012), M_dark, bevel=0.003)
 for x in (-0.008, 0.008):
     parts.append(add_box(f"rdot{x}", (x, 0.12, ZB+0.046), (0.004,0.005,0.005), M_energy, bevel=0))
 parts.append(add_box("fdot", (0, -0.144, ZB+0.045), (0.005,0.006,0.005), M_energy, bevel=0))
+
+# ── connectivity audit: every part must touch the main component ──
+def _audit(parts, eps=0.0015):
+    def bb(o):
+        xs=[v[0] for v in o.bound_box]; ys=[v[1] for v in o.bound_box]; zs=[v[2] for v in o.bound_box]
+        return (min(xs)-eps,max(xs)+eps,min(ys)-eps,max(ys)+eps,min(zs)-eps,max(zs)+eps)
+    boxes=[bb(o) for o in parts]; n=len(boxes)
+    hit=lambda a,b:(a[0]<=b[1] and b[0]<=a[1] and a[2]<=b[3] and b[2]<=a[3] and a[4]<=b[5] and b[4]<=a[5])
+    par=list(range(n))
+    def find(i):
+        while par[i]!=i: par[i]=par[par[i]]; i=par[i]
+        return i
+    for i in range(n):
+        for j in range(i+1,n):
+            if hit(boxes[i],boxes[j]): par[find(i)]=find(j)
+    comps={}
+    for i in range(n): comps.setdefault(find(i),[]).append(i)
+    main=max(comps.values(),key=len)
+    for comp in comps.values():
+        if comp is main: continue
+        for i in comp:
+            b=boxes[i]; c=(round((b[0]+b[1])/2,3),round((b[2]+b[3])/2,3),round((b[4]+b[5])/2,3))
+            print(f"FLOATING [sidearm]: {parts[i].name} center={c}")
+    if len(comps)==1: print(f"AUDIT OK [sidearm]: {n} parts, 1 component")
+_audit(parts)
 
 # ── join all parts into ONE mesh (absolute coords) named weapon_sidearm ──
 bpy.ops.object.select_all(action='DESELECT')

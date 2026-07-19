@@ -75,7 +75,7 @@ g.box((-0.0235, 0.02, Z+0.01), (0.002, 0.13, 0.06), 'metal')                 # s
 g.cyl((0.026, -0.01, Z+0.012), 0.004, 0.006, 'metal', axis='X')              # pin 1
 g.cyl((0.026, 0.05, Z+0.012), 0.004, 0.006, 'metal', axis='X')               # pin 2
 g.box((0.024, -0.045, Z+0.018), (0.004, 0.03, 0.022), 'metal')               # loading gate
-g.box((0, -0.02, Z+0.052), (0.03, 0.08, 0.012), 'dark')                      # top flat
+g.box((0, -0.02, Z+0.046), (0.03, 0.08, 0.012), 'dark')                      # top flat
 g.box((0.0238, -0.03, Z+0.032), (0.002, 0.08, 0.010), 'energy')              # green receiver window R
 g.box((-0.0238, -0.03, Z+0.032), (0.002, 0.08, 0.010), 'energy')             # green receiver window L
 g.cyl((0, -0.50, Z+0.02), 0.0155, 0.010, 'energy')                           # green barrel ring
@@ -187,7 +187,7 @@ g = build_ar(0.20, 0.26, scope=True, mag_len=0.12); g.finish('dmr', (0, -0.50, Z
 g = Gun(MATS)
 g.box((0, 0.02, Z), (0.05, 0.24, 0.06), 'dark', bevel=0.006)                 # receiver
 g.box((0, -0.005, Z+0.036), (0.044, 0.19, 0.018), 'metal', bevel=0.004)      # dust cover
-g.row((0, 0.055, Z+0.046), (0, 0.014, 0), 5, (0.040, 0.005, 0.003), 'dark')  # cover ribs
+g.row((0, 0.048, Z+0.046), (0, 0.014, 0), 4, (0.040, 0.005, 0.003), 'dark')  # cover ribs
 g.box((0, -0.005, Z+0.0468), (0.030, 0.16, 0.004), 'energy')                 # green cover stripe
 g.row((0.0196, -0.015, Z-0.075), (0, 0.018, -0.014), 3, (0.003, 0.007, 0.007), 'energy', rot=(R(-16), 0, 0))  # mag seam dots
 g.cyl((0.027, -0.03, Z+0.008), 0.004, 0.006, 'metal', axis='X')              # rivet 1
@@ -195,8 +195,8 @@ g.cyl((0.027, 0.05, Z+0.008), 0.004, 0.006, 'metal', axis='X')               # r
 g.cyl((0.027, 0.10, Z+0.008), 0.004, 0.006, 'metal', axis='X')               # rivet 3
 g.box((0.026, 0.08, Z+0.022), (0.004, 0.09, 0.010), 'metal', rot=(R(-8), 0, 0))  # safety lever blade
 g.box((0.0265, 0.02, Z-0.005), (0.005, 0.04, 0.016), 'metal')                # ejection port frame
-g.box((0, -0.185, Z+0.02), (0.05, 0.13, 0.045), 'body', bevel=0.010)         # upper handguard
-g.box((0, -0.185, Z-0.025), (0.052, 0.13, 0.04), 'body', bevel=0.010)        # lower handguard
+g.box((0, -0.175, Z+0.02), (0.05, 0.16, 0.045), 'body', bevel=0.010)         # upper handguard
+g.box((0, -0.175, Z-0.025), (0.052, 0.16, 0.04), 'body', bevel=0.010)        # lower handguard
 g.row((0.0265, -0.22, Z-0.025), (0, 0.024, 0), 5, (0.002, 0.012, 0.028), 'dark')  # hg grooves R
 g.row((-0.0265, -0.22, Z-0.025), (0, 0.024, 0), 5, (0.002, 0.012, 0.028), 'dark') # hg grooves L
 g.cyl((0, -0.32, Z+0.028), 0.007, 0.16, 'metal')                             # gas tube
@@ -221,8 +221,8 @@ g.box((0, 0.075, Z-0.06), (0.010, 0.012, 0.035), 'metal')                    # t
 g.box((0, 0.24, Z-0.02), (0.044, 0.22, 0.07), 'body', bevel=0.012, rot=(R(10), 0, 0))    # stock
 g.box((0, 0.345, Z-0.045), (0.048, 0.02, 0.08), 'dark', rot=(R(10), 0, 0))   # butt plate
 g.ring((0, 0.285, Z-0.038), 0.007, 0.002, 'metal', axis='X')                 # sling loop (on the stock)
-g.box((0, 0.13, Z+0.045), (0.018, 0.016, 0.02), 'dark')                      # rear sight block
-g.box((0, 0.115, Z+0.055), (0.010, 0.03, 0.006), 'metal', rot=(R(-6), 0, 0)) # tangent leaf
+g.box((0, 0.115, Z+0.036), (0.018, 0.030, 0.02), 'dark')                     # rear sight block (on the cover)
+g.box((0, 0.105, Z+0.050), (0.010, 0.03, 0.006), 'metal', rot=(R(-6), 0, 0)) # tangent leaf
 g.finish('rifle', (0, -0.46, Z+0.002), scale=1.4)
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -240,14 +240,14 @@ g.row((0, -0.10, Z+0.068), (0, 0.03, 0), 6, (0.040, 0.006, 0.004), 'dark')   # c
 g.box((0.0253, -0.05, Z+0.055), (0.002, 0.18, 0.012), 'energy')              # green cover stripe R
 g.box((-0.0253, -0.05, Z+0.055), (0.002, 0.18, 0.012), 'energy')             # green cover stripe L
 # visible ammo belt feeding in from the left
-g.row((-0.038, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.014, 0.007, 0.02), 'metal')
-g.row((-0.048, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.006, 0.012, 0.014), 'body')  # brass-ish tips
-g.cyl((0, -0.32, Z+0.01), 0.014, 0.28, 'metal')                              # barrel
+g.row((-0.030, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.014, 0.007, 0.02), 'metal')
+g.row((-0.040, -0.02, Z+0.02), (0, 0.016, 0), 5, (0.006, 0.012, 0.014), 'body')  # brass-ish tips
+g.cyl((0, -0.30, Z+0.01), 0.014, 0.34, 'metal')                              # barrel (into the receiver)
 g.cyl((0, -0.24, Z+0.01), 0.017, 0.06, 'dark')                               # barrel shroud step
 g.cyl((0, -0.455, Z+0.01), 0.019, 0.045, 'dark')                             # flash hider
-g.row((0.019, -0.45, Z+0.01), (0, 0.012, 0), 3, (0.002, 0.005, 0.014), 'metal')
-g.box((0, -0.24, Z+0.052), (0.014, 0.05, 0.035), 'dark', rot=(R(50), 0, 0))  # carry handle post
-g.box((0, -0.265, Z+0.075), (0.014, 0.055, 0.012), 'dark')                   # handle grip
+g.row((0.0175, -0.452, Z+0.01), (0, 0.010, 0), 3, (0.003, 0.005, 0.014), 'metal')
+g.box((0, -0.24, Z+0.044), (0.014, 0.05, 0.040), 'dark', rot=(R(50), 0, 0))  # carry handle post
+g.box((0, -0.265, Z+0.068), (0.014, 0.055, 0.012), 'dark')                   # handle grip
 # bipod w/ feet
 g.box((0.028, -0.36, Z-0.05), (0.008, 0.008, 0.15), 'metal', rot=(0, R(14), 0))
 g.box((-0.028, -0.36, Z-0.05), (0.008, 0.008, 0.15), 'metal', rot=(0, R(-14), 0))
@@ -281,12 +281,12 @@ g.ring((0, 0.395, Z+0.01), 0.048, 0.004, 'metal')                            # f
 g.box((0, -0.02, Z+0.01), (0.075, 0.16, 0.075), 'body', bevel=0.014)         # wood heat shield
 g.ring((0, -0.095, Z+0.01), 0.039, 0.004, 'dark')                            # shield band F
 g.ring((0, 0.055, Z+0.01), 0.039, 0.004, 'dark')                             # shield band R
-g.cyl((0, -0.29, Z+0.01), 0.030, 0.10, 'metal', r2=0.05)                     # warhead taper
-g.cyl((0, -0.38, Z+0.01), 0.05, 0.10, 'metal')                               # warhead bulb
-g.ring((0, -0.345, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 1
-g.ring((0, -0.385, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 2
-g.cone((0, -0.475, Z+0.01), 0.05, 0.10, 'dark')                              # ogive cone
-g.cyl((0, -0.53, Z+0.01), 0.006, 0.02, 'metal')                              # fuze tip
+g.cyl((0, -0.27, Z+0.01), 0.030, 0.11, 'metal', r2=0.05)                     # warhead taper (meets tube)
+g.cyl((0, -0.365, Z+0.01), 0.05, 0.10, 'metal')                              # warhead bulb
+g.ring((0, -0.335, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 1
+g.ring((0, -0.375, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 2
+g.cone((0, -0.46, Z+0.01), 0.05, 0.10, 'dark')                               # ogive cone
+g.cyl((0, -0.515, Z+0.01), 0.006, 0.022, 'metal')                            # fuze tip
 g.box((0, -0.10, Z-0.052), (0.036, 0.045, 0.085), 'body', bevel=0.008, rot=(R(14), 0, 0))  # front grip
 g.row((0, -0.082, Z-0.092), (0, 0.005, 0.015), 3, (0.038, 0.004, 0.006), 'dark')
 g.box((0, 0.03, Z-0.052), (0.036, 0.045, 0.09), 'body', bevel=0.008, rot=(R(18), 0, 0))    # rear grip
@@ -388,8 +388,8 @@ g.cyl((0, -0.485, Z+0.012), 0.014, 0.035, 'dark')                            # f
 g.row((0.0145, -0.48, Z+0.012), (0, 0.012, 0), 3, (0.002, 0.005, 0.016), 'metal')
 g.cyl((0, -0.32, Z+0.048), 0.013, 0.018, 'dark', axis='Y')                   # FS ring base
 g.box((0, -0.32, Z+0.065), (0.006, 0.006, 0.018), 'metal')                   # FS post
-g.cyl((0, 0.10, Z+0.050), 0.015, 0.026, 'dark', axis='Z')                    # rear drum
-g.cyl((0, 0.10, Z+0.068), 0.007, 0.010, 'metal', axis='Z')                   # drum aperture
+g.cyl((0, 0.10, Z+0.040), 0.015, 0.030, 'dark', axis='Z')                    # rear drum (on receiver)
+g.cyl((0, 0.10, Z+0.058), 0.007, 0.010, 'metal', axis='Z')                   # drum aperture
 g.box((0, 0.02, Z-0.075), (0.036, 0.05, 0.09), 'metal', bevel=0.004, rot=(R(-6), 0, 0))  # mag
 g.row((0, 0.002, Z-0.055), (0, 0.014, -0.018), 3, (0.038, 0.004, 0.009), 'dark', rot=(R(-6), 0, 0))
 g.box((0, 0.065, Z-0.115), (0.012, 0.03, 0.014), 'metal')                    # paddle release
@@ -458,8 +458,8 @@ g.row((0, 0.304, Z-0.08), (0, 0.004, 0.022), 3, (0.042, 0.003, 0.007), 'metal')
 g.box((0, 0.075, Z-0.075), (0.026, 0.08, 0.012), 'dark')                     # guard
 g.box((0, 0.085, Z-0.045), (0.010, 0.012, 0.03), 'metal')                    # trigger
 g.ring((0, 0.26, Z-0.050), 0.007, 0.002, 'metal', axis='X')                  # sling stud (on the stock)
-g.box((0, -0.485, Z+0.040), (0.008, 0.008, 0.010), 'metal')                  # bead base
-g.cyl((0, -0.488, Z+0.049), 0.004, 0.007, 'energy', axis='Z', verts=10)      # glowing bead
+g.box((0, -0.485, Z+0.032), (0.008, 0.008, 0.012), 'metal')                  # bead base
+g.cyl((0, -0.488, Z+0.042), 0.004, 0.007, 'energy', axis='Z', verts=10)      # glowing bead
 g.finish('energyshotgun', (0, -0.50, Z+0.018), scale=1.3)
 
 # ═════════════════════════════════════════════════════════════════════════════
