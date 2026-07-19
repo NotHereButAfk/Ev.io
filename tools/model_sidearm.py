@@ -110,6 +110,9 @@ parts.append(add_box("topstripe", (0, -0.05, ZB+0.036), (0.010, 0.14, 0.005), M_
 # small green square above the trigger (chart)
 for sx in (-1, 1):
     parts.append(add_box(f"sq{sx}", (sx*0.0252, -0.045, ZB-0.012), (0.004, 0.013, 0.013), M_energy, bevel=0))
+# four short green FRONT serration bars near the muzzle (chart)
+for i in range(4):
+    bx(f"fser{i}", (0, -0.150 + i*0.010, ZB+0.004), (0.053, 0.005, 0.036), M_energy, bevel=0)
 # ORANGE slanted block on the lower slide flank (chart)
 for sx in (-1, 1):
     parts.append(add_box(f"lock{sx}", (sx*0.0252, -0.095, ZB-0.010),
