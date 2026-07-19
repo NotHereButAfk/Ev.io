@@ -72,6 +72,29 @@ class Gun:
     def cone(self, loc, r, length, mat, axis='Y', rot=(0, 0, 0), verts=16):
         return self.cyl(loc, r, length, mat, axis=axis, rot=rot, verts=verts, r2=0.0)
 
+    def ring(self, loc, major, minor, mat, rot=(0, 0, 0), axis='Y'):
+        bpy.ops.mesh.primitive_torus_add(location=loc, major_radius=major, minor_radius=minor,
+                                         major_segments=20, minor_segments=8)
+        o = bpy.context.active_object
+        base = {'Y': (math.radians(90), 0, 0), 'X': (0, math.radians(90), 0), 'Z': (0, 0, 0)}[axis]
+        o.rotation_euler = tuple(a + b for a, b in zip(base, rot))
+        o.data.materials.append(self.M[mat])
+        bpy.ops.object.shade_smooth()
+        self._bake(o); self.parts.append(o); return o
+
+    def row(self, start, step, count, dim, mat, rot=(0, 0, 0), bevel=0.0):
+        # a row of identical small boxes (serrations, ribs, checkering, belt links)
+        for i in range(count):
+            loc = (start[0] + step[0]*i, start[1] + step[1]*i, start[2] + step[2]*i)
+            self.box(loc, dim, mat, bevel=bevel, rot=rot)
+
+    def knurl(self, center, radius, count, size, mat, ry=0.0):
+        # small studs around a Y-axis cylinder at center (grip/barrel-nut knurling)
+        for i in range(count):
+            a = i / count * 2 * math.pi
+            loc = (center[0] + math.cos(a) * radius, center[1], center[2] + math.sin(a) * radius)
+            self.box(loc, size, mat, bevel=0, rot=(0, ry, -a))
+
     def finish(self, gun_id, muzzle):
         bpy.ops.object.select_all(action='DESELECT')
         for p in self.parts: p.select_set(True)
