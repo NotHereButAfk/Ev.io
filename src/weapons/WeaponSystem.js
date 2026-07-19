@@ -110,7 +110,10 @@ export class WeaponSystem {
 
   _buildViewmodels() {
     this.weaponMount = new THREE.Object3D();
-    this.weaponMount.position.set(0.32, -0.26, -0.5);
+    // Tucked lower-right and scaled down so the gun frames the corner of the
+    // screen instead of blocking a third of the view (ev.io-style proportion).
+    this.weaponMount.position.set(0.30, -0.28, -0.52);
+    this.weaponMount.scale.setScalar(0.74);
     this.camera.add(this.weaponMount);
 
     // Dedicated viewmodel key light — a short-range light parented to the camera
