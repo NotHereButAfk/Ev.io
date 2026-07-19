@@ -448,38 +448,43 @@ g.finish('battlerifle', (0, -0.505, Z+0.012), scale=1.35)
 # FN P90 (needler) — molded shell, translucent top mag w/ rounds, sight bridge
 # ═════════════════════════════════════════════════════════════════════════════
 g = Gun(MATS)
-g.box((0, 0.09, Z-0.01), (0.055, 0.30, 0.10), 'dark', bevel=0.020, seg=2)    # rear shell (grey, like the chart)
-g.box((0.0285, 0.16, Z-0.02), (0.004, 0.13, 0.062), 'body', bevel=0.004)     # big orange rear panel R (chart)
-g.box((-0.0285, 0.16, Z-0.02), (0.004, 0.13, 0.062), 'body', bevel=0.004)    # big orange rear panel L
-g.box((0, -0.10, Z+0.006), (0.052, 0.14, 0.075), 'dark', bevel=0.014, seg=2) # front shell
-# lower frame built as a loop: divider column + long bottom bar + rear column
-# leave TWO real cutouts — trigger loop (front) and thumbhole (rear), the
-# P90's signature silhouette in the chart
-g.box((0, 0.015, Z-0.062), (0.034, 0.028, 0.075), 'dark', bevel=0.008)       # divider column
-g.box((0, 0.03, Z-0.100), (0.030, 0.24, 0.014), 'dark', bevel=0.006)         # bottom bar
-g.box((0, 0.125, Z-0.075), (0.040, 0.06, 0.080), 'dark', bevel=0.010)        # rear column
-g.box((0, 0.0, Z+0.052), (0.044, 0.34, 0.024), 'body', bevel=0.006)          # top mag body (ORANGE, chart)
-g.box((0, 0.0, Z+0.066), (0.008, 0.28, 0.005), 'energy', bevel=0.002)        # thin needle-glow slit
-g.row((0, -0.12, Z+0.066), (0, 0.024, 0), 11, (0.033, 0.004, 0.009), 'body') # orange mag ribs
-g.box((0, -0.165, Z+0.050), (0.040, 0.02, 0.022), 'dark')                    # mag front latch
-g.box((0, 0.17, Z+0.050), (0.040, 0.02, 0.022), 'dark')                      # mag rear latch
-g.cyl((0, -0.20, Z+0.012), 0.012, 0.06, 'metal')                             # stub barrel
-g.cyl((0, -0.228, Z+0.012), 0.016, 0.025, 'dark')                            # muzzle ring
-g.row((0.0165, -0.225, Z+0.012), (0, 0.008, 0), 2, (0.002, 0.004, 0.012), 'metal')
-g.box((0, -0.07, Z-0.062), (0.04, 0.045, 0.055), 'body', bevel=0.012, rot=(R(12), 0, 0))  # front grip hump
-g.box((0, -0.10, Z-0.030), (0.036, 0.03, 0.03), 'body', bevel=0.010)         # hump fairing
+# deep, stubby molded body — the chart P90 is tall for its length
+g.box((0, 0.09, Z-0.012), (0.055, 0.30, 0.115), 'dark', bevel=0.022, seg=3)  # rear shell
+g.box((0, -0.10, Z+0.002), (0.052, 0.14, 0.09), 'dark', bevel=0.016, seg=2)  # front shell
+g.box((0, -0.185, Z+0.012), (0.05, 0.055, 0.085), 'dark', bevel=0.014, seg=2, rot=(R(-38), 0, 0))  # 45° nose slope (chart)
+# BIG orange rear side panels — the chart's lower-rear orange block
+g.box((0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.075), 'body', bevel=0.004)
+g.box((-0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.075), 'body', bevel=0.004)
+# lower frame loop: divider + LOW bottom bar + rear column leave the two TALL
+# cutouts (small trigger loop front, big thumbhole rear) of the chart shape
+g.box((0, 0.015, Z-0.072), (0.034, 0.028, 0.095), 'dark', bevel=0.008)       # divider column
+g.box((0, 0.03, Z-0.115), (0.030, 0.24, 0.014), 'dark', bevel=0.006)         # bottom bar
+g.box((0, 0.125, Z-0.082), (0.040, 0.06, 0.10), 'dark', bevel=0.010)         # rear column
+g.box((0, -0.07, Z-0.075), (0.04, 0.045, 0.075), 'dark', bevel=0.012, rot=(R(12), 0, 0))  # front grip post (grey, chart)
 g.box((0, -0.018, Z-0.048), (0.010, 0.012, 0.03), 'metal')                   # trigger (inside the front loop)
-g.box((0, 0.235, Z-0.005), (0.05, 0.016, 0.095), 'body')                     # butt plate (orange)
-g.row((0, 0.243, Z-0.04), (0, 0, 0.022), 4, (0.044, 0.004, 0.007), 'metal')  # butt ribs
-# sight bridge with tiny reflex block
-g.box((0.014, 0.05, Z+0.076), (0.008, 0.05, 0.026), 'dark')                  # bridge leg R
-g.box((-0.014, 0.05, Z+0.076), (0.008, 0.05, 0.026), 'dark')                 # bridge leg L
-g.box((0, 0.05, Z+0.092), (0.036, 0.05, 0.012), 'dark')                      # bridge top
-g.box((0, 0.035, Z+0.104), (0.018, 0.018, 0.012), 'dark')                    # reflex block
-g.box((0, 0.026, Z+0.104), (0.012, 0.004, 0.008), 'energy')                  # reflex glow
-g.cyl((0.024, 0.0, Z-0.03), 0.004, 0.005, 'metal', axis='X')                 # shell screw 1
-g.cyl((0.024, 0.16, Z-0.02), 0.004, 0.005, 'metal', axis='X')                # shell screw 2
-g.finish('needler', (0, -0.245, Z+0.012), scale=1.45)
+# ORANGE top magazine lying along the body top (chart), pink needle slit
+g.box((0, 0.02, Z+0.052), (0.044, 0.30, 0.024), 'body', bevel=0.006)         # mag body
+g.box((0, 0.02, Z+0.066), (0.008, 0.24, 0.005), 'energy', bevel=0.002)       # needle-glow slit
+g.row((0, -0.10, Z+0.066), (0, 0.024, 0), 10, (0.033, 0.004, 0.009), 'body') # orange mag ribs
+g.box((0, -0.125, Z+0.050), (0.040, 0.02, 0.022), 'dark')                    # mag front latch
+g.box((0, 0.17, Z+0.050), (0.040, 0.02, 0.022), 'dark')                      # mag rear latch
+# barrel exits at the TOP of the nose slope (chart)
+g.cyl((0, -0.22, Z+0.030), 0.012, 0.06, 'metal')                             # stub barrel
+g.cyl((0, -0.248, Z+0.030), 0.016, 0.025, 'dark')                            # muzzle ring
+g.row((0.0155, -0.245, Z+0.030), (0, 0.008, 0), 2, (0.002, 0.004, 0.012), 'metal')
+# grey butt face with ribs (chart) — orange stays on the side panels
+g.box((0, 0.245, Z-0.012), (0.05, 0.018, 0.115), 'dark')                     # butt plate
+g.row((0, 0.252, Z-0.05), (0, 0, 0.026), 4, (0.044, 0.004, 0.007), 'metal')  # butt ribs
+# LONG sight-rail bridge with open centre: front block, diagonal rear strut,
+# long top bar, sight nubs front + rear (chart)
+g.box((0, 0.005, Z+0.078), (0.020, 0.035, 0.030), 'dark')                    # front block
+g.box((0, 0.10, Z+0.078), (0.016, 0.05, 0.026), 'dark', rot=(R(35), 0, 0))   # rear diagonal strut
+g.box((0, 0.05, Z+0.100), (0.036, 0.135, 0.014), 'dark', bevel=0.004)        # bridge top bar
+g.box((0, -0.005, Z+0.112), (0.014, 0.02, 0.012), 'dark')                    # front sight nub
+g.box((0, 0.098, Z+0.110), (0.016, 0.014, 0.010), 'dark')                    # rear sight nub
+g.cyl((0.028, 0.0, Z-0.03), 0.004, 0.005, 'metal', axis='X')                 # shell screw
+g.cyl((0.030, 0.16, Z-0.02), 0.004, 0.005, 'metal', axis='X')                # panel screw (chart dot)
+g.finish('needler', (0, -0.26, Z+0.030), scale=1.45)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Remington 870 — action bars, loading port, checkered stock, barrel ring
