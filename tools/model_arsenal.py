@@ -448,20 +448,30 @@ g.finish('battlerifle', (0, -0.505, Z+0.012), scale=1.35)
 # FN P90 (needler) — molded shell, translucent top mag w/ rounds, sight bridge
 # ═════════════════════════════════════════════════════════════════════════════
 g = Gun(MATS)
-# ORGANIC molded body — big rounded masses (deep bevels, many segments), the
-# chart P90 is a smooth soap-bar shape, not a slab assembly
-g.box((0, 0.05, Z-0.008), (0.056, 0.42, 0.105), 'dark', bevel=0.024, seg=6)  # main body capsule
-g.box((0, 0.205, Z-0.012), (0.054, 0.10, 0.112), 'dark', bevel=0.024, seg=6) # rounded butt mass
-g.box((0, -0.16, Z+0.008), (0.052, 0.10, 0.09), 'dark', bevel=0.022, seg=6, rot=(R(-32), 0, 0))  # rounded nose slope
+# Body = ONE extruded side-view silhouette traced from the chart: flat top
+# under the mag, blunt nose with the 45° slope, flowing belly, tall flat butt.
+# Crisp flat sides + smooth outline — the illustrated look.
+g.profile([
+    (0.250, Z+0.048),                       # rear top
+    (0.258, Z+0.030),                       # rear-top round-off
+    (0.258, Z-0.050),                       # flat butt face
+    (0.248, Z-0.066),                       # rear-bottom round-off
+    (-0.110, Z-0.066),                      # belly
+    (-0.180, Z-0.046),                      # belly rises toward the nose
+    (-0.242, Z-0.008),                      # nose bottom
+    (-0.252, Z+0.012),                      # nose tip lower
+    (-0.246, Z+0.028),                      # blunt muzzle face
+    (-0.145, Z+0.048),                      # top of the 45° slope
+], 0.056, 'dark', bevel=0.006, seg=2)
 # BIG orange rear side panels — the chart's lower-rear orange block
-g.box((0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.072), 'body', bevel=0.006, seg=2)
-g.box((-0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.072), 'body', bevel=0.006, seg=2)
-# lower frame loop, rounded: divider + low bottom bar + rear column leave the
-# two TALL cutouts (small trigger loop front, big thumbhole rear)
-g.box((0, 0.015, Z-0.072), (0.034, 0.028, 0.095), 'dark', bevel=0.012, seg=4)  # divider column
-g.box((0, 0.03, Z-0.115), (0.030, 0.24, 0.013), 'dark', bevel=0.006, seg=3)    # bottom bar
-g.box((0, 0.125, Z-0.082), (0.040, 0.06, 0.10), 'dark', bevel=0.016, seg=4)    # rear column
-g.box((0, -0.07, Z-0.075), (0.04, 0.045, 0.075), 'dark', bevel=0.016, seg=4, rot=(R(12), 0, 0))  # front grip post
+g.box((0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.062), 'body', bevel=0.006, seg=2)
+g.box((-0.0285, 0.155, Z-0.032), (0.004, 0.19, 0.062), 'body', bevel=0.006, seg=2)
+# lower frame loop: divider + low bottom bar + rear column leave the two TALL
+# cutouts (small trigger loop front, big thumbhole rear)
+g.box((0, 0.015, Z-0.072), (0.034, 0.028, 0.095), 'dark', bevel=0.010, seg=3)  # divider column
+g.box((0, 0.03, Z-0.115), (0.030, 0.24, 0.013), 'dark', bevel=0.005, seg=2)    # bottom bar
+g.box((0, 0.125, Z-0.082), (0.040, 0.06, 0.10), 'dark', bevel=0.012, seg=3)    # rear column
+g.box((0, -0.07, Z-0.075), (0.04, 0.045, 0.075), 'dark', bevel=0.012, seg=3, rot=(R(12), 0, 0))  # front grip post
 g.box((0, -0.018, Z-0.048), (0.010, 0.012, 0.03), 'metal')                   # trigger (inside the front loop)
 # ORANGE top magazine lying along the body top (chart), pink needle slit
 g.box((0, 0.02, Z+0.052), (0.044, 0.30, 0.024), 'body', bevel=0.010, seg=3)  # mag body

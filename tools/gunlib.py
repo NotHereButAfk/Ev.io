@@ -82,6 +82,37 @@ class Gun:
         bpy.ops.object.shade_smooth()
         self._bake(o); self.parts.append(o); return o
 
+    def profile(self, pts, width, mat, bevel=0.005, seg=2):
+        # Extruded side-view silhouette: pts = [(y, z), ...] polygon traced in
+        # the side view, extruded across X by `width`. Gives the illustrated
+        # look — a smooth flowing outline with crisp flat side faces (neither
+        # stacked slabs nor an over-beveled balloon).
+        import bmesh
+        mesh = bpy.data.meshes.new("profile")
+        obj = bpy.data.objects.new("profile", mesh)
+        bpy.context.collection.objects.link(obj)
+        bm = bmesh.new()
+        hw = width / 2
+        verts = [bm.verts.new((-hw, y, z)) for (y, z) in pts]
+        face = bm.faces.new(verts)
+        ret = bmesh.ops.extrude_face_region(bm, geom=[face])
+        ext_verts = [v for v in ret['geom'] if isinstance(v, bmesh.types.BMVert)]
+        bmesh.ops.translate(bm, verts=ext_verts, vec=(width, 0, 0))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.to_mesh(mesh)
+        bm.free()
+        obj.data.materials.append(self.M[mat])
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        if bevel > 0:
+            b = obj.modifiers.new("bev", 'BEVEL'); b.width = bevel; b.segments = seg
+            b.limit_method = 'ANGLE'; b.angle_limit = math.radians(40)
+            bpy.ops.object.modifier_apply(modifier="bev")
+        self._bake(obj)
+        self.parts.append(obj)
+        return obj
+
     def row(self, start, step, count, dim, mat, rot=(0, 0, 0), bevel=0.0):
         # a row of identical small boxes (serrations, ribs, checkering, belt links)
         for i in range(count):
