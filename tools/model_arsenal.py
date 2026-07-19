@@ -57,7 +57,7 @@ g.box((-0.024, 0.03, Z-0.005), (0.012, 0.02, 0.02), 'dark')                  # h
 g.box((0, 0.185, Z-0.01), (0.05, 0.018, 0.055), 'metal', bevel=0.004)        # butt plate
 g.row((0, 0.1955, Z-0.03), (0, 0, 0.016), 3, (0.044, 0.004, 0.006), 'dark')  # butt ribs
 g.ring((0, 0.145, Z-0.028), 0.007, 0.002, 'metal', axis='X')                 # sling loop
-g.finish('uzi', (0, -0.26, Z))
+g.finish('uzi', (0, -0.26, Z), scale=1.55)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Winchester M1887 — octagon-hint barrel, loop lever, hammer, checkered wood
@@ -92,7 +92,7 @@ g.cyl((0.014, 0.075, Z-0.076), 0.005, 0.028, 'metal', axis='X')              # l
 g.box((0, -0.012, Z-0.02), (0.010, 0.012, 0.035), 'metal')                   # trigger
 g.box((0, -0.545, Z+0.038), (0.008, 0.010, 0.014), 'metal')                  # bead base
 g.cyl((0, -0.548, Z+0.048), 0.004, 0.008, 'energy', axis='Z', verts=10)      # glowing bead
-g.finish('levershotgun', (0, -0.565, Z+0.02))
+g.finish('levershotgun', (0, -0.565, Z+0.02), scale=1.2)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # AR-15 family — deep shared builder: M4 / M16A2 / SR-25
@@ -172,9 +172,9 @@ def build_ar(blen, hg_len, stock='collapsible', scope=False, carry=False, mag_le
         a.cyl((0, 0.114, Z+0.078), 0.019, 0.006, 'energy')                    # glowing ocular lens
     return a
 
-g = build_ar(0.16, 0.16); g.finish('m4', (0, -0.40, Z+0.005))
-g = build_ar(0.24, 0.20, stock='fixed', carry=True); g.finish('m16', (0, -0.50, Z+0.005))
-g = build_ar(0.20, 0.26, scope=True, mag_len=0.12); g.finish('dmr', (0, -0.50, Z+0.005))
+g = build_ar(0.16, 0.16); g.finish('m4', (0, -0.40, Z+0.005), scale=1.55)
+g = build_ar(0.24, 0.20, stock='fixed', carry=True); g.finish('m16', (0, -0.50, Z+0.005), scale=1.4)
+g = build_ar(0.20, 0.26, scope=True, mag_len=0.12); g.finish('dmr', (0, -0.50, Z+0.005), scale=1.45)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # AK-pattern — ribbed dust cover, banana mag, slant brake, hooded post
@@ -216,7 +216,7 @@ g.box((0, 0.345, Z-0.045), (0.048, 0.02, 0.08), 'dark', rot=(R(10), 0, 0))   # b
 g.ring((0, 0.30, Z-0.075), 0.007, 0.002, 'metal', axis='X')                  # sling loop
 g.box((0, 0.13, Z+0.045), (0.018, 0.016, 0.02), 'dark')                      # rear sight block
 g.box((0, 0.115, Z+0.055), (0.010, 0.03, 0.006), 'metal', rot=(R(-6), 0, 0)) # tangent leaf
-g.finish('rifle', (0, -0.46, Z+0.002))
+g.finish('rifle', (0, -0.46, Z+0.002), scale=1.4)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # FN M240 — feed cover latches, belt links, carry handle, bipod feet
@@ -256,7 +256,7 @@ g.box((0.01, 0.0, Z-0.10), (0.06, 0.10, 0.075), 'dark', bevel=0.006)         # a
 g.box((0.042, 0.0, Z-0.10), (0.004, 0.07, 0.05), 'energy', bevel=0.002)      # glowing ammo window
 g.box((0, -0.055, Z-0.062), (0.05, 0.012, 0.008), 'metal')                   # box latch
 g.box((0, -0.13, Z+0.055), (0.012, 0.012, 0.022), 'dark')                    # front sight
-g.finish('lmg', (0, -0.48, Z+0.01))
+g.finish('lmg', (0, -0.48, Z+0.01), scale=1.4)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RPG-7 — wrapped tube, layered venturi, ribbed warhead, iron sight rail
@@ -286,7 +286,7 @@ g.box((0, -0.04, Z-0.038), (0.014, 0.03, 0.022), 'dark')                     # t
 g.box((0, -0.16, Z+0.052), (0.010, 0.05, 0.010), 'dark')                     # sight rail
 g.box((0, -0.175, Z+0.068), (0.006, 0.008, 0.022), 'metal')                  # front sight leaf
 g.box((0, 0.10, Z+0.052), (0.008, 0.020, 0.018), 'metal')                    # rear sight
-g.finish('rpg', (0, -0.535, Z+0.01))
+g.finish('rpg', (0, -0.535, Z+0.01), scale=1.3)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # AI AWM — fluted barrel, braked muzzle, turreted scope, thumbhole chassis
@@ -326,7 +326,7 @@ g.box((0, 0.045, Z-0.092), (0.037, 0.055, 0.010), 'dark', rot=(R(-5), 0, 0)) # f
 g.box((0, 0.12, Z-0.075), (0.038, 0.045, 0.08), 'body', bevel=0.008, rot=(R(18), 0, 0))   # grip
 g.box((0, 0.075, Z-0.09), (0.024, 0.07, 0.012), 'dark')                      # guard
 g.box((0, 0.085, Z-0.055), (0.010, 0.012, 0.03), 'metal')                    # trigger
-g.finish('boltsniper', (0, -0.575, Z+0.012))
+g.finish('boltsniper', (0, -0.575, Z+0.012), scale=1.35)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Desert Eagle — slab slide w/ top rib + serrations, safety, grip screws
@@ -359,7 +359,7 @@ g.box((0.007, 0.125, Z+0.065), (0.004, 0.005, 0.005), 'energy')              # s
 g.box((-0.007, 0.125, Z+0.065), (0.004, 0.005, 0.005), 'energy')             # sight dot L
 g.box((0, -0.135, Z+0.058), (0.010, 0.012, 0.010), 'dark')                   # front sight
 g.box((0, -0.14, Z+0.066), (0.005, 0.006, 0.005), 'energy')                  # front dot
-g.finish('magnum', (0, -0.180, Z+0.02))
+g.finish('magnum', (0, -0.180, Z+0.02), scale=1.3)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # H&K G3 — drum sight, fluted handguard, paddle release, charging tube
@@ -390,7 +390,7 @@ g.box((0, 0.09, Z-0.06), (0.010, 0.012, 0.035), 'metal')                     # t
 g.box((0, 0.26, Z-0.01), (0.044, 0.20, 0.07), 'body', bevel=0.010, rot=(R(6), 0, 0))     # stock
 g.row((0, 0.19, Z+0.024), (0, 0.024, -0.002), 3, (0.046, 0.006, 0.006), 'dark', rot=(R(6), 0, 0))  # buffer rings
 g.box((0, 0.355, Z-0.025), (0.048, 0.02, 0.08), 'dark', rot=(R(6), 0, 0))    # butt
-g.finish('battlerifle', (0, -0.505, Z+0.012))
+g.finish('battlerifle', (0, -0.505, Z+0.012), scale=1.35)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # FN P90 (needler) — molded shell, translucent top mag w/ rounds, sight bridge
@@ -422,7 +422,7 @@ g.box((0, 0.035, Z+0.104), (0.018, 0.018, 0.012), 'dark')                    # r
 g.box((0, 0.026, Z+0.104), (0.012, 0.004, 0.008), 'energy')                  # reflex glow
 g.cyl((0.024, 0.0, Z-0.03), 0.004, 0.005, 'metal', axis='X')                 # shell screw 1
 g.cyl((0.024, 0.16, Z-0.02), 0.004, 0.005, 'metal', axis='X')                # shell screw 2
-g.finish('needler', (0, -0.245, Z+0.012))
+g.finish('needler', (0, -0.245, Z+0.012), scale=1.45)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Remington 870 — action bars, loading port, checkered stock, barrel ring
@@ -450,7 +450,7 @@ g.box((0, 0.085, Z-0.045), (0.010, 0.012, 0.03), 'metal')                    # t
 g.ring((0, 0.25, Z-0.075), 0.007, 0.002, 'metal', axis='X')                  # sling stud
 g.box((0, -0.485, Z+0.040), (0.008, 0.008, 0.010), 'metal')                  # bead base
 g.cyl((0, -0.488, Z+0.049), 0.004, 0.007, 'energy', axis='Z', verts=10)      # glowing bead
-g.finish('energyshotgun', (0, -0.50, Z+0.018))
+g.finish('energyshotgun', (0, -0.50, Z+0.018), scale=1.3)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # M79 — break-action w/ hinge + lever, ladder sight frame, shell rim
@@ -477,7 +477,7 @@ g.box((0.013, -0.30, Z+0.075), (0.004, 0.004, 0.045), 'metal')               # l
 g.box((-0.013, -0.30, Z+0.075), (0.004, 0.004, 0.045), 'metal')              # ladder rail L
 g.row((0, -0.30, Z+0.062), (0, 0, 0.012), 3, (0.024, 0.003, 0.003), 'metal') # ladder rungs
 g.box((0, 0.09, Z+0.048), (0.016, 0.012, 0.016), 'dark')                     # rear notch
-g.finish('fuelrod', (0, -0.375, Z+0.01))
+g.finish('fuelrod', (0, -0.375, Z+0.01), scale=1.25)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Combat knife — fullered crystal blade, quillon guard, wrapped handle
@@ -495,6 +495,6 @@ g.box((0, 0.045, Z), (0.024, 0.13, 0.036), 'body', bevel=0.010)              # h
 g.row((0, -0.005, Z), (0, 0.022, 0), 6, (0.026, 0.006, 0.038), 'dark')       # wrap rings
 g.box((0, 0.115, Z), (0.028, 0.02, 0.04), 'dark', bevel=0.004)               # pommel
 g.ring((0, 0.128, Z), 0.009, 0.0025, 'metal')                                # lanyard ring
-g.finish('knife', (0, -0.30, Z))
+g.finish('knife', (0, -0.30, Z), scale=0.78)
 
 export(os.path.join(os.path.dirname(__file__), "..", "public", "weapons_authored.glb"))

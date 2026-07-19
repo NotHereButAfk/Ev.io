@@ -154,9 +154,15 @@ bpy.context.view_layer.objects.active = parts[0]
 bpy.ops.object.join()
 gun = bpy.context.active_object
 gun.name = "weapon_sidearm"
+# normalise to pistol size (the first export came out nearly carbine-length)
+S = 0.75
+gun.scale = (S, S, S)
+bpy.ops.object.select_all(action='DESELECT')
+gun.select_set(True); bpy.context.view_layer.objects.active = gun
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 # muzzle empty at the bore, parented to the gun mesh
-bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, -0.29, 0.070))
+bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, -0.29*S, 0.070*S))
 mz = bpy.context.active_object; mz.name = "muzzle_point"; mz.parent = gun
 
 # ── export ──

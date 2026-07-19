@@ -95,14 +95,20 @@ class Gun:
             loc = (center[0] + math.cos(a) * radius, center[1], center[2] + math.sin(a) * radius)
             self.box(loc, size, mat, bevel=0, rot=(0, ry, -a))
 
-    def finish(self, gun_id, muzzle):
+    def finish(self, gun_id, muzzle, scale=1.0):
         bpy.ops.object.select_all(action='DESELECT')
         for p in self.parts: p.select_set(True)
         bpy.context.view_layer.objects.active = self.parts[0]
         bpy.ops.object.join()
         gun = bpy.context.active_object
         gun.name = f"weapon_{gun_id}"
-        bpy.ops.object.empty_add(type='PLAIN_AXES', location=muzzle)
+        if scale != 1.0:
+            # normalise the gun's in-hand size (viewmodel mount expects the
+            # procedural-era dimensions); bake the scale into the mesh
+            gun.scale = (scale, scale, scale)
+            self._bake(gun)
+        bpy.ops.object.empty_add(type='PLAIN_AXES',
+                                 location=(muzzle[0]*scale, muzzle[1]*scale, muzzle[2]*scale))
         mz = bpy.context.active_object; mz.name = "muzzle_point"; mz.parent = gun
         self.parts = []
         return gun
