@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -59,6 +60,50 @@ export function preloadWeaponModels() {
   }
 }
 
+// ── Illustrated ("reference chart") look for the authored guns ──────────────
+// Flat cel shading: a shared stepped ramp makes lighting break into two/three
+// bands like the chart's fills instead of a smooth PBR falloff.
+let _toonRampTex = null;
+function _toonRamp() {
+  if (_toonRampTex) return _toonRampTex;
+  const d = new Uint8Array([115, 185, 235, 255]);
+  _toonRampTex = new THREE.DataTexture(d, 4, 1, THREE.RedFormat);
+  _toonRampTex.minFilter = _toonRampTex.magFilter = THREE.NearestFilter;
+  _toonRampTex.needsUpdate = true;
+  return _toonRampTex;
+}
+function T(role, color, opts = {}) {
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: _toonRamp() });
+  if (opts.emissive !== undefined) {
+    m.emissive = new THREE.Color(opts.emissive);
+    m.emissiveIntensity = opts.emissiveIntensity ?? 1;
+  }
+  m.userData.role = role;   // skins recolor by role, same as the PBR path
+  return m;
+}
+
+// Dark contour outline — the chart's linework. Classic inverted hull: a
+// slightly inflated back-face copy of the mesh, displaced along smoothed
+// vertex normals so the silhouette gets a clean dark edge from every angle.
+const _outlineGeoCache = new WeakMap();
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x272c33, side: THREE.BackSide });
+function _outlineGeometry(src) {
+  let g = _outlineGeoCache.get(src);
+  if (g) return g;
+  g = src.clone();
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g.deleteAttribute('tangent');
+  g = mergeVertices(g, 1e-4);          // weld so corner normals average smoothly
+  g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, t = 0.005;
+  for (let i = 0; i < p.count; i++) {
+    p.setXYZ(i, p.getX(i) + n.getX(i) * t, p.getY(i) + n.getY(i) * t, p.getZ(i) + n.getZ(i) * t);
+  }
+  _outlineGeoCache.set(src, g);
+  return g;
+}
+
 function _buildFromGLB(weaponDef) {
   const name = `weapon_${weaponDef.id}`;
   let weaponRoot = _overrideTemplates.get(weaponDef.id)?.getObjectByName(name) || null;
@@ -76,36 +121,19 @@ function _buildFromGLB(weaponDef) {
   const eCol = weaponDef.energyColor ?? 0x2ee6ff;
   const sci  = weaponDef.sciFi === true;
 
-  const body  = sci
-    ? M('body',  color, { roughness: 0.48, metalness: 0.42 })
-    : M('body',  color, { roughness: 0.55, metalness: 0.35 });
-  // Reference-chart steel: light flat grey. Metalness stays LOW — with no
-  // env map a metallic surface reflects nothing and goes near-black, which
-  // is exactly the "black+orange" look the chart doesn't have.
-  const metal = sci
-    ? M('metal', 0xaab1b9, { metalness: 0.30, roughness: 0.42 })
-    : M('metal', 0xaab1b9, { metalness: 0.28, roughness: 0.45 });
-  // "dark" parts read as MEDIUM GREY (reference-chart gunmetal), not black —
-  // this is what makes the guns read grey+orange instead of black+orange.
-  // A notch darker than 'metal' so receivers/mags/scopes separate from the
-  // light barrels the way the chart's two greys do.
-  const dark  = sci
-    ? M('accent', 0x757c85, { roughness: 0.55, metalness: 0.15 })
-    : M('accent', 0x757c85, { roughness: 0.58, metalness: 0.12 });
-  const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
-  const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
-                                        clearcoat: 0.8, clearcoatRoughness: 0.08 });
-  const scope = M('special', 0x060a10, { roughness: 0.08, metalness: 0.2,
-                                         clearcoat: 0.9, clearcoatRoughness: 0.05 });
-  // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
-  // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
-  // Near-black base kills the lit (diffuse/env) contribution and the emissive
-  // stays under the ACES clip point, so the glow reads as saturated colour
-  // instead of washing out to white.
+  // Illustrated chart palette, cel-shaded: orange furniture (def.color), light
+  // flat steel, a medium grey a notch darker so receivers/mags/scopes separate
+  // from the barrels the way the chart's two greys do.
+  const body  = T('body',  color);
+  const metal = T('metal', 0xaab1b9);
+  const dark  = T('accent', 0x757c85);
+  const wood  = T('wood',   0x4a2e18);
+  const blade = T('metal',  0xd0d8e0);
+  const scope = T('special', 0x2a3038);
+  // Glow parts: near-black base + emissive keeps the neon saturated instead
+  // of washing out to white under ACES tone mapping.
   const eBase = new THREE.Color(eCol).multiplyScalar(0.12).getHex();
-  const energy = M('energy', eBase,
-                   { roughness: 0.22, metalness: 0.1,
-                     emissive: eCol, emissiveIntensity: sci ? 1.3 : 1.2 });
+  const energy = T('energy', eBase, { emissive: eCol, emissiveIntensity: sci ? 1.3 : 1.2 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
@@ -127,6 +155,16 @@ function _buildFromGLB(weaponDef) {
   // it as one wrap (faces stay a consistent size regardless of how the mesh is
   // split). Idempotent — geometries are shared across clones, so it runs once.
   _applyBoxUVs(cloned);
+
+  // Chart-style dark contour: attach an inverted-hull outline to each mesh.
+  const outlineHosts = [];
+  cloned.traverse(o => { if (o.isMesh && o.material !== OUTLINE_MAT) outlineHosts.push(o); });
+  for (const o of outlineHosts) {
+    const ol = new THREE.Mesh(_outlineGeometry(o.geometry), OUTLINE_MAT);
+    ol.name = 'outline';
+    ol.castShadow = false;
+    o.add(ol);
+  }
 
   // Find muzzle point (Blender auto-renames duplicates to muzzle_point.001 etc.)
   let muzzle = null;
