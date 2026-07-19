@@ -128,9 +128,10 @@ def build_ar(blen, hg_len, stock='collapsible', scope=False, carry=False, mag_le
     a.cyl((0, brl_z, Z+0.005), 0.010, blen, 'metal')                          # barrel (pencil)
     a.cyl((0, brl_z + blen*0.25, Z+0.005), 0.012, blen*0.4, 'metal')          # barrel step
     fsb_y = brl_z + blen/2 - 0.02
-    a.box((0, fsb_y, Z+0.030), (0.012, 0.016, 0.05), 'dark', rot=(R(8), 0, 0))    # FSB A-frame front
-    a.box((0, fsb_y + 0.014, Z+0.030), (0.012, 0.016, 0.05), 'dark', rot=(R(-8), 0, 0))  # rear leg
-    a.box((0, fsb_y + 0.007, Z+0.058), (0.006, 0.008, 0.018), 'metal')       # front post
+    a.box((0, fsb_y, Z+0.032), (0.016, 0.02, 0.058), 'dark', rot=(R(10), 0, 0))   # FSB A-frame front
+    a.box((0, fsb_y + 0.018, Z+0.032), (0.016, 0.02, 0.058), 'dark', rot=(R(-10), 0, 0))  # rear leg
+    a.box((0, fsb_y + 0.009, Z+0.010), (0.020, 0.036, 0.026), 'dark')        # FSB base on barrel
+    a.box((0, fsb_y + 0.009, Z+0.066), (0.007, 0.009, 0.022), 'metal')       # front post
     a.ring((0, fsb_y + 0.007, Z-0.012), 0.007, 0.002, 'metal', axis='X')     # sling swivel
     fh_y = brl_z - blen/2 - 0.024
     a.cyl((0, fh_y, Z+0.005), 0.014, 0.052, 'dark')                          # A2 birdcage
@@ -152,6 +153,7 @@ def build_ar(blen, hg_len, stock='collapsible', scope=False, carry=False, mag_le
         a.knurl((0, 0.125, Z+0.005), 0.019, 8, (0.005, 0.014, 0.005), 'metal')# castle nut
         a.box((0, 0.235, Z-0.005), (0.046, 0.09, 0.075), 'body', bevel=0.008)
         a.box((0, 0.21, Z+0.032), (0.04, 0.05, 0.014), 'body')                # cheek
+        a.box((0, 0.205, Z-0.048), (0.044, 0.075, 0.03), 'body', bevel=0.008, rot=(R(-28), 0, 0))  # angled underside (M4 look)
         a.box((0, 0.285, Z-0.005), (0.05, 0.016, 0.085), 'dark')              # butt pad
         a.row((0, 0.294, Z-0.035), (0, 0, 0.022), 3, (0.044, 0.004, 0.007), 'metal')
         a.ring((0, 0.255, Z-0.045), 0.007, 0.002, 'metal', axis='X')          # sling loop
@@ -261,9 +263,9 @@ g.box((0, 0.055, Z-0.06), (0.010, 0.012, 0.035), 'metal')                    # t
 g.box((0, 0.26, Z+0.005), (0.046, 0.14, 0.075), 'body', bevel=0.008)         # stock
 g.box((0, 0.245, Z+0.052), (0.04, 0.09, 0.016), 'body')                      # stock hump
 g.box((0, 0.33, Z+0.005), (0.05, 0.016, 0.085), 'dark')                      # butt pad
-g.box((0.01, 0.0, Z-0.10), (0.06, 0.10, 0.075), 'dark', bevel=0.006)         # ammo box
-g.box((0.042, 0.0, Z-0.10), (0.004, 0.075, 0.055), 'energy', bevel=0.002)    # glowing ammo window R
-g.box((-0.022, 0.0, Z-0.10), (0.004, 0.075, 0.055), 'energy', bevel=0.002)   # glowing ammo window L
+g.box((0.01, 0.0, Z-0.10), (0.06, 0.10, 0.075), 'energy', bevel=0.006)       # GLOWING green ammo box (chart)
+g.box((0.01, -0.028, Z-0.10), (0.064, 0.014, 0.079), 'dark', bevel=0.002)    # box strap F
+g.box((0.01, 0.028, Z-0.10), (0.064, 0.014, 0.079), 'dark', bevel=0.002)     # box strap R
 g.box((0, -0.055, Z-0.062), (0.05, 0.012, 0.008), 'metal')                   # box latch
 g.box((0, -0.13, Z+0.055), (0.012, 0.012, 0.022), 'dark')                    # front sight
 g.finish('lmg', (0, -0.48, Z+0.01), scale=1.4)
@@ -281,8 +283,8 @@ g.ring((0, 0.395, Z+0.01), 0.048, 0.004, 'metal')                            # f
 g.box((0, -0.02, Z+0.01), (0.075, 0.16, 0.075), 'body', bevel=0.014)         # wood heat shield
 g.ring((0, -0.095, Z+0.01), 0.039, 0.004, 'dark')                            # shield band F
 g.ring((0, 0.055, Z+0.01), 0.039, 0.004, 'dark')                             # shield band R
-g.cyl((0, -0.27, Z+0.01), 0.030, 0.11, 'metal', r2=0.05)                     # warhead taper (meets tube)
-g.cyl((0, -0.365, Z+0.01), 0.05, 0.10, 'metal')                              # warhead bulb
+g.cyl((0, -0.27, Z+0.01), 0.030, 0.11, 'body', r2=0.05)                      # warhead taper (ORANGE, chart look)
+g.cyl((0, -0.365, Z+0.01), 0.05, 0.10, 'body')                               # warhead bulb (orange)
 g.ring((0, -0.335, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 1
 g.ring((0, -0.375, Z+0.01), 0.051, 0.003, 'dark')                            # warhead rib 2
 g.cone((0, -0.46, Z+0.01), 0.05, 0.10, 'dark')                               # ogive cone
@@ -390,7 +392,7 @@ g.cyl((0, -0.32, Z+0.048), 0.013, 0.018, 'dark', axis='Y')                   # F
 g.box((0, -0.32, Z+0.065), (0.006, 0.006, 0.018), 'metal')                   # FS post
 g.cyl((0, 0.10, Z+0.040), 0.015, 0.030, 'dark', axis='Z')                    # rear drum (on receiver)
 g.cyl((0, 0.10, Z+0.058), 0.007, 0.010, 'metal', axis='Z')                   # drum aperture
-g.box((0, 0.02, Z-0.075), (0.036, 0.05, 0.09), 'metal', bevel=0.004, rot=(R(-6), 0, 0))  # mag
+g.box((0, 0.02, Z-0.075), (0.036, 0.05, 0.09), 'body', bevel=0.004, rot=(R(-6), 0, 0))   # mag (orange, chart look)
 g.row((0, 0.002, Z-0.055), (0, 0.014, -0.018), 3, (0.038, 0.004, 0.009), 'dark', rot=(R(-6), 0, 0))
 g.box((0, 0.065, Z-0.115), (0.012, 0.03, 0.014), 'metal')                    # paddle release
 g.box((0, 0.13, Z-0.075), (0.04, 0.05, 0.085), 'body', bevel=0.008, rot=(R(20), 0, 0))   # grip

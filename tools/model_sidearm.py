@@ -109,7 +109,7 @@ parts.append(add_cyl("crown", (0, -0.176, ZB+0.002), 0.017, 0.014, M_metal, axis
 parts.append(add_cyl("bore",  (0, -0.183, ZB+0.002), 0.010, 0.008, M_energy, axis='Y', verts=14))
 
 # ── FRAME: grey steel block + rail ──
-bx("frame",  (0, -0.02, ZB-0.040), (0.044, 0.28, 0.048), M_metal, bevel=0.005)   # taller: welds slide to lower half
+bx("frame",  (0, -0.02, ZB-0.040), (0.044, 0.28, 0.048), M_dark, bevel=0.005)    # same grey as the slide (chart look)
 bx("rail",   (0, -0.12, ZB-0.070), (0.034, 0.10, 0.016), M_dark, bevel=0.003)
 parts.append(add_cyl("pin", (0, 0.02, ZB-0.045), 0.0035, 0.048, M_dark, axis='X'))
 
