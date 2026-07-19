@@ -97,13 +97,23 @@ bx("slide",  (0, -0.015, ZB+0.006), (0.050, 0.30, 0.052), M_dark, bevel=0.005)
 bx("slidetop",(0, -0.015, ZB+0.031), (0.036, 0.28, 0.008), M_dark, bevel=0.003)
 bx("nose",   (0, -0.155, ZB+0.002), (0.048, 0.035, 0.046), M_dark, bevel=0.006, rot=(math.radians(-14),0,0))
 bx("ejport", (0.0255, -0.03, ZB+0.014), (0.006, 0.07, 0.024), M_metal, bevel=0.002)
-for i in range(5):                                                   # rear serrations
-    bx(f"ser{i}", (0, 0.085 - i*0.013, ZB+0.004), (0.053, 0.005, 0.044), M_metal, bevel=0)
-# neon-green glowing slide windows (3 slits per side) + top glow stripe
+for i in range(5):                                                   # rear serrations — GREEN bars (chart)
+    bx(f"ser{i}", (0, 0.085 - i*0.014, ZB+0.004), (0.053, 0.006, 0.044), M_energy, bevel=0)
+# chart front-top detail: three SLANTED green slashes + a long thin stripe
+for i in range(3):
+    for sx in (-1, 1):
+        parts.append(add_box(f"slash{sx}{i}", (sx*0.0252, -0.115 + i*0.024, ZB+0.016),
+                             (0.004, 0.010, 0.030), M_energy, bevel=0, rot=(math.radians(28),0,0)))
 for sx in (-1, 1):
-    for i in range(3):
-        parts.append(add_box(f"win{sx}{i}", (sx*0.0252, -0.10 + i*0.028, ZB+0.010), (0.004, 0.012, 0.030), M_energy, bevel=0))
-parts.append(add_box("topstripe", (0, -0.08, ZB+0.036), (0.010, 0.10, 0.005), M_energy, bevel=0))
+    parts.append(add_box(f"stripe{sx}", (sx*0.0252, 0.0, ZB+0.024), (0.004, 0.13, 0.007), M_energy, bevel=0))
+parts.append(add_box("topstripe", (0, -0.05, ZB+0.036), (0.010, 0.14, 0.005), M_energy, bevel=0))
+# small green square above the trigger (chart)
+for sx in (-1, 1):
+    parts.append(add_box(f"sq{sx}", (sx*0.0252, -0.045, ZB-0.012), (0.004, 0.013, 0.013), M_energy, bevel=0))
+# ORANGE slanted block on the lower slide flank (chart)
+for sx in (-1, 1):
+    parts.append(add_box(f"lock{sx}", (sx*0.0252, -0.095, ZB-0.010),
+                         (0.004, 0.05, 0.022), M_body, bevel=0.002, rot=(math.radians(20),0,0)))
 # muzzle + glowing bore
 parts.append(add_cyl("crown", (0, -0.176, ZB+0.002), 0.017, 0.014, M_metal, axis='Y'))
 parts.append(add_cyl("bore",  (0, -0.183, ZB+0.002), 0.010, 0.008, M_energy, axis='Y', verts=14))
@@ -126,11 +136,11 @@ for sx in (-1, 1):
     for i in range(3):
         bx(f"st{sx}{i}", (sx*0.0235, 0.065 + i*0.022, ZB-0.16 - i*0.006), (0.002, 0.012, 0.05), M_dark, bevel=0, rot=(GR,0,0))
 
-# ── ANGULAR TRIGGER GUARD (orange, like the chart) + trigger ──
-bx("gtop",   (0, -0.045, ZB-0.070), (0.028, 0.09, 0.012), M_body, bevel=0.004)
-bx("gfront", (0, -0.085, ZB-0.100), (0.026, 0.014, 0.055), M_body, bevel=0.005, rot=(math.radians(18),0,0))
-bx("gbot",   (0, -0.028, ZB-0.122), (0.026, 0.105, 0.012), M_body, bevel=0.005)
-bx("grear",  (0, 0.024, ZB-0.100), (0.028, 0.014, 0.050), M_body, bevel=0.004)
+# ── ANGULAR TRIGGER GUARD (grey, like the chart) + trigger ──
+bx("gtop",   (0, -0.045, ZB-0.070), (0.028, 0.09, 0.012), M_dark, bevel=0.004)
+bx("gfront", (0, -0.085, ZB-0.100), (0.026, 0.014, 0.055), M_dark, bevel=0.005, rot=(math.radians(18),0,0))
+bx("gbot",   (0, -0.028, ZB-0.122), (0.026, 0.105, 0.012), M_dark, bevel=0.005)
+bx("grear",  (0, 0.024, ZB-0.100), (0.028, 0.014, 0.050), M_dark, bevel=0.004)
 bx("trigger",(0, -0.038, ZB-0.095), (0.011, 0.013, 0.036), M_metal, bevel=0.002)
 
 # ── SIGHTS with green dots ──

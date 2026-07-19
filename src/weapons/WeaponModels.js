@@ -79,14 +79,17 @@ function _buildFromGLB(weaponDef) {
   const body  = sci
     ? M('body',  color, { roughness: 0.48, metalness: 0.42 })
     : M('body',  color, { roughness: 0.55, metalness: 0.35 });
+  // Reference-chart steel: light flat grey. Metalness stays LOW — with no
+  // env map a metallic surface reflects nothing and goes near-black, which
+  // is exactly the "black+orange" look the chart doesn't have.
   const metal = sci
-    ? M('metal', 0x8a929c, { metalness: 0.94, roughness: 0.20 })
-    : M('metal', 0x808890, { metalness: 0.92, roughness: 0.18 });
+    ? M('metal', 0xaab1b9, { metalness: 0.30, roughness: 0.42 })
+    : M('metal', 0xaab1b9, { metalness: 0.28, roughness: 0.45 });
   // "dark" parts read as MEDIUM GREY (reference-chart gunmetal), not black —
   // this is what makes the guns read grey+orange instead of black+orange.
   const dark  = sci
-    ? M('accent', 0x565d66, { roughness: 0.45, metalness: 0.55 })
-    : M('accent', 0x565d66, { roughness: 0.48, metalness: 0.5 });
+    ? M('accent', 0x8a9199, { roughness: 0.55, metalness: 0.15 })
+    : M('accent', 0x8a9199, { roughness: 0.58, metalness: 0.12 });
   const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
   const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
                                         clearcoat: 0.8, clearcoatRoughness: 0.08 });
@@ -98,9 +101,9 @@ function _buildFromGLB(weaponDef) {
   // stays under the ACES clip point, so the glow reads as saturated colour
   // instead of washing out to white.
   const eBase = new THREE.Color(eCol).multiplyScalar(0.12).getHex();
-  const energy = M('energy', sci ? eBase : eCol,
+  const energy = M('energy', eBase,
                    { roughness: 0.22, metalness: 0.1,
-                     emissive: eCol, emissiveIntensity: sci ? 1.6 : 2.4 });
+                     emissive: eCol, emissiveIntensity: sci ? 1.3 : 1.2 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
