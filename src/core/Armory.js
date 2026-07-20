@@ -1,8 +1,11 @@
 // Per-weapon cosmetic skin storage, backed by localStorage.
 // Each weapon has an independently equipped skin.
-// Skins are a MAIN-weapon feature only (the loadout core guns) — extras and
-// melee always show their default look. Enforced here centrally so the UI,
-// the viewmodel and the thumbnails all agree.
+// Skins are for the ALWAYS-EQUIPPED loadout items only: the 5 main guns and
+// the Arc Blade sword (the player always carries a gun + the sword). They all
+// share ONE skin catalog (WEAPON_SKINS — the authored sword uses the same
+// material roles as the guns), so every skinnable item has the same skins.
+// Everything else (extras, knife, hammer) always shows its default look.
+// Enforced here centrally so the UI, viewmodel and thumbnails all agree.
 
 import { getWeaponSkin } from '../weapons/WeaponSkins.js';
 import { getSwordSkin } from '../weapons/SwordSkins.js';
@@ -17,9 +20,9 @@ function _load() {
 function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 
 export const Armory = {
-  // Only the main-category guns can wear skins.
+  // The main-category guns + the always-equipped sword can wear skins.
   canSkin(weaponId) {
-    return getWeapon(weaponId)?.category === 'main';
+    return weaponId === 'sword' || getWeapon(weaponId)?.category === 'main';
   },
 
   getSkinId(weaponId, isSword = false) {
@@ -69,14 +72,16 @@ export const Armory = {
     _save(d);
   },
 
-  // Returns Map<weaponId, { skin, isSword }>  for all weapons in loadout
+  // Returns Map<weaponId, { skin, isSword }>  for all weapons in loadout.
+  // Every skinnable item (main guns + sword) uses the shared WEAPON_SKINS
+  // catalog, so isSword is always false — the legacy sword-catalog path only
+  // survives inside ownsSkin for old saves.
   buildSkinMap(weapons) {
     const d = _load();
     const map = new Map();
     for (const w of weapons) {
-      const isSword = w.kind === 'melee';
-      const skinId  = this.canSkin(w.id) ? (d[w.id] || null) : null;
-      map.set(w.id, { skin: skinId ? (isSword ? getSwordSkin(skinId) : getWeaponSkin(skinId)) : null, isSword });
+      const skinId = this.canSkin(w.id) ? (d[w.id] || null) : null;
+      map.set(w.id, { skin: skinId ? getWeaponSkin(skinId) : null, isSword: false });
     }
     return map;
   },

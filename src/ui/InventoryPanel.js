@@ -11,7 +11,6 @@ import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPONS, weaponsByCategory } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
-import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
@@ -197,13 +196,14 @@ export class InventoryPanel {
       this._equipWeapon(gun, null);
     }));
 
-    // Skins are a MAIN-weapon feature — extras and melee only show Default.
+    // Skins are for the always-equipped items only (main guns + sword) —
+    // everything else shows just Default.
     if (!Armory.canSkin(gun.id)) return;
 
     // Only the skins the player OWNS for this weapon. New accounts have
     // none — the tab shows just Default until skins are earned/bought.
-    const allSkins = isMelee ? SWORD_SKINS : WEAPON_SKINS;
-    const owned = allSkins.filter((s) => Armory.ownsSkin(s.id));
+    // ONE shared catalog: the sword wears the same 40 finishes as the guns.
+    const owned = WEAPON_SKINS.filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
     for (const s of owned) {
       const card = this._weaponCard(gun, s, this._isEquipped(gun.id, s.id), () => {
@@ -284,9 +284,12 @@ export class InventoryPanel {
 
   _weaponCard(gun, skin, equipped, onClick) {
     const isMelee = gun.kind === 'melee';
+    // Branch on the skin's SHAPE, not the weapon: the sword wears gun skins
+    // (body/accent) now; only legacy sword-catalog entries carry .blade.
     const bg = skin
-      ? (isMelee ? _grad(skin.blade ?? 0x8090a0, skin.guard ?? 0x303840)
-                 : _grad(skin.body  ?? 0x556070, skin.accent ?? 0x202830))
+      ? (skin.blade !== undefined
+          ? _grad(skin.blade ?? 0x8090a0, skin.guard ?? 0x303840)
+          : _grad(skin.body  ?? 0x556070, skin.accent ?? 0x202830))
       : _grad(gun.color || 0x2a3040, _darken(gun.color || 0x2a3040, 0.4));
     const card = this._cardBase({
       bg, rarity: skin?.rarity, equipped, onClick,

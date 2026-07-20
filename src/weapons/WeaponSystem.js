@@ -1124,8 +1124,10 @@ export class WeaponSystem {
     const perSkin = this._armoryMap?.get(def.id)?.skin;
     const activeSkin = perSkin || (def.kind === 'melee' ? this.swordSkin : this.weaponSkin);
     if (activeSkin?.animated) {
-      if (def.kind === 'melee') animateSwordSkin(activeGroup, activeSkin, this.animTime);
-      else                      animateWeaponSkin(activeGroup, activeSkin, this.animTime);
+      // Route by catalog shape: the sword wears the shared gun catalog
+      // (body/accent/energy roles) — only legacy entries carry .blade.
+      if (activeSkin.blade !== undefined) animateSwordSkin(activeGroup, activeSkin, this.animTime);
+      else                                animateWeaponSkin(activeGroup, activeSkin, this.animTime);
     }
   }
 

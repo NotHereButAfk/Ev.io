@@ -73,11 +73,13 @@ export class WeaponPreviewRenderer {
   }
 
   // Apply (or preview) a skin on the current model without saving.
+  // Route by catalog shape — the sword wears the shared gun catalog now;
+  // only legacy sword-catalog entries carry .blade.
   previewSkin(skin) {
     if (!this._group || !skin) return;
     this._skin = skin;
-    if (this._isSword) applySwordSkin(this._group, skin);
-    else               applyWeaponSkin(this._group, skin);
+    if (skin.blade !== undefined) applySwordSkin(this._group, skin);
+    else                          applyWeaponSkin(this._group, skin);
   }
 
   start() {
@@ -90,8 +92,8 @@ export class WeaponPreviewRenderer {
         this._group.position.y = Math.sin(this._t * 1.3) * 0.016;
         // Drive animated skin if applicable
         if (this._skin?.animated) {
-          if (this._isSword) animateSwordSkin(this._group, this._skin, this._t);
-          else               animateWeaponSkin(this._group, this._skin, this._t);
+          if (this._skin.blade !== undefined) animateSwordSkin(this._group, this._skin, this._t);
+          else                                animateWeaponSkin(this._group, this._skin, this._t);
         }
       }
       this._renderer.render(this._scene, this._camera);

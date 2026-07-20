@@ -592,14 +592,15 @@ export class MenuUI {
     return shuffled.slice(0, count);
   }
 
-  // Deterministic per-skin, per-day showcase gun: a weapon skin is a generic
-  // finish usable on any of the 5 main guns, but the Night Market card should
-  // still show *one* real gun wearing it (stable for the day, so it doesn't
-  // flicker between renders) rather than always the Auto Rifle.
+  // Deterministic per-skin, per-day showcase item: a weapon skin is a generic
+  // finish usable on any of the 5 main guns AND the always-equipped sword,
+  // but the Night Market card should still show *one* real weapon wearing it
+  // (stable for the day, so it doesn't flicker between renders).
   _nightMarketGunFor(skinId) {
+    const pool = [...MAIN_GUNS, { id: 'sword', label: 'Arc Blade' }];
     let h = this._nightMarketSeed();
     for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
-    return MAIN_GUNS[Math.abs(h) % MAIN_GUNS.length];
+    return pool[Math.abs(h) % pool.length];
   }
 
   _nightMarketTimeLeft() {
