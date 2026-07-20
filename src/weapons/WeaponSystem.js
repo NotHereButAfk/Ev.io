@@ -947,9 +947,9 @@ export class WeaponSystem {
     const activeSkinDef = this._activeSkinFor?.(this.currentDef?.id);
     if (activeSkinDef?.fireEmbers) this._spawnFireEmbers();
 
-    this.kickPos.z += def.recoil * 2.2;
-    this.kickPos.y += def.recoil * 0.4;
-    this.kickRotX -= def.recoil * 3.2;
+    this.kickPos.z += def.recoil * 2.8;
+    this.kickPos.y += def.recoil * 0.5;
+    this.kickRotX -= def.recoil * 4.0;
     if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
 
     if (this.onShoot) this.onShoot(def);

@@ -48,6 +48,8 @@ export class Player {
     this.bobTime = 0;
     this.recoilPitch = 0;
     this.recoilPitchVel = 0;
+    this.recoilYaw = 0;
+    this.recoilYawVel = 0;
 
     this.name = 'Recruit';
     this.skin = null;
@@ -103,6 +105,8 @@ export class Player {
     this._shieldRegenDelay  = 0;
     this.position.copy(position);
     this.velocity.set(0, 0, 0);
+    this.recoilPitch = 0; this.recoilPitchVel = 0;
+    this.recoilYaw = 0;   this.recoilYawVel = 0;
   }
 
   takeDamage(amount) {
@@ -115,7 +119,12 @@ export class Player {
   }
 
   applyRecoil(amount) {
-    this.recoilPitchVel -= amount;
+    // Camera kick: guns kick UP — an immediate jolt plus follow-through
+    // velocity, with a touch of random horizontal drift. The springs in
+    // update() pull the view back to where the player was aiming.
+    this.recoilPitch    += amount * 0.9;
+    this.recoilPitchVel += amount * 7;
+    this.recoilYawVel   += (Math.random() - 0.5) * amount * 6;
   }
 
   update(dt, input, world) {
@@ -136,6 +145,9 @@ export class Player {
     const recoilSpring = -this.recoilPitch * 18 - this.recoilPitchVel * 6;
     this.recoilPitchVel += recoilSpring * dt;
     this.recoilPitch += this.recoilPitchVel * dt;
+    const yawSpring = -this.recoilYaw * 18 - this.recoilYawVel * 6;
+    this.recoilYawVel += yawSpring * dt;
+    this.recoilYaw += this.recoilYawVel * dt;
 
     // --- movement input ---
     let moveX = 0;
@@ -361,7 +373,7 @@ export class Player {
       // First-person: camera sits at eye height with head-bob.
       this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
       this.camera.rotation.order = 'YXZ';
-      this.camera.rotation.y = this.yaw;
+      this.camera.rotation.y = this.yaw + this.recoilYaw;
       this.camera.rotation.x = this.pitch + this.recoilPitch;
       this.camera.rotation.z = this._sprintT * -0.025; // slight COD-style lean while sprinting
     }
