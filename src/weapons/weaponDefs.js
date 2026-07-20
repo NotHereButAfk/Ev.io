@@ -351,7 +351,8 @@ export const WEAPONS = [
     reloadTime: 2.5,
     range: 150,
     recoil: 0.06,
-    color: 0x0a1a2a
+    color: 0xd9782e,        // orange canopy/grip (chart furniture)
+    energyColor: 0xb44bff   // plasma-violet vents + bore core
   },
   {
     id: 'energyshotgun',
@@ -383,7 +384,8 @@ export const WEAPONS = [
     fireRate: 0.85,
     range: 3.2,
     arc: 1.4,
-    color: 0x1a0a00
+    color: 0xd9782e,        // orange grip + head plates (chart furniture)
+    energyColor: 0xff5a2e   // molten power band
   },
 ];
 

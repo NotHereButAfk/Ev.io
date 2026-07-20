@@ -615,4 +615,57 @@ g.box((0, 0.170, Z), (0.032, 0.024, 0.048), 'dark', bevel=0.005)             # p
 g.cyl((0, 0.185, Z), 0.008, 0.012, 'energy')                                 # pommel crystal
 g.finish('sword', (0, -0.52, Z), scale=1.0)
 
+# ═════════════════════════════════════════════════════════════════════════════
+# Concussion Rifle — chunky sci-fi launcher: one fat traced body with a punched
+# trigger guard, orange top canopy + grip panels, glowing vents + muzzle core
+# ═════════════════════════════════════════════════════════════════════════════
+g = Gun(MATS)
+body = g.profile([
+    (0.24, Z+0.050),                           # rear top
+    (0.30, Z+0.015),                           # butt slope
+    (0.30, Z-0.050),                           # flat butt
+    (0.22, Z-0.075),                           # butt underside
+    (-0.10, Z-0.075),                          # belly
+    (-0.17, Z-0.052),                          # taper toward the nose
+    (-0.30, Z-0.035),                          # nose bottom
+    (-0.325, Z+0.008),                         # muzzle face
+    (-0.28, Z+0.045),                          # nose top slope
+    (-0.05, Z+0.058),                          # body hump
+], 0.075, 'dark', bevel=0.010, seg=3)
+g.hole_rect(body, 0.10, Z-0.035, 0.085, 0.045, bevel=0.014)      # trigger guard opening
+g.box((0, 0.075, Z-0.020), (0.010, 0.011, 0.045), 'metal')       # trigger (anchored above the hole)
+g.box((0, 0.0, Z+0.062), (0.058, 0.30, 0.028), 'body', bevel=0.010, seg=3)  # orange top canopy
+g.box((0, -0.02, Z+0.078), (0.014, 0.20, 0.006), 'energy')       # canopy core line
+g.box((0.039, 0.16, Z-0.030), (0.004, 0.075, 0.055), 'body', bevel=0.005)   # grip panel R
+g.box((-0.039, 0.16, Z-0.030), (0.004, 0.075, 0.055), 'body', bevel=0.005)  # grip panel L
+g.row((0.0375, -0.24, Z+0.005), (0, 0.055, 0), 3, (0.004, 0.032, 0.020), 'energy')   # glow vents R
+g.row((-0.0375, -0.24, Z+0.005), (0, 0.055, 0), 3, (0.004, 0.032, 0.020), 'energy')  # glow vents L
+g.cyl((0, -0.335, Z+0.005), 0.034, 0.03, 'dark')                 # muzzle collar
+g.cyl((0, -0.348, Z+0.005), 0.026, 0.010, 'energy')              # glowing bore core
+g.box((0, -0.05, Z+0.085), (0.012, 0.05, 0.014), 'dark', bevel=0.004)  # top sight fin
+g.box((0, 0.20, Z+0.052), (0.05, 0.05, 0.020), 'dark', bevel=0.006)    # rear hump vent block
+g.finish('concussion', (0, -0.355, Z+0.005), scale=1.25)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Gravity Hammer — two-hand shaft, massive grey head with orange side plates,
+# glowing power band, top spike, flat striking face
+# ═════════════════════════════════════════════════════════════════════════════
+g = Gun(MATS)
+g.cyl((0, -0.02, Z), 0.018, 0.60, 'dark')                        # shaft
+g.box((0, 0.16, Z), (0.030, 0.16, 0.046), 'body', bevel=0.010, seg=2)   # orange grip
+g.row((0, 0.10, Z), (0, 0.030, 0), 5, (0.033, 0.007, 0.049), 'dark')    # grip wrap bands
+g.box((0, 0.27, Z), (0.036, 0.024, 0.052), 'dark', bevel=0.005)  # pommel
+g.cyl((0, 0.285, Z), 0.009, 0.012, 'energy')                     # pommel crystal
+g.box((0, -0.24, Z), (0.05, 0.05, 0.07), 'dark', bevel=0.008)    # head coupling collar
+# the head
+g.box((0, -0.36, Z+0.02), (0.10, 0.16, 0.20), 'dark', bevel=0.012, seg=2)   # head block
+g.box((0.052, -0.36, Z+0.02), (0.006, 0.13, 0.16), 'body', bevel=0.005)     # orange side plate R
+g.box((-0.052, -0.36, Z+0.02), (0.006, 0.13, 0.16), 'body', bevel=0.005)    # orange side plate L
+g.box((0, -0.36, Z+0.02), (0.118, 0.028, 0.17), 'energy')        # glowing power band through the head
+g.box((0, -0.447, Z+0.02), (0.11, 0.018, 0.21), 'metal', bevel=0.004)   # striking face plate
+g.row((0, -0.457, Z-0.05), (0, 0, 0.048), 3, (0.09, 0.005, 0.012), 'dark')  # face ribs
+g.cone((0, -0.36, Z+0.15), 0.030, 0.09, 'dark', axis='Z')        # top spike
+g.cyl((0, -0.36, Z+0.115), 0.034, 0.02, 'metal', axis='Z')       # spike collar
+g.finish('ghammer', (0, -0.46, Z+0.02), scale=1.0)
+
 export(os.path.join(os.path.dirname(__file__), "..", "public", "weapons_authored.glb"))
