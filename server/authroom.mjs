@@ -115,18 +115,18 @@ export class AuthRoom {
     if (p.queue.length > MAX_INPUT_QUEUE) p.queue.splice(0, p.queue.length - MAX_INPUT_QUEUE);
   }
 
+  // Queue a fire request (replay-guarded). It's RESOLVED inside update() on the
+  // tick, so lag-comp rewinds to the right tick and the hit/kill events survive
+  // to that tick's snapshot (clearing events at the top of update() would wipe
+  // anything resolved between ticks).
   onFire(id, msg) {
     const p = this.players.get(id);
     if (!p || !p.alive) return;
-    if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;
+    if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;   // replay/dup
     p.lastFireSeq = msg.seq;
-    if (p.fireCooldown > 0 || p.mag <= 0) return;               // authority: rate + ammo
-    const w = WEAPONS[msg.wid] || WEAPONS.m4;
-    p.wid = WEAPONS[msg.wid] ? msg.wid : 'm4';
-    p.fireCooldown = w.rate;
-    p.mag--;
-    this._hitscan(p, w, Number.isFinite(msg.yaw) ? msg.yaw : 0,
-                  Number.isFinite(msg.pitch) ? msg.pitch : 0);
+    p.fireReq = { wid: WEAPONS[msg.wid] ? msg.wid : 'm4',
+                  yaw: Number.isFinite(msg.yaw) ? msg.yaw : 0,
+                  pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
   }
 
   _hitscan(shooter, w, yaw, pitch) {
@@ -203,6 +203,19 @@ export class AuthRoom {
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
       this._record(p);
+    }
+
+    // resolve fire requests AFTER movement + history record, so hitscan sees
+    // this tick's positions and events land in this tick's snapshot.
+    for (const p of this.players.values()) {
+      if (!p.fireReq || !p.alive) { p.fireReq = null; continue; }
+      const req = p.fireReq; p.fireReq = null;
+      if (p.fireCooldown > 0 || p.mag <= 0) continue;   // authority: rate + ammo
+      const w = WEAPONS[req.wid] || WEAPONS.m4;
+      p.wid = req.wid;
+      p.fireCooldown = w.rate;
+      p.mag--;
+      this._hitscan(p, w, req.yaw, req.pitch);
     }
 
     // send per-player snapshots (each gets its own ack + authoritative you-state)

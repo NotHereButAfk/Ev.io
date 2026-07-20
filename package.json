@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:move": "node tools/movesim_fixtures.mjs"
+    "test:move": "node tools/movesim_fixtures.mjs",
+    "arena:metrics": "node tools/arena_metrics.mjs"
   },
   "repository": {
     "type": "git",
