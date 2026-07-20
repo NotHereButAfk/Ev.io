@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Shared match-state relay for kyx.io — NOT the static game site. Deploy separately to a host that keeps a Node process running (see README.md).",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "auth": "node authserver.mjs",
+    "test:auth": "node authnet_test.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

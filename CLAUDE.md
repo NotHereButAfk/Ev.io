@@ -138,6 +138,39 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   localStorage kx_movesim=1): sim owns movement at 20Hz with interpolation;
   the legacy Player controller remains the DEFAULT until G2 sign-off.
 
+## Phase 4/5 — authoritative multiplayer (evidence layer)
+- `server/authroom.mjs` — fixed-20Hz authoritative room. Runs the SAME
+  MoveSim the client predicts with; owns ALL truth: validated movement (never
+  trusts client transforms — only tri-state intent), health/shield/damage/
+  death, 3s respawn, score, kill feed, and lag-compensated hitscan (rewinds
+  targets to the shooter's acked tick over 1s of position history). Sequenced
+  input queue per player with catch-up cap.
+- `server/authserver.mjs` — WS host with the connection protections:
+  origin allow-list (ALLOWED_ORIGINS), JSON schema + 2KB size cap, token-bucket
+  rate limit, monotonic-seq replay guard, ping/pong heartbeat + dead-socket
+  reap, snapshot backpressure shedding, duplicate-session reject. `npm run auth`
+  (server/) → :8788.
+- `src/net/AuthClient.js` — client prediction/replay + remote interpolation:
+  predicts locally each tick, on every snapshot snaps to server truth at
+  ackTick and replays unacked inputs; renders remotes 2 ticks in the past
+  lerped between snapshots.
+- `server/authnet_test.mjs` (`npm run test:auth` in server/) — 15 authority/
+  abuse proofs: forged transforms ignored, replay/reorder guarded, spam-fire
+  rate-limited, impossible ammo blocked, forged kill/damage ignored, duplicate
+  fire/session dropped, reconnect, 50%-loss+jitter survival. All pass.
+- `authnet-lab.html` — browser lab (`?ws=…&name=…&auto=circle|forward`); the
+  G3 capture ran TWO independent browser contexts in one authoritative room,
+  each predicting locally and seeing the other via snapshots.
+- Not yet wired into the live Game.js loop — the authoritative path is proven
+  standalone; folding it into the shipping game (replacing local ServerSim) is
+  the integration step gated behind G3 sign-off.
+
+## Phase 6 — original arena graybox
+- `src/sim/arenas.js` — `INKFALL` (Inkfall Foundry graybox): analytic arena
+  (Crucible deck + N/S ramps, E/W foundry walls, Slag Duct crouch tunnel,
+  Gantry steps, Ink Crate cover) with spawns, callouts, and pickups. Shared by
+  the auth room and the labs; topology tunable here before beauty work.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a
