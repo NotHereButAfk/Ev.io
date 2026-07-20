@@ -154,7 +154,7 @@ function _buildFromGLB(weaponDef) {
   // continuous box projection across the whole assembled gun so decals map onto
   // it as one wrap (faces stay a consistent size regardless of how the mesh is
   // split). Idempotent — geometries are shared across clones, so it runs once.
-  _applyBoxUVs(cloned);
+  _applyBoxUVs(cloned, 1.7, true);
 
   // Chart-style dark contour: attach an inverted-hull outline to each mesh.
   const outlineHosts = [];
@@ -188,7 +188,7 @@ const _boxUV = {
   box: new THREE.Box3(), size: new THREE.Vector3(), v: new THREE.Vector3(),
   n: new THREE.Vector3(), m: new THREE.Matrix4(), nm: new THREE.Matrix3(),
 };
-function _applyBoxUVs(root, TILES = 1.7) {
+function _applyBoxUVs(root, TILES = 1.7, force = false) {
   root.updateWorldMatrix(true, true);
   const box = _boxUV.box.setFromObject(root);
   const size = box.getSize(_boxUV.size);
@@ -197,7 +197,13 @@ function _applyBoxUVs(root, TILES = 1.7) {
   root.traverse((o) => {
     if (!o.isMesh || !o.geometry) return;
     const g = o.geometry;
-    if (g.attributes.uv) return;                 // keep authored UVs
+    if (g.userData.__boxUV) return;              // already projected (shared geo)
+    // Without `force`, existing UVs are kept. The authored Blender guns DO
+    // ship UVs — but they're primitive defaults (each box face = the full
+    // texture) and bmesh-profile parts have degenerate (0,0) UVs that sample
+    // a single texel, so decals showed as flat colour there. The authored
+    // path forces the continuous box wrap instead.
+    if (g.attributes.uv && !force) return;       // keep real authored UVs
     if (!g.attributes.normal) g.computeVertexNormals();
     const pos = g.attributes.position, nor = g.attributes.normal;
     const uv = new Float32Array(pos.count * 2);
@@ -215,6 +221,7 @@ function _applyBoxUVs(root, TILES = 1.7) {
       uv[i * 2] = u * scale; uv[i * 2 + 1] = w * scale;
     }
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.userData.__boxUV = true;
   });
 }
 

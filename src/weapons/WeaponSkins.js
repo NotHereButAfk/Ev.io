@@ -203,13 +203,47 @@ export function applyWeaponSkin(group, skin) {
       if (m.userData.baseEnergyColor === undefined) {
         m.userData.baseEnergyColor = m.color.getHex();
         m.userData.baseEnergyEmissive = m.emissive.getHex();
+        m.userData.baseEnergyIntensity = m.emissiveIntensity;
       }
-      if (skin.energyColor !== undefined) {
-        m.color.setHex(_hsl.setHex(skin.energyColor).multiplyScalar(0.12).getHex());
-        m.emissive.setHex(skin.energyColor);
+      // Rarity artwork ON the glow surfaces: epic+ decal skins paint their
+      // pattern onto the energy parts — on guns that's the conduits; on the
+      // Arc Blade it's the whole blade, which is what makes an epic /
+      // legendary / mythic finish actually LOOK different from a common
+      // recolor there (the blade dominates the sword's silhouette).
+      // Composition: the art is the SURFACE (white base × decal map) and the
+      // glow follows the art's bright lines (emissiveMap) in the skin's hue.
+      if (decal && skin.decalEmissive) {
+        // Dedicated half-repeat copy so the art renders LARGE on the glow
+        // surfaces — at normal tiling the pattern is too fine to read on a
+        // thin blade.
+        if (m.userData.energyDecalSrc !== decal) {
+          const t = decal.clone();
+          // Glow surfaces are thin (the blade especially): box UVs give them
+          // a very short span on one axis, so a symmetric repeat samples a
+          // narrow band of the art and reads as a flat tone. Stretch the
+          // sampling across that short axis so the art streaks ALONG the
+          // surface — reads as flowing energy in the blade.
+          t.repeat.set(6, 1.2);
+          t.needsUpdate = true;
+          m.userData.energyDecal = t;
+          m.userData.energyDecalSrc = decal;
+        }
+        m.map = m.userData.energyDecal;
+        m.emissiveMap = m.userData.energyDecal;
+        m.color.setHex(0xffffff);
+        m.emissive.setHex(skin.energyColor !== undefined ? skin.energyColor : 0xffffff);
+        m.emissiveIntensity = 1.5;
       } else {
-        m.color.setHex(m.userData.baseEnergyColor);
-        m.emissive.setHex(m.userData.baseEnergyEmissive);
+        m.map = null;
+        m.emissiveMap = null;
+        m.emissiveIntensity = m.userData.baseEnergyIntensity;
+        if (skin.energyColor !== undefined) {
+          m.color.setHex(_hsl.setHex(skin.energyColor).multiplyScalar(0.12).getHex());
+          m.emissive.setHex(skin.energyColor);
+        } else {
+          m.color.setHex(m.userData.baseEnergyColor);
+          m.emissive.setHex(m.userData.baseEnergyEmissive);
+        }
       }
       m.needsUpdate = true;
     } else if (role === 'metal') {
