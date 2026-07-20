@@ -40,16 +40,58 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the map. Currently the **Winter-Bishop town**: textured
-  building blocks in 3 rings, avenues/plaza, walkable snowy rooftops, ramps +
-  rooftop bridges, grav-lifts, central pavilion, snow drifts, string lights.
-  Collision via `colliders[]` (boxes) + `platforms[]` (walkable tops) +
-  `groundHeightAt()`. Snowy overcast palette, no neon.
+- `src/world/World.js` — the map. Currently a **REAL SHOPPING MALL**
+  (ARENA_HALF=62): a bright, **daylit** two-level retail gallery modelled on a
+  real mall photo. Cream stone-tile floor (`_buildGround`, `MeshPhysicalMaterial`
+  clearcoat + faint grout grid); pale-plaster outer shell (`_buildArenaWalls`);
+  daylight lighting (`_buildLighting`: strong warm hemisphere + near-vertical
+  "sun through the roof" key). The hero feature is a **vaulted glass skylight
+  roof** (`_buildGlassRoof`) — a barrel vault of emissive translucent glass on
+  white steel arch ribs + purlins, arcing over the whole atrium (decorative, no
+  colliders). `_buildMall()` builds the interior: four sides of **warm-lit glass
+  storefronts** (bright emissive shop interiors + clear glass panes + red accents
+  + illuminated lightbox signs + mannequin displays, 2 storeys, white pilasters);
+  a walkable **mezzanine** (`platforms[]`) around a central **light-well** with
+  clear glass + steel railings (`_mallRailing`), white soffit ceilings + recessed
+  downlights; four **escalators** (`_rampBox`, dark steel treads + glass
+  balustrades, rising ±24→±34 to meet the deck through the railing gaps) and four
+  **glass scenic elevators** (`_gravLift`, reskinned — clear glass shaft + lit
+  cabin, still launches you up) link the levels; a central **tiered stone
+  fountain** is the landmark/cover; **leafy ficus trees** in stone pots + bright
+  **retail kiosks** (walkable) are the concourse cover. Deep detail pass: every
+  shop has a **named illuminated lightbox sign** (canvas `makeStoreSignTexture`,
+  12 store brands × 3 sign styles), **stocked display windows** (shelves +
+  product boxes + mannequins behind glass, sealed by invisible display
+  colliders), and one **open entrance alcove per side** (welcome mat + shrubs —
+  a shallow cover niche); décor = floor **medallion** rings, wood **benches**,
+  trash bins, a **café terrace** (tables/stools/red umbrellas), **MALL MAP**
+  directory boards, 16 hanging **promo banners** (`makeBannerTexture`: SALE /
+  NEW SEASON / KYX GALLERIA), mezzanine railing **hedge planters**, and warm
+  track **spotlights** on the roof's dark clerestory fascia. Collision
+  via `colliders[]` (boxes) + `platforms[]` + `gravLifts[]` + `groundHeightAt()`.
+  (The old `_buildGlassField()`/`_glassPillar()`, `_buildArena()`,
+  `_buildMonument()`, `_buildWinterTown()`, `_buildOrbitalRing()` remain defined
+  but unused.)
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
-- `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB).
+- `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
+  loader + procedural builders). The arsenal's models are **Blender-authored
+  GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers — box/cyl/row +
+  `profile()` traced-silhouette extrusion + `hole_rect`/`hole_ellipse`
+  boolean punches + strict BVH connectivity audit on every export;
+  `model_arsenal.py` → `public/weapons_authored.glb` with real-firearm
+  silhouettes — Uzi/M1887/M4/M16/AK/M240/RPG-7/AWM/DEagle/G3/P90/SR-25/
+  870/M79/knife/sword; `model_sidearm.py` → `public/sidearm.glb` Glock).
+  Loader precedence: per-id override GLB → authored atlas → legacy
+  weapons.glb → procedural (plasmarifle/concussion/ghammer stay procedural).
+  Authored guns render ILLUSTRATED: MeshToonMaterial cel shading + an
+  inverted-hull dark outline per mesh (matches the reference-chart art).
+  Furniture = `body` role (orange default via def color), glow = `energy`
+  role (def energyColor). Skins are MAIN-weapon only (Armory.canSkin:
+  m4/magnum/battlerifle/energyshotgun/plasmarifle); the Night Market sells
+  armor + gun skins only (no sword skins). Viewmodel mount is scaled 0.74.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
   (green/cyan/amber bars, coin popups, weapon wheel), `Nameplates.js`,
@@ -73,7 +115,8 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   vertical weapon wheel; enemy nameplates; coin-earn popups; Winter-Bishop
   map + map loading screen; Esc opens the full nav GUI mid-match;
   fixed false-positive mobile controls on desktop (pointer-lock now works);
-  **Inventory v2** = real skinned-weapon renders + search + rarity filter chips.
+  **Inventory v2** = real skinned-weapon renders + search + rarity filter chips;
+  gun-skin catalog doubled to 30 (10 common / 10 epic / 6 legendary / 4 mythic).
 
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player

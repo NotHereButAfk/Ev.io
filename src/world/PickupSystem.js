@@ -1,7 +1,21 @@
 import * as THREE from 'three';
+import { buildWeaponModel } from '../weapons/WeaponModels.js';
+import { getWeapon } from '../weapons/weaponDefs.js';
 
 const RESPAWN_DELAY = 18;  // seconds before a pickup reappears
 const COLLECT_RADIUS = 1.6;
+const WEAPON_RESPAWN = 35;  // power weapons come back slowly — worth fighting over
+const WEAPON_COLLECT_RADIUS = 2.0;
+
+// The five "power" weapons that spawn on the map (ev.io style): a marked beam of
+// light with the floating weapon inside. Collecting one swaps it into your hands.
+const SPECIAL_WEAPONS = [
+  { id: 'rpg',        pos: [  0,   0], color: 0xff7a1a },  // Nova Launcher (centre holo-fountain — most contested)
+  { id: 'boltsniper', pos: [ 22,   0], color: 0x33d0ec },  // Rail Driver
+  { id: 'fuelrod',    pos: [-22,   0], color: 0x5cff7a },  // Fuel Rod
+  { id: 'needler',    pos: [  0,  22], color: 0xff4dd2 },  // Needler
+  { id: 'concussion', pos: [  0, -22], color: 0xb27bff },  // Concussion Rifle
+];
 
 // Pickup definitions: type, color, geometry size
 const PICKUP_DEFS = {
@@ -16,8 +30,8 @@ const SPAWN_LAYOUT = [
   // Centre cross-avenues (health + ammo alternating)
   ['health', [  0,  28]], ['ammo',   [  0, -28]],
   ['health', [ 28,   0]], ['ammo',   [-28,   0]],
-  ['health', [  0,  58]], ['ammo',   [  0, -58]],
-  ['health', [ 58,   0]], ['ammo',   [-58,   0]],
+  ['health', [  0,  44]], ['ammo',   [  0, -44]],
+  ['health', [ 44,   0]], ['ammo',   [-44,   0]],
   // Cross-street corners (the old corner spots are now inside the towers)
   ['shield', [ 38,  38]], ['shield', [-38,  38]],
   ['shield', [ 38, -38]], ['shield', [-38, -38]],
@@ -78,6 +92,60 @@ export class PickupSystem {
       // Stagger _animT so every pickup floats at a different phase from the start
       this._pickups.push({ type, def, mesh, active: true, respawnTimer: 0, baseY: 0.7, _animT: this._pickups.length * 1.37 });
     }
+    // Special power-weapon spawns.
+    for (const spec of SPECIAL_WEAPONS) {
+      const gun = getWeapon(spec.id);
+      if (!gun) continue;
+      const mesh = this._buildWeaponMesh(spec, gun);
+      mesh.position.set(spec.pos[0], 0, spec.pos[1]);
+      this.scene.add(mesh);
+      this._pickups.push({
+        type: 'weapon', gunId: spec.id, def: gun, name: gun.name, mesh,
+        active: true, respawnTimer: 0, baseY: 1.4, _animT: this._pickups.length * 1.37,
+        _spin: mesh.getObjectByName('wpnSpin'),
+      });
+    }
+  }
+
+  // A marked power-weapon spawn: a beam of light + a glowing base ring with the
+  // floating weapon model inside.
+  _buildWeaponMesh(spec, gun) {
+    const group = new THREE.Group();
+    group.userData.noHit = true;
+    const col = spec.color;
+
+    // Light beam column (translucent, visible from across the map).
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false,
+    });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 6, 16, 1, true), beamMat);
+    beam.position.y = 3.0; beam.userData.noHit = true; group.add(beam);
+    // Base ring + pad.
+    const ringMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.08, 8, 28), ringMat);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.12; ring.userData.noHit = true; group.add(ring);
+
+    // Floating weapon model (procedural — no GLB dependency), scaled to fit.
+    const spin = new THREE.Group(); spin.name = 'wpnSpin'; spin.position.y = 1.4;
+    const built = buildWeaponModel(gun, { procedural: true });
+    const wm = built && built.group;
+    if (wm) {
+      wm.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.userData.noHit = true; } });
+      const box = new THREE.Box3().setFromObject(wm);
+      const size = box.getSize(new THREE.Vector3());
+      const maxd = Math.max(size.x, size.y, size.z) || 1;
+      wm.scale.setScalar(2.4 / maxd);
+      const c = box.getCenter(new THREE.Vector3()).multiplyScalar(2.4 / maxd);
+      wm.position.sub(c);
+      spin.add(wm);
+    } else {
+      // fallback: a glowing diamond
+      const dm = new THREE.Mesh(new THREE.OctahedronGeometry(0.5),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.4 }));
+      spin.add(dm);
+    }
+    group.add(spin);
+    return group;
   }
 
   _disposeMesh(obj) {
@@ -92,8 +160,20 @@ export class PickupSystem {
 
   _collect(pickup, player, weaponSystem, hud) {
     pickup.active      = false;
-    pickup.respawnTimer = RESPAWN_DELAY;
+    pickup.respawnTimer = pickup.type === 'weapon' ? WEAPON_RESPAWN : RESPAWN_DELAY;
     pickup.mesh.visible = false;
+
+    if (pickup.type === 'weapon') {
+      if (weaponSystem?.addMapGun) {
+        const def = weaponSystem.addMapGun(pickup.gunId);
+        if (def && hud) {
+          hud.addKillFeed(`PICKED UP — ${def.name}`);
+          // Rebuild the right-side weapon inventory so the extra shows next to the main.
+          hud.buildWeaponSlots?.(weaponSystem.getHudInfo().slots, weaponSystem.currentIndex);
+        }
+      }
+      return;
+    }
 
     if (pickup.type === 'health') {
       const gained = Math.min(40, player.maxHealth - player.health);
@@ -140,15 +220,22 @@ export class PickupSystem {
 
       // Float + spin animation — use frame time instead of Date.now() (avoids 20 syscalls/frame)
       p._animT += dt * 2.0;
-      p.mesh.position.y  = p.baseY + Math.sin(p._animT) * 0.12;
-      p.mesh.rotation.y += dt * 1.4;
+      if (p.type === 'weapon') {
+        // Spin only the floating weapon; the beam/ring stay put.
+        if (p._spin) { p._spin.rotation.y += dt * 1.1; p._spin.position.y = p.baseY + Math.sin(p._animT) * 0.18; }
+      } else {
+        p.mesh.position.y  = p.baseY + Math.sin(p._animT) * 0.12;
+        p.mesh.rotation.y += dt * 1.4;
+      }
 
       // Proximity collect
       const dx = pPos.x - p.mesh.position.x;
       const dz = pPos.z - p.mesh.position.z;
-      if (Math.sqrt(dx * dx + dz * dz) < COLLECT_RADIUS && !player.isDead) {
-        // Only collect if the resource isn't already full
+      const radius = p.type === 'weapon' ? WEAPON_COLLECT_RADIUS : COLLECT_RADIUS;
+      if (Math.sqrt(dx * dx + dz * dz) < radius && !player.isDead) {
+        // Only collect if it does something useful.
         let needed = false;
+        if (p.type === 'weapon')  needed = weaponSystem?.currentDef?.id !== p.gunId;  // not already holding it
         if (p.type === 'health')  needed = player.health  < player.maxHealth;
         if (p.type === 'shield')  needed = player.maxShield > 0 ? player.shield < player.maxShield : player.health < player.maxHealth;
         if (p.type === 'ammo')    needed = weaponSystem?.loadout.some(w =>

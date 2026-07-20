@@ -68,8 +68,10 @@ export function renderWeaponSkinned(weaponDef, skin) {
   const g = built.group;
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
   if (skin) {
-    if (weaponDef.kind === 'melee') applySwordSkin(g, skin);
-    else                            applyWeaponSkin(g, skin);
+    // Route by the skin's catalog shape: sword-catalog entries carry .blade;
+    // the shared gun catalog (which the sword also wears) carries .body.
+    if (skin.blade !== undefined) applySwordSkin(g, skin);
+    else                          applyWeaponSkin(g, skin);
   }
   scene.add(g);
   // Some Blender-exported weapon models keep their mesh nodes positioned far

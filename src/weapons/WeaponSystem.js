@@ -110,7 +110,10 @@ export class WeaponSystem {
 
   _buildViewmodels() {
     this.weaponMount = new THREE.Object3D();
-    this.weaponMount.position.set(0.32, -0.26, -0.5);
+    // Tucked lower-right and scaled down so the gun frames the corner of the
+    // screen instead of blocking a third of the view (ev.io-style proportion).
+    this.weaponMount.position.set(0.30, -0.28, -0.52);
+    this.weaponMount.scale.setScalar(0.74);
     this.camera.add(this.weaponMount);
 
     // Dedicated viewmodel key light — a short-range light parented to the camera
@@ -308,26 +311,44 @@ export class WeaponSystem {
     const melee = this.allWeapons.find((w) => w.id === meleeId && w.kind === 'melee')
                || this.allWeapons.find((w) => w.kind === 'melee');
     this.loadout = [gun, melee].filter(Boolean);
+    this._mainGunId = gun?.id ?? null;   // remembered so map power-weapons can be dropped on respawn
+    this._meleeId   = melee?.id ?? null;
     this.currentIndex = 0;
     this._rebuildKeyMap();
     this._setActiveModel(0);
   }
 
-  // Swap the primary gun to a map-collected weapon, keeping the current melee,
-  // refill it to full, and switch to holding it. Returns the weapon def (or null).
-  equipMapGun(gunId) {
+  // Add a map-collected POWER weapon as an extra slot alongside the main gun, so
+  // the HUD shows [main gun, power gun, melee]. Switches to it and refills it.
+  // Picking up a different power weapon replaces the power slot (you carry one).
+  addMapGun(gunId) {
     const def = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee');
     if (!def) return null;
-    const melee = this.loadout.find((w) => w.kind === 'melee');
-    this.setLoadout(gunId, melee?.id);
-    const st = this.state.get(gunId);
+    const main  = this.allWeapons.find((w) => w.id === this._mainGunId && w.kind !== 'melee')
+               || this.loadout.find((w) => w.kind !== 'melee');
+    const melee = this.allWeapons.find((w) => w.id === this._meleeId && w.kind === 'melee')
+               || this.loadout.find((w) => w.kind === 'melee');
+    const slots = [];
+    if (main) slots.push(main);
+    if (!main || main.id !== def.id) slots.push(def);   // the extra power slot
+    if (melee) slots.push(melee);
+    this.loadout = slots;
+    this.currentIndex = this.loadout.indexOf(def);
+    this._rebuildKeyMap();
+    const st = this.state.get(def.id);
     if (st) {
       st.magAmmo = def.magSize;
       st.reserveAmmo = def.reserveMax;
       st.isReloading = false;
       st.reloadTimer = 0;
     }
+    this._setActiveModel(this.currentIndex);
     return def;
+  }
+
+  // Drop any picked-up power weapon — back to the base main gun + melee.
+  resetLoadout() {
+    this.setLoadout(this._mainGunId, this._meleeId);
   }
 
   _setActiveModel(index) {
@@ -926,9 +947,9 @@ export class WeaponSystem {
     const activeSkinDef = this._activeSkinFor?.(this.currentDef?.id);
     if (activeSkinDef?.fireEmbers) this._spawnFireEmbers();
 
-    this.kickPos.z += def.recoil * 2.2;
-    this.kickPos.y += def.recoil * 0.4;
-    this.kickRotX -= def.recoil * 3.2;
+    this.kickPos.z += def.recoil * 2.8;
+    this.kickPos.y += def.recoil * 0.5;
+    this.kickRotX -= def.recoil * 4.0;
     if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
 
     if (this.onShoot) this.onShoot(def);
@@ -1103,8 +1124,10 @@ export class WeaponSystem {
     const perSkin = this._armoryMap?.get(def.id)?.skin;
     const activeSkin = perSkin || (def.kind === 'melee' ? this.swordSkin : this.weaponSkin);
     if (activeSkin?.animated) {
-      if (def.kind === 'melee') animateSwordSkin(activeGroup, activeSkin, this.animTime);
-      else                      animateWeaponSkin(activeGroup, activeSkin, this.animTime);
+      // Route by catalog shape: the sword wears the shared gun catalog
+      // (body/accent/energy roles) — only legacy entries carry .blade.
+      if (activeSkin.blade !== undefined) animateSwordSkin(activeGroup, activeSkin, this.animTime);
+      else                                animateWeaponSkin(activeGroup, activeSkin, this.animTime);
     }
   }
 

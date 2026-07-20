@@ -1,37 +1,114 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // ── Blender GLB weapon loader ─────────────────────────────────────────────────
 let _weaponTemplate = null, _weaponLoading = false;
 
+// Per-weapon override GLBs — a dedicated Blender-authored model that supersedes
+// the shared weapons.glb node for that weapon (smoother than the procedural or
+// placeholder build). Each file has a node named `weapon_<id>`.
+const WEAPON_GLB_OVERRIDES = { sidearm: '/sidearm.glb' };
+const _overrideTemplates = new Map();   // id -> gltf.scene
+// Authored atlases — Blender-scripted real-firearm models for the whole
+// arsenal (tools/model_arsenal.py). Searched before the legacy weapons.glb.
+const AUTHORED_ATLASES = ['/weapons_authored.glb'];
+const _authoredTemplates = [];
+
 // Callbacks waiting on the GLB template (e.g. WeaponSystem swaps its
 // procedural viewmodels for the detailed Blender guns once it arrives).
 let _readyCallbacks = [];
+let _allReady = false;
+
+function _fireReady() {
+  _allReady = true;
+  const cbs = _readyCallbacks; _readyCallbacks = [];
+  for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[WeaponGLB] ready cb failed:', e); } }
+}
 
 export function onWeaponModelsReady(cb) {
-  if (_weaponTemplate) { cb(); return; }
+  if (_allReady) { cb(); return; }
   _readyCallbacks.push(cb);
 }
 
 export function preloadWeaponModels() {
   if (_weaponTemplate || _weaponLoading) return;
   _weaponLoading = true;
-  new GLTFLoader().load('/weapons.glb',
-    (gltf) => {
-      _weaponTemplate = gltf.scene;
-      _weaponLoading = false;
-      const cbs = _readyCallbacks; _readyCallbacks = [];
-      for (const cb of cbs) { try { cb(); } catch (e) { console.warn('[WeaponGLB] ready cb failed:', e); } }
-    },
-    undefined,
-    (err) => { console.warn('[WeaponGLB] load failed:', err.message); _weaponLoading = false; }
-  );
+  const loader = new GLTFLoader();
+  // main atlas + authored atlases + every override; fire ready only once all
+  // settle so viewmodels rebuild with the best model in place (no flash)
+  const jobs = [
+    ['/weapons.glb', { kind: 'main' }],
+    ...AUTHORED_ATLASES.map((url) => [url, { kind: 'authored' }]),
+    ...Object.entries(WEAPON_GLB_OVERRIDES).map(([id, url]) => [url, { kind: 'override', id }]),
+  ];
+  let pending = jobs.length;
+  const done = () => { if (--pending === 0) { _weaponLoading = false; _fireReady(); } };
+  for (const [url, tag] of jobs) {
+    loader.load(url,
+      (gltf) => {
+        if (tag.kind === 'override') _overrideTemplates.set(tag.id, gltf.scene);
+        else if (tag.kind === 'authored') _authoredTemplates.push(gltf.scene);
+        else _weaponTemplate = gltf.scene;
+        done();
+      },
+      undefined,
+      (err) => { console.warn(`[WeaponGLB] load failed (${url}):`, err.message); done(); }
+    );
+  }
+}
+
+// ── Illustrated ("reference chart") look for the authored guns ──────────────
+// Flat cel shading: a shared stepped ramp makes lighting break into two/three
+// bands like the chart's fills instead of a smooth PBR falloff.
+let _toonRampTex = null;
+function _toonRamp() {
+  if (_toonRampTex) return _toonRampTex;
+  const d = new Uint8Array([115, 185, 235, 255]);
+  _toonRampTex = new THREE.DataTexture(d, 4, 1, THREE.RedFormat);
+  _toonRampTex.minFilter = _toonRampTex.magFilter = THREE.NearestFilter;
+  _toonRampTex.needsUpdate = true;
+  return _toonRampTex;
+}
+function T(role, color, opts = {}) {
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: _toonRamp() });
+  if (opts.emissive !== undefined) {
+    m.emissive = new THREE.Color(opts.emissive);
+    m.emissiveIntensity = opts.emissiveIntensity ?? 1;
+  }
+  m.userData.role = role;   // skins recolor by role, same as the PBR path
+  return m;
+}
+
+// Dark contour outline — the chart's linework. Classic inverted hull: a
+// slightly inflated back-face copy of the mesh, displaced along smoothed
+// vertex normals so the silhouette gets a clean dark edge from every angle.
+const _outlineGeoCache = new WeakMap();
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x272c33, side: THREE.BackSide });
+function _outlineGeometry(src) {
+  let g = _outlineGeoCache.get(src);
+  if (g) return g;
+  g = src.clone();
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g.deleteAttribute('tangent');
+  g = mergeVertices(g, 1e-4);          // weld so corner normals average smoothly
+  g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, t = 0.005;
+  for (let i = 0; i < p.count; i++) {
+    p.setXYZ(i, p.getX(i) + n.getX(i) * t, p.getY(i) + n.getY(i) * t, p.getZ(i) + n.getZ(i) * t);
+  }
+  _outlineGeoCache.set(src, g);
+  return g;
 }
 
 function _buildFromGLB(weaponDef) {
-  const weaponRoot = _weaponTemplate?.getObjectByName(`weapon_${weaponDef.id}`);
+  const name = `weapon_${weaponDef.id}`;
+  let weaponRoot = _overrideTemplates.get(weaponDef.id)?.getObjectByName(name) || null;
+  if (!weaponRoot) for (const t of _authoredTemplates) { weaponRoot = t.getObjectByName(name); if (weaponRoot) break; }
+  if (!weaponRoot) weaponRoot = _weaponTemplate?.getObjectByName(name) || null;
   if (!weaponRoot) return null;
 
   const cloned = weaponRoot.clone(true);
@@ -44,29 +121,19 @@ function _buildFromGLB(weaponDef) {
   const eCol = weaponDef.energyColor ?? 0x2ee6ff;
   const sci  = weaponDef.sciFi === true;
 
-  const body  = sci
-    ? M('body',  color, { roughness: 0.48, metalness: 0.42 })
-    : M('body',  color, { roughness: 0.55, metalness: 0.35 });
-  const metal = sci
-    ? M('metal', 0x8a929c, { metalness: 0.94, roughness: 0.20 })
-    : M('metal', 0x808890, { metalness: 0.92, roughness: 0.18 });
-  const dark  = sci
-    ? M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 })
-    : M('accent', 0x0e0f11, { roughness: 0.45, metalness: 0.55 });
-  const wood  = M('wood',   0x4a2e18, { roughness: 0.72, metalness: 0.0  });
-  const blade = M('metal',  0xd0d8e0, { metalness: 0.95, roughness: 0.10,
-                                        clearcoat: 0.8, clearcoatRoughness: 0.08 });
-  const scope = M('special', 0x060a10, { roughness: 0.08, metalness: 0.2,
-                                         clearcoat: 0.9, clearcoatRoughness: 0.05 });
-  // Sci-fi glow parts (power cells, conduits, muzzle emitters). Always-on
-  // emissive; per-weapon hue via weaponDef.energyColor, skins leave it alone.
-  // Near-black base kills the lit (diffuse/env) contribution and the emissive
-  // stays under the ACES clip point, so the glow reads as saturated colour
-  // instead of washing out to white.
+  // Illustrated chart palette, cel-shaded: orange furniture (def.color), light
+  // flat steel, a medium grey a notch darker so receivers/mags/scopes separate
+  // from the barrels the way the chart's two greys do.
+  const body  = T('body',  color);
+  const metal = T('metal', 0xaab1b9);
+  const dark  = T('accent', 0x757c85);
+  const wood  = T('wood',   0x4a2e18);
+  const blade = T('metal',  0xd0d8e0);
+  const scope = T('special', 0x2a3038);
+  // Glow parts: near-black base + emissive keeps the neon saturated instead
+  // of washing out to white under ACES tone mapping.
   const eBase = new THREE.Color(eCol).multiplyScalar(0.12).getHex();
-  const energy = M('energy', sci ? eBase : eCol,
-                   { roughness: 0.22, metalness: 0.1,
-                     emissive: eCol, emissiveIntensity: sci ? 1.6 : 2.4 });
+  const energy = T('energy', eBase, { emissive: eCol, emissiveIntensity: sci ? 1.3 : 1.2 });
 
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
@@ -87,7 +154,17 @@ function _buildFromGLB(weaponDef) {
   // continuous box projection across the whole assembled gun so decals map onto
   // it as one wrap (faces stay a consistent size regardless of how the mesh is
   // split). Idempotent — geometries are shared across clones, so it runs once.
-  _applyBoxUVs(cloned);
+  _applyBoxUVs(cloned, 1.7, true);
+
+  // Chart-style dark contour: attach an inverted-hull outline to each mesh.
+  const outlineHosts = [];
+  cloned.traverse(o => { if (o.isMesh && o.material !== OUTLINE_MAT) outlineHosts.push(o); });
+  for (const o of outlineHosts) {
+    const ol = new THREE.Mesh(_outlineGeometry(o.geometry), OUTLINE_MAT);
+    ol.name = 'outline';
+    ol.castShadow = false;
+    o.add(ol);
+  }
 
   // Find muzzle point (Blender auto-renames duplicates to muzzle_point.001 etc.)
   let muzzle = null;
@@ -111,7 +188,7 @@ const _boxUV = {
   box: new THREE.Box3(), size: new THREE.Vector3(), v: new THREE.Vector3(),
   n: new THREE.Vector3(), m: new THREE.Matrix4(), nm: new THREE.Matrix3(),
 };
-function _applyBoxUVs(root, TILES = 1.7) {
+function _applyBoxUVs(root, TILES = 1.7, force = false) {
   root.updateWorldMatrix(true, true);
   const box = _boxUV.box.setFromObject(root);
   const size = box.getSize(_boxUV.size);
@@ -120,7 +197,13 @@ function _applyBoxUVs(root, TILES = 1.7) {
   root.traverse((o) => {
     if (!o.isMesh || !o.geometry) return;
     const g = o.geometry;
-    if (g.attributes.uv) return;                 // keep authored UVs
+    if (g.userData.__boxUV) return;              // already projected (shared geo)
+    // Without `force`, existing UVs are kept. The authored Blender guns DO
+    // ship UVs — but they're primitive defaults (each box face = the full
+    // texture) and bmesh-profile parts have degenerate (0,0) UVs that sample
+    // a single texel, so decals showed as flat colour there. The authored
+    // path forces the continuous box wrap instead.
+    if (g.attributes.uv && !force) return;       // keep real authored UVs
     if (!g.attributes.normal) g.computeVertexNormals();
     const pos = g.attributes.position, nor = g.attributes.normal;
     const uv = new Float32Array(pos.count * 2);
@@ -138,6 +221,7 @@ function _applyBoxUVs(root, TILES = 1.7) {
       uv[i * 2] = u * scale; uv[i * 2 + 1] = w * scale;
     }
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.userData.__boxUV = true;
   });
 }
 
@@ -263,91 +347,77 @@ function picRail(group, mat, x, y, zStart, length, step = 0.028) {
 // PISTOLS
 // ===========================================================================
 
-function buildSidearm(color) {
+// Pulse Pistol — clean light-grey faceted sci-fi Glock: long slide with a
+// raised top rib and chamfered nose, bevelled frame + grip, dark cyan-lit
+// barrel, and glowing cyan energy accents (sight dots, a bolt slash on the
+// frame, grip charge lines + a base chevron). Default light finish is the skin.
+function buildSidearm(color, def = {}) {
   const g = new THREE.Group();
-  const body    = M('body',   color,    { roughness: 0.55, metalness: 0.35 });
-  const slide   = M('accent', 0x18191d, { roughness: 0.35, metalness: 0.72 });
-  const metal   = M('metal',  0x6c7177, { metalness: 0.85, roughness: 0.25 });
-  const dark    = M('accent', 0x0e0f11, { roughness: 0.65, metalness: 0.2  });
+  const eCol = def.energyColor ?? 0x50d4ff;
+  const body  = M('body',   color ?? 0xd2cdc3, { roughness: 0.5,  metalness: 0.25 });   // light polymer frame/grip
+  const slide = M('accent', 0xcac5bb,          { roughness: 0.42, metalness: 0.45 });   // slide, a hair cooler
+  const metal = M('metal',  0x8a8f96,          { metalness: 0.9,  roughness: 0.28 });   // small steel bits
+  const dark  = M('accent', 0x2e3238,          { roughness: 0.5,  metalness: 0.55 });   // muzzle / insets (dark grey, not black)
+  const energy = M('energy', new THREE.Color(eCol).multiplyScalar(0.22).getHex(),
+    { roughness: 0.2, metalness: 0.1, emissive: eCol, emissiveIntensity: 1.5 });
 
-  // Frame
-  const frame = box(0.072, 0.055, 0.28, body);
-  frame.position.set(0, 0.0, -0.02);
-  g.add(frame);
+  // ── slide: main block + chamfer strips + raised top rib + angled nose ──
+  const sl = box(0.078, 0.082, 0.38, slide); sl.position.set(0, 0.062, -0.05); g.add(sl);
+  for (const sx of [-1, 1]) { const chamf = box(0.010, 0.024, 0.38, slide); chamf.position.set(sx * 0.036, 0.096, -0.05); chamf.rotation.z = sx * -0.5; g.add(chamf); }
+  const topRib = box(0.030, 0.014, 0.36, slide); topRib.position.set(0, 0.106, -0.05); g.add(topRib);
+  const nose = box(0.070, 0.070, 0.05, slide); nose.position.set(0, 0.058, -0.235); nose.rotation.x = -0.18; g.add(nose);
+  // rear + front cocking serrations
+  for (let i = 0; i < 6; i++) { const s = box(0.082, 0.066, 0.006, dark); s.position.set(0, 0.062, 0.075 + i * 0.015); g.add(s); }
+  for (let i = 0; i < 4; i++) { const s = box(0.082, 0.056, 0.006, dark); s.position.set(0, 0.058, -0.175 + i * 0.015); g.add(s); }
+  // ejection port
+  const ej = box(0.006, 0.036, 0.075, dark); ej.position.set(0.040, 0.072, -0.085); g.add(ej);
 
-  // Slide
-  const sl = box(0.080, 0.088, 0.36, slide);
-  sl.position.set(0, 0.062, -0.04);
-  g.add(sl);
+  // ── frame: bevelled block + accessory rail + takedown pin ──
+  const frame = box(0.070, 0.052, 0.30, body); frame.position.set(0, 0.004, -0.03); g.add(frame);
+  const frameBevelF = box(0.062, 0.030, 0.05, body); frameBevelF.position.set(0, -0.014, -0.16); frameBevelF.rotation.x = 0.4; g.add(frameBevelF);
+  const rail = box(0.048, 0.014, 0.13, dark); rail.position.set(0, -0.024, -0.11); g.add(rail);
+  for (let i = 0; i < 4; i++) { const tooth = box(0.050, 0.006, 0.010, metal); tooth.position.set(0, -0.014, -0.065 - i * 0.026); g.add(tooth); }
+  const pin = cyl(0.008, 0.008, 0.080, metal, 12, 0); pin.rotation.z = Math.PI / 2; pin.position.set(0, 0.000, -0.05); g.add(pin);
 
-  // Rear serrations on slide
-  for (let i = 0; i < 6; i++) {
-    const s = box(0.084, 0.072, 0.007, metal);
-    s.position.set(0, 0.062, 0.06 + i * 0.016);
-    g.add(s);
+  // ── grip: bevelled panels + stipple ──
+  const grip = box(0.074, 0.20, 0.098, body); grip.position.set(0, -0.115, 0.105); grip.rotation.x = 0.2; g.add(grip);
+  for (const sx of [-1, 1]) { const panel = box(0.010, 0.15, 0.070, body); panel.position.set(sx * 0.036, -0.11, 0.105); panel.rotation.z = sx * -0.35; panel.rotation.x = 0.2; g.add(panel); }
+  stippleGrip(g, dark, 0.038, -0.10, 0.070, 0.0, 0.14, 3, 5);
+  const magBase = box(0.078, 0.020, 0.10, dark); magBase.position.set(0, -0.215, 0.140); magBase.rotation.x = 0.2; g.add(magBase);
+
+  // ── angular trigger guard ──
+  const tgBot = box(0.050, 0.014, 0.10, body); tgBot.position.set(0, -0.050, 0.02); g.add(tgBot);
+  const tgFront = box(0.050, 0.044, 0.014, body); tgFront.position.set(0, -0.028, -0.028); tgFront.rotation.x = -0.25; g.add(tgFront);
+  const trig = box(0.014, 0.044, 0.016, metal); trig.position.set(0, -0.022, 0.008); g.add(trig);
+
+  // ── dark barrel with a cyan-lit chamber, poking through the nose ──
+  const barrel = cyl(0.016, 0.015, 0.075, dark, 14); barrel.position.set(0, 0.060, -0.255); g.add(barrel);
+  const crown = cyl(0.018, 0.019, 0.012, dark, 14); crown.position.set(0, 0.060, -0.290); g.add(crown);
+  const bore = cyl(0.010, 0.012, 0.010, energy, 12); bore.position.set(0, 0.060, -0.295); g.add(bore);
+
+  // ── iron sights with glowing cyan dots ──
+  const sightR = box(0.024, 0.016, 0.016, dark); sightR.position.set(0, 0.120, 0.10); g.add(sightR);
+  for (const sx of [-1, 1]) { const d = box(0.004, 0.005, 0.004, energy); d.position.set(sx * 0.008, 0.124, 0.104); g.add(d); }
+  const sightF = box(0.010, 0.016, 0.010, dark); sightF.position.set(0, 0.120, -0.20); g.add(sightF);
+  const fDot = box(0.005, 0.006, 0.004, energy); fDot.position.set(0, 0.126, -0.204); g.add(fDot);
+
+  // ── cyan energy accents (the skin's signature glow) ──
+  // a lightning-bolt slash on each frame flank above the trigger
+  for (const sx of [-1, 1]) {
+    const b1 = box(0.004, 0.010, 0.030, energy); b1.position.set(sx * 0.036, 0.014, -0.005); b1.rotation.x = 0.7; g.add(b1);
+    const b2 = box(0.004, 0.010, 0.026, energy); b2.position.set(sx * 0.036, 0.002, 0.020); b2.rotation.x = -0.6; g.add(b2);
   }
-
-  // Front serrations
-  for (let i = 0; i < 3; i++) {
-    const s = box(0.084, 0.06, 0.007, metal);
-    s.position.set(0, 0.062, -0.18 + i * 0.016);
-    g.add(s);
+  // a big cyan chevron mid-grip (the skin's signature) + charge dashes at the base
+  for (const sx of [-1, 1]) {
+    const cvU = box(0.004, 0.008, 0.030, energy); cvU.position.set(sx * 0.035, -0.090, 0.095); cvU.rotation.x = 0.9; g.add(cvU);
+    const cvL = box(0.004, 0.008, 0.030, energy); cvL.position.set(sx * 0.035, -0.118, 0.100); cvL.rotation.x = -0.4; g.add(cvL);
+    const l1 = box(0.004, 0.006, 0.030, energy); l1.position.set(sx * 0.035, -0.168, 0.152); l1.rotation.x = 0.2; g.add(l1);
+    const l2 = box(0.004, 0.006, 0.030, energy); l2.position.set(sx * 0.035, -0.192, 0.157); l2.rotation.x = 0.2; g.add(l2);
   }
+  // slide-side energy vent line
+  for (const sx of [-1, 1]) { const v = box(0.004, 0.008, 0.10, energy); v.position.set(sx * 0.040, 0.040, -0.03); g.add(v); }
 
-  // Ejection port (inset panel on slide side)
-  const ej = box(0.005, 0.04, 0.08, dark);
-  ej.position.set(0.041, 0.07, -0.08);
-  g.add(ej);
-
-  // Dust cover rail
-  const rail = box(0.05, 0.016, 0.14, dark);
-  rail.position.set(0, -0.022, -0.1);
-  g.add(rail);
-  for (let i = 0; i < 4; i++) {
-    const tooth = box(0.052, 0.006, 0.012, metal);
-    tooth.position.set(0, -0.012, -0.06 - i * 0.026);
-    g.add(tooth);
-  }
-
-  // Grip
-  const grip = box(0.078, 0.195, 0.1, body);
-  grip.position.set(0, -0.11, 0.1);
-  grip.rotation.x = 0.2;
-  g.add(grip);
-  stippleGrip(g, dark, 0.041, -0.1, 0.06, 0.0, 0.15, 4, 6);
-
-  // Trigger guard
-  const tgBot = box(0.052, 0.014, 0.1, body);
-  tgBot.position.set(0, -0.048, 0.02);
-  g.add(tgBot);
-  const tgFront = box(0.052, 0.04, 0.014, body);
-  tgFront.position.set(0, -0.026, -0.03);
-  g.add(tgFront);
-
-  // Trigger
-  const trig = box(0.016, 0.048, 0.018, metal);
-  trig.position.set(0, -0.02, 0.01);
-  g.add(trig);
-
-  // Barrel
-  const barrel = cyl(0.016, 0.014, 0.065, metal);
-  barrel.position.set(0, 0.062, -0.25);
-  g.add(barrel);
-
-  // Sights
-  const sightR = box(0.022, 0.016, 0.018, metal);
-  sightR.position.set(0, 0.112, -0.18);
-  g.add(sightR);
-  const sightF = box(0.01, 0.014, 0.012, metal);
-  sightF.position.set(0, 0.112, 0.09);
-  g.add(sightF);
-
-  // Takedown pin
-  const pin = cyl(0.008, 0.008, 0.086, metal, 16, 0);
-  pin.position.set(0, -0.002, -0.04);
-  g.add(pin);
-
-  const muzzle = addMuzzle(g, 0, 0.062, -0.295);
+  const muzzle = addMuzzle(g, 0, 0.060, -0.31);
   return { group: g, muzzle };
 }
 
@@ -942,57 +1012,66 @@ function buildM4(color) {
 }
 
 // AR-10 .308 — beefier M4 variant, 20-rd PMAG, red dot optic.
-function buildAR10(color) {
+function buildAR10(color, def = {}) {
   const g = new THREE.Group();
   const body  = M('body',   color,    { roughness: 0.55, metalness: 0.3  });
   const dark  = M('accent', 0x0f1116, { roughness: 0.6,  metalness: 0.22 });
   const metal = M('metal',  0x7c8289, { metalness: 0.76, roughness: 0.3  });
   const glass = M('special', 0x163b2a, { metalness: 0.15, roughness: 0.1,
                                          emissive: 0x0a2a1c, emissiveIntensity: 0.2 });
+  // sci-fi energy accents (the DMR uses this builder — it lives in a sci-fi
+  // arsenal, so it carries glowing tech details like the rest)
+  const eCol = def.energyColor ?? 0x2ee6ff;
+  const energy = M('energy', new THREE.Color(eCol).multiplyScalar(0.12).getHex(),
+    { roughness: 0.2, metalness: 0.1, emissive: eCol, emissiveIntensity: 3.0 });
 
   // Upper + lower receivers
-  const upper = box(0.092, 0.085, 0.4, dark);
-  upper.position.set(0, 0.095, 0.06);
+  const upper = box(0.078, 0.070, 0.4, dark);
+  upper.position.set(0, 0.098, 0.06);
   g.add(upper);
-  const lower = box(0.092, 0.075, 0.38, body);
-  lower.position.set(0, 0.022, 0.06);
+  const lower = box(0.078, 0.062, 0.38, body);
+  lower.position.set(0, 0.032, 0.06);
   g.add(lower);
 
   // M-LOK handguard (longer/beefier)
-  const hg = box(0.082, 0.092, 0.52, dark);
-  hg.position.set(0, 0.078, -0.36);
+  const hg = box(0.070, 0.078, 0.52, dark);
+  hg.position.set(0, 0.084, -0.36);
   g.add(hg);
-  railSlats(g, metal, 7, 0, 0.13, -0.16, 0.068, 0.09);
-  railSlats(g, metal, 5, 0.043, 0.072, -0.18, 0.086, 0.007, 0.04);
+  railSlats(g, metal, 7, 0, 0.126, -0.16, 0.058, 0.09);
+  railSlats(g, metal, 5, 0.037, 0.078, -0.18, 0.086, 0.007, 0.04);
 
   // Top rail
-  const topRail = box(0.042, 0.022, 0.88, metal);
-  topRail.position.set(0, 0.148, -0.19);
+  const topRail = box(0.040, 0.020, 0.88, metal);
+  topRail.position.set(0, 0.142, -0.19);
   g.add(topRail);
-  picRail(g, dark, 0, 0.16, 0.22, 0.88);
+  picRail(g, dark, 0, 0.155, 0.22, 0.88);
 
-  // Red-dot optic (Aimpoint-style)
+  // Red-dot optic (Aimpoint-style) — tube lies along the bore axis
   const base = box(0.052, 0.042, 0.115, dark);
-  base.position.set(0, 0.178, 0.03);
+  base.position.set(0, 0.172, 0.03);
   g.add(base);
-  const tube = cyl(0.032, 0.032, 0.105, dark, 16, 0);
-  tube.position.set(0, 0.225, 0.03);
+  const tube = cyl(0.032, 0.032, 0.105, dark, 16);
+  tube.position.set(0, 0.216, 0.03);
   g.add(tube);
-  const lens1 = cyl(0.028, 0.028, 0.012, glass, 16, 0);
-  lens1.position.set(0, 0.225, -0.045);
+  const lens1 = cyl(0.028, 0.028, 0.012, glass, 16);
+  lens1.position.set(0, 0.216, -0.028);
   g.add(lens1);
-  const lens2 = cyl(0.028, 0.028, 0.012, glass, 16, 0);
-  lens2.position.set(0, 0.225, 0.105);
+  const lens2 = cyl(0.028, 0.028, 0.012, glass, 16);
+  lens2.position.set(0, 0.216, 0.088);
   g.add(lens2);
   const adjKnob = cyl(0.01, 0.01, 0.03, metal, 8, 0);
-  adjKnob.position.set(0, 0.258, 0.03);
+  adjKnob.position.set(0, 0.252, 0.03);
   g.add(adjKnob);
+  // glowing holo reticle visible in the rear lens
+  const reticle = cyl(0.012, 0.012, 0.006, energy, 10);
+  reticle.position.set(0, 0.216, 0.082);
+  g.add(reticle);
 
   // Barrel (heavier .308 profile)
-  const barrel = cyl(0.021, 0.019, 0.24, metal);
+  const barrel = cyl(0.023, 0.021, 0.24, metal);
   barrel.position.set(0, 0.078, -0.72);
   g.add(barrel);
-  // Muzzle brake
+  // Muzzle brake + energy emitter ring
   const mbBody = cyl(0.032, 0.028, 0.076, dark);
   mbBody.position.set(0, 0.078, -0.878);
   g.add(mbBody);
@@ -1001,29 +1080,38 @@ function buildAR10(color) {
     port.position.set(Math.cos(i / 3 * Math.PI * 2) * 0.028, 0.078 + Math.sin(i / 3 * Math.PI * 2) * 0.028, -0.87);
     g.add(port);
   }
+  const mbEmit = cyl(0.018, 0.022, 0.014, energy, 12);
+  mbEmit.position.set(0, 0.078, -0.912);
+  g.add(mbEmit);
+  // energy conduits along the handguard sides
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.008, 0.42, energy); c.position.set(sx * 0.0365, 0.116, -0.34); g.add(c); }
 
-  // Magazine — 20-rd PMAG
-  const mag = box(0.059, 0.305, 0.094, body);
+  // Magazine — 20-rd PMAG with a glowing witness strip
+  const mag = box(0.052, 0.285, 0.086, body);
   mag.position.set(0, -0.16, 0.04);
   mag.rotation.x = -0.1;
   g.add(mag);
-  const magFloor = box(0.063, 0.022, 0.098, dark);
-  magFloor.position.set(0, -0.318, 0.04);
+  const magFloor = box(0.056, 0.020, 0.090, dark);
+  magFloor.position.set(0, -0.300, 0.04);
   g.add(magFloor);
+  const witness = box(0.013, 0.20, 0.008, energy);
+  witness.position.set(0, -0.145, 0.086);
+  witness.rotation.x = -0.1;
+  g.add(witness);
 
   // Pistol grip
-  const grip = box(0.073, 0.176, 0.086, dark);
-  grip.position.set(0, -0.098, 0.22);
+  const grip = box(0.062, 0.150, 0.072, dark);
+  grip.position.set(0, -0.082, 0.22);
   grip.rotation.x = 0.3;
   g.add(grip);
-  stippleGrip(g, metal, 0.038, -0.095, 0.088, 0.0, 0.14, 4, 5);
+  stippleGrip(g, metal, 0.032, -0.080, 0.088, 0.0, 0.12, 4, 5);
 
   // Buffer tube + collapsible stock
-  const btube = cyl(0.027, 0.027, 0.22, dark);
-  btube.position.set(0, 0.065, 0.36);
+  const btube = cyl(0.024, 0.024, 0.22, dark);
+  btube.position.set(0, 0.072, 0.36);
   g.add(btube);
-  const stockBody = box(0.075, 0.14, 0.135, dark);
-  stockBody.position.set(0, 0.034, 0.42);
+  const stockBody = box(0.056, 0.086, 0.135, dark);
+  stockBody.position.set(0, 0.062, 0.42);
   g.add(stockBody);
 
   const muzzle = addMuzzle(g, 0, 0.078, -0.92);
@@ -1680,136 +1768,568 @@ function buildKnife(color) {
 // Shared sci-fi material set for the main guns. Roles body / accent / metal /
 // energy; the energy parts glow in the weapon's signature `energyColor`.
 function _sciFiMats(color, eCol) {
+  // Tuned for tonal separation: mid-tone polymer furniture (def.color), hard
+  // anodized receiver parts that still catch light, bright brushed steel.
   return {
-    body:   M('body',   color,    { roughness: 0.48, metalness: 0.42 }),
-    dark:   M('accent', 0x0c0e11, { roughness: 0.42, metalness: 0.60 }),
-    metal:  M('metal',  0x8a929c, { metalness: 0.94, roughness: 0.20 }),
+    body:   M('body',   color,    { roughness: 0.46, metalness: 0.35 }),
+    dark:   M('accent', 0x1a1e24, { roughness: 0.38, metalness: 0.62 }),
+    metal:  M('metal',  0x9aa3ad, { metalness: 0.92, roughness: 0.22 }),
     energy: M('energy', eCol,     { roughness: 0.20, metalness: 0.10, emissive: eCol, emissiveIntensity: 3.2 }),
   };
 }
 
-// m4 — sci-fi assault carbine: railed receiver, vented handguard, red-dot
-// optic, curved energy magazine, collapsible stock.
+// m4 — realistic AR-15-pattern carbine with a light sci-fi accent: proper
+// upper/lower receivers (magwell, ejection port, brass deflector, charging
+// handle), M-LOK handguard, gas block + tube, birdcage flash hider, PMAG with
+// ribs, stippled grip, buffer tube + collapsible stock, red-dot optic.
 function buildSciFiAR(color, def = {}) {
   const eCol = def.energyColor ?? 0x2ee6ff;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-  const lower = box(0.070, 0.075, 0.30, body); lower.position.set(0, 0.012, 0.06); g.add(lower);
-  const upper = box(0.078, 0.072, 0.34, dark); upper.position.set(0, 0.088, 0.02); g.add(upper);
-  const rail  = box(0.030, 0.020, 0.44, metal); rail.position.set(0, 0.128, -0.04); g.add(rail);
-  picRail(g, dark, 0, 0.140, 0.14, 0.42);
-  const hg = box(0.062, 0.078, 0.34, dark); hg.position.set(0, 0.082, -0.32); g.add(hg);
-  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const v = box(0.006, 0.032, 0.05, energy); v.position.set(sx * 0.034, 0.086, -0.22 - i * 0.08); g.add(v); }
-  const brl = cyl(0.016, 0.016, 0.22, metal, 12); brl.position.set(0, 0.082, -0.52); g.add(brl);
-  const ring = cyl(0.028, 0.030, 0.03, dark, 12); ring.position.set(0, 0.082, -0.63); g.add(ring);
-  const emit = cyl(0.018, 0.024, 0.02, energy, 12); emit.position.set(0, 0.082, -0.648); g.add(emit);
-  const mag = box(0.050, 0.205, 0.078, dark); mag.position.set(0, -0.128, 0.05); mag.rotation.x = -0.10; g.add(mag);
-  const magCore = box(0.020, 0.150, 0.030, energy); magCore.position.set(0, -0.118, 0.090); magCore.rotation.x = -0.10; g.add(magCore);
-  const grip = box(0.050, 0.130, 0.060, body); grip.position.set(0, -0.070, 0.145); grip.rotation.x = 0.30; g.add(grip);
-  const tg = box(0.038, 0.034, 0.090, dark); tg.position.set(0, -0.028, 0.105); g.add(tg);
-  const ob = box(0.050, 0.030, 0.070, dark); ob.position.set(0, 0.150, 0.055); g.add(ob);
-  const og = box(0.046, 0.046, 0.008, metal); og.position.set(0, 0.186, 0.028); g.add(og);
-  const od = box(0.009, 0.009, 0.006, energy); od.position.set(0, 0.186, 0.024); g.add(od);
-  const st = box(0.050, 0.090, 0.150, body); st.position.set(0, 0.030, 0.255); g.add(st);
-  for (const sx of [-1, 1]) { const c = box(0.010, 0.052, 0.10, energy); c.position.set(sx * 0.030, 0.030, 0.255); g.add(c); }
-  const muzzle = addMuzzle(g, 0, 0.082, -0.68);
+
+  // receivers
+  const lower = box(0.072, 0.068, 0.30, body); lower.position.set(0, 0.014, 0.07); g.add(lower);
+  const magwell = box(0.062, 0.052, 0.085, body); magwell.position.set(0, -0.030, 0.045); g.add(magwell);
+  const upper = box(0.076, 0.070, 0.34, dark); upper.position.set(0, 0.082, 0.03); g.add(upper);
+  // ejection port + brass deflector + forward assist (right side)
+  const port = box(0.006, 0.030, 0.075, metal); port.position.set(0.039, 0.078, -0.015); g.add(port);
+  const deflector = box(0.014, 0.026, 0.020, dark); deflector.position.set(0.042, 0.078, 0.035); g.add(deflector);
+  const fwdAssist = cyl(0.011, 0.011, 0.016, metal, 10, 0); fwdAssist.rotation.z = Math.PI / 2; fwdAssist.position.set(0.044, 0.062, 0.055); g.add(fwdAssist);
+  // charging handle
+  const chandle = box(0.040, 0.012, 0.050, dark); chandle.position.set(0, 0.108, 0.19); g.add(chandle);
+  const chLatch = box(0.016, 0.010, 0.026, metal); chLatch.position.set(-0.026, 0.108, 0.185); g.add(chLatch);
+
+  // full-length top rail + optic
+  const rail = box(0.036, 0.016, 0.52, metal); rail.position.set(0, 0.126, -0.08); g.add(rail);
+  picRail(g, dark, 0, 0.138, 0.16, 0.50);
+  const optBase = box(0.038, 0.020, 0.070, dark); optBase.position.set(0, 0.148, 0.06); g.add(optBase);
+  const optHood = box(0.042, 0.040, 0.056, dark); optHood.position.set(0, 0.178, 0.055); g.add(optHood);
+  const optGlass = box(0.034, 0.032, 0.006, M('special', 0x0a1420, { roughness: 0.05, metalness: 0.2, clearcoat: 1 })); optGlass.position.set(0, 0.178, 0.028); g.add(optGlass);
+  // holographic reticle: glowing ring + centre dot floating in the glass
+  const optRing = cyl(0.011, 0.011, 0.005, energy, 12); optRing.position.set(0, 0.178, 0.025); g.add(optRing);
+  const optDot = box(0.005, 0.005, 0.005, energy); optDot.position.set(0, 0.178, 0.023); g.add(optDot);
+  const optKnob = cyl(0.009, 0.009, 0.012, metal, 10, 0); optKnob.rotation.z = Math.PI / 2; optKnob.position.set(0.026, 0.178, 0.055); g.add(optKnob);
+
+  // M-LOK handguard with slots + thin energy conduits along the top edges
+  const hg = box(0.060, 0.074, 0.36, dark); hg.position.set(0, 0.080, -0.33); g.add(hg);
+  railSlats(g, metal, 4, 0.032, 0.070, -0.20, 0.088, 0.007, 0.034);
+  railSlats(g, metal, 4, -0.032, 0.070, -0.20, 0.088, 0.007, 0.034);
+  railSlats(g, metal, 4, 0, 0.040, -0.20, 0.088, 0.040, 0.010);
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.010, 0.30, energy); c.position.set(sx * 0.030, 0.114, -0.31); g.add(c); }
+  // glowing status strip on the receiver flank (ammo readout)
+  const status = box(0.005, 0.010, 0.085, energy); status.position.set(-0.039, 0.096, 0.03); g.add(status);
+  // angled foregrip at the front of the handguard
+  const afg = box(0.034, 0.062, 0.040, body); afg.position.set(0, 0.026, -0.44); afg.rotation.x = -0.55; g.add(afg);
+  // flip-up rear sight aperture on the rail
+  const rsBase = box(0.030, 0.016, 0.026, dark); rsBase.position.set(0, 0.144, 0.135); g.add(rsBase);
+  const rsRing = cyl(0.009, 0.009, 0.007, metal, 10, 0); rsRing.position.set(0, 0.162, 0.135); g.add(rsRing);
+
+  // barrel group: gas block, tube, exposed barrel, birdcage flash hider
+  const brl = cyl(0.017, 0.016, 0.16, metal, 12); brl.position.set(0, 0.078, -0.575); g.add(brl);
+  const gasBlock = box(0.028, 0.030, 0.036, dark); gasBlock.position.set(0, 0.082, -0.50); g.add(gasBlock);
+  const gasTube = cyl(0.006, 0.006, 0.34, metal, 8); gasTube.position.set(0, 0.108, -0.34); g.add(gasTube);
+  const fh = cyl(0.021, 0.016, 0.055, dark, 12); fh.position.set(0, 0.078, -0.665); g.add(fh);
+  for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; const slot = box(0.005, 0.011, 0.038, metal); slot.position.set(Math.cos(a) * 0.019, 0.078 + Math.sin(a) * 0.019, -0.665); g.add(slot); }
+  const emit = cyl(0.014, 0.017, 0.014, energy, 10); emit.position.set(0, 0.078, -0.690); g.add(emit);
+
+  // PMAG: curved polymer, ribs, floorplate, glowing witness strip
+  const mag = box(0.048, 0.185, 0.074, body); mag.position.set(0, -0.128, 0.035); mag.rotation.x = -0.14; g.add(mag);
+  for (let i = 0; i < 3; i++) { const rib = box(0.052, 0.007, 0.064, dark); rib.position.set(0, -0.092 - i * 0.042, 0.042 + i * 0.006); rib.rotation.x = -0.14; g.add(rib); }
+  const magFloor = box(0.054, 0.015, 0.080, dark); magFloor.position.set(0, -0.224, 0.050); magFloor.rotation.x = -0.14; g.add(magFloor);
+  const witness = box(0.013, 0.14, 0.008, energy); witness.position.set(0, -0.124, 0.075); witness.rotation.x = -0.14; g.add(witness);
+
+  // controls: mag release, selector both sides, bolt catch, trigger + guard
+  const magRel = cyl(0.008, 0.008, 0.012, metal, 8, 0); magRel.rotation.z = Math.PI / 2; magRel.position.set(0.040, 0.010, 0.005); g.add(magRel);
+  for (const sx of [-1, 1]) { const sel = box(0.008, 0.010, 0.030, metal); sel.position.set(sx * 0.040, 0.036, 0.115); g.add(sel); }
+  const boltCatch = box(0.006, 0.022, 0.030, metal); boltCatch.position.set(-0.040, 0.030, 0.02); g.add(boltCatch);
+  const trigger = box(0.010, 0.032, 0.008, metal); trigger.position.set(0, -0.026, 0.115); trigger.rotation.x = 0.25; g.add(trigger);
+  const tg = box(0.034, 0.008, 0.085, dark); tg.position.set(0, -0.048, 0.10); g.add(tg);
+  const tgFront = box(0.034, 0.030, 0.008, dark); tgFront.position.set(0, -0.032, 0.062); g.add(tgFront);
+
+  // stippled pistol grip with backstrap
+  const grip = box(0.052, 0.125, 0.058, body); grip.position.set(0, -0.070, 0.165); grip.rotation.x = 0.32; g.add(grip);
+  const backstrap = box(0.052, 0.115, 0.012, dark); backstrap.position.set(0, -0.078, 0.196); backstrap.rotation.x = 0.32; g.add(backstrap);
+  stippleGrip(g, dark, 0, -0.075, 0.140, 0.034, 0.095, 3, 4);
+
+  // buffer tube + castle nut + 6-position collapsible stock
+  const btube = cyl(0.023, 0.023, 0.17, dark, 12); btube.position.set(0, 0.062, 0.28); g.add(btube);
+  knurledCollar(g, metal, 0, 0.062, 0.205, 0.027, 10);
+  for (let i = 0; i < 3; i++) { const notch = box(0.050, 0.006, 0.008, metal); notch.position.set(0, 0.040, 0.24 + i * 0.04); g.add(notch); }
+  // stock stays in scale with the receiver — comb on the buffer-tube line
+  const stock = box(0.054, 0.082, 0.115, body); stock.position.set(0, 0.046, 0.375); g.add(stock);
+  const cheek = box(0.046, 0.016, 0.105, dark); cheek.position.set(0, 0.092, 0.375); g.add(cheek);
+  const stockToe = box(0.048, 0.042, 0.052, body); stockToe.position.set(0, 0.008, 0.396); stockToe.rotation.x = 0.35; g.add(stockToe);
+  const buttpad = box(0.052, 0.086, 0.016, dark); buttpad.position.set(0, 0.046, 0.437); g.add(buttpad);
+  const slingLoop = box(0.010, 0.020, 0.008, metal); slingLoop.position.set(0, 0.000, 0.36); g.add(slingLoop);
+
+  const muzzle = addMuzzle(g, 0, 0.078, -0.70);
   return { group: g, muzzle };
 }
 
-// magnum — compact energy hand cannon: short slide, steep grip, and a glowing
-// revolver-style power cylinder. No stock; pistol proportions.
+// magnum — realistic heavy revolver-automag hybrid: serrated slide, ported
+// barrel shroud, fluted six-shot cylinder (glowing chambers), hammer spur,
+// under-rail, stippled grip panels, proper sights.
 function buildSciFiHandCannon(color, def = {}) {
   const eCol = def.energyColor ?? 0xffb03a;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-  const slide = box(0.052, 0.075, 0.28, dark); slide.position.set(0, 0.075, -0.06); g.add(slide);
-  const frame = box(0.050, 0.055, 0.20, body); frame.position.set(0, 0.028, -0.02); g.add(frame);
-  const rib = box(0.016, 0.012, 0.24, metal); rib.position.set(0, 0.116, -0.06); g.add(rib);
-  const rs = box(0.030, 0.020, 0.020, dark); rs.position.set(0, 0.122, 0.05); g.add(rs);
-  const fs = box(0.012, 0.020, 0.012, metal); fs.position.set(0, 0.122, -0.17); g.add(fs);
-  const cylC = cyl(0.032, 0.032, 0.10, dark, 12); cylC.position.set(0, 0.045, 0.02); g.add(cylC);
-  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const ch = cyl(0.006, 0.006, 0.10, energy, 6); ch.position.set(Math.cos(a) * 0.022, 0.045 + Math.sin(a) * 0.022, 0.02); g.add(ch); }
-  const brl = cyl(0.018, 0.018, 0.14, metal, 12); brl.position.set(0, 0.075, -0.20); g.add(brl);
-  const ring = cyl(0.030, 0.030, 0.02, dark, 12); ring.position.set(0, 0.075, -0.265); g.add(ring);
-  const emit = cyl(0.020, 0.026, 0.02, energy, 12); emit.position.set(0, 0.075, -0.28); g.add(emit);
-  const grip = box(0.050, 0.150, 0.062, body); grip.position.set(0, -0.055, 0.09); grip.rotation.x = 0.42; g.add(grip);
-  const cell = box(0.020, 0.090, 0.026, energy); cell.position.set(0, -0.050, 0.116); cell.rotation.x = 0.42; g.add(cell);
-  const tg = box(0.036, 0.032, 0.060, dark); tg.position.set(0, -0.006, 0.03); g.add(tg);
-  const muzzle = addMuzzle(g, 0, 0.075, -0.30);
+
+  // Proportions follow a real large-frame pistol: slim slide riding a shallow
+  // frame, everything hung off one bore line (y=0.072).
+  // slide with front + rear cocking serrations and ejection port
+  const slide = box(0.048, 0.052, 0.30, dark); slide.position.set(0, 0.072, -0.05); g.add(slide);
+  // brushed-steel sight rib along the slide top — breaks up the black slab
+  const sightRib = box(0.026, 0.007, 0.29, metal); sightRib.position.set(0, 0.101, -0.05); g.add(sightRib);
+  for (let i = 0; i < 5; i++) { const s = box(0.052, 0.028, 0.005, metal); s.position.set(0, 0.078, 0.055 + i * 0.013); g.add(s); }
+  for (let i = 0; i < 3; i++) { const s = box(0.052, 0.028, 0.005, metal); s.position.set(0, 0.078, -0.145 - i * 0.013); g.add(s); }
+  const eport = box(0.006, 0.020, 0.060, metal); eport.position.set(0.025, 0.076, -0.03); g.add(eport);
+
+  // ported barrel shroud + exposed match barrel + recessed crown — the middle
+  // port on each side glows (energy bleed-off vents)
+  const shroud = box(0.044, 0.044, 0.115, body); shroud.position.set(0, 0.072, -0.245); g.add(shroud);
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const p = box(0.006, 0.014, 0.022, i === 1 ? energy : dark); p.position.set(sx * 0.023, 0.082, -0.21 - i * 0.032); g.add(p); }
+  const brl = cyl(0.015, 0.015, 0.06, metal, 12); brl.position.set(0, 0.072, -0.285); g.add(brl);
+  const crown = cyl(0.017, 0.019, 0.014, dark, 12); crown.position.set(0, 0.072, -0.292); g.add(crown);
+  const emit = cyl(0.010, 0.012, 0.010, energy, 10); emit.position.set(0, 0.072, -0.298); g.add(emit);
+
+  // fluted six-shot cylinder on a crane, chambers glow
+  const cylC = cyl(0.032, 0.032, 0.095, dark, 12); cylC.position.set(0, 0.034, 0.015); g.add(cylC);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const flute = box(0.008, 0.008, 0.080, metal); flute.position.set(Math.cos(a) * 0.032, 0.034 + Math.sin(a) * 0.032, 0.015); flute.rotation.z = a; g.add(flute);
+    const ch = cyl(0.006, 0.006, 0.098, energy, 6); ch.position.set(Math.cos(a + 0.5) * 0.019, 0.034 + Math.sin(a + 0.5) * 0.019, 0.015); g.add(ch);
+  }
+  const crane = box(0.010, 0.028, 0.060, metal); crane.position.set(-0.028, 0.018, 0.015); g.add(crane);
+  const cylLatch = box(0.008, 0.013, 0.028, metal); cylLatch.position.set(-0.027, 0.048, 0.075); g.add(cylLatch);
+  // glowing energy seam ring on the cylinder face
+  const cylSeam = cyl(0.026, 0.026, 0.006, energy, 12); cylSeam.position.set(0, 0.034, -0.036); g.add(cylSeam);
+
+  // frame with a cylinder window (front section + rear section) so the fluted
+  // cylinder and its glowing chambers stay visible, like a Mateba automag.
+  const frame = box(0.044, 0.038, 0.155, body); frame.position.set(0, 0.022, -0.133); g.add(frame);
+  // rear frame block runs from the slide all the way down into the grip so the
+  // back end reads as one piece instead of hanging chunks
+  const frameRear = box(0.042, 0.088, 0.058, body); frameRear.position.set(0, 0.002, 0.072); g.add(frameRear);
+  const underCyl = box(0.040, 0.014, 0.11, body); underCyl.position.set(0, -0.004, 0.015); g.add(underCyl);
+  const dust = box(0.038, 0.012, 0.10, dark); dust.position.set(0, 0.000, -0.22); g.add(dust);
+  picRail(g, metal, 0, -0.008, -0.17, 0.09, 0.022);
+
+  // hammer spur + beavertail
+  const hammer = box(0.013, 0.028, 0.015, metal); hammer.position.set(0, 0.094, 0.098); hammer.rotation.x = -0.5; g.add(hammer);
+  const beaver = box(0.040, 0.013, 0.042, dark); beaver.position.set(0, 0.026, 0.096); g.add(beaver);
+
+  // sights: serrated ramp front with glow dot, notch rear with two dots
+  const fs = box(0.011, 0.020, 0.015, dark); fs.position.set(0, 0.100, -0.27); g.add(fs);
+  const fsDot = box(0.006, 0.006, 0.005, energy); fsDot.position.set(0, 0.108, -0.276); g.add(fsDot);
+  const rs = box(0.030, 0.016, 0.015, dark); rs.position.set(0, 0.104, 0.085); g.add(rs);
+  for (const sx of [-1, 1]) { const d = box(0.005, 0.005, 0.005, energy); d.position.set(sx * 0.010, 0.110, 0.092); g.add(d); }
+
+  // grip: stippled panels, finger grooves, lanyard loop, energy cell window
+  // (gentler rake, tucked up into the rear frame block)
+  const grip = box(0.046, 0.140, 0.056, body); grip.position.set(0, -0.055, 0.062); grip.rotation.x = 0.34; g.add(grip);
+  for (const sx of [-1, 1]) { const panel = box(0.006, 0.095, 0.042, dark); panel.position.set(sx * 0.024, -0.058, 0.065); panel.rotation.x = 0.34; g.add(panel); }
+  for (let i = 0; i < 3; i++) { const groove = box(0.048, 0.008, 0.010, dark); groove.position.set(0, -0.025 - i * 0.035, 0.030 + i * 0.013); g.add(groove); }
+  const cell = box(0.015, 0.065, 0.018, energy); cell.position.set(0, -0.065, 0.088); cell.rotation.x = 0.34; g.add(cell);
+  const lanyard = box(0.010, 0.013, 0.008, metal); lanyard.position.set(0, -0.118, 0.078); g.add(lanyard);
+
+  // trigger + guard bridging the grip front to the frame underside
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.018, 0.020); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.085, dark); tgB.position.set(0, -0.042, 0.010); g.add(tgB);
+  const tgF = box(0.032, 0.034, 0.008, dark); tgF.position.set(0, -0.026, -0.028); g.add(tgF);
+
+  const muzzle = addMuzzle(g, 0, 0.072, -0.31);
   return { group: g, muzzle };
 }
 
-// battlerifle — long scoped marksman rifle: boxy receiver, big scope on rings,
-// ported barrel, straight box magazine.
+// battlerifle — realistic scoped DMR: monolithic receiver, free-float M-LOK
+// handguard, fluted heavy barrel + muzzle brake, full scope (bell, turrets,
+// rings, sunshade), 20-rd mag, adjustable precision stock.
 function buildSciFiBattleRifle(color, def = {}) {
   const eCol = def.energyColor ?? 0x39ff9d;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-  const lower = box(0.066, 0.080, 0.36, body); lower.position.set(0, 0.012, 0.04); g.add(lower);
-  const upper = box(0.072, 0.060, 0.40, dark); upper.position.set(0, 0.086, 0.00); g.add(upper);
-  const hg = box(0.060, 0.070, 0.30, dark); hg.position.set(0, 0.078, -0.36); g.add(hg);
-  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) { const v = box(0.006, 0.028, 0.06, energy); v.position.set(sx * 0.032, 0.082, -0.30 - i * 0.10); g.add(v); }
-  const brl = cyl(0.015, 0.015, 0.28, metal, 12); brl.position.set(0, 0.080, -0.56); g.add(brl);
-  const brake = box(0.036, 0.036, 0.06, dark); brake.position.set(0, 0.080, -0.70); g.add(brake);
-  const emit = cyl(0.016, 0.022, 0.02, energy, 12); emit.position.set(0, 0.080, -0.73); g.add(emit);
-  for (const z of [-0.02, 0.14]) { const rr = box(0.020, 0.030, 0.020, dark); rr.position.set(0, 0.118, z); g.add(rr); }
-  const scope = cyl(0.026, 0.026, 0.30, dark, 14); scope.position.set(0, 0.150, 0.06); g.add(scope);
-  const lensF = cyl(0.024, 0.024, 0.010, metal, 14); lensF.position.set(0, 0.150, -0.09); g.add(lensF);
-  const lensR = cyl(0.022, 0.022, 0.010, energy, 14); lensR.position.set(0, 0.150, 0.21); g.add(lensR);
-  const mag = box(0.046, 0.190, 0.070, dark); mag.position.set(0, -0.120, 0.02); g.add(mag);
-  const magCore = box(0.018, 0.140, 0.028, energy); magCore.position.set(0, -0.110, 0.058); g.add(magCore);
-  const grip = box(0.048, 0.130, 0.058, body); grip.position.set(0, -0.066, 0.135); grip.rotation.x = 0.28; g.add(grip);
-  const tg = box(0.036, 0.032, 0.085, dark); tg.position.set(0, -0.026, 0.10); g.add(tg);
-  const st = box(0.052, 0.100, 0.170, body); st.position.set(0, 0.020, 0.27); g.add(st);
-  const stGlow = box(0.014, 0.060, 0.11, energy); stGlow.position.set(0, 0.055, 0.27); g.add(stGlow);
-  const muzzle = addMuzzle(g, 0, 0.080, -0.74);
+
+  // receivers + magwell + ejection port + side charging handle
+  const lower = box(0.066, 0.070, 0.34, body); lower.position.set(0, 0.014, 0.055); g.add(lower);
+  const upper = box(0.072, 0.062, 0.42, dark); upper.position.set(0, 0.082, 0.00); g.add(upper);
+  const magwell = box(0.058, 0.045, 0.080, body); magwell.position.set(0, -0.026, 0.015); g.add(magwell);
+  const eport = box(0.006, 0.026, 0.070, metal); eport.position.set(0.037, 0.078, -0.03); g.add(eport);
+  const chandle = box(0.028, 0.012, 0.045, metal); chandle.position.set(-0.052, 0.092, 0.05); g.add(chandle);
+
+  // full-length rail
+  const rail = box(0.034, 0.014, 0.60, metal); rail.position.set(0, 0.120, -0.10); g.add(rail);
+  picRail(g, dark, 0, 0.131, 0.16, 0.56);
+
+  // free-float M-LOK handguard + bottom bipod rail stub + conduits
+  const hg = box(0.058, 0.066, 0.34, dark); hg.position.set(0, 0.076, -0.37); g.add(hg);
+  railSlats(g, metal, 4, 0.031, 0.066, -0.26, 0.082, 0.007, 0.030);
+  railSlats(g, metal, 4, -0.031, 0.066, -0.26, 0.082, 0.007, 0.030);
+  picRail(g, metal, 0, 0.038, -0.44, 0.09, 0.024);
+  for (const sx of [-1, 1]) { const c = box(0.006, 0.009, 0.28, energy); c.position.set(sx * 0.029, 0.106, -0.36); g.add(c); }
+  for (const sx of [-1, 1]) { const c = box(0.005, 0.008, 0.22, energy); c.position.set(sx * 0.0295, 0.058, -0.35); g.add(c); }
+
+  // fluted heavy barrel + target crown muzzle brake with side ports
+  const brl = cyl(0.018, 0.017, 0.24, metal, 12); brl.position.set(0, 0.078, -0.60); g.add(brl);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; const fl = box(0.005, 0.005, 0.20, dark); fl.position.set(Math.cos(a) * 0.017, 0.078 + Math.sin(a) * 0.017, -0.60); g.add(fl); }
+  const brake = box(0.034, 0.034, 0.065, dark); brake.position.set(0, 0.078, -0.715); g.add(brake);
+  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) { const p = box(0.008, 0.016, 0.016, metal); p.position.set(sx * 0.018, 0.078, -0.700 - i * 0.024); g.add(p); }
+  const emit = cyl(0.012, 0.015, 0.012, energy, 10); emit.position.set(0, 0.078, -0.752); g.add(emit);
+
+  // scope: rings, tube, objective bell + sunshade, ocular, turrets, glow lens
+  for (const z of [-0.03, 0.13]) { const ring = box(0.022, 0.032, 0.022, dark); ring.position.set(0, 0.146, z); g.add(ring); }
+  const tube = cyl(0.024, 0.024, 0.26, dark, 14); tube.position.set(0, 0.168, 0.05); g.add(tube);
+  const bell = cyl(0.034, 0.026, 0.055, dark, 14); bell.position.set(0, 0.168, -0.10); g.add(bell);
+  const shade = cyl(0.035, 0.035, 0.035, metal, 14); shade.position.set(0, 0.168, -0.145); g.add(shade);
+  const objGlow = cyl(0.019, 0.019, 0.006, energy, 14); objGlow.position.set(0, 0.168, -0.158); g.add(objGlow);
+  const ocular = cyl(0.028, 0.024, 0.045, dark, 14); ocular.position.set(0, 0.168, 0.195); g.add(ocular);
+  const magRing = cyl(0.026, 0.026, 0.018, metal, 14); magRing.position.set(0, 0.168, 0.165); g.add(magRing);
+  const lens = cyl(0.020, 0.020, 0.008, energy, 14); lens.position.set(0, 0.168, 0.220); g.add(lens);
+  const elev = cyl(0.013, 0.013, 0.020, metal, 10, 0); elev.position.set(0, 0.200, 0.045); g.add(elev);
+  const wind = cyl(0.013, 0.013, 0.020, metal, 10, 0); wind.rotation.z = Math.PI / 2; wind.position.set(0.034, 0.168, 0.045); g.add(wind);
+  const para = cyl(0.011, 0.011, 0.016, metal, 10, 0); para.rotation.z = Math.PI / 2; para.position.set(-0.032, 0.168, 0.045); g.add(para);
+
+  // 20-rd straight mag with ribs + witness glow
+  const mag = box(0.048, 0.175, 0.068, dark); mag.position.set(0, -0.115, 0.010); mag.rotation.x = -0.06; g.add(mag);
+  for (let i = 0; i < 3; i++) { const rib = box(0.052, 0.006, 0.060, metal); rib.position.set(0, -0.080 - i * 0.040, 0.014); g.add(rib); }
+  const witness = box(0.012, 0.125, 0.008, energy); witness.position.set(0, -0.110, 0.046); witness.rotation.x = -0.06; g.add(witness);
+
+  // stippled grip + palm shelf, trigger + guard
+  const grip = box(0.050, 0.125, 0.056, body); grip.position.set(0, -0.066, 0.150); grip.rotation.x = 0.28; g.add(grip);
+  stippleGrip(g, dark, 0, -0.070, 0.126, 0.032, 0.09, 3, 4);
+  const shelf = box(0.054, 0.014, 0.050, dark); shelf.position.set(0, -0.128, 0.168); g.add(shelf);
+  const trigger = box(0.010, 0.030, 0.008, metal); trigger.position.set(0, -0.024, 0.105); trigger.rotation.x = 0.25; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.080, dark); tgB.position.set(0, -0.046, 0.09); g.add(tgB);
+  const tgF = box(0.032, 0.030, 0.008, dark); tgF.position.set(0, -0.030, 0.052); g.add(tgF);
+
+  // precision stock: body, adjustable cheek riser with knobs, buttpad, hook —
+  // kept at receiver height so the back end doesn't outgrow the gun
+  const stock = box(0.054, 0.082, 0.185, body); stock.position.set(0, 0.038, 0.285); g.add(stock);
+  const riser = box(0.046, 0.022, 0.110, dark); riser.position.set(0, 0.088, 0.275); g.add(riser);
+  for (const z of [0.235, 0.315]) { const knob = cyl(0.009, 0.009, 0.013, metal, 10, 0); knob.rotation.z = Math.PI / 2; knob.position.set(0.029, 0.062, z); g.add(knob); }
+  const buttpad = box(0.052, 0.086, 0.016, dark); buttpad.position.set(0, 0.038, 0.382); g.add(buttpad);
+  const hook = box(0.028, 0.026, 0.050, dark); hook.position.set(0, -0.012, 0.345); g.add(hook);
+  const stGlow = box(0.010, 0.040, 0.10, energy); stGlow.position.set(0, 0.055, 0.285); g.add(stGlow);
+
+  const muzzle = addMuzzle(g, 0, 0.078, -0.76);
   return { group: g, muzzle };
 }
 
-// energyshotgun — wide scattergun: 2x2 emitter cluster, pump foregrip, wide
-// shell drum. Short and bulky.
+// energyshotgun — realistic tactical pump shotgun: vented heat shield over the
+// barrel, under-barrel mag tube, grooved pump with action bars, side-saddle
+// shell carrier with visible shells, ghost-ring sight, rubber recoil pad.
 function buildSciFiScattergun(color, def = {}) {
   const eCol = def.energyColor ?? 0x3a86ff;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-  const rec = box(0.100, 0.095, 0.30, body); rec.position.set(0, 0.05, 0.02); g.add(rec);
-  const top = box(0.090, 0.030, 0.26, dark); top.position.set(0, 0.108, -0.02); g.add(top);
-  for (const [x, y] of [[-0.030, 0.030], [0.030, 0.030], [-0.030, 0.075], [0.030, 0.075]]) {
-    const b = cyl(0.020, 0.020, 0.20, metal, 10); b.position.set(x, y, -0.34); g.add(b);
-    const r = cyl(0.026, 0.028, 0.02, dark, 10); r.position.set(x, y, -0.435); g.add(r);
-    const e = cyl(0.018, 0.024, 0.02, energy, 10); e.position.set(x, y, -0.45); g.add(e);
+  const shellRed = M('accent', 0x8a2a22, { roughness: 0.6, metalness: 0.1 });
+  const brass    = M('metal', 0xb8963a, { metalness: 0.9, roughness: 0.3 });
+
+  // receiver — slim, barely taller than the barrel line, like a real shotgun
+  const rec = box(0.062, 0.066, 0.26, body); rec.position.set(0, 0.062, 0.03); g.add(rec);
+  const eport = box(0.006, 0.028, 0.085, metal); eport.position.set(0.032, 0.068, -0.01); g.add(eport);
+  const bolt = box(0.012, 0.022, 0.055, metal); bolt.position.set(0.031, 0.068, 0.045); g.add(bolt);
+  const lport = box(0.028, 0.006, 0.070, dark); lport.position.set(0, 0.032, 0.02); g.add(lport);
+
+  // barrel + vented heat shield + bead sight; the bore glows faintly (energy)
+  const brl = cyl(0.020, 0.020, 0.34, metal, 14); brl.position.set(0, 0.085, -0.29); g.add(brl);
+  const shield = box(0.052, 0.030, 0.30, dark); shield.position.set(0, 0.104, -0.27); g.add(shield);
+  railSlats(g, metal, 6, 0, 0.121, -0.15, 0.048, 0.036, 0.008);
+  // energy bleed lines along the heat-shield flanks + mag-tube charge ring
+  for (const sx of [-1, 1]) { const c = box(0.005, 0.008, 0.27, energy); c.position.set(sx * 0.028, 0.104, -0.27); g.add(c); }
+  const tubeEmit = cyl(0.011, 0.013, 0.010, energy, 10); tubeEmit.position.set(0, 0.048, -0.443); g.add(tubeEmit);
+  const fsHousing = box(0.020, 0.022, 0.024, dark); fsHousing.position.set(0, 0.120, -0.435); g.add(fsHousing);
+  const bead = cyl(0.006, 0.006, 0.010, energy, 8, 0); bead.position.set(0, 0.138, -0.435); g.add(bead);
+  const bore = cyl(0.013, 0.016, 0.012, energy, 12); bore.position.set(0, 0.085, -0.462); g.add(bore);
+  const choke = cyl(0.022, 0.024, 0.020, dark, 14); choke.position.set(0, 0.085, -0.452); g.add(choke);
+
+  // under-barrel magazine tube + end cap + barrel clamp
+  const tubeMag = cyl(0.014, 0.014, 0.30, dark, 12); tubeMag.position.set(0, 0.048, -0.27); g.add(tubeMag);
+  const cap = cyl(0.016, 0.016, 0.022, metal, 12); cap.position.set(0, 0.048, -0.428); g.add(cap);
+  const clamp = box(0.048, 0.062, 0.016, metal); clamp.position.set(0, 0.066, -0.38); g.add(clamp);
+
+  // grooved pump forend riding the mag tube + twin action bars
+  const pump = box(0.062, 0.055, 0.13, body); pump.position.set(0, 0.042, -0.20); g.add(pump);
+  for (let i = 0; i < 5; i++) { const gr = box(0.066, 0.008, 0.010, dark); gr.position.set(0, 0.030, -0.15 - i * 0.024); g.add(gr); }
+  for (const sx of [-1, 1]) { const bar = box(0.006, 0.012, 0.16, metal); bar.position.set(sx * 0.030, 0.058, -0.10); g.add(bar); }
+
+  // side-saddle shell carrier with four visible shells (brass heads down)
+  const saddle = box(0.012, 0.058, 0.13, dark); saddle.position.set(-0.040, 0.062, 0.045); g.add(saddle);
+  for (let i = 0; i < 4; i++) {
+    const sh = cyl(0.009, 0.009, 0.046, shellRed, 8, 0); sh.position.set(-0.048, 0.066, -0.005 + i * 0.032); g.add(sh);
+    const bh = cyl(0.010, 0.010, 0.010, brass, 8, 0); bh.position.set(-0.048, 0.040, -0.005 + i * 0.032); g.add(bh);
   }
-  const pump = box(0.085, 0.045, 0.10, dark); pump.position.set(0, -0.02, -0.26); g.add(pump);
-  const pumpGlow = box(0.060, 0.008, 0.08, energy); pumpGlow.position.set(0, -0.044, -0.26); g.add(pumpGlow);
-  const drum = box(0.070, 0.140, 0.10, dark); drum.position.set(0, -0.09, 0.06); g.add(drum);
-  const drumGlow = box(0.030, 0.100, 0.03, energy); drumGlow.position.set(0, -0.08, 0.115); g.add(drumGlow);
-  const tv = box(0.030, 0.008, 0.16, energy); tv.position.set(0, 0.124, -0.02); g.add(tv);
-  const grip = box(0.052, 0.120, 0.062, body); grip.position.set(0, -0.055, 0.16); grip.rotation.x = 0.30; g.add(grip);
-  const tg = box(0.040, 0.030, 0.08, dark); tg.position.set(0, -0.02, 0.12); g.add(tg);
-  const st = box(0.055, 0.100, 0.14, body); st.position.set(0, 0.02, 0.27); g.add(st);
-  const muzzle = addMuzzle(g, 0, 0.052, -0.48);
+
+  // ghost ring rear sight + short rail
+  const rail = box(0.030, 0.010, 0.14, metal); rail.position.set(0, 0.100, 0.05); g.add(rail);
+  const ghost = cyl(0.011, 0.011, 0.008, dark, 12); ghost.rotation.x = 0; ghost.position.set(0, 0.110, 0.09); g.add(ghost);
+
+  // trigger group hangs directly off the receiver underside into the grip
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, 0.008, 0.115); trigger.rotation.x = 0.25; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.090, dark); tgB.position.set(0, -0.018, 0.105); g.add(tgB);
+  const tgF = box(0.032, 0.050, 0.008, dark); tgF.position.set(0, 0.004, 0.062); g.add(tgF);
+  const grip = box(0.048, 0.110, 0.056, body); grip.position.set(0, -0.038, 0.165); grip.rotation.x = 0.34; g.add(grip);
+  stippleGrip(g, dark, 0, -0.044, 0.140, 0.032, 0.080, 3, 4);
+  // stock runs forward to meet the receiver, held at receiver height
+  const stock = box(0.054, 0.082, 0.24, body); stock.position.set(0, 0.048, 0.275); g.add(stock);
+  const comb = box(0.046, 0.014, 0.20, dark); comb.position.set(0, 0.092, 0.285); g.add(comb);
+  const pad = box(0.052, 0.086, 0.020, dark); pad.position.set(0, 0.048, 0.40); g.add(pad);
+  const stud = cyl(0.006, 0.006, 0.012, metal, 8, 0); stud.position.set(0, 0.012, 0.34); g.add(stud);
+  const cellGlow = box(0.010, 0.045, 0.08, energy); cellGlow.position.set(0, 0.055, 0.29); g.add(cellGlow);
+
+  const muzzle = addMuzzle(g, 0, 0.085, -0.47);
   return { group: g, muzzle };
 }
 
-// plasmarifle — sleek alien plasma rifle: shells over an exposed glowing core,
-// forked emitter prongs with an arc, rear energy chamber (no boxy magazine).
+// plasmarifle — machined directed-energy rifle: clamshell body over an exposed
+// glowing core with rib clamps, heat-sink fin stack, coolant line, forked
+// emitter with focus ring, rear power-cell drum. Reads mechanical, not toy.
 function buildSciFiPlasma(color, def = {}) {
   const eCol = def.energyColor ?? 0xb44bff;
   const { body, dark, metal, energy } = _sciFiMats(color, eCol);
   const g = new THREE.Group();
-  const topShell = box(0.058, 0.045, 0.62, dark); topShell.position.set(0, 0.11, -0.10); g.add(topShell);
-  const botShell = box(0.058, 0.045, 0.50, body); botShell.position.set(0, 0.03, -0.06); g.add(botShell);
-  const core = cyl(0.028, 0.028, 0.34, energy, 14); core.position.set(0, 0.072, -0.10); g.add(core);
-  for (let i = 0; i < 4; i++) { const rib = cyl(0.033, 0.033, 0.02, dark, 14); rib.position.set(0, 0.072, -0.24 + i * 0.09); g.add(rib); }
-  for (const sx of [-1, 1]) { const pr = box(0.014, 0.050, 0.14, metal); pr.position.set(sx * 0.028, 0.09, -0.44); g.add(pr); }
-  const arc = box(0.050, 0.020, 0.03, energy); arc.position.set(0, 0.09, -0.50); g.add(arc);
-  const tip = cyl(0.020, 0.026, 0.02, energy, 12); tip.position.set(0, 0.072, -0.46); g.add(tip);
-  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) { const v = box(0.005, 0.026, 0.05, energy); v.position.set(sx * 0.031, 0.09, -0.20 - i * 0.09); g.add(v); }
-  const grip = box(0.048, 0.130, 0.06, body); grip.position.set(0, -0.055, 0.10); grip.rotation.x = 0.32; g.add(grip);
-  const tg = box(0.036, 0.030, 0.07, dark); tg.position.set(0, -0.016, 0.06); g.add(tg);
-  const chamber = cyl(0.030, 0.030, 0.10, dark, 12); chamber.position.set(0, 0.05, 0.20); g.add(chamber);
-  const chGlow = cyl(0.022, 0.022, 0.11, energy, 12); chGlow.position.set(0, 0.05, 0.20); g.add(chGlow);
-  const muzzle = addMuzzle(g, 0, 0.072, -0.52);
+
+  // clamshell body: chamfered top/bottom shells with an exposed core between.
+  // The core gets its own dimmer emissive so it doesn't blow out to white.
+  const coreMat = M('energy', new THREE.Color(eCol).multiplyScalar(0.15).getHex(),
+    { roughness: 0.25, metalness: 0.1, emissive: eCol, emissiveIntensity: 1.3 });
+  const topShell = box(0.050, 0.034, 0.56, dark); topShell.position.set(0, 0.104, -0.09); g.add(topShell);
+  const topChamfer = box(0.038, 0.012, 0.52, metal); topChamfer.position.set(0, 0.124, -0.09); g.add(topChamfer);
+  const botShell = box(0.050, 0.034, 0.42, body); botShell.position.set(0, 0.036, -0.03); g.add(botShell);
+  const core = cyl(0.021, 0.021, 0.36, coreMat, 14); core.position.set(0, 0.070, -0.10); g.add(core);
+  for (let i = 0; i < 5; i++) { const clampR = cyl(0.028, 0.028, 0.020, dark, 14); clampR.position.set(0, 0.070, -0.26 + i * 0.08); g.add(clampR);
+    const bolt = box(0.008, 0.062, 0.010, metal); bolt.position.set(0, 0.070, -0.26 + i * 0.08); g.add(bolt); }
+
+  // heat-sink fin stack on the top rear + coolant line down the left side
+  for (let i = 0; i < 6; i++) { const fin = box(0.044, 0.020, 0.006, metal); fin.position.set(0, 0.130, 0.02 + i * 0.016); g.add(fin); }
+  const pipeA = cyl(0.006, 0.006, 0.30, metal, 8); pipeA.position.set(-0.030, 0.094, -0.12); g.add(pipeA);
+  const pipeB = cyl(0.006, 0.006, 0.10, metal, 8, 0); pipeB.position.set(-0.030, 0.055, 0.035); g.add(pipeB);
+  const pipeJoint = cyl(0.009, 0.009, 0.016, dark, 8); pipeJoint.position.set(-0.030, 0.094, 0.03); g.add(pipeJoint);
+
+  // side cooling vents (louvered)
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) { const v = box(0.006, 0.018, 0.010, dark); v.position.set(sx * 0.027, 0.104, -0.22 - i * 0.035); g.add(v); }
+
+  // forked emitter: a nose cap closes the shells, then two slim separated
+  // prongs reach forward with the arc glowing in the gap between their tips
+  const noseCap = box(0.046, 0.048, 0.055, dark); noseCap.position.set(0, 0.076, -0.385); g.add(noseCap);
+  const focus = cyl(0.024, 0.028, 0.020, dark, 12); focus.position.set(0, 0.070, -0.372); g.add(focus);
+  for (const sx of [-1, 1]) { const pr = box(0.009, 0.032, 0.13, metal); pr.position.set(sx * 0.027, 0.076, -0.455); pr.rotation.y = sx * -0.06; g.add(pr); }
+  const arc = box(0.044, 0.012, 0.020, energy); arc.position.set(0, 0.076, -0.50); g.add(arc);
+  const tip = cyl(0.013, 0.017, 0.016, energy, 12); tip.position.set(0, 0.076, -0.445); g.add(tip);
+
+  // iron sight blades
+  const fsight = box(0.008, 0.018, 0.008, dark); fsight.position.set(0, 0.130, -0.33); g.add(fsight);
+  const rsight = box(0.022, 0.014, 0.008, dark); rsight.position.set(0, 0.128, 0.115); g.add(rsight);
+
+  // grip with stipple, trigger + guard
+  const grip = box(0.048, 0.125, 0.058, body); grip.position.set(0, -0.055, 0.105); grip.rotation.x = 0.32; g.add(grip);
+  stippleGrip(g, dark, 0, -0.060, 0.082, 0.032, 0.085, 3, 4);
+  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.012, 0.062); trigger.rotation.x = 0.28; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.075, dark); tgB.position.set(0, -0.034, 0.05); g.add(tgB);
+  const tgF = box(0.032, 0.028, 0.008, dark); tgF.position.set(0, -0.020, 0.015); g.add(tgF);
+
+  // rear power-cell drum: knurled ring + glow window + eject lever
+  const chamber = cyl(0.030, 0.030, 0.095, dark, 12); chamber.position.set(0, 0.062, 0.21); g.add(chamber);
+  knurledCollar(g, metal, 0, 0.062, 0.17, 0.030, 10);
+  const chGlow = cyl(0.020, 0.020, 0.100, energy, 12); chGlow.position.set(0, 0.062, 0.21); g.add(chGlow);
+  const lever = box(0.010, 0.024, 0.030, metal); lever.position.set(0.034, 0.076, 0.23); g.add(lever);
+
+  const muzzle = addMuzzle(g, 0, 0.070, -0.52);
+  return { group: g, muzzle };
+}
+
+// needler — needle SMG built like a REAL firearm: boxy railed receiver,
+// barrel shroud + multi-port needle muzzle, front/rear sights, curved energy
+// magazine, stippled grip, skeleton stock — the crystal shard row rides in a
+// top-mounted ammo rack like a transparent magazine. Pink glow.
+function buildNeedler(color, def = {}) {
+  const eCol = def.energyColor ?? 0xff4dd2;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const crystal = M('energy', new THREE.Color(eCol).multiplyScalar(0.25).getHex(),
+    { roughness: 0.15, metalness: 0.1, emissive: eCol, emissiveIntensity: 2.2, transparent: true, opacity: 0.85 });
+  const g = new THREE.Group();
+
+  // ── receiver: boxy SMG body with a bottom accent plate and rear cap ──
+  const receiver = box(0.058, 0.068, 0.30, body); receiver.position.set(0, 0.058, 0.03); g.add(receiver);
+  const belly = box(0.050, 0.012, 0.26, dark); belly.position.set(0, 0.020, 0.02); g.add(belly);
+  const rearCap = box(0.050, 0.060, 0.020, dark); rearCap.position.set(0, 0.058, 0.185); g.add(rearCap);
+  // machined detail: panel seam lines, retaining screws, ejection port with a
+  // steel rim, charging handle on the left — a manufactured receiver, not a slab
+  for (const y of [0.038, 0.080]) { const seam = box(0.0592, 0.004, 0.27, dark); seam.position.set(0, y, 0.03); g.add(seam); }
+  const vseam = box(0.0592, 0.048, 0.004, dark); vseam.position.set(0, 0.058, 0.135); g.add(vseam);
+  for (const sx of [-1, 1]) for (const [py, pz] of [[0.074, -0.085], [0.074, 0.155], [0.042, -0.085], [0.042, 0.155]]) {
+    const screw = cyl(0.0035, 0.0035, 0.004, metal, 8, 0); screw.rotation.z = Math.PI / 2; screw.position.set(sx * 0.0296, py, pz); g.add(screw);
+  }
+  const eject = box(0.006, 0.020, 0.055, metal); eject.position.set(0.0295, 0.066, -0.045); g.add(eject);
+  const chandle = box(0.020, 0.010, 0.030, metal); chandle.position.set(-0.036, 0.076, 0.10); g.add(chandle);
+  // glowing feed slits on the receiver flanks
+  for (const sx of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const slit = box(0.005, 0.016, 0.007, energy); slit.position.set(sx * 0.030, 0.058, 0.005 + i * 0.05); g.add(slit);
+  }
+
+  // ── top-mounted needle magazine: a translucent box mag (like a P90's) with
+  // the glowing needle rounds stacked visibly inside — reads as real ammo in a
+  // real container, not exposed spikes ──
+  // ── top-mounted needle magazine: a SOLID armoured pod (matches the gun body,
+  // recolours with skins) with a glowing energy charge-window down each flank
+  // showing the needle reserve — clean sci-fi tech, not a clear plastic box ──
+  const magBody = box(0.046, 0.064, 0.29, body); magBody.position.set(0, 0.126, 0.040); g.add(magBody);
+  const magTop  = box(0.034, 0.016, 0.29, dark); magTop.position.set(0, 0.166, 0.040); g.add(magTop);
+  const capF = box(0.050, 0.068, 0.016, dark); capF.position.set(0, 0.126, -0.092); g.add(capF);
+  const capR = box(0.050, 0.068, 0.016, dark); capR.position.set(0, 0.126, 0.172); g.add(capR);
+  // horizontal seam + retaining screws on the pod body (machined detail)
+  const magSeam = box(0.0472, 0.004, 0.26, dark); magSeam.position.set(0, 0.146, 0.040); g.add(magSeam);
+  for (const sx of [-1, 1]) for (const pz of [-0.05, 0.13]) {
+    const s = cyl(0.003, 0.003, 0.005, metal, 8, 0); s.rotation.z = Math.PI / 2; s.position.set(sx * 0.0236, 0.104, pz); g.add(s);
+  }
+  // glowing charge window down each flank, segmented into discrete needle cells
+  for (const sx of [-1, 1]) {
+    const frame = box(0.006, 0.036, 0.24, dark); frame.position.set(sx * 0.023, 0.122, 0.040); g.add(frame);
+    const win   = box(0.004, 0.028, 0.225, energy); win.position.set(sx * 0.0255, 0.122, 0.040); g.add(win);
+    for (let i = 0; i < 8; i++) { const tick = box(0.005, 0.030, 0.005, dark); tick.position.set(sx * 0.0256, 0.122, -0.070 + i * 0.030); g.add(tick); }
+  }
+  // three crystal needle tips just breaking the front feed lip (identity accent)
+  for (let i = 0; i < 3; i++) {
+    const tip = cone(0.0075, 0.028, crystal, 6, 0);
+    tip.position.set(0, 0.170, -0.068 + i * 0.026); tip.rotation.x = -0.25; g.add(tip);
+  }
+  // front feed throat where the needles drop down into the receiver
+  const throat = box(0.042, 0.026, 0.026, dark); throat.position.set(0, 0.100, -0.078); g.add(throat);
+
+  // ── iron sights raised on posts over the magazine spine (sighted over the
+  // top mag, like a real top-fed SMG) ──
+  const fsWing = box(0.016, 0.018, 0.010, dark); fsWing.position.set(0, 0.182, -0.090); g.add(fsWing);
+  const fsPost = box(0.005, 0.014, 0.006, dark); fsPost.position.set(0, 0.190, -0.090); g.add(fsPost);
+  const fsDot  = box(0.004, 0.004, 0.004, energy); fsDot.position.set(0, 0.197, -0.093); g.add(fsDot);
+  const rsBase = box(0.024, 0.016, 0.014, dark); rsBase.position.set(0, 0.181, 0.150); g.add(rsBase);
+  const rsNotch = box(0.006, 0.012, 0.008, dark); rsNotch.position.set(0, 0.189, 0.150); g.add(rsNotch);
+  for (const sx of [-1, 1]) { const d = box(0.004, 0.004, 0.004, energy); d.position.set(sx * 0.008, 0.191, 0.153); g.add(d); }
+
+  // ── barrel group: shroud with glowing vents, exposed barrel, needle head ──
+  // a collar fairs the receiver into the slimmer shroud
+  const collar = box(0.052, 0.058, 0.026, dark); collar.position.set(0, 0.058, -0.118); g.add(collar);
+  const shroud = box(0.046, 0.050, 0.13, dark); shroud.position.set(0, 0.058, -0.185); g.add(shroud);
+  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) {
+    const v = box(0.005, 0.014, 0.020, energy); v.position.set(sx * 0.024, 0.058, -0.150 - i * 0.045); g.add(v);
+  }
+  const brl = cyl(0.014, 0.014, 0.06, metal, 12); brl.position.set(0, 0.058, -0.275); g.add(brl);
+  // multi-port needle muzzle: tapered head, steel face, seven glowing tubes
+  const head = cyl(0.019, 0.023, 0.040, dark, 12); head.position.set(0, 0.058, -0.318); g.add(head);
+  const face = cyl(0.017, 0.019, 0.010, metal, 12); face.position.set(0, 0.058, -0.340); g.add(face);
+  const port0 = cyl(0.0040, 0.0040, 0.013, energy, 6); port0.position.set(0, 0.058, -0.343); g.add(port0);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const port = cyl(0.0040, 0.0040, 0.013, energy, 6);
+    port.position.set(Math.cos(a) * 0.010, 0.058 + Math.sin(a) * 0.010, -0.343);
+    g.add(port);
+  }
+
+  // ── curved energy magazine ahead of the trigger guard ──
+  const mag = box(0.044, 0.155, 0.062, dark); mag.position.set(0, -0.052, -0.032); mag.rotation.x = -0.14; g.add(mag);
+  for (let i = 0; i < 2; i++) { const rib = box(0.048, 0.006, 0.054, metal); rib.position.set(0, -0.030 - i * 0.045, -0.028 - i * 0.006); rib.rotation.x = -0.14; g.add(rib); }
+  const magFloor = box(0.048, 0.013, 0.066, metal); magFloor.position.set(0, -0.128, -0.044); magFloor.rotation.x = -0.14; g.add(magFloor);
+  const witness = box(0.011, 0.115, 0.007, energy); witness.position.set(0, -0.048, 0.000); witness.rotation.x = -0.14; g.add(witness);
+
+  // ── grip, trigger + guard bridging up to the receiver ──
+  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.038, 0.100); grip.rotation.x = 0.32; g.add(grip);
+  stippleGrip(g, dark, 0, -0.044, 0.076, 0.030, 0.080, 3, 4);
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, -0.002, 0.052); trigger.rotation.x = 0.3; g.add(trigger);
+  const tgB = box(0.030, 0.008, 0.080, dark); tgB.position.set(0, -0.026, 0.032); g.add(tgB);
+  const tgF = box(0.030, 0.034, 0.008, dark); tgF.position.set(0, -0.006, -0.004); g.add(tgF);
+
+  // ── solid skeleton stock: twin struts framing an open window, ribbed pad ──
+  const strutTop = box(0.022, 0.018, 0.115, dark); strutTop.position.set(0, 0.076, 0.245); g.add(strutTop);
+  const strutLow = box(0.018, 0.014, 0.108, dark); strutLow.position.set(0, 0.032, 0.245); strutLow.rotation.x = -0.16; g.add(strutLow);
+  const pad = box(0.046, 0.085, 0.020, body); pad.position.set(0, 0.052, 0.305); g.add(pad);
+  const padRib = box(0.048, 0.088, 0.006, dark); padRib.position.set(0, 0.052, 0.317); g.add(padRib);
+
+  const muzzle = addMuzzle(g, 0, 0.058, -0.35);
+  return { group: g, muzzle };
+}
+
+// fuelrod — shoulder-fired fuel rod cannon: fat segmented tube, flared muzzle
+// bell, side fuel canister with glowing windows, carry handle, front grip.
+function buildFuelRod(color, def = {}) {
+  const eCol = def.energyColor ?? 0x5cff7a;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+
+  // main tube with segment rings + rivets (knurl sunk into the ring surface)
+  const tube = cyl(0.045, 0.045, 0.52, body, 16); tube.position.set(0, 0.075, -0.13); g.add(tube);
+  for (const z of [-0.34, -0.18, -0.02, 0.10]) {
+    const ring = cyl(0.050, 0.050, 0.020, dark, 16); ring.position.set(0, 0.075, z); g.add(ring);
+    knurledCollar(g, metal, 0, 0.075, z, 0.047, 8);
+    const seam = cyl(0.0465, 0.0465, 0.007, energy, 16); seam.position.set(0, 0.075, z + 0.016); g.add(seam);
+  }
+  // flared muzzle bell + inner glow
+  const bell = cyl(0.048, 0.062, 0.075, dark, 16); bell.position.set(0, 0.075, -0.435); g.add(bell);
+  const bore = cyl(0.034, 0.046, 0.020, energy, 14); bore.position.set(0, 0.075, -0.465); g.add(bore);
+
+  // rear breech + vent grill
+  const breech = cyl(0.048, 0.040, 0.10, dark, 16); breech.position.set(0, 0.075, 0.18); g.add(breech);
+  for (let i = 0; i < 4; i++) { const vent = box(0.070, 0.006, 0.010, metal); vent.position.set(0, 0.075, 0.145 + i * 0.018); g.add(vent); }
+
+  // side fuel canister with three glowing windows + valve
+  const can = cyl(0.024, 0.024, 0.15, dark, 12); can.position.set(0.058, 0.055, 0.01); g.add(can);
+  for (let i = 0; i < 3; i++) { const win = box(0.010, 0.014, 0.026, energy); win.position.set(0.070, 0.055, -0.03 + i * 0.045); g.add(win); }
+  const valve = cyl(0.010, 0.010, 0.014, metal, 8); valve.position.set(0.058, 0.055, 0.095); g.add(valve);
+
+  // top carry handle + simple sights
+  const handle = box(0.020, 0.014, 0.16, dark); handle.position.set(0, 0.155, -0.04); g.add(handle);
+  for (const z of [-0.11, 0.03]) { const post = box(0.014, 0.032, 0.014, dark); post.position.set(0, 0.134, z); g.add(post); }
+  const fs = box(0.006, 0.020, 0.006, metal); fs.position.set(0, 0.128, -0.30); g.add(fs);
+
+  // front vertical grip + rear pistol grip + trigger + shoulder pad
+  const fgrip = box(0.036, 0.090, 0.042, body); fgrip.position.set(0, -0.005, -0.25); fgrip.rotation.x = -0.15; g.add(fgrip);
+  for (let i = 0; i < 3; i++) { const gr = box(0.040, 0.007, 0.008, dark); gr.position.set(0, -0.008 - i * 0.018, -0.247 - i * 0.003); g.add(gr); }
+  const grip = box(0.046, 0.115, 0.056, body); grip.position.set(0, -0.025, 0.10); grip.rotation.x = 0.35; g.add(grip);
+  const trigger = box(0.010, 0.026, 0.008, metal); trigger.position.set(0, 0.012, 0.055); trigger.rotation.x = 0.28; g.add(trigger);
+  const tgB = box(0.030, 0.008, 0.070, dark); tgB.position.set(0, -0.010, 0.045); g.add(tgB);
+  const pad = box(0.050, 0.110, 0.020, dark); pad.position.set(0, 0.060, 0.245); g.add(pad);
+
+  const muzzle = addMuzzle(g, 0, 0.075, -0.48);
+  return { group: g, muzzle };
+}
+
+// concussion — violet plasma mortar rifle: thick tapering barrel with glowing
+// segment seams, wide aperture, humped receiver with spine fins, twin grips.
+function buildConcussion(color, def = {}) {
+  const eCol = def.energyColor ?? 0xb27bff;
+  const { body, dark, metal, energy } = _sciFiMats(color, eCol);
+  const g = new THREE.Group();
+
+  // thick tapering barrel with glowing seams between segments
+  const seg1 = cyl(0.040, 0.044, 0.14, body, 14); seg1.position.set(0, 0.075, -0.16); g.add(seg1);
+  const seg2 = cyl(0.036, 0.040, 0.13, dark, 14); seg2.position.set(0, 0.075, -0.29); g.add(seg2);
+  const seg3 = cyl(0.032, 0.036, 0.11, body, 14); seg3.position.set(0, 0.075, -0.40); g.add(seg3);
+  for (const z of [-0.225, -0.35]) { const seam = cyl(0.041, 0.041, 0.010, energy, 14); seam.position.set(0, 0.075, z); g.add(seam); }
+  // wide aperture: flare ring + inner glow
+  const aper = cyl(0.034, 0.044, 0.030, dark, 14); aper.position.set(0, 0.075, -0.465); g.add(aper);
+  const glowMouth = cyl(0.024, 0.034, 0.016, energy, 14); glowMouth.position.set(0, 0.075, -0.478); g.add(glowMouth);
+
+  // humped receiver + spine fins + side plasma drum
+  const rec = box(0.072, 0.095, 0.26, body); rec.position.set(0, 0.055, 0.04); g.add(rec);
+  const hump = box(0.058, 0.040, 0.18, dark); hump.position.set(0, 0.125, 0.05); g.add(hump);
+  for (let i = 0; i < 4; i++) { const fin = box(0.008, 0.026, 0.036, metal); fin.position.set(0, 0.155, -0.02 + i * 0.048); g.add(fin); }
+  const drum = cyl(0.030, 0.030, 0.075, dark, 12, 0); drum.rotation.z = Math.PI / 2; drum.position.set(0.052, 0.060, 0.09); g.add(drum);
+  const drumGlow = cyl(0.020, 0.020, 0.080, energy, 12, 0); drumGlow.rotation.z = Math.PI / 2; drumGlow.position.set(0.052, 0.060, 0.09); g.add(drumGlow);
+
+  // underside vent slats + energy feed line into the barrel
+  for (let i = 0; i < 3; i++) { const v = box(0.040, 0.008, 0.012, dark); v.position.set(0, 0.010, -0.14 - i * 0.05); g.add(v); }
+  const feed = cyl(0.007, 0.007, 0.20, energy, 8); feed.position.set(0, 0.030, -0.20); g.add(feed);
+
+  // blade sight
+  const fs = box(0.008, 0.020, 0.008, dark); fs.position.set(0, 0.150, -0.40); g.add(fs);
+  const rs = box(0.022, 0.014, 0.008, dark); rs.position.set(0, 0.150, 0.13); g.add(rs);
+
+  // twin grips: angled foregrip + rear grip with stipple, trigger + guard
+  const fgrip = box(0.038, 0.085, 0.044, body); fgrip.position.set(0, -0.008, -0.16); fgrip.rotation.x = -0.35; g.add(fgrip);
+  const grip = box(0.048, 0.120, 0.058, body); grip.position.set(0, -0.045, 0.155); grip.rotation.x = 0.36; g.add(grip);
+  stippleGrip(g, dark, 0, -0.050, 0.128, 0.032, 0.085, 3, 4);
+  const trigger = box(0.010, 0.028, 0.008, metal); trigger.position.set(0, -0.002, 0.105); trigger.rotation.x = 0.28; g.add(trigger);
+  const tgB = box(0.032, 0.008, 0.075, dark); tgB.position.set(0, -0.026, 0.09); g.add(tgB);
+  const tgF = box(0.032, 0.028, 0.008, dark); tgF.position.set(0, -0.012, 0.055); g.add(tgF);
+
+  const muzzle = addMuzzle(g, 0, 0.075, -0.49);
   return { group: g, muzzle };
 }
 
@@ -1873,11 +2393,11 @@ const BUILDERS = {
   // Halo/Destiny expanded arsenal
   magnum:       buildSciFiHandCannon,
   battlerifle:  buildSciFiBattleRifle,
-  needler:      buildEnergyWeapon,
+  needler:      buildNeedler,
   plasmarifle:  buildSciFiPlasma,
-  dmr:          buildEnergyWeapon,
-  fuelrod:      buildEnergyWeapon,
-  concussion:   buildEnergyWeapon,
+  dmr:          buildAR10,
+  fuelrod:      buildFuelRod,
+  concussion:   buildConcussion,
   energyshotgun: buildSciFiScattergun,
   ghammer:      buildGravityHammer,
 };

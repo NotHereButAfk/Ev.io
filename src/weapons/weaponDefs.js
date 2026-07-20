@@ -20,7 +20,8 @@ export const WEAPONS = [
     reloadTime: 1.4,
     range: 140,
     recoil: 0.035,
-    color: 0x061a2a
+    color: 0xd9782e,        // orange grip/guard (reference-chart Glock)
+    energyColor: 0x86ff2e   // neon-green slide windows + sight dots
   },
   {
     id: 'uzi',
@@ -38,7 +39,8 @@ export const WEAPONS = [
     reloadTime: 1.5,
     range: 80,
     recoil: 0.013,
-    color: 0x0c1520
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'levershotgun',
@@ -56,7 +58,8 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 30,
     recoil: 0.05,
-    color: 0x1a0e2e
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'm4',
@@ -74,9 +77,10 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 150,
     recoil: 0.02,
-    color: 0x394049,
+    color: 0xd9782e,
     energyColor: 0x2ee6ff,
-    sciFi: true
+    sciFi: true,
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'm16',
@@ -94,7 +98,7 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 160,
     recoil: 0.02,
-    color: 0x080e1a
+    color: 0xd9782e
   },
   {
     id: 'rifle',
@@ -112,7 +116,8 @@ export const WEAPONS = [
     reloadTime: 1.9,
     range: 140,
     recoil: 0.022,
-    color: 0x0f1a14
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'lmg',
@@ -130,7 +135,8 @@ export const WEAPONS = [
     reloadTime: 4.5,
     range: 160,
     recoil: 0.03,
-    color: 0x0a1018
+    color: 0xd9782e,
+    energyColor: 0x86ff2e   // neon-green accents (reference chart)
   },
   {
     id: 'rpg',
@@ -151,7 +157,7 @@ export const WEAPONS = [
     reloadTime: 3.2,
     range: 220,
     recoil: 0.09,
-    color: 0x180a22
+    color: 0xd9782e
   },
   {
     id: 'boltsniper',
@@ -170,7 +176,7 @@ export const WEAPONS = [
     range: 320,
     recoil: 0.06,
     scoped: true,
-    color: 0x050e20
+    color: 0xd9782e
   },
   {
     id: 'knife',
@@ -186,7 +192,8 @@ export const WEAPONS = [
     throwDamage: 9999,     // one-hit kill on throw
     throwCooldown: 0.85,   // seconds before you pull a fresh knife
     throwRewardMult: 3,    // 3x coins/score/xp — only on a thrown kill
-    color: 0x00aaff
+    color: 0xd9782e,       // orange wrapped handle (reference chart)
+    energyColor: 0x35e0ff  // cyan crystal blade
   },
   {
     id: 'sword',
@@ -197,7 +204,8 @@ export const WEAPONS = [
     fireRate: 0.45,
     range: 2.6,
     arc: 1.0,
-    color: 0x00e5ff
+    color: 0xd9782e,        // orange guard/grip (chart knife language)
+    energyColor: 0x00e5ff   // signature cyan arc blade
   },
   // ── Halo/Destiny-style expanded arsenal ──────────────────────────────────
   {
@@ -217,9 +225,10 @@ export const WEAPONS = [
     reloadTime: 1.2,
     range: 120,
     recoil: 0.028,
-    color: 0x394049,
-    energyColor: 0x2ee6ff,
-    sciFi: true
+    color: 0xd9782e,
+    energyColor: 0xffb03a,
+    sciFi: true,
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'battlerifle',
@@ -238,9 +247,10 @@ export const WEAPONS = [
     reloadTime: 2.0,
     range: 170,
     recoil: 0.022,
-    color: 0x394049,
-    energyColor: 0x2ee6ff,
-    sciFi: true
+    color: 0xd9782e,
+    energyColor: 0x39ff9d,
+    sciFi: true,
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'needler',
@@ -258,7 +268,8 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 55,
     recoil: 0.01,
-    color: 0x6600aa
+    color: 0xd9782e,        // orange furniture (reference-chart P90; shells are grey)
+    energyColor: 0xff4dd2   // signature pink needle glow
   },
   {
     id: 'plasmarifle',
@@ -276,9 +287,10 @@ export const WEAPONS = [
     reloadTime: 1.6,
     range: 90,
     recoil: 0.014,
-    color: 0x394049,
-    energyColor: 0x2ee6ff,
-    sciFi: true
+    color: 0x556274,
+    energyColor: 0xb44bff,
+    sciFi: true,
+    proceduralModel: true   // detailed procedural model beats the low-poly GLB placeholder
   },
   {
     id: 'dmr',
@@ -297,7 +309,7 @@ export const WEAPONS = [
     reloadTime: 2.2,
     range: 200,
     recoil: 0.028,
-    color: 0x0a1a10
+    color: 0xd9782e
   },
   {
     id: 'fuelrod',
@@ -318,7 +330,7 @@ export const WEAPONS = [
     reloadTime: 3.5,
     range: 180,
     recoil: 0.12,
-    color: 0x002200
+    color: 0xd9782e
   },
   {
     id: 'concussion',
@@ -339,7 +351,8 @@ export const WEAPONS = [
     reloadTime: 2.5,
     range: 150,
     recoil: 0.06,
-    color: 0x0a1a2a
+    color: 0xd9782e,        // orange canopy/grip (chart furniture)
+    energyColor: 0xb44bff   // plasma-violet vents + bore core
   },
   {
     id: 'energyshotgun',
@@ -357,9 +370,10 @@ export const WEAPONS = [
     reloadTime: 1.8,
     range: 28,
     recoil: 0.055,
-    color: 0x394049,
-    energyColor: 0x2ee6ff,
-    sciFi: true
+    color: 0xd9782e,
+    energyColor: 0x3a86ff,
+    sciFi: true,
+    authoredModel: true   // Blender model in weapons_authored.glb
   },
   {
     id: 'ghammer',
@@ -370,10 +384,28 @@ export const WEAPONS = [
     fireRate: 0.85,
     range: 3.2,
     arc: 1.4,
-    color: 0x1a0a00
+    color: 0xd9782e,        // orange grip + head plates (chart furniture)
+    energyColor: 0xff5a2e   // molten power band
   },
 ];
 
+// Organise the arsenal into categories:
+//   'main'  — the balanced core guns featured in the loadout,
+//   'extra' — the specials / heavies (snipers, launchers, exotics),
+//   'melee' — the blades / hammer.
+// Tagged here (rather than on each def) so it stays in one place. Consumed by
+// the inventory to split the arsenal into Main / Extra / Melee groups.
+export const MAIN_WEAPON_IDS = ['m4', 'magnum', 'battlerifle', 'energyshotgun', 'plasmarifle'];
+const _MAIN = new Set(MAIN_WEAPON_IDS);
+for (const w of WEAPONS) {
+  w.category = w.kind === 'melee' ? 'melee' : (_MAIN.has(w.id) ? 'main' : 'extra');
+}
+
 export function getWeapon(id) {
   return WEAPONS.find((w) => w.id === id);
+}
+
+// Guns/blades in a given category, in arsenal order.
+export function weaponsByCategory(category) {
+  return WEAPONS.filter((w) => w.category === category);
 }

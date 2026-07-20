@@ -9,18 +9,16 @@
  */
 import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
-import { WEAPONS } from '../weapons/weaponDefs.js';
+import { WEAPONS, weaponsByCategory } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
-import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponThumbnails.js';
 
-// The 5 main-weapon slots offered in the inventory (with ev.io-style labels).
-// If the saved loadout points to a gun that isn't here, we snap it to the
-// first entry when the panel opens so EQUIPPED matches an actual tab.
+// The 5 MAIN-weapon slots (ev.io-style labels). The rest of the arsenal is
+// shown under EXTRA, and the blades under MELEE — all browsable/equippable.
 export const MAIN_GUNS = [
   { id: 'm4',            label: 'Auto Rifle' },
   { id: 'magnum',        label: 'Hand Cannon' },
@@ -28,13 +26,21 @@ export const MAIN_GUNS = [
   { id: 'energyshotgun', label: 'Sweeper' },
   { id: 'plasmarifle',   label: 'Laser Rifle' },
 ];
-const MAIN_GUN_IDS = new Set(MAIN_GUNS.map((g) => g.id));
+// EXTRA guns + MELEE, derived from the weapon categories (labels = weapon names).
+const EXTRA_GUNS = weaponsByCategory('extra').map((w) => ({ id: w.id, label: w.name }));
+const MELEE      = weaponsByCategory('melee').map((w) => ({ id: w.id, label: w.name }));
 
-const TABS = [
-  { id: 'character', label: 'Character' },
-  ...MAIN_GUNS,
-  { id: 'sword',     label: 'Sword' },
+// Tab strip organised into labelled groups.
+const TAB_GROUPS = [
+  { label: null,    tabs: [{ id: 'character', label: 'Character' }] },
+  { label: 'MAIN',  tabs: MAIN_GUNS },
+  { label: 'EXTRA', tabs: EXTRA_GUNS },
+  { label: 'MELEE', tabs: MELEE },
 ];
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
+// Every valid gun id (main + extra) — used to keep an equipped extra from being
+// snapped back to a main gun when the panel reopens.
+const ALL_GUN_IDS = new Set(WEAPONS.filter((w) => w.kind !== 'melee').map((w) => w.id));
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const CHAR_SVG = `
@@ -83,9 +89,9 @@ export class InventoryPanel {
     if (nameEl) {
       nameEl.textContent = (u && u !== '__guest__') ? UserAccount.getDisplayName(u) : (u === '__guest__' ? 'guest' : 'Recruit');
     }
-    // If the saved loadout points to a gun outside the 5 main slots, snap to
-    // the first main gun so EQUIPPED always matches an available tab.
-    if (!MAIN_GUN_IDS.has(Loadout.getGun())) Loadout.setGun(MAIN_GUNS[0].id);
+    // Snap only if the saved gun isn't a real gun at all (main OR extra are both
+    // valid now); keeps EQUIPPED pointing at an available tab.
+    if (!ALL_GUN_IDS.has(Loadout.getGun())) Loadout.setGun(MAIN_GUNS[0].id);
 
     this._renderMeta();
     this._renderTabs();
@@ -118,18 +124,26 @@ export class InventoryPanel {
     const tabs = document.getElementById('inv-tabs');
     if (!tabs) return;
     tabs.innerHTML = '';
-    for (const t of TABS) {
-      const b = document.createElement('button');
-      b.className = 'inv-tab' + (t.id === this._tab ? ' active' : '');
-      b.textContent = t.label;
-      b.addEventListener('click', () => {
-        if (this._tab === t.id) return;
-        this._tab = t.id;
-        tabs.querySelectorAll('.inv-tab').forEach((x) => x.classList.remove('active'));
-        b.classList.add('active');
-        this._renderGrid();
-      });
-      tabs.appendChild(b);
+    for (const group of TAB_GROUPS) {
+      if (group.label) {
+        const gl = document.createElement('span');
+        gl.className = 'inv-tab-group';
+        gl.textContent = group.label;
+        tabs.appendChild(gl);
+      }
+      for (const t of group.tabs) {
+        const b = document.createElement('button');
+        b.className = 'inv-tab' + (t.id === this._tab ? ' active' : '');
+        b.textContent = t.label;
+        b.addEventListener('click', () => {
+          if (this._tab === t.id) return;
+          this._tab = t.id;
+          tabs.querySelectorAll('.inv-tab').forEach((x) => x.classList.remove('active'));
+          b.classList.add('active');
+          this._renderGrid();
+        });
+        tabs.appendChild(b);
+      }
     }
   }
 
@@ -182,10 +196,14 @@ export class InventoryPanel {
       this._equipWeapon(gun, null);
     }));
 
+    // Skins are for the always-equipped items only (main guns + sword) —
+    // everything else shows just Default.
+    if (!Armory.canSkin(gun.id)) return;
+
     // Only the skins the player OWNS for this weapon. New accounts have
     // none — the tab shows just Default until skins are earned/bought.
-    const allSkins = isMelee ? SWORD_SKINS : WEAPON_SKINS;
-    const owned = allSkins.filter((s) => Armory.ownsSkin(s.id));
+    // ONE shared catalog: the sword wears the same 40 finishes as the guns.
+    const owned = WEAPON_SKINS.filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
     for (const s of owned) {
       const card = this._weaponCard(gun, s, this._isEquipped(gun.id, s.id), () => {
@@ -266,9 +284,12 @@ export class InventoryPanel {
 
   _weaponCard(gun, skin, equipped, onClick) {
     const isMelee = gun.kind === 'melee';
+    // Branch on the skin's SHAPE, not the weapon: the sword wears gun skins
+    // (body/accent) now; only legacy sword-catalog entries carry .blade.
     const bg = skin
-      ? (isMelee ? _grad(skin.blade ?? 0x8090a0, skin.guard ?? 0x303840)
-                 : _grad(skin.body  ?? 0x556070, skin.accent ?? 0x202830))
+      ? (skin.blade !== undefined
+          ? _grad(skin.blade ?? 0x8090a0, skin.guard ?? 0x303840)
+          : _grad(skin.body  ?? 0x556070, skin.accent ?? 0x202830))
       : _grad(gun.color || 0x2a3040, _darken(gun.color || 0x2a3040, 0.4));
     const card = this._cardBase({
       bg, rarity: skin?.rarity, equipped, onClick,

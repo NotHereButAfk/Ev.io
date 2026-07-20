@@ -2,7 +2,6 @@ import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
-import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Achievements } from '../core/Achievements.js';
 import { Shop } from '../core/Shop.js';
@@ -17,9 +16,8 @@ import { WEAPONS } from '../weapons/weaponDefs.js';
 import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
 
 // Shop card previews use the same weapon-render pipeline as the inventory:
-// pick one showcase gun for all weapon-skin cards, and the sword for melee.
+// each gun-skin card shows one of the 5 main guns wearing the finish.
 const _SHOP_GUN = () => WEAPONS.find((w) => w.id === 'm4') || WEAPONS.find((w) => w.kind !== 'melee');
-const _SHOP_SWORD = () => WEAPONS.find((w) => w.id === 'sword');
 const _shopThumbCache = new Map();  // `${weaponId}:${skinId}` -> dataURL
 
 const SHOP_CHAR_SVG = `
@@ -594,14 +592,15 @@ export class MenuUI {
     return shuffled.slice(0, count);
   }
 
-  // Deterministic per-skin, per-day showcase gun: a weapon skin is a generic
-  // finish usable on any of the 5 main guns, but the Night Market card should
-  // still show *one* real gun wearing it (stable for the day, so it doesn't
-  // flicker between renders) rather than always the Auto Rifle.
+  // Deterministic per-skin, per-day showcase item: a weapon skin is a generic
+  // finish usable on any of the 5 main guns AND the always-equipped sword,
+  // but the Night Market card should still show *one* real weapon wearing it
+  // (stable for the day, so it doesn't flicker between renders).
   _nightMarketGunFor(skinId) {
+    const pool = [...MAIN_GUNS, { id: 'sword', label: 'Arc Blade' }];
     let h = this._nightMarketSeed();
     for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
-    return MAIN_GUNS[Math.abs(h) % MAIN_GUNS.length];
+    return pool[Math.abs(h) % pool.length];
   }
 
   _nightMarketTimeLeft() {
@@ -662,7 +661,7 @@ export class MenuUI {
     // in progressively (a few per frame) after the initial render.
     const previewJobs = [];
 
-    // kind: 'character' | 'weapon' | 'sword'
+    // kind: 'character' | 'weapon'   (sword skins are no longer sold)
     const makeCard = (skin, kind) => {
       const rarity  = skin.rarity || 'common';
       const color   = RARITY_COLORS[rarity];
@@ -705,7 +704,7 @@ export class MenuUI {
         // stable-for-the-day gun wearing it rather than always the Auto Rifle.
         const gunInfo = kind === 'weapon' ? this._nightMarketGunFor(skin.id) : null;
         const gun = gunInfo ? WEAPONS.find((w) => w.id === gunInfo.id) : null;
-        showcase = kind === 'sword' ? _SHOP_SWORD() : (gun || _SHOP_GUN());
+        showcase = gun || _SHOP_GUN();
         if (showcase) {
           const key = `${showcase.id}:${skin.id}`;
           const cached = _shopThumbCache.get(key);
@@ -812,10 +811,11 @@ export class MenuUI {
     // Night Market: 5 daily items seeded by today's date. Unowned skins get
     // priority so the rotation stays worth checking; owned ones only pad out
     // the row when the collection is nearly complete.
+    // Stock = armor finishes + gun skins. Sword skins are NOT sold any more —
+    // skins are a main-weapon feature, so melee finishes would be unusable.
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
     const weaponItems    = WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' }));
-    const swordItems     = SWORD_SKINS.map(s => ({ ...s, _kind: 'sword'  }));
-    const allItems = [...characterItems, ...weaponItems, ...swordItems];
+    const allItems = [...characterItems, ...weaponItems];
     const isOwnedItem = (s) => s._kind === 'character' ? Shop.isOwned(s.id) : Armory.ownsSkin(s.id);
     const unowned = allItems.filter(s => !isOwnedItem(s));
 

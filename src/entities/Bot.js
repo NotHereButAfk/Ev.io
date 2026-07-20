@@ -196,6 +196,9 @@ export class Bot {
     this._dying = false;
     this.alive = true;
     this.mesh.visible = true;
+    // Human bots "phase in" on respawn — play the teleport-arrival reform so they
+    // materialise with a braced crouch-and-recover instead of popping in.
+    if (this._isHuman) this.mesh.userData.triggerTeleport?.();
   }
 
   _shootAt(player, onAttack, world) {
