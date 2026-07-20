@@ -204,7 +204,8 @@ export const WEAPONS = [
     fireRate: 0.45,
     range: 2.6,
     arc: 1.0,
-    color: 0x00e5ff
+    color: 0xd9782e,        // orange guard/grip (chart knife language)
+    energyColor: 0x00e5ff   // signature cyan arc blade
   },
   // ── Halo/Destiny-style expanded arsenal ──────────────────────────────────
   {

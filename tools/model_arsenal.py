@@ -587,4 +587,32 @@ g.box((0, 0.115, Z), (0.028, 0.02, 0.04), 'dark', bevel=0.004)               # p
 g.ring((0, 0.124, Z), 0.009, 0.0025, 'metal')                                # lanyard ring
 g.finish('knife', (0, -0.30, Z), scale=0.78)
 
+# ═════════════════════════════════════════════════════════════════════════════
+# Arc Blade (sword) — full-size crystal sword in the knife's chart language:
+# glowing faceted blade (one traced profile), orange guard + wrapped grip
+# ═════════════════════════════════════════════════════════════════════════════
+g = Gun(MATS)
+# blade: one extruded silhouette — straight spine, long taper, clipped tip
+g.profile([
+    (-0.030, Z+0.044),                        # base, spine side
+    (-0.380, Z+0.038),                        # spine run
+    (-0.520, Z+0.004),                        # clipped tip point
+    (-0.430, Z-0.030),                        # edge return
+    (-0.030, Z-0.038),                        # base, edge side
+], 0.013, 'energy', bevel=0.003, seg=2)
+g.box((0, -0.19, Z+0.004), (0.0145, 0.30, 0.009), 'dark')                    # fuller groove
+g.box((0, -0.115, Z+0.040), (0.008, 0.014, 0.011), 'dark', rot=(R(45), 0, 0))  # spine notch 1
+g.box((0, -0.085, Z+0.041), (0.008, 0.014, 0.011), 'dark', rot=(R(45), 0, 0))  # spine notch 2
+# orange angular guard + swept quillons (chart knife language, scaled up)
+g.box((0, -0.018, Z), (0.034, 0.026, 0.13), 'body', bevel=0.005)
+g.box((0, -0.030, Z+0.070), (0.016, 0.018, 0.026), 'body', rot=(R(35), 0, 0))   # quillon up
+g.box((0, -0.030, Z-0.070), (0.016, 0.018, 0.026), 'body', rot=(R(-35), 0, 0))  # quillon down
+g.box((0, -0.005, Z+0.030), (0.006, 0.010, 0.020), 'energy')                 # guard gem glow
+# two-hand grip: orange with dark wrap bands, grey pommel + ring
+g.box((0, 0.075, Z), (0.028, 0.17, 0.042), 'body', bevel=0.010, seg=2)
+g.row((0, 0.010, Z), (0, 0.026, 0), 6, (0.030, 0.007, 0.044), 'dark')        # wrap bands
+g.box((0, 0.170, Z), (0.032, 0.024, 0.048), 'dark', bevel=0.005)             # pommel
+g.cyl((0, 0.185, Z), 0.008, 0.012, 'energy')                                 # pommel crystal
+g.finish('sword', (0, -0.52, Z), scale=1.0)
+
 export(os.path.join(os.path.dirname(__file__), "..", "public", "weapons_authored.glb"))

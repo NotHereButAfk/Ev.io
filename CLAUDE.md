@@ -78,14 +78,20 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
 - `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
   loader + procedural builders). The arsenal's models are **Blender-authored
-  GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers,
+  GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers — box/cyl/row +
+  `profile()` traced-silhouette extrusion + `hole_rect`/`hole_ellipse`
+  boolean punches + strict BVH connectivity audit on every export;
   `model_arsenal.py` → `public/weapons_authored.glb` with real-firearm
   silhouettes — Uzi/M1887/M4/M16/AK/M240/RPG-7/AWM/DEagle/G3/P90/SR-25/
-  870/M79/knife; `model_sidearm.py` → `public/sidearm.glb` Glock). Loader
-  precedence: per-id override GLB → authored atlas → legacy weapons.glb →
-  procedural (plasmarifle/concussion/sword/ghammer stay procedural).
+  870/M79/knife/sword; `model_sidearm.py` → `public/sidearm.glb` Glock).
+  Loader precedence: per-id override GLB → authored atlas → legacy
+  weapons.glb → procedural (plasmarifle/concussion/ghammer stay procedural).
+  Authored guns render ILLUSTRATED: MeshToonMaterial cel shading + an
+  inverted-hull dark outline per mesh (matches the reference-chart art).
   Furniture = `body` role (orange default via def color), glow = `energy`
-  role (def energyColor) so skins recolor everything as before.
+  role (def energyColor). Skins are MAIN-weapon only (Armory.canSkin:
+  m4/magnum/battlerifle/energyshotgun/plasmarifle); the Night Market sells
+  armor + gun skins only (no sword skins). Viewmodel mount is scaled 0.74.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
   (green/cyan/amber bars, coin popups, weapon wheel), `Nameplates.js`,
