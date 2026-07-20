@@ -28,6 +28,7 @@ import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { MobileControls } from '../ui/MobileControls.js';
 import { KILL_MULT_BONUS } from './RarityPerks.js';
@@ -1034,7 +1035,17 @@ export class Game {
 
     // Player input is blocked while the menu overlay is open (no pointer lock),
     // but the match keeps running — this is a multiplayer game.
-    if (!menuOpen) this.player.update(dt, this.input, this.world);
+    // Phase 3: with the movesim flag on, the deterministic fixed-20Hz core
+    // drives movement (interpolated); the legacy controller stays the default.
+    if (!menuOpen) {
+      if (this._moveSimOn === undefined) this._moveSimOn = moveSimEnabled();
+      if (this._moveSimOn) {
+        if (!this.moveBridge) this.moveBridge = new MoveBridge(this.player, this.world);
+        this.moveBridge.update(dt, this.input, this.world);
+      } else {
+        this.player.update(dt, this.input, this.world);
+      }
+    }
     this.player.camera.updateMatrixWorld(true);
 
     // Animate the living sci-fi city (flying traffic, pulsing energy).

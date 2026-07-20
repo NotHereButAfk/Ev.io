@@ -118,6 +118,26 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   **Inventory v2** = real skinned-weapon renders + search + rarity filter chips;
   gun-skin catalog doubled to 30 (10 common / 10 epic / 6 legendary / 4 mythic).
 
+## Phase 3 — deterministic movement (evidence layer)
+- `src/sim/MoveSim.js` — pure fixed-20Hz movement/collision core (no THREE/DOM;
+  state quantized 1e-6/tick → bit-identical replays). Mirrors the legacy
+  controller's constants + World's platform/collider semantics, and seals the
+  legacy gaps: flat-floor stability + support NORMALS (snap-down hysteresis),
+  ceiling clamp, crouch-aware collision height + no-stand-under-blocked-headroom,
+  kill-plane recovery to last safe support, deterministic teleport ray.
+- `src/sim/fixtures.js` — 10 sealed fixtures (flat-floor, wall, corner, ramp,
+  step, ceiling, crouch tunnel, slide, teleport, recovery), shared by runner+lab.
+- `npm run test:move` (tools/movesim_fixtures.mjs) — invariants, double-run
+  bit-identity, frame-schedule parity (two seeded irregular frame schedules →
+  identical 20Hz hashes), golden hashes in tests/movesim.golden.json, movement
+  tapes in tests/tapes/. `--write` regenerates goldens.
+- `movement-lab.html` (vite dev page) — graybox lab: live WASD drive of the sim
+  + deterministic fixture-tape playback; browser hashes match the Node runner
+  exactly (cross-environment determinism).
+- `src/sim/MoveBridge.js` — feature-flagged rendered bridge (`?movesim=1` or
+  localStorage kx_movesim=1): sim owns movement at 20Hz with interpolation;
+  the legacy Player controller remains the DEFAULT until G2 sign-off.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a
