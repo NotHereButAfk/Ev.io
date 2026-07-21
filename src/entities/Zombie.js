@@ -732,8 +732,8 @@ export class Zombie {
     // zombies too (they wear the shambler look but still vary).
     const R = () => Math.random();
     const prof = this._profile = {
-      height:  0.92 + R() * 0.18,      // 0.92–1.10 (kept in check so tall ≠ stick)
-      girth:   1.32 + R() * 0.38,      // 1.32–1.70 — heavy, meaty build
+      height:  1.02 + R() * 0.22,      // 1.02–1.24 — taller, looms over the player
+      girth:   1.40 + R() * 0.42,      // 1.40–1.82 — heavy, meaty build
       decay:   R(),                    // 0 fresh ↔ 1 rotted
       lean:    0.12 + R() * 0.16,      // permanent forward hunch
       hunch:  (R() - 0.5) * 0.16,      // shoulder/spine tilt to one side
@@ -762,8 +762,10 @@ export class Zombie {
     // Runner: tear the armor off (hide the heavy kit meshes).
     if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
     rig.eyeGlow?.color.setHex(glow);
-    // Non-uniform build scale (height × girth) on top of the variant scale.
-    const s = V.scale;
+    // Non-uniform build scale (height × girth) on top of the variant scale,
+    // then a global SIZE bump so the whole mob reads bigger / more imposing.
+    const SIZE = 1.22;
+    const s = V.scale * SIZE;
     rig.root.scale.set(s * prof.girth, s * prof.height, s * prof.girth);
     this._baseScale = rig.root.scale.clone();   // preserved through lunge pulses
 
