@@ -43,8 +43,12 @@ export class Nameplates {
       if (!el) {
         el = document.createElement('div');
         el.className = 'nameplate';
-        el.innerHTML = '<div class="np-name"></div><div class="np-bar"><div class="np-bar-fg"></div></div>';
-        el._name = el.querySelector('.np-name');
+        // Bots are honestly labelled with a BOT chip — never presented as a
+        // human player (Phase 11: no fake-human surfaces).
+        const botChip = (bot.isBot !== false) ? '<span class="np-bot">BOT</span>' : '';
+        el.innerHTML = `<div class="np-name">${botChip}<span class="np-nametext"></span></div>` +
+                       '<div class="np-bar"><div class="np-bar-fg"></div></div>';
+        el._name = el.querySelector('.np-nametext');
         el._fg   = el.querySelector('.np-bar-fg');
         el._name.textContent = bot.displayName || 'Enemy';
         this.container.appendChild(el);

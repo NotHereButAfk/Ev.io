@@ -11,7 +11,7 @@ import { WebSocket } from 'ws';
 import { makeAuthServer } from './authserver.mjs';
 
 const PORT = 8799;
-const { close } = makeAuthServer({ port: PORT });
+const { close, room } = makeAuthServer({ port: PORT });
 await sleep(150);
 
 let pass = 0, fail = 0;
@@ -153,6 +153,22 @@ const v = a.last().you;
 const speed = Math.hypot(v.vx, v.vy, v.vz);
 ok('ability: impulse knockback velocity clamped (no infinite launch)', speed < 40 && Number.isFinite(speed), `|v|=${speed.toFixed(1)}`);
 
+// ═══ Phase 11 — clearly-labelled bots (no fake-human surfaces) ═══
+room.addBot('TrainingDummy');
+await sleep(150);
+const roster = b.last().players;
+const humanEntry = roster.find((p) => p.id === b.welcome.you);
+const botEntry = roster.find((p) => p.name === 'TrainingDummy');
+ok('bots: a labelled bot appears in the snapshot roster', !!botEntry);
+ok('bots: bot is flagged isBot=true', botEntry?.isBot === true);
+ok('bots: a human player is flagged isBot=false', humanEntry?.isBot === false);
+// a bot cannot present itself as human — there is no client path to clear the
+// flag (only room.addBot sets it; the socket protocol has no isBot field).
+b.ws.send(JSON.stringify({ t: 'hello', name: 'FakeHuman', isBot: false }));
+await sleep(120);
+ok('bots: client cannot forge/clear the bot flag via protocol',
+   b.last().players.find((p) => p.name === 'TrainingDummy')?.isBot === true);
+
 // reconnect + duplicate session
 const dup = client(); await open(dup);
 dup.hello('Alice2'); dup.hello('Alice2');   // second hello on same socket
@@ -160,8 +176,10 @@ await sleep(150);
 ok('duplicate session: second hello on live socket ignored',
    dup.last()?.players.length >= 2);
 
+const aliceId = a.welcome.you;
 a.ws.close(); await sleep(200);
-ok('leave: roster shrinks after disconnect', b.last().players.length <= 2);
+ok('leave: disconnected player removed from roster',
+   !b.last().players.some((p) => p.id === aliceId));
 const re = client(); await open(re); re.hello('Alice-Rejoin');
 await sleep(150);
 ok('reconnect: fresh join succeeds', !!re.welcome);

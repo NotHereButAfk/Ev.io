@@ -97,11 +97,19 @@ export class AuthRoom {
     this.matchDurationMs = 8 * 60 * 1000;
   }
 
-  add(send, name) {
+  // Add a HUMAN-controlled player (a real socket).
+  add(send, name) { return this._add(send, name, false); }
+
+  // Add a clearly-labelled BOT for gameplay/load/stability testing. isBot
+  // rides the roster + every snapshot so no client can ever be shown a bot as
+  // a human (Phase 11: no fake-human surfaces).
+  addBot(name) { return this._add(() => {}, name, true); }
+
+  _add(send, name, isBot) {
     const id = _pid++;
     const spawn = this._spawn();
     const p = {
-      id, send, name,
+      id, send, name, isBot: !!isBot,
       state: createState(spawn[0], spawn[1], spawn[2]),
       lastInputSeq: 0, ackTick: 0,
       queue: [],
@@ -347,7 +355,7 @@ export class AuthRoom {
     const publicList = [];
     for (const p of this.players.values()) {
       publicList.push({
-        id: p.id, name: p.name,
+        id: p.id, name: p.name, isBot: p.isBot,
         x: p.state.px, y: p.state.py, z: p.state.pz,
         yaw: p._lastYaw ?? 0, crouch: p.state.crouch, alive: p.alive,
         health: p.health, shield: p.shield,
@@ -384,7 +392,7 @@ export class AuthRoom {
 
   _roster() {
     return Array.from(this.players.values()).map((p) => ({
-      id: p.id, name: p.name, kills: p.kills, deaths: p.deaths, score: p.score,
+      id: p.id, name: p.name, isBot: p.isBot, kills: p.kills, deaths: p.deaths, score: p.score,
     }));
   }
 

@@ -44,6 +44,7 @@ export class BotManager {
     bot.maxHealth   = Math.round(100 * healthMult);
     bot.health      = bot.maxHealth;
     bot.isHumanSlot = isHumanSlot;
+    bot.isBot       = true;   // every combatant here is a bot — labelled as one
     bot.displayName = randomTag(this._usedTags);
     this.scene.add(bot.mesh);
     this.bots.push(bot);
