@@ -29,6 +29,7 @@ import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
+import { AuthNetBridge, authNetTarget } from '../net/AuthNetBridge.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { MobileControls } from '../ui/MobileControls.js';
 import { KILL_MULT_BONUS } from './RarityPerks.js';
@@ -1052,9 +1053,17 @@ export class Game {
     // but the match keeps running — this is a multiplayer game.
     // Phase 3: with the movesim flag on, the deterministic fixed-20Hz core
     // drives movement (interpolated); the legacy controller stays the default.
+    // Phase 4/5 integration: with ?authnet on, the AUTHORITATIVE SERVER owns
+    // movement + combat — the local player is client-predicted and other
+    // players are real remotes. Falls back cleanly if the socket isn't up.
+    if (this._authNet === undefined) {
+      const url = authNetTarget();
+      this._authNet = url ? new AuthNetBridge(this, url) : null;
+    }
     if (!menuOpen) {
-      if (this._moveSimOn === undefined) this._moveSimOn = moveSimEnabled();
-      if (this._moveSimOn) {
+      if (this._authNet && this._authNet.ready) {
+        this._authNet.update(dt, this.input);
+      } else if (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled())) {
         if (!this.moveBridge) this.moveBridge = new MoveBridge(this.player, this.world);
         this.moveBridge.update(dt, this.input, this.world);
       } else {

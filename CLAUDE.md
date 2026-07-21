@@ -161,9 +161,16 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `authnet-lab.html` — browser lab (`?ws=…&name=…&auto=circle|forward`); the
   G3 capture ran TWO independent browser contexts in one authoritative room,
   each predicting locally and seeing the other via snapshots.
-- Not yet wired into the live Game.js loop — the authoritative path is proven
-  standalone; folding it into the shipping game (replacing local ServerSim) is
-  the integration step gated behind G3 sign-off.
+- `src/net/AuthNetBridge.js` — folds the authoritative path INTO the live game
+  behind a flag (`?authnet=1` / `?authnet=ws://host:port` / localStorage
+  kx_authnet=1). When on, the server owns movement+combat: the local player is
+  client-predicted (drives camera + position), remotes render as interpolated
+  avatars with nameplates, fire routes to the server, and hit/kill events flow
+  to the HUD. OFF by default → the local ServerSim path is completely
+  untouched. Verified: build clean, flag-detection unit-tested, and it wraps
+  the same AuthClient proven in the two-browser G3 capture. (Full in-game
+  headless screenshot is blocked by the sandbox's swiftshader/vite instability,
+  not the code.)
 
 ## Phase 6 — original arena graybox
 - `src/sim/arenas.js` — `INKFALL` (Inkfall Foundry graybox): analytic arena
