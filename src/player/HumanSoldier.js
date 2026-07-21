@@ -985,6 +985,40 @@ function _buildArmorPieces(root, armorTypeId, look) {
       animated.push({ mesh, mat, anim: sp.anim, baseQuat: mesh.quaternion.clone() });
     }
   }
+
+  // ── Forearm gauntlets + hand plates (bone-LOCAL attach) ─────────────────────
+  // The world-space spec system above assumes the bind pose, but the arms are
+  // posed well away from bind — so arm armour is attached directly in each
+  // bone's LOCAL space, where the limb axis is a stable +Y (forearm→hand offset
+  // is [0, +len, 0]). The plates then ride the forearm/hand in ANY pose. This
+  // kits out the previously-bare arms so they read as armoured, not a base suit.
+  const _armPlate = (foreName, handName) => {
+    const fore = bone(foreName), hand = bone(handName);
+    if (!fore || !hand) return;
+    const L = hand.position.length() || 24;           // forearm length (bone-local units)
+    const addTo = (parent, geo, mat, y, z = 0) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(0, y, z);
+      m.frustumCulled = false; m.castShadow = true; m.receiveShadow = true;
+      parent.add(m);
+    };
+    // Wrapping gauntlet over the lower two-thirds of the forearm.
+    addTo(fore, box(L * 0.32, L * 0.64, L * 0.32), plate, L * 0.55);
+    // Dark wrist cuff where the gauntlet meets the hand (subtle groove, not a
+    // bright band — keep the silhouette dark).
+    addTo(fore, box(L * 0.40, L * 0.11, L * 0.40), dark,  L * 0.90);
+    // Thin themed accent sliver on the outer forearm (matches the visor glow).
+    addTo(fore, box(L * 0.10, L * 0.34, L * 0.345), accent, L * 0.55, -L * 0.02);
+    // Elbow cap at the top of the forearm.
+    addTo(fore, box(L * 0.34, L * 0.16, L * 0.34), plate, L * 0.10);
+    // Knuckle plate riding the back of the hand toward the fingers.
+    const hChild = hand.children.find(c => c.isBone);
+    const hy = hChild ? hChild.position.length() * 0.5 : L * 0.16;
+    addTo(hand, box(L * 0.30, L * 0.22, L * 0.34), plate, hy);
+  };
+  _armPlate('LeftForeArm', 'LeftHand');
+  _armPlate('RightForeArm', 'RightHand');
+
   return { animated };
 }
 
