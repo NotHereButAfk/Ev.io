@@ -707,8 +707,8 @@ export class Zombie {
     // zombies too (they wear the shambler look but still vary).
     const R = () => Math.random();
     const prof = this._profile = {
-      height:  0.9  + R() * 0.30,      // lanky ↔ short
-      girth:   0.88 + R() * 0.28,      // gaunt ↔ stocky
+      height:  0.92 + R() * 0.18,      // 0.92–1.10 (kept in check so tall ≠ stick)
+      girth:   1.32 + R() * 0.38,      // 1.32–1.70 — heavy, meaty build
       decay:   R(),                    // 0 fresh ↔ 1 rotted
       lean:    0.12 + R() * 0.16,      // permanent forward hunch
       hunch:  (R() - 0.5) * 0.16,      // shoulder/spine tilt to one side
