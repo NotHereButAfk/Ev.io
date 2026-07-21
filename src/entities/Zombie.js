@@ -701,12 +701,30 @@ export class Zombie {
 
     this.position = spawnPoint.clone();
 
-    // Build rig — prefer the Blender GLB if already loaded
+    // ── PER-INSTANCE PROFILE — every zombie is physically distinct ──────────
+    // build, decay, posture and gait personality are all randomised so a wave
+    // reads as a mob of individuals, not a clone army. Applies to armed
+    // zombies too (they wear the shambler look but still vary).
+    const R = () => Math.random();
+    const prof = this._profile = {
+      height:  0.9  + R() * 0.30,      // lanky ↔ short
+      girth:   0.88 + R() * 0.28,      // gaunt ↔ stocky
+      decay:   R(),                    // 0 fresh ↔ 1 rotted
+      lean:    0.12 + R() * 0.16,      // permanent forward hunch
+      hunch:  (R() - 0.5) * 0.16,      // shoulder/spine tilt to one side
+      headTilt:(R() - 0.5) * 0.55,     // cocked-head loll bias
+      headTurn:(R() - 0.5) * 0.4,
+      limpSide: R() < 0.5 ? 1 : -1,    // which leg drags
+      gaitMul: 0.85 + R() * 0.35,      // cadence personality
+    };
+
     const mat = makeMats();
-    // Per-instance skin/cloth tint jitter so even same-variant zombies differ.
-    const hueJit = (Math.random() - 0.5) * 0.05;
-    mat.flesh.color.offsetHSL(hueJit, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.05);
-    mat.suit.color.offsetHSL(hueJit * 0.6, 0, (Math.random() - 0.5) * 0.04);
+    // Skin tone + DECAY: rotted ones desaturate & darken, wounds glow hotter.
+    const hueJit = (R() - 0.5) * 0.08;
+    mat.flesh.color.offsetHSL(hueJit, -prof.decay * 0.12 + (R() - 0.5) * 0.06, -prof.decay * 0.10 + (R() - 0.5) * 0.05);
+    mat.suit.color.offsetHSL(hueJit * 0.6, 0, (R() - 0.5) * 0.06 - prof.decay * 0.04);
+    // Rotted ones get faintly glowing infected wounds.
+    if (mat.blood) mat.blood.emissive.setRGB(prof.decay * 0.22, 0, 0);
     // Variant glow retint (eyes / nodes / veins + the eye point light).
     if (V.glow) {
       mat.eye.emissive.setHex(V.glow);
@@ -716,7 +734,10 @@ export class Zombie {
     // Runner: tear the armor off (hide the heavy kit meshes).
     if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
     if (V.glow) rig.eyeGlow?.color.setHex(V.glow);
-    if (V.scale !== 1) rig.root.scale.setScalar(V.scale);
+    // Non-uniform build scale (height × girth) on top of the variant scale —
+    // lanky/short × gaunt/stocky gives each a distinct silhouette.
+    const s = V.scale;
+    rig.root.scale.set(s * prof.girth, s * prof.height, s * prof.girth);
     this._rig       = rig;
     this._fleshMat  = rig.mat.flesh;
 
@@ -768,8 +789,9 @@ export class Zombie {
     // Variant gait speed: runners scurry (1.7x), brutes trudge (0.75x).
     // The phase advances UNEVENLY — a quick push on the driving stride, a slow
     // drag between — which reads as a lurching shamble instead of a metronome.
+    const P = this._profile;
     const lurch = isMoving ? (1 + 0.5 * Math.sin(this._animPhase)) : 1;
-    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1) * lurch;
+    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1) * (P?.gaitMul ?? 1) * lurch;
     const t = this._animPhase;
 
     // Forward SURGE from the gait — velocity peaks on the strong stride (used
@@ -784,14 +806,17 @@ export class Zombie {
     this._reach     = this._reach     + (wantReach - this._reach)     * damp(8, dt);
     this._headTrack = this._headTrack + (wantTrack - this._headTrack) * damp(5, dt);
 
+    // which leg drags is per-instance (limpSide) — swaps the weak/strong roles
+    const wk = (P?.limpSide ?? 1) > 0 ? rig.legs.left  : rig.legs.right;   // weak/limp
+    const st = (P?.limpSide ?? 1) > 0 ? rig.legs.right : rig.legs.left;    // strong
     if (isMoving) {
-      // Walk cycle — legs (asymmetric shamble: weak left, driving right)
-      rig.legs.left.hip.rotation.x   = -Math.sin(t) * 0.18;  // limp
-      rig.legs.right.hip.rotation.x  =  Math.sin(t) * 0.30;  // strong stride
-      rig.legs.left.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28;
-      rig.legs.right.knee.rotation.x =  Math.max(0, -Math.sin(t)) * 0.38;
-      rig.legs.left.ankle.rotation.x = -Math.sin(t) * 0.08;
-      rig.legs.right.ankle.rotation.x=  Math.sin(t) * 0.10;
+      // Walk cycle — asymmetric shamble: one leg limps, the other drives.
+      wk.hip.rotation.x   = -Math.sin(t) * 0.18;  // limp
+      st.hip.rotation.x   =  Math.sin(t) * 0.30;  // strong stride
+      wk.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28;
+      st.knee.rotation.x  =  Math.max(0, -Math.sin(t)) * 0.38;
+      wk.ankle.rotation.x = -Math.sin(t) * 0.08;
+      st.ankle.rotation.x =  Math.sin(t) * 0.10;
 
       // Pelvis bob
       rig.torsoGroup.position.y = Math.abs(Math.sin(t)) * -0.035;
@@ -823,12 +848,14 @@ export class Zombie {
       }
     }
 
-    // Always: forward lean + rock
-    rig.spineGroup.rotation.x = 0.18 + Math.sin(t * 0.8) * 0.04;
+    // Always: per-instance forward lean + side hunch + rock
+    rig.spineGroup.rotation.x = (P?.lean ?? 0.18) + Math.sin(t * 0.8) * 0.04;
+    rig.spineGroup.rotation.z += (P?.hunch ?? 0);
 
-    // Head loll — with a hungry lean-in toward the player when close.
-    rig.headGroup.rotation.z = Math.sin(t * 0.9 + 0.4) * 0.14 * (1 - this._headTrack * 0.6);
+    // Head loll — per-instance cocked-head bias + hungry lean-in when close.
+    rig.headGroup.rotation.z = (P?.headTilt ?? 0) + Math.sin(t * 0.9 + 0.4) * 0.14 * (1 - this._headTrack * 0.6);
     rig.headGroup.rotation.x = -0.06 + Math.sin(t * 1.1) * 0.05 + this._headTrack * 0.22;
+    rig.headGroup.rotation.y = (P?.headTurn ?? 0) * (1 - this._headTrack);
 
     // Hungry REACH — both arms extend forward to grab as it closes in (melee).
     if (this._reach > 0.01 && !this.armedType) {
