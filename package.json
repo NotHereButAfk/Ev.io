@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:move": "node tools/movesim_fixtures.mjs",
-    "arena:metrics": "node tools/arena_metrics.mjs"
+    "arena:metrics": "node tools/arena_metrics.mjs",
+    "stress:soak": "node tools/stress_soak.mjs"
   },
   "repository": {
     "type": "git",
