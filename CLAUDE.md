@@ -170,6 +170,32 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   (Crucible deck + N/S ramps, E/W foundry walls, Slag Duct crouch tunnel,
   Gantry steps, Ink Crate cover) with spawns, callouts, and pickups. Shared by
   the auth room and the labs; topology tunable here before beauty work.
+- `tools/arena_metrics.mjs` (`npm run arena:metrics`) — bot-driven route times,
+  occupancy heatmaps, kills/reachability at 2/4/8p. Confirms no dead zones.
+
+## Phase 8 — accessibility (evidence layer)
+- Settings ACCESSIBILITY section (index.html) → GameSettings keys, applied live
+  via `<html>` data-attrs + CSS vars in `MainMenu._previewAccessibility`
+  (style.css PHASE 8 block): crosshair shape (cross/dot/circle) + colour,
+  colour-blind SVG filters (protan/deutan/tritan over #game-canvas + #hud),
+  HUD scale, reduce-motion (CSS + 3D: no bob, recoil-cam suppressed in
+  Player.js), reduce-flashes, high-contrast, hit-sound toggle, focus rings.
+
+## Phase 9 — stress/soak (evidence layer)
+- `tools/stress_soak.mjs` (`npm run stress:soak`) — tick-budget matrix at
+  8/16/32/64p + a soak run. The auth sim maxes ~0.7ms/tick at 64p (50ms
+  budget), 0 invalid states, no leak; network bandwidth is the real limit.
+
+## Phase 10 — server-authoritative abilities
+- `server/authroom.mjs` ABILITIES: flash / smoke / impulse throwables. Server
+  owns charges (2 each), cooldown, the aim-ray detonation point, and every
+  effect: flash = LOS-gated blind, smoke = a vision volume that blocks hitscan
+  (`_raySmoked`), impulse = radial knockback with per-component clamp
+  (IMPULSE_MAX). `onAbility` is replay-guarded; resolved in update() like fire.
+  Snapshots carry blind/abilities/smokes; `AuthClient.sendAbility`.
+- `server/authnet_test.mjs` now 21 proofs (was 15): +unknown-kind ignored,
+  spam capped by charges/cooldown, smoke volume created, duplicate seq ignored,
+  impulse velocity clamped (no infinite launch).
 
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player

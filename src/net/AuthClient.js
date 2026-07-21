@@ -28,7 +28,10 @@ export class AuthClient {
     this.sim = null;                        // predicted local state
     this.simWorld = null;
     this.remotes = new Map();               // id -> {name, buf:[{t,x,y,z,yaw,crouch}]}
-    this.self = { health: 100, shield: 0, alive: true, mag: 30, kills: 0, deaths: 0, score: 0 };
+    this.self = { health: 100, shield: 0, alive: true, mag: 30, kills: 0, deaths: 0, score: 0,
+                  blind: false, blindTicks: 0, abilities: { flash: 2, smoke: 2, impulse: 2 }, abilityCD: 0 };
+    this.smokes = [];                       // active smoke volumes from the server
+    this.abilitySeq = 0;
     this.events = [];                       // drained by the game each frame
     this.arena = null;
     this.onWelcome = null;
@@ -74,7 +77,10 @@ export class AuthClient {
     // authoritative self
     const y = snap.you;
     this.self = { health: y.health, shield: y.shield, alive: y.alive,
-                  mag: y.mag, kills: y.kills, deaths: y.deaths, score: y.score };
+                  mag: y.mag, kills: y.kills, deaths: y.deaths, score: y.score,
+                  blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
+                  abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
+    this.smokes = snap.smokes ?? [];
     // snap predicted state to server truth
     this.sim = { ...this.sim,
       px: y.x, py: y.y, pz: y.z, vx: y.vx, vy: y.vy, vz: y.vz,
@@ -121,6 +127,14 @@ export class AuthClient {
     if (!this.connected) return;
     this.fireSeq++;
     this.ws.send(JSON.stringify({ t: 'fire', seq: this.fireSeq, wid, yaw, pitch }));
+  }
+
+  // Request a throwable ability (flash / smoke / impulse). The server owns
+  // charges, cooldown, and the effect — this is only a request.
+  sendAbility(kind, yaw, pitch) {
+    if (!this.connected) return;
+    this.abilitySeq++;
+    this.ws.send(JSON.stringify({ t: 'ability', seq: this.abilitySeq, kind, yaw, pitch }));
   }
 
   // Predicted local position (for the camera/viewmodel owner).

@@ -81,6 +81,9 @@ export function makeAuthServer({ server, port } = {}) {
         case 'fire':
           if (conn.id != null) room.onFire(conn.id, msg);
           break;
+        case 'ability':
+          if (conn.id != null) room.onAbility(conn.id, msg);
+          break;
         case 'pong':
           break;                                         // liveness handled by lastSeen
         default:

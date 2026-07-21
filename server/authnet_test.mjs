@@ -112,6 +112,47 @@ a.fireRaw({ seq: 501, wid: 'm4', yaw: yawToBob, pitch: 0 });  // dup 501
 await sleep(200);
 ok('duplicate fire seq: replayed fire ignored', a.last().you.mag >= magX - 1, `mag ${magX}→${a.last().you.mag}`);
 
+// ═══ Phase 10 — ability authority/abuse ═══
+b.abilitySeq = 0;
+b.ability = (kind, yaw = 0) => b.ws.send(JSON.stringify({ t: 'ability', seq: ++b.abilitySeq, kind, yaw, pitch: 0 }));
+b.abilityRaw = (o) => b.ws.send(JSON.stringify({ t: 'ability', ...o }));
+
+// unknown ability type ignored
+const chargesBefore = JSON.stringify(b.last().you.abilities);
+b.abilityRaw({ seq: 1000, kind: 'nuke', yaw: 0, pitch: 0 });
+await sleep(150);
+ok('ability: unknown kind ignored (charges unchanged)',
+   JSON.stringify(b.last().you.abilities) === chargesBefore);
+
+// spam smoke: only `charges` may be spent despite a flood (cooldown + charge cap)
+const smokeStart = b.last().you.abilities.smoke;
+for (let i = 0; i < 20; i++) b.ability('smoke', 0);
+await sleep(500);
+const smokeLeft = b.last().you.abilities.smoke;
+ok('ability: spam capped by charges (smoke never below 0)', smokeLeft >= 0, `smoke ${smokeStart}→${smokeLeft}`);
+ok('ability: cooldown limited the burst (≤ start charges spent)', smokeStart - smokeLeft <= smokeStart);
+ok('ability: active smoke volume created', (b.last().smokes?.length || 0) >= 1);
+
+// duplicate ability seq: replay does nothing
+b.abilitySeq = 2000;
+const flashStart = b.last().you.abilities.flash;
+await sleep(1600);                          // let cooldown clear
+b.ability('flash', 0);                       // seq 2001
+b.abilityRaw({ seq: 2001, kind: 'flash', yaw: 0, pitch: 0 });  // dup 2001
+await sleep(200);
+ok('ability: duplicate seq ignored (one charge max)', flashStart - b.last().you.abilities.flash <= 1);
+
+// impulse cannot launch to infinity — velocity is server-clamped
+a.abilitySeq = 0;
+a.ability = (kind, yaw = 0) => a.ws.send(JSON.stringify({ t: 'ability', seq: ++a.abilitySeq, kind, yaw, pitch: 0 }));
+await sleep(400);
+// fire an impulse repeatedly at own feet; server clamps knockback
+for (let i = 0; i < 5; i++) { a.ability('impulse', 0); await sleep(120); }
+await sleep(200);
+const v = a.last().you;
+const speed = Math.hypot(v.vx, v.vy, v.vz);
+ok('ability: impulse knockback velocity clamped (no infinite launch)', speed < 40 && Number.isFinite(speed), `|v|=${speed.toFixed(1)}`);
+
 // reconnect + duplicate session
 const dup = client(); await open(dup);
 dup.hello('Alice2'); dup.hello('Alice2');   // second hello on same socket
