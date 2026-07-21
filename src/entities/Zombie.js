@@ -765,6 +765,7 @@ export class Zombie {
     // Non-uniform build scale (height × girth) on top of the variant scale.
     const s = V.scale;
     rig.root.scale.set(s * prof.girth, s * prof.height, s * prof.girth);
+    this._baseScale = rig.root.scale.clone();   // preserved through lunge pulses
 
     // ── STRUCTURAL mutations — distinct silhouettes at a glance ──
     const headScale = 0.82 + R() * 0.5;            // pinhead ↔ swollen head
@@ -854,43 +855,31 @@ export class Zombie {
     // which leg drags is per-instance (limpSide) — swaps the weak/strong roles
     const wk = (P?.limpSide ?? 1) > 0 ? rig.legs.left  : rig.legs.right;   // weak/limp
     const st = (P?.limpSide ?? 1) > 0 ? rig.legs.right : rig.legs.left;    // strong
-    if (isMoving) {
-      // Walk cycle — asymmetric shamble: one leg limps, the other drives.
-      wk.hip.rotation.x   = -Math.sin(t) * 0.18;  // limp
-      st.hip.rotation.x   =  Math.sin(t) * 0.30;  // strong stride
-      wk.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28;
-      st.knee.rotation.x  =  Math.max(0, -Math.sin(t)) * 0.38;
-      wk.ankle.rotation.x = -Math.sin(t) * 0.08;
-      st.ankle.rotation.x =  Math.sin(t) * 0.10;
 
-      // Pelvis bob
-      rig.torsoGroup.position.y = Math.abs(Math.sin(t)) * -0.035;
+    // Smooth start/stop: blend the whole walk cycle in and out with one eased
+    // factor instead of hard-switching idle↔moving (that snap was the last
+    // rough edge). At mb=0 the amplitudes fade to a resting stand; at mb=1 the
+    // full shamble plays. Everything below scales by mb, so nothing pops.
+    this._moveBlend = (this._moveBlend ?? 0) + ((isMoving ? 1 : 0) - (this._moveBlend ?? 0)) * damp(7, dt);
+    const mb = this._moveBlend;
 
-      // Torso sway
-      rig.spineGroup.rotation.z = Math.sin(t * 1.3) * 0.065;
-
-      // Arms sway opposite legs (only when unarmed), elbows dragging behind
-      if (!this.armedType) {
-        rig.arms.left.shoulder.rotation.x  = -0.65 + Math.sin(t) * 0.18;
-        rig.arms.right.shoulder.rotation.x = -0.65 - Math.sin(t) * 0.18;
-        rig.arms.left.elbow.rotation.x     = -0.30 - Math.max(0,  Math.sin(t + 0.5)) * 0.22;
-        rig.arms.right.elbow.rotation.x    = -0.30 - Math.max(0, -Math.sin(t + 0.5)) * 0.22;
-      }
-    } else {
-      // Idle — zero leg rotations
-      rig.legs.left.hip.rotation.x    = 0;
-      rig.legs.right.hip.rotation.x   = 0;
-      rig.legs.left.knee.rotation.x   = 0;
-      rig.legs.right.knee.rotation.x  = 0;
-      rig.legs.left.ankle.rotation.x  = 0;
-      rig.legs.right.ankle.rotation.x = 0;
-      rig.torsoGroup.position.y       = 0;
-      rig.spineGroup.rotation.z       = Math.sin(t * 1.3) * 0.025;
-
-      if (!this.armedType) {
-        rig.arms.left.shoulder.rotation.x  = -0.65;
-        rig.arms.right.shoulder.rotation.x = -0.65;
-      }
+    // Walk cycle — asymmetric shamble (one leg limps, the other drives),
+    // amplitude-scaled by the move blend.
+    wk.hip.rotation.x   = -Math.sin(t) * 0.18 * mb;
+    st.hip.rotation.x   =  Math.sin(t) * 0.30 * mb;
+    wk.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28 * mb;
+    st.knee.rotation.x  =  Math.max(0, -Math.sin(t)) * 0.38 * mb;
+    wk.ankle.rotation.x = -Math.sin(t) * 0.08 * mb;
+    st.ankle.rotation.x =  Math.sin(t) * 0.10 * mb;
+    // Pelvis bob + torso sway (idle keeps a faint sway, walk swells it).
+    rig.torsoGroup.position.y = Math.abs(Math.sin(t)) * -0.035 * mb;
+    rig.spineGroup.rotation.z = Math.sin(t * 1.3) * (0.025 + 0.04 * mb);
+    // Arms sway opposite the legs (unarmed), easing between rest and swing.
+    if (!this.armedType) {
+      rig.arms.left.shoulder.rotation.x  = -0.65 + Math.sin(t) * 0.18 * mb;
+      rig.arms.right.shoulder.rotation.x = -0.65 - Math.sin(t) * 0.18 * mb;
+      rig.arms.left.elbow.rotation.x     = -0.30 - Math.max(0,  Math.sin(t + 0.5)) * 0.22 * mb;
+      rig.arms.right.elbow.rotation.x    = -0.30 - Math.max(0, -Math.sin(t + 0.5)) * 0.22 * mb;
     }
 
     // Always: per-instance forward lean + side hunch + rock
@@ -1057,13 +1046,16 @@ export class Zombie {
       this._fleshMat.emissiveIntensity = 0;
     }
 
-    // Lunge scale pulse
+    // Lunge scale pulse — MULTIPLIES the per-instance build scale (girth ×
+    // height × variant) rather than replacing it, so a lunge no longer wipes
+    // the zombie's individual proportions.
+    const bs = this._baseScale;
     if (this.lungeTimer > 0) {
       this.lungeTimer -= dt;
       const s = 1 + Math.sin((this.lungeTimer / 0.2) * Math.PI) * 0.12;
-      this.mesh.scale.setScalar(s);
+      this.mesh.scale.set(bs.x * s, bs.y * s, bs.z * s);
     } else {
-      this.mesh.scale.setScalar(1);
+      this.mesh.scale.copy(bs);
     }
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
