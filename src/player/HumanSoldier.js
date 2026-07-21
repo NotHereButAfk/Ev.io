@@ -321,6 +321,23 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 
   // Stance offsets applied after mixer.update overwrites bones (per armor type).
   const poseOffsets = [];
+  // Global posture correction: the Vanguard idle clip bakes a forward hunch
+  // (rounded upper back + forward-jutting head). Straighten it once for EVERY
+  // variant so the base stance stands tall. Negative X leans the spine back
+  // upright; the neck pulls the head off its forward jut and the head levels
+  // the gaze. Per-variant spineLean/headPitch below then read as relative
+  // adjustments from this upright base (recon a touch more upright, heavy a
+  // touch more lumbering) rather than stacking on top of the clip's hunch.
+  const UPRIGHT = [
+    [B.spine, -0.15],   // un-fold the hip: the deepest part of the clip's hunch
+    [B.s1,    -0.15],
+    [B.s2,    -0.09],
+    [B.neck,  -0.18],   // pull the head off its forward jut
+    [B.head,   0.07],   // re-level the gaze after the neck straightens
+  ];
+  for (const [bone, ax] of UPRIGHT)
+    if (bone) poseOffsets.push({ bone, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, ax) });
+
   if (B.s1 && motion.spineLean)
     poseOffsets.push({ bone: B.s1, q: new THREE.Quaternion().setFromAxisAngle(_AX_X, motion.spineLean) });
   if (B.head && motion.headPitch)
