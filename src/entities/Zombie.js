@@ -18,6 +18,31 @@ let _nextId = 5000;
 // Frame-rate-independent smoothing factor for lerp/slerp toward a target.
 const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 
+// ── DIVERSITY palettes — each zombie draws a distinct look from these, so a
+// horde reads as many different corpses, not one recolored template. ──────────
+const SKIN_TONES = [
+  0x8a9a6b, // green rot
+  0x9a9488, // ashen grey
+  0xb0a25c, // jaundiced yellow
+  0x8a6a74, // bruised purple
+  0x7c8f84, // pallid teal
+  0xa6785e, // leathery tan
+  0x6f7a5e, // deep moss
+  0xc9c3b4, // bloodless pale
+];
+const SUIT_TONES = [
+  0x2a3225, // olive drab
+  0x212329, // black ops
+  0x3a3122, // desert tan
+  0x233039, // navy
+  0x3a251d, // rust brown
+  0x2e2a34, // charcoal violet
+  0x445236, // field green
+];
+// Eye/vein glow (shamblers roll one; runner/brute keep their variant glow).
+const EYE_GLOWS = [0x35e0ff, 0x54ff5e, 0xffb020, 0xff3a3a, 0xb44dff, 0xe8f0ff, 0xff7a1e];
+const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+
 // ─── Visual/stat variants — so waves aren't clone armies ──────────────────────
 // shambler: the base UNIT-73 trooper. runner: armor torn away, toxic-green
 // glow, fast and frail. brute: scaled up, blood-red glow, slow and tanky.
@@ -719,25 +744,45 @@ export class Zombie {
     };
 
     const mat = makeMats();
-    // Skin tone + DECAY: rotted ones desaturate & darken, wounds glow hotter.
-    const hueJit = (R() - 0.5) * 0.08;
-    mat.flesh.color.offsetHSL(hueJit, -prof.decay * 0.12 + (R() - 0.5) * 0.06, -prof.decay * 0.10 + (R() - 0.5) * 0.05);
-    mat.suit.color.offsetHSL(hueJit * 0.6, 0, (R() - 0.5) * 0.06 - prof.decay * 0.04);
+    // Distinct SKIN + CLOTHING family per zombie, then decay + fine jitter on
+    // top (so even two "green rot" corpses aren't identical).
+    const hueJit = (R() - 0.5) * 0.06;
+    mat.flesh.color.setHex(pick(SKIN_TONES)).offsetHSL(hueJit, -prof.decay * 0.14 + (R() - 0.5) * 0.05, -prof.decay * 0.12 + (R() - 0.5) * 0.04);
+    if (mat.faceSkin) mat.faceSkin.color.copy(mat.flesh.color).offsetHSL(0, 0, 0.04);
+    if (mat.skin2)    mat.skin2.color.copy(mat.flesh.color).offsetHSL(0, -0.04, -0.05);
+    mat.suit.color.setHex(pick(SUIT_TONES)).offsetHSL(hueJit * 0.5, 0, (R() - 0.5) * 0.05);
+    if (mat.rag)  mat.rag.color.copy(mat.suit.color).offsetHSL(0, -0.05, -0.06);
     // Rotted ones get faintly glowing infected wounds.
     if (mat.blood) mat.blood.emissive.setRGB(prof.decay * 0.22, 0, 0);
-    // Variant glow retint (eyes / nodes / veins + the eye point light).
-    if (V.glow) {
-      mat.eye.emissive.setHex(V.glow);
-      mat.eye.color.copy(new THREE.Color(V.glow)).multiplyScalar(0.12);
-    }
+    // Eye/vein glow — variant glow wins; otherwise a per-instance colour.
+    const glow = V.glow ?? pick(EYE_GLOWS);
+    mat.eye.emissive.setHex(glow);
+    mat.eye.color.copy(new THREE.Color(glow)).multiplyScalar(0.12);
     const rig = buildZombieRigFromGLB(mat) ?? buildZombieRig();
     // Runner: tear the armor off (hide the heavy kit meshes).
     if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
-    if (V.glow) rig.eyeGlow?.color.setHex(V.glow);
-    // Non-uniform build scale (height × girth) on top of the variant scale —
-    // lanky/short × gaunt/stocky gives each a distinct silhouette.
+    rig.eyeGlow?.color.setHex(glow);
+    // Non-uniform build scale (height × girth) on top of the variant scale.
     const s = V.scale;
     rig.root.scale.set(s * prof.girth, s * prof.height, s * prof.girth);
+
+    // ── STRUCTURAL mutations — distinct silhouettes at a glance ──
+    const headScale = 0.82 + R() * 0.5;            // pinhead ↔ swollen head
+    rig.headGroup.scale.multiplyScalar(headScale);
+    // withered / overgrown limbs (asymmetric) — scale a limb's root joint
+    const limbScale = (j, sx, sy) => { j.scale.x *= sx; j.scale.z *= sx; j.scale.y *= sy; };
+    if (R() < 0.4) {                                // one withered arm
+      const arm = R() < 0.5 ? rig.arms.left : rig.arms.right;
+      limbScale(arm.shoulder, 0.68, 0.86);
+    } else if (R() < 0.3) {                         // one over-long grabbing arm
+      const arm = R() < 0.5 ? rig.arms.left : rig.arms.right;
+      limbScale(arm.shoulder, 1.12, 1.2);
+    }
+    if (R() < 0.3) limbScale(R() < 0.5 ? rig.legs.left : rig.legs.right, 0.9, 0.9); // gimp leg
+    // uneven shoulders (hunched to one side)
+    rig.arms.left.shoulder.position.y  += prof.hunch * 0.4;
+    rig.arms.right.shoulder.position.y -= prof.hunch * 0.4;
+
     this._rig       = rig;
     this._fleshMat  = rig.mat.flesh;
 
