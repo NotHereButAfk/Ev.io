@@ -15,6 +15,9 @@ const ARMED_CFG = {
 
 let _nextId = 5000;
 
+// Frame-rate-independent smoothing factor for lerp/slerp toward a target.
+const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
+
 // ─── Visual/stat variants — so waves aren't clone armies ──────────────────────
 // shambler: the base UNIT-73 trooper. runner: armor torn away, toxic-green
 // glow, fast and frail. brute: scaled up, blood-red glow, slow and tanky.
@@ -675,6 +678,17 @@ export class Zombie {
     this._deathBaseY     = 0;
     this._animPhase      = Math.random() * Math.PI * 2;
     this._muzzleFlashTimer = 0;
+    // ── realism state ──
+    this._weaveT     = Math.random() * 10;       // drunken lateral drift phase
+    this._weaveAmt   = 0.14 + Math.random() * 0.16;
+    this._stumbleIn  = 3 + Math.random() * 5;    // seconds until next stumble
+    this._stumbleT   = 0;                         // >0 while mid-stumble
+    this._surge      = 1;                         // gait-driven forward surge
+    this._distToPlayer = 999;                     // shared with _animate for reach
+    this._reach      = 0;                          // 0..1 arm-reach blend
+    this._headTrack  = 0;                          // 0..1 look-at-player blend
+    this._tmpQuat    = new THREE.Quaternion();
+    this._tmpObj     = new THREE.Object3D();
 
     // Armed state
     this.armedType     = armedType;
@@ -752,8 +766,23 @@ export class Zombie {
   _animate(dt, isMoving) {
     const rig = this._rig;
     // Variant gait speed: runners scurry (1.7x), brutes trudge (0.75x).
-    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1);
+    // The phase advances UNEVENLY — a quick push on the driving stride, a slow
+    // drag between — which reads as a lurching shamble instead of a metronome.
+    const lurch = isMoving ? (1 + 0.5 * Math.sin(this._animPhase)) : 1;
+    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1) * lurch;
     const t = this._animPhase;
+
+    // Forward SURGE from the gait — velocity peaks on the strong stride (used
+    // by update() to modulate movement speed). Base tuned so the lurch nets
+    // ~95% of the constant speed (keeps the wave difficulty curve intact).
+    this._surge = isMoving ? (0.74 + 1.3 * Math.max(0, Math.sin(t))) : 1;
+
+    const staggering = this._stumbleT > 0;
+    // Hungry reach + head-track ramp in when the player is close (melee only).
+    const wantReach = (!this.armedType && this._distToPlayer < 3.4) ? 1 : 0;
+    const wantTrack = (this._distToPlayer < 9) ? 1 : 0;
+    this._reach     = this._reach     + (wantReach - this._reach)     * damp(8, dt);
+    this._headTrack = this._headTrack + (wantTrack - this._headTrack) * damp(5, dt);
 
     if (isMoving) {
       // Walk cycle — legs (asymmetric shamble: weak left, driving right)
@@ -797,9 +826,29 @@ export class Zombie {
     // Always: forward lean + rock
     rig.spineGroup.rotation.x = 0.18 + Math.sin(t * 0.8) * 0.04;
 
-    // Head loll
-    rig.headGroup.rotation.z = Math.sin(t * 0.9 + 0.4) * 0.14;
-    rig.headGroup.rotation.x = -0.06 + Math.sin(t * 1.1) * 0.05;
+    // Head loll — with a hungry lean-in toward the player when close.
+    rig.headGroup.rotation.z = Math.sin(t * 0.9 + 0.4) * 0.14 * (1 - this._headTrack * 0.6);
+    rig.headGroup.rotation.x = -0.06 + Math.sin(t * 1.1) * 0.05 + this._headTrack * 0.22;
+
+    // Hungry REACH — both arms extend forward to grab as it closes in (melee).
+    if (this._reach > 0.01 && !this.armedType) {
+      const r = this._reach;
+      rig.arms.left.shoulder.rotation.x  = THREE.MathUtils.lerp(rig.arms.left.shoulder.rotation.x,  -1.35, r);
+      rig.arms.right.shoulder.rotation.x = THREE.MathUtils.lerp(rig.arms.right.shoulder.rotation.x, -1.35, r);
+      rig.arms.left.elbow.rotation.x     = THREE.MathUtils.lerp(rig.arms.left.elbow.rotation.x,     -0.15, r);
+      rig.arms.right.elbow.rotation.x    = THREE.MathUtils.lerp(rig.arms.right.elbow.rotation.x,    -0.15, r);
+      // clawing fingers twitch as it reaches
+      rig.spineGroup.rotation.x += r * (0.12 + Math.sin(t * 6) * 0.03);
+    }
+
+    // Stagger — a stumble pitches the whole body forward and flails the arms.
+    if (staggering) {
+      const s = Math.sin((this._stumbleT / 0.5) * Math.PI);   // 0→1→0 over the stumble
+      rig.spineGroup.rotation.x += s * 0.28;
+      rig.torsoGroup.position.y -= s * 0.06;
+      rig.arms.left.shoulder.rotation.z  += s * 0.4;
+      rig.arms.right.shoulder.rotation.z -= s * 0.4;
+    }
 
     // Jaw chatter — the hanging mandible works while it shambles, snaps wide
     // during a lunge.
@@ -955,11 +1004,26 @@ export class Zombie {
     );
     const toPlayer = this._toPlayer;
     const dist = toPlayer.length();
+    this._distToPlayer = dist;
     let moveDir  = null;
     let isMoving = false;
 
+    // ── stumble / stagger: every so often a shambler trips and lurches ──
+    this._stumbleIn -= dt;
+    if (this._stumbleT > 0) this._stumbleT -= dt;
+    else if (this._stumbleIn <= 0) {
+      this._stumbleT = 0.35 + Math.random() * 0.35;   // brief stagger
+      this._stumbleIn = 4 + Math.random() * 6;
+    }
+    const staggering = this._stumbleT > 0;
+
     if (!player.isDead && dist < (this.armedType ? ARMED_CFG[this.armedType].chaseRange : DETECT_RADIUS)) {
-      this.mesh.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
+      // Clumsy TURNING — zombies don't snap to face you; they slew toward you
+      // (brutes slowest). Slerp the whole mesh quaternion (convention-safe).
+      this._tmpObj.position.copy(this.mesh.position);
+      this._tmpObj.lookAt(player.position.x, this.position.y + 1.08, player.position.z);
+      const turnRate = this.armedType ? 6 : (2.2 + this._surge * 1.5);
+      this.mesh.quaternion.slerp(this._tmpObj.quaternion, damp(turnRate, dt));
 
       if (this.armedType) {
         const cfg = ARMED_CFG[this.armedType];
@@ -989,9 +1053,15 @@ export class Zombie {
           isMoving = true;
         }
       } else {
-        // Pure melee
+        // Pure melee — chase with a drunken WEAVE so a horde doesn't beeline
+        // in perfect parallel lines (organic, staggering approach).
         if (dist > ATTACK_RADIUS * 0.85) {
-          moveDir  = toPlayer.normalize();
+          this._weaveT += dt * 1.3;
+          const fwd = toPlayer.normalize();
+          // perpendicular in the ground plane
+          this._strafeVec.set(-fwd.z, 0, fwd.x);
+          const weave = Math.sin(this._weaveT) * this._weaveAmt * Math.min(1, dist / 6);
+          moveDir  = fwd.addScaledVector(this._strafeVec, weave).normalize();
           isMoving = true;
         } else if (this.attackCooldown <= 0) {
           this.attackCooldown = ATTACK_COOLDOWN;
@@ -1021,7 +1091,11 @@ export class Zombie {
     }
 
     if (moveDir) {
-      this.position.addScaledVector(moveDir, this.speed * dt);
+      // Lurching gait: velocity SURGES on the strong stride and drags between
+      // (this._surge is set from the gait phase in _animate). Staggering cuts
+      // the shambler to a near-crawl mid-stumble.
+      const gaitVel = this.speed * this._surge * (staggering ? 0.25 : 1);
+      this.position.addScaledVector(moveDir, gaitVel * dt);
       this.world.resolveCollisions(this.position, RADIUS);
     }
     this.mesh.position.set(this.position.x, this.position.y, this.position.z);
