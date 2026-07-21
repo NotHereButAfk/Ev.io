@@ -16,6 +16,19 @@
           crossorigin="anonymous"></script>
 </head>
 <body>
+  <!-- Colour-blind correction matrices (Phase 8 accessibility). Applied to the
+       scene canvas + HUD via CSS filter when a filter is selected in Settings.
+       Standard Machado/Brettel daltonisation approximations. -->
+  <svg id="cb-filters" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <filter id="cb-protanopia"><feColorMatrix type="matrix" values="
+        0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+      <filter id="cb-deuteranopia"><feColorMatrix type="matrix" values="
+        0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/></filter>
+      <filter id="cb-tritanopia"><feColorMatrix type="matrix" values="
+        0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/></filter>
+    </defs>
+  </svg>
   <div id="app">
     <canvas id="game-canvas"></canvas>
 
@@ -211,6 +224,62 @@
         <button class="quality-btn" data-q="low">LOW</button>
         <button class="quality-btn active" data-q="medium">MEDIUM</button>
         <button class="quality-btn" data-q="high">HIGH</button>
+      </div>
+
+      <div class="settings-section">ACCESSIBILITY</div>
+
+      <label class="field-label">Crosshair Shape</label>
+      <div class="quality-btns" id="xhair-shape-btns">
+        <button class="quality-btn xhair-shape active" data-xh="cross">CROSS</button>
+        <button class="quality-btn xhair-shape" data-xh="dot">DOT</button>
+        <button class="quality-btn xhair-shape" data-xh="circle">CIRCLE</button>
+      </div>
+
+      <label class="field-label">Crosshair Colour</label>
+      <div class="quality-btns" id="xhair-color-btns">
+        <button class="quality-btn xhair-color active" data-xc="cyan" style="color:#33e0ff">CYAN</button>
+        <button class="quality-btn xhair-color" data-xc="green" style="color:#54ff8a">GREEN</button>
+        <button class="quality-btn xhair-color" data-xc="white" style="color:#fff">WHITE</button>
+        <button class="quality-btn xhair-color" data-xc="magenta" style="color:#ff4dd2">MAGENTA</button>
+        <button class="quality-btn xhair-color" data-xc="yellow" style="color:#ffe23a">YELLOW</button>
+      </div>
+
+      <label class="field-label">Colour-Blind Filter</label>
+      <div class="quality-btns" id="cblind-btns">
+        <button class="quality-btn cblind active" data-cb="none">OFF</button>
+        <button class="quality-btn cblind" data-cb="protanopia">PROTAN</button>
+        <button class="quality-btn cblind" data-cb="deuteranopia">DEUTAN</button>
+        <button class="quality-btn cblind" data-cb="tritanopia">TRITAN</button>
+      </div>
+
+      <label class="field-label">HUD Scale</label>
+      <div class="setting-row">
+        <input type="range" id="set-hudscale" min="80" max="140" step="5" value="100" class="setting-slider" />
+        <span id="set-hudscale-val" class="setting-val">100%</span>
+      </div>
+
+      <label class="field-label">Reduce Motion (shake / bob / recoil cam)</label>
+      <div class="quality-btns" id="reduce-motion-btns">
+        <button class="quality-btn rmotion active" data-on="off">OFF</button>
+        <button class="quality-btn rmotion" data-on="on">ON</button>
+      </div>
+
+      <label class="field-label">Reduce Flashes (photosensitivity)</label>
+      <div class="quality-btns" id="reduce-flash-btns">
+        <button class="quality-btn rflash active" data-on="off">OFF</button>
+        <button class="quality-btn rflash" data-on="on">ON</button>
+      </div>
+
+      <label class="field-label">High Contrast UI</label>
+      <div class="quality-btns" id="contrast-btns">
+        <button class="quality-btn hcontrast active" data-on="off">OFF</button>
+        <button class="quality-btn hcontrast" data-on="on">ON</button>
+      </div>
+
+      <label class="field-label">Hit Sound Cue</label>
+      <div class="quality-btns" id="hitsound-btns">
+        <button class="quality-btn hitsound" data-on="off">OFF</button>
+        <button class="quality-btn hitsound active" data-on="on">ON</button>
       </div>
 
       <button id="settings-save-btn" class="play-btn" style="margin-top:22px">SAVE SETTINGS</button>

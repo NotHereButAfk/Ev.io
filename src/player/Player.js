@@ -353,8 +353,13 @@ export class Player {
       this.bobTime += dt * 4;
       this._lastBobSign = 1;
     }
-    const bobAmount = moving && this.onGround ? 0.045 : 0.012;
+    // Reduce Motion (accessibility): footsteps still fire, but the view stops
+    // bobbing and the recoil camera-kick is suppressed (gun viewmodel keeps its
+    // kick — only the VIEW is held steady).
+    const bobAmount = this.reduceMotion ? 0 : (moving && this.onGround ? 0.045 : 0.012);
     const bobOffset = Math.sin(this.bobTime) * bobAmount;
+    const recoilView = this.reduceMotion ? 0 : this.recoilPitch;
+    const recoilViewYaw = this.reduceMotion ? 0 : this.recoilYaw;
 
     // --- apply to camera ---
     if (this._camDist > 0) {
@@ -373,8 +378,8 @@ export class Player {
       // First-person: camera sits at eye height with head-bob.
       this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
       this.camera.rotation.order = 'YXZ';
-      this.camera.rotation.y = this.yaw + this.recoilYaw;
-      this.camera.rotation.x = this.pitch + this.recoilPitch;
+      this.camera.rotation.y = this.yaw + recoilViewYaw;
+      this.camera.rotation.x = this.pitch + recoilView;
       this.camera.rotation.z = this._sprintT * -0.025; // slight COD-style lean while sprinting
     }
   }

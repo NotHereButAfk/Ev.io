@@ -4930,3 +4930,84 @@ html, body { margin: 0; }
   text-shadow: 0 0 18px rgba(95, 233, 255, 0.45);
 }
 .nm-complete-sub { max-width: 460px; color: #9fb2c8; font-size: 13px; line-height: 1.6; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 8 — ACCESSIBILITY
+   Driven by <html> data-attrs + CSS vars set by MainMenu._previewAccessibility.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root { --hud-scale: 1; --xhair-color: #33e0ff; }
+
+/* HUD scale — zoom the panels/readouts without moving the centered crosshair
+   or hitmarker (those stay pixel-perfect at screen centre). */
+#hud .hud-panel, #hud #weapon-name-wrap, #hud #ammo-wrap, #hud #killfeed,
+#hud #mode-info, #hud #ability-tray, #hud #coin-hud {
+  zoom: var(--hud-scale);
+}
+
+/* Crosshair colour — every stroke uses the token. */
+#crosshair span { background: var(--xhair-color) !important; }
+#crosshair::before, #crosshair::after { border-color: var(--xhair-color) !important; }
+
+/* Crosshair shapes. DOT hides the arms + shows a centre dot; CIRCLE hides the
+   arms + shows a ring; CROSS is the default four arms. */
+:root[data-xhair="dot"] #crosshair span,
+:root[data-xhair="circle"] #crosshair span { display: none; }
+:root[data-xhair="dot"] #crosshair::before {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%;
+  background: var(--xhair-color); box-shadow: 0 0 2px #000;
+}
+:root[data-xhair="circle"] #crosshair::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;
+  border: 2px solid var(--xhair-color); box-shadow: 0 0 2px #000;
+}
+
+/* Reduce motion — kill the animations/transitions that shake or pulse the view.
+   Movement itself is untouched; only decorative motion is damped. */
+:root[data-reduce-motion="1"] #hitmarker,
+:root[data-reduce-motion="1"] #damage-flash,
+:root[data-reduce-motion="1"] .coin-popup,
+:root[data-reduce-motion="1"] .dmg-number,
+:root[data-reduce-motion="1"] #hud * {
+  animation-duration: 0.001s !important;
+  transition-duration: 0.001s !important;
+}
+
+/* Reduce flashes — cap the full-screen damage/heal flash opacity so it can
+   never strobe brightly (photosensitivity safety). */
+:root[data-reduce-flashes="1"] #damage-flash { opacity: 0 !important; }
+:root[data-reduce-flashes="1"] #damage-flash.show { opacity: 0.18 !important; }
+:root[data-reduce-flashes="1"] #screen-flash,
+:root[data-reduce-flashes="1"] .fullscreen-flash { opacity: 0.15 !important; }
+
+/* High contrast — heavier panel backgrounds, brighter text, solid outlines. */
+:root[data-contrast="1"] .hud-panel,
+:root[data-contrast="1"] .nav-panel,
+:root[data-contrast="1"] #scoreboard,
+:root[data-contrast="1"] .glass-panel {
+  background: rgba(4, 8, 12, 0.92) !important;
+  border: 1px solid #eaf6ff !important;
+}
+:root[data-contrast="1"] #hud,
+:root[data-contrast="1"] .nav-panel { color: #ffffff !important; }
+:root[data-contrast="1"] #crosshair span { box-shadow: 0 0 0 1px #000, 0 0 3px #000 !important; }
+
+/* Colour-blind filters — an SVG matrix applied to the whole scene canvas +
+   HUD. Filters live in index.html (#cb-filters). */
+:root[data-colorblind="protanopia"]   #game-canvas,
+:root[data-colorblind="protanopia"]   #hud { filter: url(#cb-protanopia); }
+:root[data-colorblind="deuteranopia"] #game-canvas,
+:root[data-colorblind="deuteranopia"] #hud { filter: url(#cb-deuteranopia); }
+:root[data-colorblind="tritanopia"]   #game-canvas,
+:root[data-colorblind="tritanopia"]   #hud { filter: url(#cb-tritanopia); }
+
+/* Keyboard focus — visible focus ring for keyboard navigation of menus
+   (mouse users don't see it thanks to :focus-visible). */
+button:focus-visible, .nav-item:focus-visible, .setting-slider:focus-visible,
+input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
+  outline: 3px solid #35e0ff !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

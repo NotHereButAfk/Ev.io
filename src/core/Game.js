@@ -300,6 +300,15 @@ export class Game {
     const pr = q === 'high' ? Math.min(window.devicePixelRatio, 2)
              : q === 'low'  ? 0.6 : 1;
     this.renderer.setPixelRatio(pr);
+
+    // accessibility → runtime (visuals are CSS-driven; these are the 3D + audio bits)
+    const rm = GameSettings.get('reduceMotion');
+    this.player.reduceMotion = rm;
+    if (this.hud) {
+      this.hud.reduceMotion  = rm;
+      this.hud.reduceFlashes = GameSettings.get('reduceFlashes');
+      this.hud.hitSound      = GameSettings.get('hitSound');
+    }
   }
 
   // ── Wire callbacks ──────────────────────────────────────────────────────────
@@ -329,7 +338,7 @@ export class Game {
 
     this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
       const killed = enemy.takeDamage(dmg);
-      this.audio.playHit();
+      if (this.hud.hitSound !== false) this.audio.playHit();   // accessibility toggle
       this.hud.flashHitmarker(meta?.headshot);
       this.damageNumbers.spawn(this.player.camera, point, dmg, { headshot: meta?.headshot, killed });
       if (meta?.headshot) this.hud.showHeadshotFlair?.();
@@ -442,6 +451,12 @@ export class Game {
       // so the lighting part of the change takes full effect on the next reload.
       this._bloomEnabled = s.quality !== 'low';
       // shadows stay off — sky-only lighting has no shadow casters.
+      // accessibility toggles apply live
+      const rm = GameSettings.get('reduceMotion');
+      this.player.reduceMotion = rm;
+      this.hud.reduceMotion    = rm;
+      this.hud.reduceFlashes   = GameSettings.get('reduceFlashes');
+      this.hud.hitSound        = GameSettings.get('hitSound');
     };
     this.menu.onLoginRequest = () => { window.location.href = '/login'; };
     this.menu.onLogout = () => {

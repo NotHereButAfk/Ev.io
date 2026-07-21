@@ -8,7 +8,7 @@ import { Shop } from '../core/Shop.js';
 import { Armory } from '../core/Armory.js';
 import { describePerk } from '../core/RarityPerks.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
-import { GameSettings } from '../core/GameSettings.js';
+import { GameSettings, CROSSHAIR_COLORS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
@@ -108,6 +108,10 @@ export class MenuUI {
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
+    // Apply saved accessibility prefs at boot so the crosshair/HUD/motion
+    // settings take effect immediately, not only after opening Settings.
+    GameSettings.load();
+    this._loadSettings();
   }
 
   // ── Nav wiring ──────────────────────────────────────────────────────────────
@@ -321,6 +325,22 @@ export class MenuUI {
       });
     });
 
+    // Accessibility segmented groups — generic single-select within each group,
+    // with a live preview so changes are visible before saving.
+    const segGroup = (sel) => document.querySelectorAll(sel).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btn.parentElement.querySelectorAll('.quality-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this._previewAccessibility();
+      });
+    });
+    ['#xhair-shape-btns .xhair-shape', '#xhair-color-btns .xhair-color',
+     '#cblind-btns .cblind', '#reduce-motion-btns .rmotion', '#reduce-flash-btns .rflash',
+     '#contrast-btns .hcontrast', '#hitsound-btns .hitsound'].forEach(segGroup);
+    const hs = document.getElementById('set-hudscale');
+    if (hs) update(hs, 'set-hudscale-val', (v) => `${Math.round(v)}%`);
+    hs?.addEventListener('input', () => this._previewAccessibility());
+
     document.getElementById('settings-save-btn').addEventListener('click', () => {
       const s = {
         sensitivity: parseFloat(sens.value) / 100,
@@ -334,6 +354,20 @@ export class MenuUI {
       GameSettings.set('volume',      s.volume);
       GameSettings.set('quality',     s.quality);
       GameSettings.set('invertY',     s.invertY);
+
+      // accessibility
+      const pick = (sel, attr) => document.querySelector(sel + ' .quality-btn.active')?.dataset[attr];
+      const on = (sel) => pick(sel, 'on') === 'on';
+      GameSettings.set('crosshairStyle', pick('#xhair-shape-btns', 'xh') || 'cross');
+      GameSettings.set('crosshairColor', pick('#xhair-color-btns', 'xc') || 'cyan');
+      GameSettings.set('colorblind',     pick('#cblind-btns', 'cb') || 'none');
+      GameSettings.set('hudScale',       parseInt(document.getElementById('set-hudscale').value) / 100);
+      GameSettings.set('reduceMotion',   on('#reduce-motion-btns'));
+      GameSettings.set('reduceFlashes',  on('#reduce-flash-btns'));
+      GameSettings.set('highContrast',   on('#contrast-btns'));
+      GameSettings.set('hitSound',       on('#hitsound-btns'));
+      this._previewAccessibility();
+
       this.onSettingsSaved?.(s);
       const btn = document.getElementById('settings-save-btn');
       btn.textContent = 'SAVED ✓';
@@ -356,6 +390,46 @@ export class MenuUI {
     document.querySelectorAll('#quality-btns .quality-btn').forEach((b) => b.classList.toggle('active', b.dataset.q === q));
     const inv = GameSettings.get('invertY') ? 'on' : 'off';
     document.querySelectorAll('#invert-btns .invert-btn').forEach((b) => b.classList.toggle('active', b.dataset.inv === inv));
+
+    // accessibility state → controls
+    const setSeg = (sel, attr, val) => document.querySelectorAll(sel + ' .quality-btn')
+      .forEach((b) => b.classList.toggle('active', b.dataset[attr] === val));
+    const onOff = (v) => (v ? 'on' : 'off');
+    setSeg('#xhair-shape-btns', 'xh', GameSettings.get('crosshairStyle'));
+    setSeg('#xhair-color-btns', 'xc', GameSettings.get('crosshairColor'));
+    setSeg('#cblind-btns', 'cb', GameSettings.get('colorblind'));
+    setSeg('#reduce-motion-btns', 'on', onOff(GameSettings.get('reduceMotion')));
+    setSeg('#reduce-flash-btns', 'on', onOff(GameSettings.get('reduceFlashes')));
+    setSeg('#contrast-btns', 'on', onOff(GameSettings.get('highContrast')));
+    setSeg('#hitsound-btns', 'on', onOff(GameSettings.get('hitSound')));
+    const hs = document.getElementById('set-hudscale');
+    if (hs) { hs.value = Math.round(GameSettings.get('hudScale') * 100); hs.dispatchEvent(new Event('input')); }
+    this._previewAccessibility();
+  }
+
+  // Apply accessibility settings to the live DOM. Reads the CURRENTLY SELECTED
+  // buttons (not saved state) so the settings panel previews instantly; called
+  // again after save so it also reflects a persisted change. Everything hangs
+  // off <html> data-attributes + CSS vars so style.css drives the visuals and
+  // the in-match HUD/crosshair pick them up with no per-frame cost.
+  _previewAccessibility() {
+    const root = document.documentElement;
+    const pick = (sel, attr, def) =>
+      document.querySelector(sel + ' .quality-btn.active')?.dataset[attr] ?? def;
+    const on = (sel) => pick(sel, 'on', 'off') === 'on';
+    const shape = pick('#xhair-shape-btns', 'xh', GameSettings.get('crosshairStyle'));
+    const color = pick('#xhair-color-btns', 'xc', GameSettings.get('crosshairColor'));
+    const cb    = pick('#cblind-btns', 'cb', GameSettings.get('colorblind'));
+    const scaleEl = document.getElementById('set-hudscale');
+    const scale = scaleEl ? parseInt(scaleEl.value) / 100 : GameSettings.get('hudScale');
+    root.dataset.xhair = shape;
+    root.dataset.xhairColor = color;
+    root.dataset.colorblind = cb;
+    root.dataset.reduceMotion = on('#reduce-motion-btns') ? '1' : '0';
+    root.dataset.reduceFlashes = on('#reduce-flash-btns') ? '1' : '0';
+    root.dataset.contrast = on('#contrast-btns') ? '1' : '0';
+    root.style.setProperty('--hud-scale', String(scale));
+    root.style.setProperty('--xhair-color', CROSSHAIR_COLORS[color] || CROSSHAIR_COLORS.cyan);
   }
 
   // ── Profile ────────────────────────────────────────────────────────────────

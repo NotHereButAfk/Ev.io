@@ -6,6 +6,22 @@ export const DEFAULTS = {
   fov:         78,    // player camera field-of-view in degrees
   quality:     'medium', // 'low' | 'medium' | 'high'
   invertY:     false, // invert vertical look (mouse + touch)
+
+  // ── accessibility (Phase 8) ──
+  reduceMotion:  false,   // damp screen shake / bob / recoil camera / flashes
+  reduceFlashes: false,   // cap full-screen flashes (photosensitivity safe)
+  crosshairStyle:'cross', // 'cross' | 'dot' | 'circle' — shape, not just colour
+  crosshairColor:'cyan',  // 'cyan' | 'green' | 'white' | 'magenta' | 'yellow'
+  colorblind:    'none',  // 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia'
+  hudScale:      1.0,     // 0.8–1.4 — scales the whole HUD
+  highContrast:  false,   // stronger panel/text contrast + outlines
+  hitSound:      true,    // audio confirmation on hit (not just the visual mark)
+};
+
+// Crosshair colour tokens (contrast-safe on both bright + dark maps).
+export const CROSSHAIR_COLORS = {
+  cyan: '#33e0ff', green: '#54ff8a', white: '#ffffff',
+  magenta: '#ff4dd2', yellow: '#ffe23a',
 };
 
 export const GameSettings = {
