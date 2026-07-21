@@ -732,8 +732,8 @@ export class Zombie {
     // zombies too (they wear the shambler look but still vary).
     const R = () => Math.random();
     const prof = this._profile = {
-      height:  1.02 + R() * 0.22,      // 1.02–1.24 — taller, looms over the player
-      girth:   1.40 + R() * 0.42,      // 1.40–1.82 — heavy, meaty build
+      height:  0.98 + R() * 0.12,      // 0.98–1.10 — centred so a shambler ≈ player height
+      girth:   1.05 + R() * 0.20,      // 1.05–1.25 — broad/meaty without hulking out
       decay:   R(),                    // 0 fresh ↔ 1 rotted
       lean:    0.12 + R() * 0.16,      // permanent forward hunch
       hunch:  (R() - 0.5) * 0.16,      // shoulder/spine tilt to one side
@@ -762,9 +762,11 @@ export class Zombie {
     // Runner: tear the armor off (hide the heavy kit meshes).
     if (V.hide) rig.root.traverse(o => { if (o.isMesh && V.hide.test(o.name)) o.visible = false; });
     rig.eyeGlow?.color.setHex(glow);
-    // Non-uniform build scale (height × girth) on top of the variant scale,
-    // then a global SIZE bump so the whole mob reads bigger / more imposing.
-    const SIZE = 1.22;
+    // Non-uniform build scale (height × girth) on top of the variant scale.
+    // SIZE is calibrated so a standard shambler (variant 1.0, mid height 1.04)
+    // renders at ~1.83m — the same height as the player soldier model
+    // (native zombie rig is 2.048m tall → 1.83 / 2.048 ≈ 0.895 = SIZE·1.04).
+    const SIZE = 0.86;
     const s = V.scale * SIZE;
     rig.root.scale.set(s * prof.girth, s * prof.height, s * prof.girth);
     this._baseScale = rig.root.scale.clone();   // preserved through lunge pulses
@@ -781,7 +783,7 @@ export class Zombie {
       const arm = R() < 0.5 ? rig.arms.left : rig.arms.right;
       limbScale(arm.shoulder, 1.12, 1.2);
     }
-    if (R() < 0.3) limbScale(R() < 0.5 ? rig.legs.left : rig.legs.right, 0.9, 0.9); // gimp leg
+    if (R() < 0.3) limbScale((R() < 0.5 ? rig.legs.left : rig.legs.right).hip, 0.9, 0.9); // gimp leg
     // uneven shoulders (hunched to one side)
     rig.arms.left.shoulder.position.y  += prof.hunch * 0.4;
     rig.arms.right.shoulder.position.y -= prof.hunch * 0.4;
