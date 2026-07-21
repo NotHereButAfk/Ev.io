@@ -810,13 +810,13 @@ function _buildArmorPieces(root, armorTypeId, look) {
     color: new THREE.Color(look.body).multiplyScalar(0.4), roughness: 0.92, metalness: 0.05,
     side: THREE.DoubleSide,
   });
-  // Clean armoured helmet shell — brighter than the plate and lightly polished so
-  // the head reads as a sculpted helmet, not a bare scalp.
-  // Keep the shell's own hue (only a whisper toward white) so warm armours don't
-  // desaturate into a fleshy "bald head" tone — the helmet stays on-theme.
+  // Dark tactical helmet shell — a near-black gunmetal that matches the dark
+  // plating instead of a bright white dome. Carries only a whisper of the
+  // variant hue so recon/heavy/stealth still read subtly different, but no
+  // armour (least of all the white/silver assault) shows a big white egg.
   const helmetMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).lerp(new THREE.Color(0xffffff), 0.08),
-    roughness: 0.44, metalness: 0.55, envMapIntensity: 1.0,
+    color: new THREE.Color(look.body).multiplyScalar(0.26).lerp(new THREE.Color(0x14171e), 0.55),
+    roughness: 0.4, metalness: 0.72, envMapIntensity: 1.0,
   });
   // Dark glossy visor glass — a near-black reflective faceplate (Halo/Titanfall
   // style) so the face reads as a real visor, not a bright oval.
