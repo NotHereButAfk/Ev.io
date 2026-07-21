@@ -7,6 +7,27 @@ import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 const TRACER_LIFE = 0.07;
 const FLASH_LIFE = 0.05;
 
+// ── smoothing helpers ───────────────────────────────────────────────────────
+// Frame-rate-INDEPENDENT exponential smoothing: the result is identical at any
+// framerate (unlike `x += (t-x)*k*dt`, which jitters when dt varies). `lambda`
+// is the decay rate — bigger = snappier. This is the core of the smooth feel.
+function expDamp(current, target, lambda, dt) {
+  return target + (current - target) * Math.exp(-lambda * dt);
+}
+// Advance a damped-spring scalar (x, v) toward 0 by one step. Critically-ish
+// damped for a punchy snap that settles with no jitter. Returns [x, v].
+function springTo(x, v, target, stiffness, damping, dt) {
+  // semi-implicit Euler, substepped so a big dt can't blow the spring up
+  const steps = dt > 1 / 60 ? Math.ceil(dt * 60) : 1;
+  const h = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    const a = -stiffness * (x - target) - damping * v;
+    v += a * h;
+    x += v * h;
+  }
+  return [x, v];
+}
+
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
 // get the pink muzzle flash + sparkle-heart burst treatment.
 const CUTE_SOUNDS = new Set(['anime', 'waifu', 'meow', 'uwu', 'bark', 'sparkle']);
@@ -54,10 +75,20 @@ export class WeaponSystem {
     this.fireTimer = 0;
     this.prevMouseDown = false;
     this.kickPos = new THREE.Vector3();
+    this.kickVel = new THREE.Vector3();   // recoil spring velocity
     this.kickRotX = 0;
+    this.kickRotXVel = 0;
     this.swingPhase = 1;
     this.scopeT = 0; // 0..1 zoom blend
     this._sprintT = 0; // 0..1 sprint carry blend
+    // smoothed viewmodel state (all frame-rate-independent) — the applied
+    // transform eases toward these targets so nothing ever snaps.
+    this._swayX = 0; this._swayY = 0;         // smoothed look-sway
+    this._swayVelX = 0; this._swayVelY = 0;   // smoothed mouse velocity
+    this._bobPhase = 0;                       // continuous bob phase (own clock)
+    this._mountPos = new THREE.Vector3(0.32, -0.26, -0.5);
+    this._mountRot = new THREE.Vector3(0, 0, 0);
+    this._raiseT = 1;                         // 0=just switched (lowered) → 1=up
 
     this.tracers = [];
     this.rockets = [];
@@ -359,6 +390,8 @@ export class WeaponSystem {
     }
     const cur = this.loadout[index];
     if (cur) this.models.get(cur.id).group.visible = true;
+    // Kick off the raise animation — the new gun eases up from lowered.
+    this._raiseT = 0;
   }
 
   get currentDef() {
@@ -947,9 +980,14 @@ export class WeaponSystem {
     const activeSkinDef = this._activeSkinFor?.(this.currentDef?.id);
     if (activeSkinDef?.fireEmbers) this._spawnFireEmbers();
 
-    this.kickPos.z += def.recoil * 2.8;
-    this.kickPos.y += def.recoil * 0.5;
-    this.kickRotX -= def.recoil * 4.0;
+    // Recoil impulse: a displacement kick PLUS a velocity punch, so the spring
+    // launches fast and settles smoothly (juicier than a pure position offset).
+    this.kickPos.z += def.recoil * 2.2;
+    this.kickPos.y += def.recoil * 0.4;
+    this.kickRotX  -= def.recoil * 3.2;
+    this.kickVel.z += def.recoil * 26;
+    this.kickVel.y += def.recoil * 6;
+    this.kickRotXVel -= def.recoil * 34;
     if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
 
     if (this.onShoot) this.onShoot(def);
@@ -1016,11 +1054,20 @@ export class WeaponSystem {
       this.camera.updateProjectionMatrix();
     }
 
-    // recoil spring back
-    this.kickPos.multiplyScalar(Math.max(0, 1 - dt * 10));
-    this.kickRotX *= Math.max(0, 1 - dt * 10);
-    this.kickGroup.position.set(this.kickPos.x, this.kickPos.y, this.kickPos.z);
-    this.kickGroup.rotation.x = this.kickRotX;
+    // recoil spring-back — a damped spring (position + velocity) gives a
+    // punchy kick that snaps back and settles smoothly, instead of a stiff
+    // frame-rate-dependent linear decay.
+    const K = 190, D = 25;   // stiffness / damping (~critically damped, tiny snap)
+    [this.kickPos.x, this.kickVel.x] = springTo(this.kickPos.x, this.kickVel.x, 0, K, D, dt);
+    [this.kickPos.y, this.kickVel.y] = springTo(this.kickPos.y, this.kickVel.y, 0, K, D, dt);
+    [this.kickPos.z, this.kickVel.z] = springTo(this.kickPos.z, this.kickVel.z, 0, K, D, dt);
+    [this.kickRotX, this.kickRotXVel] = springTo(this.kickRotX, this.kickRotXVel, 0, K, D, dt);
+    // weapon-switch raise: the model eases up from lowered on every swap
+    this._raiseT = expDamp(this._raiseT, 1, 14, dt);
+    const raiseDrop = (1 - this._raiseT) * 0.28;
+    const raiseTilt = (1 - this._raiseT) * 0.9;
+    this.kickGroup.position.set(this.kickPos.x, this.kickPos.y - raiseDrop, this.kickPos.z);
+    this.kickGroup.rotation.x = this.kickRotX - raiseTilt;
 
     // sword swing animation — windup → fast diagonal slash → recover
     if (def.kind === 'melee' && this.swingPhase < 1) {
@@ -1054,7 +1101,8 @@ export class WeaponSystem {
       this.kickGroup.rotation.y = -0.7;
     }
 
-    // idle breathing / weapon settle — fades out during sprint
+    // idle breathing / weapon settle — fades out during sprint. Its own smooth
+    // clock (not tied to any snappy state).
     this._idleT += dt;
     if (def.kind !== 'melee') {
       const breatheAmt = 1.0 - this._sprintT;
@@ -1064,26 +1112,44 @@ export class WeaponSystem {
       this.kickGroup.rotation.z = swayB;
     }
 
-    // viewmodel sway based on mouse movement (weighty feel)
-    const swayTargetX = THREE.MathUtils.clamp(-input.mouseDX * 0.0006, -0.06, 0.06);
-    const swayTargetY = THREE.MathUtils.clamp(-input.mouseDY * 0.0006, -0.05, 0.05);
-    this.swayGroup.rotation.y += (swayTargetX - this.swayGroup.rotation.y) * Math.min(1, dt * 8);
-    this.swayGroup.rotation.x += (swayTargetY - this.swayGroup.rotation.x) * Math.min(1, dt * 8);
+    // viewmodel look-sway: smooth the raw mouse delta into a VELOCITY first
+    // (normalised by dt so it's framerate-independent, no jitter), then ease
+    // the sway offset toward it — two stages of damping = buttery lag.
+    const invDt = dt > 1e-4 ? 1 / dt : 0;
+    const mvX = THREE.MathUtils.clamp(-input.mouseDX * invDt * 0.00003, -0.06, 0.06);
+    const mvY = THREE.MathUtils.clamp(-input.mouseDY * invDt * 0.00003, -0.05, 0.05);
+    this._swayVelX = expDamp(this._swayVelX, mvX, 16, dt);
+    this._swayVelY = expDamp(this._swayVelY, mvY, 16, dt);
+    this._swayX = expDamp(this._swayX, this._swayVelX, 9, dt);
+    this._swayY = expDamp(this._swayY, this._swayVelY, 9, dt);
+    this.swayGroup.rotation.y = this._swayX;
+    this.swayGroup.rotation.x = this._swayY;
 
-    // COD-style weapon bob: larger amplitude, lateral sway component
-    const bobAmt = player.onGround ? (player.isSprinting ? 0.026 : 0.016) : 0;
-    const bobV   = Math.sin(player.bobTime) * bobAmt;
-    const bobH   = Math.sin(player.bobTime * 0.5) * bobAmt * 0.55;
+    // COD-style weapon bob driven by a CONTINUOUS phase that accelerates with
+    // move speed — no pops when starting/stopping, and framerate-independent.
+    const moveSpeed = Math.hypot(player.velocity?.x || 0, player.velocity?.z || 0);
+    const bobHz = player.onGround ? (2.0 + moveSpeed * 0.9) : 0;
+    this._bobPhase += bobHz * dt;
+    const bobAmtTarget = (player.onGround && moveSpeed > 0.5)
+      ? (player.isSprinting ? 0.026 : 0.016) : 0.0;
+    this._bobAmt = expDamp(this._bobAmt ?? 0, bobAmtTarget, 8, dt);   // fade bob in/out
+    const bobV = Math.sin(this._bobPhase * 2) * this._bobAmt;
+    const bobH = Math.sin(this._bobPhase) * this._bobAmt * 0.55;
 
-    // ADS: slide gun to center-screen when scoping
-    const adsShiftX = -this.scopeT * 0.32;
-
-    // Sprint carry: raise gun and tilt to side like COD
-    const sprintRaiseY = this._sprintT * 0.12;
+    // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
+    // start/stop sprint or scope in/out).
+    const adsShiftX    = -this.scopeT * 0.32;
+    const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
-    this.weaponMount.position.set(0.32 + sprintShiftX + adsShiftX + bobH, -0.26 + sprintRaiseY + bobV, -0.5);
-    this.weaponMount.rotation.x = this._sprintT * 0.22;
-    this.weaponMount.rotation.z = this._sprintT * -1.0;
+    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH;
+    const tgtY = -0.26 + sprintRaiseY + bobV;
+    this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
+    this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
+    this._mountRot.x = expDamp(this._mountRot.x, this._sprintT * 0.22, 14, dt);
+    this._mountRot.z = expDamp(this._mountRot.z, this._sprintT * -1.0, 14, dt);
+    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, -0.5);
+    this.weaponMount.rotation.x = this._mountRot.x;
+    this.weaponMount.rotation.z = this._mountRot.z;
 
     // muzzle flash decay
     if (this._flashTimer !== undefined && this._flashTimer > 0) {
