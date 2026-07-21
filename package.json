@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test:move": "node tools/movesim_fixtures.mjs",
     "arena:metrics": "node tools/arena_metrics.mjs",
-    "stress:soak": "node tools/stress_soak.mjs"
+    "stress:soak": "node tools/stress_soak.mjs",
+    "assets": "node tools/asset_pipeline.mjs",
+    "certify": "node tools/certify.mjs"
   },
   "repository": {
     "type": "git",

@@ -1,0 +1,127 @@
+{
+  "generated": "2026-07-21T00:52:25.731Z",
+  "budgets": {
+    "maxBytes": 3670016,
+    "maxVerts": 120000,
+    "maxMeshes": 64
+  },
+  "totals": {
+    "assets": 7,
+    "bytes": 8116652,
+    "vertices": 164338,
+    "megabytes": 7.74
+  },
+  "assets": [
+    {
+      "file": "player.glb",
+      "bytes": 1363668,
+      "sha256": "cdb9a8d694a13209",
+      "glbVersion": 2,
+      "meshes": 209,
+      "primitives": 209,
+      "vertices": 35808,
+      "triangles": 21916,
+      "nodes": 213,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 1204752,
+      "warnings": [
+        "over mesh-count budget (209 > 64)"
+      ]
+    },
+    {
+      "file": "sidearm.glb",
+      "bytes": 136016,
+      "sha256": "85b9b6b91ebef56a",
+      "glbVersion": 2,
+      "meshes": 1,
+      "primitives": 4,
+      "vertices": 3740,
+      "triangles": 1992,
+      "nodes": 2,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 131632,
+      "warnings": []
+    },
+    {
+      "file": "soldier.glb",
+      "bytes": 2159764,
+      "sha256": "5f75df0a1035956c",
+      "glbVersion": 2,
+      "meshes": 2,
+      "primitives": 2,
+      "vertices": 7434,
+      "triangles": 11376,
+      "nodes": 68,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 1808464,
+      "warnings": []
+    },
+    {
+      "file": "spartan.glb",
+      "bytes": 256508,
+      "sha256": "377d6461d47c4324",
+      "glbVersion": 2,
+      "meshes": 1,
+      "primitives": 5,
+      "vertices": 6230,
+      "triangles": 8648,
+      "nodes": 1,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 251248,
+      "warnings": []
+    },
+    {
+      "file": "weapons.glb",
+      "bytes": 2019140,
+      "sha256": "3c0ded95defbb4dd",
+      "glbVersion": 2,
+      "meshes": 386,
+      "primitives": 386,
+      "vertices": 52710,
+      "triangles": 28920,
+      "nodes": 414,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 1710672,
+      "warnings": [
+        "over mesh-count budget (386 > 64)"
+      ]
+    },
+    {
+      "file": "weapons_authored.glb",
+      "bytes": 1946952,
+      "sha256": "d228652b47743147",
+      "glbVersion": 2,
+      "meshes": 18,
+      "primitives": 66,
+      "vertices": 52990,
+      "triangles": 33350,
+      "nodes": 36,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 1893020,
+      "warnings": []
+    },
+    {
+      "file": "zombie.glb",
+      "bytes": 234604,
+      "sha256": "f67258d00882c787",
+      "glbVersion": 2,
+      "meshes": 122,
+      "primitives": 122,
+      "vertices": 5426,
+      "triangles": 2430,
+      "nodes": 138,
+      "hasUV": false,
+      "compressed": false,
+      "binBytes": 142644,
+      "warnings": [
+        "over mesh-count budget (122 > 64)"
+      ]
+    }
+  ]
+}
