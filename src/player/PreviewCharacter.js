@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
+import { buildLowPolyCharacter, isLowPolyId } from './LowPolyModels.js';
 
 // ── Blender-built Spartan GLB (the white/orange armoured soldier) ────────────
 let _spartanTemplate = null, _spartanLoading = false;
@@ -340,6 +341,11 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null, opts = {}) {
+  // Low-poly cel-shaded models own their whole look (their own toon materials +
+  // outlines), so they take precedence over every other path — for the player,
+  // bots and previews alike. Rigged by rigCharacterLimbs() via their named limbs.
+  if (isLowPolyId(armorTypeId)) return buildLowPolyCharacter(armorTypeId);
+
   // The Blender-built Spartan (static mesh) — used for menu/loadout previews.
   if (opts.preferSpartan && isSpartanReady()) {
     const sp = buildSpartanModel();
@@ -392,6 +398,8 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin =
 }
 
 export function applySkinToCharacter(group, skin, armorSkin = null) {
+  // Low-poly models ship a designed cel palette — leave it intact.
+  if (group.userData?.isLowPoly) return;
   // Human soldier: tint the body texture instead of recoloring armor plates.
   if (group.userData?.isHuman) { tintHumanSoldier(group, skin, armorSkin); return; }
 
