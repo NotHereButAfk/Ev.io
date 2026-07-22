@@ -23,23 +23,23 @@ export const ARMOR_TYPES = [
     desc: 'Minimal profile infiltrator — move unseen',
     icon: 'M16 6 L13 9 L13 21 L19 21 L19 9 Z'
   },
-  // ── Low-poly cel-shaded models (illustrated like the authored guns) ──
+  // ── Low-poly cel-shaded cyborg-terminator models ──
   {
     id:   'vanguard',
-    name: 'VANGUARD',
-    desc: 'Low-poly heavy trooper — cel-shaded, orange trim',
+    name: 'ENDO-800',
+    desc: 'White endoskeleton cyborg — skull face, red optics',
     icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z'
   },
   {
     id:   'striker',
-    name: 'STRIKER',
-    desc: 'Low-poly agile scout — cel-shaded, teal visor',
+    name: 'CRYO HUNTER',
+    desc: 'Steel-blue infiltrator cyborg — cyan optics',
     icon: 'M16 5 L11 8 L12 21 L20 21 L21 8 Z'
   },
   {
     id:   'phantom',
-    name: 'PHANTOM',
-    desc: 'Low-poly stealth infiltrator — cel-shaded, violet glow',
+    name: 'NIGHTSTALKER',
+    desc: 'Blacked-out graphite cyborg — red optics',
     icon: 'M16 5 L12 9 L13 21 L19 21 L20 9 Z'
   },
 ];

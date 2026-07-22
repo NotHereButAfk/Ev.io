@@ -1,12 +1,13 @@
-// ── Low-poly, cel-shaded player models — styled like the authored guns ───────
-// Three clean low-poly humanoids that render with the SAME illustrated look as
-// the arsenal: flat MeshToonMaterial cel bands (shared stepped ramp) + a dark
-// inverted-hull contour outline on every part. Built from crisp boxes so the
-// silhouette reads as tidy low-poly linework rather than smooth PBR.
+// ── Low-poly cyborg-terminator player models — cel-shaded like the guns ──────
+// Endoskeleton cyborgs modelled on the "Cyborg Terminator (low poly)" look: a
+// bare metal SKULL face with glowing red eyes, white/lavender armour plates over
+// a black underframe, red glow accents scattered across chest / knees / thighs,
+// and heavy angular segmented armour. Rendered with the SAME illustrated look as
+// the authored arsenal — flat MeshToonMaterial cel bands + a dark inverted-hull
+// contour outline on every part.
 //
-// They follow the procedural-body naming convention (boot_/lleg_/thigh_/knee_/
-// uarm_/farm_/elbow_/hand_) so rigCharacterLimbs() animates them for free — no
-// special-casing in the walk/run rig.
+// Built with the procedural-body naming convention (boot_/lleg_/thigh_/knee_/
+// uarm_/farm_/elbow_/hand_) so rigCharacterLimbs() walk-animates them for free.
 
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -18,10 +19,8 @@ export function isLowPolyId(id) { return LOWPOLY_IDS.includes(id); }
 let _rampTex = null;
 function _ramp() {
   if (_rampTex) return _rampTex;
-  // Lifted shadow floor (vs the guns' 115): big flat character plates that turn
-  // away from the key would otherwise drop into a near-black band and read as
-  // holes. Higher floor keeps the cel steps but shadows stay mid-grey.
-  const d = new Uint8Array([158, 198, 232, 255]);          // 3 soft light bands
+  // Lifted shadow floor so big flat plates don't crush to black under ACES.
+  const d = new Uint8Array([150, 196, 232, 255]);
   _rampTex = new THREE.DataTexture(d, 4, 1, THREE.RedFormat);
   _rampTex.minFilter = _rampTex.magFilter = THREE.NearestFilter;
   _rampTex.needsUpdate = true;
@@ -37,9 +36,9 @@ function T(color, opts = {}) {
   return m;
 }
 
-// Dark contour outline — classic inverted hull: a back-face copy inflated along
-// smoothed vertex normals, so every part gets a clean dark edge from any angle.
-const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x23272e, side: THREE.BackSide });
+// Dark contour outline — inverted hull: a back-face copy inflated along smoothed
+// vertex normals gives every part a clean dark edge from any angle.
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x1c1e24, side: THREE.BackSide });
 const _olCache = new WeakMap();
 function _outlineGeo(src, t) {
   let g = _olCache.get(src);
@@ -55,59 +54,55 @@ function _outlineGeo(src, t) {
   _olCache.set(src, g);
   return g;
 }
-function _addOutlines(group, t = 0.012) {
+function _addOutlines(group, t = 0.011) {
   const hosts = [];
   group.traverse(o => { if (o.isMesh && o.material !== OUTLINE_MAT) hosts.push(o); });
   for (const o of hosts) {
     const ol = new THREE.Mesh(_outlineGeo(o.geometry, t), OUTLINE_MAT);
     ol.name = 'outline';
     ol.castShadow = false;
-    ol.raycast = () => {};   // never a hit/headshot target
+    ol.raycast = () => {};
     o.add(ol);
   }
 }
 
-// ── Palettes — clean steel bodies with one bright accent, gun-chart style.
-// Kept light enough that the cel bands read even on the dark themes.
+// ── Palettes — white/lavender endoskeleton armour + black frame + red glow.
+// Three armour tones; the red terminator eyes/lights are shared.
 const PALETTES = {
-  // Light steel bodies like the gun chart + one bright accent. Kept clear of the
-  // medium-dark range that crushes to black in the cel shadow band.
-  vanguard: { plate: 0xbcc2ca, plate2: 0x8b929c, suit: 0x6c737d, dark: 0x2a2d33,
-              trim: 0xe4e9ee, accent: 0xff8a1f, visor: 0x2ee6ff, skin: 0x34383f },
-  striker:  { plate: 0x84919c, plate2: 0x616d78, suit: 0x586570, dark: 0x24282e,
-              trim: 0xbcc8d2, accent: 0x1fe0c2, visor: 0x54ffcf, skin: 0x2b2f36 },
-  phantom:  { plate: 0x6a6f79, plate2: 0x494e57, suit: 0x40444c, dark: 0x1c1d22,
-              trim: 0x9aa0ab, accent: 0xc158ff, visor: 0xe29bff, skin: 0x232429 },
+  vanguard: { armor: 0xe6e2ec, armor2: 0xc4bed2, frame: 0x1b1b22, joint: 0x0f0f13,
+              steel: 0x8f8a9e, bone: 0xe0dde8, glow: 0xff2a20, bulk: 1.08 },   // white T-800
+  striker:  { armor: 0x9aa6b4, armor2: 0x6c7684, frame: 0x181b20, joint: 0x0d0f13,
+              steel: 0xcbd4dd, bone: 0xaab4c0, glow: 0x36e0ff, bulk: 0.96 },   // steel-blue (cyan eyes)
+  phantom:  { armor: 0x585960, armor2: 0x393a40, frame: 0x121216, joint: 0x08090b,
+              steel: 0x8f9099, bone: 0x6f7078, glow: 0xff2f26, bulk: 0.92 },   // dark graphite
 };
 
 function _mats(pal) {
-  const eBase = (hex) => new THREE.Color(hex).multiplyScalar(0.14).getHex();
-  // Body materials carry a self-emissive floor (a fraction of their own colour)
-  // so the cel shadow band keeps the surface's hue instead of crushing to black
-  // under ACES tone mapping — the failure mode for large flat character plates
-  // in medium-dark greys. Glow materials (accent/visor) use a dark base + bright
-  // emissive as usual.
-  const body = (hex, role, floor = 0.34) => {
-    const m = T(hex, { role });
+  // Body materials carry a self-emissive floor so cel shadows keep their hue
+  // instead of crushing to black on large flat plates under ACES tone mapping.
+  const body = (hex, floor = 0.32) => {
+    const m = T(hex);
     m.emissive = new THREE.Color(hex).multiplyScalar(floor);
     m.emissiveIntensity = 1;
     return m;
   };
+  const red = pal.glow;
   return {
-    plate:  body(pal.plate,  'body'),
-    plate2: body(pal.plate2, 'accent'),
-    suit:   body(pal.suit,   'special'),
-    dark:   body(pal.dark,   'metal', 0.55),
-    trim:   body(pal.trim,   'metal', 0.30),
-    accent: T(eBase(pal.accent), { role: 'energy', emissive: pal.accent, emissiveIntensity: 0.9  }),
-    visor:  T(eBase(pal.visor),  { role: 'energy', emissive: pal.visor,  emissiveIntensity: 1.25 }),
-    skin:   body(pal.skin,   'skin', 0.45),
+    armor:  body(pal.armor, 0.34),
+    armor2: body(pal.armor2, 0.34),
+    frame:  body(pal.frame, 0.6),
+    joint:  body(pal.joint, 0.7),
+    steel:  body(pal.steel, 0.3),
+    bone:   body(pal.bone, 0.36),
+    glow:   T(new THREE.Color(red).multiplyScalar(0.15).getHex(), { role: 'energy', emissive: red, emissiveIntensity: 1.5 }),
+    eye:    T(new THREE.Color(red).multiplyScalar(0.2).getHex(),  { role: 'energy', emissive: red, emissiveIntensity: 2.2 }),
   };
 }
 
 // ── Primitive + placement helpers ────────────────────────────────────────────
 const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
 const cyl = (r, h, m, s = 8) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, s), m);
+const sph = (r, m, w = 8, h = 6) => new THREE.Mesh(new THREE.SphereGeometry(r, w, h), m);
 function put(g, mesh, x, y, z, rx = 0, ry = 0, rz = 0, name) {
   mesh.position.set(x, y, z);
   if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
@@ -115,134 +110,99 @@ function put(g, mesh, x, y, z, rx = 0, ry = 0, rz = 0, name) {
   g.add(mesh);
   return mesh;
 }
+// red glow nub
+function glowAt(g, M, x, y, z, w = 0.05, h = 0.05, d = 0.03) { put(g, box(w, h, d, M.glow), x, y, z); }
 
-// ── Shared clean low-poly humanoid base (named limbs → auto-rigged) ──────────
-// Tapered torso (wide shoulders → narrow waist), clearly separated slim limbs,
-// a proportioned head. `cfg` = { bulk, arm, leg } tunes the build per variant.
-// Every mesh below the neck carries a limb name so the walk rig swings it.
-function _base(g, M, cfg) {
-  const { bulk = 1.0, arm = 0.052, leg = 0.075 } = cfg;
-  // Legs (left −0.12 / right +0.12) — clear gap at the centreline
-  for (const [sx, sd] of [[-0.12, 'L'], [0.12, 'R']]) {
-    put(g, box(0.15, 0.09, 0.30, M.dark),               sx, 0.05,  0.03, 0, 0, 0, `boot_${sd}`);
-    put(g, box(0.14, 0.16, 0.15, M.suit),                sx, 0.22, -0.01, 0, 0, 0, `boot_${sd}_u`);
-    put(g, box(leg * 2 * bulk, 0.34, leg * 2 * bulk, M.suit),   sx, 0.52, 0, 0, 0, 0, `lleg_${sd}`);
-    put(g, box(0.15, 0.11, 0.14, M.plate2),              sx, 0.70, -0.02, 0, 0, 0, `knee_${sd}`);
-    put(g, box(leg * 2.4 * bulk, 0.30, leg * 2.2 * bulk, M.suit), sx, 0.93, 0, 0, 0, 0, `thigh_${sd}`);
-  }
-  // Pelvis + belt (static)
-  put(g, box(0.32, 0.14, 0.23, M.suit), 0, 1.13, 0);
-  put(g, box(0.35, 0.05, 0.25, M.trim), 0, 1.205, 0);
-  // Tapered torso (static): narrow waist → chest → wide shoulder yoke
-  put(g, box(0.28, 0.16, 0.20, M.suit),                 0, 1.30, 0);
-  put(g, box(0.34 * bulk, 0.30, 0.21 * bulk, M.suit),   0, 1.53, 0);
-  put(g, box(0.42 * bulk, 0.11, 0.23 * bulk, M.plate2), 0, 1.67, 0);   // shoulder yoke
-  // Arms (left −0.30 / right +0.30) — slim, hang clear of the torso
-  for (const [sx, sd] of [[-0.30, 'L'], [0.30, 'R']]) {
-    put(g, box(arm * 2 * bulk, 0.26, arm * 2 * bulk, M.suit), sx, 1.51, 0, 0, 0, 0, `uarm_${sd}`);
-    put(g, box(0.10, 0.09, 0.10, M.plate2),                   sx, 1.32, 0, 0, 0, 0, `elbow_${sd}`);
-    put(g, box(arm * 1.8 * bulk, 0.22, arm * 1.8 * bulk, M.suit), sx, 1.12, 0, 0, 0, 0, `farm_${sd}`);
-    put(g, box(0.10, 0.11, 0.09, M.dark),                    sx, 0.93, 0, 0, 0, 0, `hand_${sd}`);
-  }
-  // Neck + head base (static; the helmet covers it per-variant)
-  put(g, cyl(0.055, 0.10, M.suit, 8), 0, 1.80, 0);
-  put(g, box(0.21, 0.25, 0.23, M.dark), 0, 1.99, 0);
-}
-
-// ── VANGUARD — blocky armoured trooper, big pauldrons, boxed helmet ──────────
-function _vanguard(g, M) {
-  _base(g, M, { bulk: 1.08, arm: 0.058, leg: 0.082 });
-  // Breastplate: medium plate with a light collar + a clean glowing sternum.
-  put(g, box(0.34, 0.30, 0.09, M.plate2), 0, 1.52, -0.11);          // main breastplate
-  put(g, box(0.30, 0.07, 0.10, M.plate),  0, 1.66, -0.115);         // light upper collar
-  put(g, box(0.22, 0.02, 0.10, M.trim),   0, 1.45, -0.117);         // rib line
-  put(g, box(0.05, 0.20, 0.05, M.accent), 0, 1.50, -0.155);         // glowing sternum
-  put(g, box(0.34, 0.30, 0.09, M.plate2), 0, 1.52,  0.11);          // back plate
-  put(g, box(0.17, 0.21, 0.11, M.dark),   0, 1.57,  0.19);          // pack
-  // Angular pauldrons in the light plate so the shoulders pop.
+// ── Metal SKULL head — the signature terminator face ─────────────────────────
+function _skull(g, M) {
+  // Cranium: rounded metal dome + boxy back, with a couple of dark rivet dots.
+  put(g, sph(0.125, M.bone, 10, 8), 0, 2.07, 0.01);
+  put(g, box(0.20, 0.14, 0.20, M.bone), 0, 2.05, 0.02);
+  for (const s of [-1, 1]) put(g, box(0.03, 0.03, 0.03, M.joint), s * 0.07, 2.15, 0.0);   // rivets
+  put(g, box(0.03, 0.03, 0.03, M.joint), 0, 2.17, -0.05);
+  // Angled face plate + dark brow shadow line
+  put(g, box(0.185, 0.13, 0.06, M.bone), 0, 1.965, -0.09);
+  put(g, box(0.19, 0.03, 0.04, M.joint), 0, 2.03, -0.10);                                 // brow ridge
+  // Deep eye-socket recess + two glowing red eyes
+  put(g, box(0.17, 0.055, 0.035, M.joint), 0, 1.985, -0.115);
   for (const s of [-1, 1]) {
-    put(g, box(0.18, 0.14, 0.22, M.plate),  s * 0.31, 1.71, 0);
-    put(g, box(0.19, 0.05, 0.24, M.trim),   s * 0.31, 1.775, 0);
-    put(g, box(0.045, 0.045, 0.05, M.accent), s * 0.31, 1.71, -0.13);
+    glowAt(g, M, s * 0.046, 1.985, -0.132, 0.05, 0.035, 0.03);
   }
-  // Forearm vambraces + knee pads (named — swing with the limb)
-  for (const [sx, sd] of [[-0.30, 'L'], [0.30, 'R']])
-    put(g, box(0.14, 0.18, 0.09, M.plate), sx, 1.12, -0.08, 0, 0, 0, `farm_${sd}_va`);
-  for (const [sx, sd] of [[-0.12, 'L'], [0.12, 'R']])
-    put(g, box(0.16, 0.13, 0.11, M.plate), sx, 0.71, -0.10, 0, 0, 0, `knee_${sd}_kp`);
-  // Helmet — boxed shell, crown band, visor slit, brow, crest fin
-  put(g, box(0.25, 0.24, 0.26, M.plate),  0, 2.00, 0.0);
-  put(g, box(0.27, 0.06, 0.28, M.plate2), 0, 2.11, 0.0);            // crown band
-  put(g, box(0.21, 0.05, 0.02, M.visor),  0, 1.99, -0.135);        // visor slit
-  put(g, box(0.25, 0.045, 0.09, M.dark),  0, 1.91, -0.10);         // brow/chin
-  put(g, box(0.05, 0.13, 0.15, M.accent), 0, 2.15, 0.02);          // crest fin
+  // Cheekbones (angled), temples, nose ridge
+  for (const s of [-1, 1]) put(g, box(0.045, 0.09, 0.06, M.bone), s * 0.075, 1.90, -0.075, 0, 0, s * -0.25);
+  for (const s of [-1, 1]) put(g, box(0.05, 0.16, 0.12, M.frame), s * 0.105, 1.99, 0.0);   // temple frame
+  put(g, box(0.03, 0.06, 0.04, M.bone), 0, 1.93, -0.115);                                  // nose ridge
+  // Jaw taper to a chin + bared metal teeth (individual segments → a grin)
+  put(g, box(0.14, 0.055, 0.12, M.bone), 0, 1.875, -0.02);
+  put(g, box(0.10, 0.04, 0.10, M.bone), 0, 1.835, -0.03);                                  // chin taper
+  put(g, box(0.135, 0.05, 0.03, M.joint), 0, 1.885, -0.112);                               // dark mouth recess
+  put(g, box(0.12, 0.03, 0.026, M.steel), 0, 1.888, -0.118);                               // teeth base
+  for (let i = 0; i < 6; i++) put(g, box(0.006, 0.032, 0.022, M.joint), -0.05 + i * 0.02, 1.888, -0.126); // tooth gaps
+  // neck actuators
+  put(g, cyl(0.05, 0.11, M.frame, 8), 0, 1.79, 0);
+  for (const s of [-1, 1]) put(g, cyl(0.018, 0.12, M.steel, 6), s * 0.05, 1.80, 0.03);
 }
 
-// ── STRIKER — slim agile scout, sleek raked visor, light kit ─────────────────
-function _striker(g, M) {
-  _base(g, M, { bulk: 0.94, arm: 0.048, leg: 0.070 });
-  // Slim chest rig + accent + slim pack
-  put(g, box(0.30, 0.28, 0.07, M.plate), 0, 1.52, -0.10);
-  put(g, box(0.30, 0.02, 0.07, M.trim),  0, 1.60, -0.106);
-  put(g, box(0.30, 0.02, 0.07, M.trim),  0, 1.46, -0.106);
-  put(g, box(0.05, 0.15, 0.04, M.accent),0, 1.53, -0.14);
-  put(g, box(0.16, 0.24, 0.08, M.plate2),0, 1.55,  0.12);
-  // Small angled shoulder caps
-  for (const s of [-1, 1]) {
-    put(g, box(0.13, 0.09, 0.16, M.plate), s * 0.29, 1.70, 0, 0, 0, s * 0.22);
-    put(g, box(0.03, 0.03, 0.03, M.accent), s * 0.31, 1.73, -0.08);
+// ── Shared endoskeleton body (named limbs → auto-rigged) ─────────────────────
+// `plating` scales how much white armour vs exposed black frame shows.
+function _endoBase(g, M, cfg) {
+  const { bulk = 1.0, plating = 1.0 } = cfg;
+  const AW = M.armor, A2 = M.armor2, FR = M.frame, JT = M.joint;
+  // ── Legs (left −0.13 / right +0.13) — armoured greaves over a dark frame ──
+  for (const [sx, sd] of [[-0.13, 'L'], [0.13, 'R']]) {
+    put(g, box(0.17, 0.09, 0.20, JT),                sx, 0.045, 0.04, 0, 0, 0, `boot_${sd}`);      // sole
+    put(g, box(0.16, 0.14, 0.30, AW),                 sx, 0.13,  0.04, 0, 0, 0, `boot_${sd}_a`);    // armoured foot
+    put(g, box(0.11, 0.16, 0.13, FR),                 sx, 0.30, -0.01, 0, 0, 0, `boot_${sd}_u`);    // ankle frame
+    put(g, box(0.15 * bulk, 0.34, 0.15 * bulk, AW),   sx, 0.52,  0,    0, 0, 0, `lleg_${sd}`);      // shin greave
+    put(g, box(0.16, 0.13, 0.15, AW),                 sx, 0.72, -0.02, 0, 0, 0, `knee_${sd}`);      // knee cap
+    put(g, box(0.055, 0.05, 0.03, M.glow),            sx, 0.72, -0.11, 0, 0, 0, `knee_${sd}_g`);    // red knee light
+    put(g, box(0.16 * bulk, 0.30, 0.16 * bulk, AW),   sx, 0.95,  0,    0, 0, 0, `thigh_${sd}`);     // thigh plate
+    put(g, box(0.05, 0.10, 0.03, M.glow),             sx + (sd === 'L' ? -0.085 : 0.085), 0.98, -0.05, 0, 0, 0, `thigh_${sd}_g`); // thigh light
   }
-  // Wrist units (named — swing)
-  for (const [sx, sd] of [[-0.30, 'L'], [0.30, 'R']]) {
-    put(g, box(0.11, 0.09, 0.10, M.plate2), sx, 1.02, -0.02, 0, 0, 0, `farm_${sd}_wr`);
-    put(g, box(0.03, 0.03, 0.015, M.accent), sx, 1.02, -0.07, 0, 0, 0, `farm_${sd}_wt`);
+  // ── Pelvis: dark frame + white hip plates + red core ──
+  put(g, box(0.30, 0.16, 0.22, FR), 0, 1.13, 0);
+  for (const s of [-1, 1]) put(g, box(0.10, 0.16, 0.16, AW), s * 0.16, 1.14, -0.01);
+  glowAt(g, M, 0, 1.16, -0.115, 0.05, 0.05, 0.03);
+  // ── Torso: dark endoskeleton frame with layered white plates ──
+  put(g, box(0.26, 0.20, 0.19, FR), 0, 1.32, 0);                                 // abdomen frame
+  for (let i = 0; i < 2; i++) put(g, box(0.22, 0.03, 0.20, A2), 0, 1.27 + i * 0.10, -0.005);  // ab plates
+  glowAt(g, M, 0, 1.30, -0.11, 0.05, 0.07, 0.03);                                 // ab core light
+  put(g, box(0.34 * bulk, 0.26, 0.22 * bulk, FR), 0, 1.55, 0);                    // chest frame
+  // pectoral plates (angled) + sternum + chest core
+  for (const s of [-1, 1]) put(g, box(0.16 * bulk, 0.20, 0.10, AW), s * 0.09, 1.56, -0.12, 0, 0, s * 0.12);
+  put(g, box(0.07, 0.24, 0.09, A2), 0, 1.55, -0.13);                              // sternum
+  glowAt(g, M, 0, 1.58, -0.175, 0.045, 0.06, 0.03);                              // chest core
+  put(g, box(0.40 * bulk, 0.09, 0.23 * bulk, A2), 0, 1.69, 0);                    // collar/yoke
+  // spine + shoulder cables (thin dark cylinders)
+  put(g, box(0.14, 0.26, 0.14, FR), 0, 1.55, 0.10);                               // back unit
+  for (const s of [-1, 1]) put(g, cyl(0.02, 0.20, M.steel, 6), s * 0.16, 1.62, 0.02, 0.3, 0, s * 0.35);
+  // ── Arms (left −0.32 / right +0.32) — white pauldron, dark frame, gauntlet ──
+  for (const [sx, sd] of [[-0.32, 'L'], [0.32, 'R']]) {
+    put(g, box(0.19, 0.16, 0.21, AW),      sx, 1.70, 0, 0, 0, 0, `uarm_${sd}_p`);   // pauldron (static-ish, swings with arm)
+    glowAt(g, M, sx, 1.71, -0.11, 0.045, 0.045, 0.03);
+    put(g, box(0.10, 0.24, 0.10, FR),      sx, 1.50, 0, 0, 0, 0, `uarm_${sd}`);      // upper-arm frame
+    put(g, box(0.11, 0.09, 0.11, JT),      sx, 1.31, 0, 0, 0, 0, `elbow_${sd}`);     // elbow joint
+    put(g, box(0.13, 0.22, 0.12, AW),      sx, 1.11, 0, 0, 0, 0, `farm_${sd}`);      // forearm gauntlet
+    put(g, box(0.035, 0.10, 0.03, M.glow), sx, 1.11, -0.075, 0, 0, 0, `farm_${sd}_g`);
+    put(g, box(0.10, 0.12, 0.09, JT),      sx, 0.90, 0, 0, 0, 0, `hand_${sd}`);      // black mech hand
+    for (let f = 0; f < 3; f++) put(g, box(0.022, 0.06, 0.02, JT), sx - 0.03 + f * 0.03, 0.81, -0.03, 0, 0, 0, `hand_${sd}_f${f}`);
   }
-  // Sleek angled helmet — forward-raked wedge visor
-  put(g, box(0.23, 0.22, 0.25, M.plate),  0, 2.00, 0.0);
-  put(g, box(0.24, 0.11, 0.08, M.visor),  0, 1.98, -0.115, -0.2);   // raked visor band
-  put(g, box(0.22, 0.05, 0.26, M.plate2), 0, 2.10, 0.01);           // crown
-  put(g, box(0.02, 0.05, 0.19, M.accent), 0, 2.11, 0.02);           // centre ridge
-  // small swept-back side vents (kept low/flat so they don't read as ears)
-  for (const s of [-1, 1]) put(g, box(0.02, 0.05, 0.11, M.dark), s * 0.10, 2.05, 0.10, 0.7, 0, 0);
+  // Head
+  _skull(g, M);
 }
 
-// ── PHANTOM — sleek stealth infiltrator, hooded cowl, glowing eye visor ──────
-function _phantom(g, M) {
-  _base(g, M, { bulk: 0.92, arm: 0.046, leg: 0.068 });
-  // Minimal chest + a single glowing seam + slim pack
-  put(g, box(0.27, 0.32, 0.06, M.plate),  0, 1.52, -0.09);
-  put(g, box(0.02, 0.24, 0.03, M.accent), 0, 1.52, -0.12);
-  put(g, box(0.15, 0.22, 0.07, M.plate2), 0, 1.54,  0.12);
-  // Low sleek shoulder pads
-  for (const s of [-1, 1]) {
-    put(g, box(0.12, 0.07, 0.15, M.plate),  s * 0.28, 1.68, 0);
-    put(g, box(0.09, 0.02, 0.12, M.accent), s * 0.28, 1.715, 0);
-  }
-  // Forearm blades/guards (named — swing)
-  for (const [sx, sd] of [[-0.30, 'L'], [0.30, 'R']])
-    put(g, box(0.09, 0.20, 0.06, M.plate2), sx, 1.12, -0.065, 0, 0, 0, `farm_${sd}_bl`);
-  // Hooded cowl head: raked hood shell over a dark face with a bright eye visor
-  put(g, box(0.28, 0.19, 0.28, M.plate),  0, 2.06, 0.02, -0.14);    // raked hood shell
-  put(g, box(0.30, 0.15, 0.06, M.plate),  0, 2.03,  0.13);          // hood back
-  put(g, box(0.19, 0.055, 0.02, M.visor), 0, 1.985, -0.125);        // bright eye visor
-  put(g, box(0.06, 0.02, 0.02, M.accent), 0, 2.045, -0.12);         // brow accent
-  put(g, box(0.05, 0.05, 0.05, M.accent), 0, 2.16, 0.05, 0.3);      // hood peak
-  for (const s of [-1, 1]) put(g, box(0.035, 0.15, 0.13, M.plate2), s * 0.125, 1.98, -0.02);  // cheek guards
-}
-
-const BUILDERS = { vanguard: _vanguard, striker: _striker, phantom: _phantom };
-
-// ── Public builder ───────────────────────────────────────────────────────────
-export function buildLowPolyCharacter(id = 'vanguard') {
+function _build(id) {
   const pal = PALETTES[id] || PALETTES.vanguard;
   const M = _mats(pal);
   const g = new THREE.Group();
-  (BUILDERS[id] || _vanguard)(g, M);
+  _endoBase(g, M, { bulk: pal.bulk });
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   _addOutlines(g);
-  g.userData = {
-    isLowPoly: true, armorTypeId: id,
-    primaryMat: M.plate, secondaryMat: M.plate2,
-  };
+  g.userData = { isLowPoly: true, armorTypeId: id, primaryMat: M.armor, secondaryMat: M.armor2 };
   return g;
+}
+
+// ── Public builder ───────────────────────────────────────────────────────────
+export function buildLowPolyCharacter(id = 'vanguard') {
+  return _build(id);
 }
