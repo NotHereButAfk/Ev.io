@@ -103,6 +103,9 @@ function _mats(pal) {
 const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
 const cyl = (r, h, m, s = 8) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, s), m);
 const sph = (r, m, w = 8, h = 6) => new THREE.Mesh(new THREE.SphereGeometry(r, w, h), m);
+// Rounded muscle (capsule) + tapered muscle (cone-cylinder) — the human forms.
+const cap = (r, len, m, s = 12) => new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 5, s), m);
+const tcyl = (rt, rb, h, m, s = 12) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, s), m);
 function put(g, mesh, x, y, z, rx = 0, ry = 0, rz = 0, name) {
   mesh.position.set(x, y, z);
   if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
@@ -143,51 +146,67 @@ function _skull(g, M) {
   for (const s of [-1, 1]) put(g, cyl(0.018, 0.12, M.steel, 6), s * 0.05, 1.80, 0.03);
 }
 
-// ── Shared endoskeleton body (named limbs → auto-rigged) ─────────────────────
-// `plating` scales how much white armour vs exposed black frame shows.
+// ── Shared endoskeleton body — HUMAN anatomy (muscle frame + armour plates) ──
+// Rounded muscular limbs (capsules / tapered cones) form the endoskeleton; hard
+// white armour plates strap over them, with the dark muscle showing at the
+// joints. Heroic human proportions: broad round shoulders, defined chest,
+// tapered waist, muscular tapered legs.
 function _endoBase(g, M, cfg) {
-  const { bulk = 1.0, plating = 1.0 } = cfg;
+  const { bulk = 1.0 } = cfg;
   const AW = M.armor, A2 = M.armor2, FR = M.frame, JT = M.joint;
-  // ── Legs (left −0.13 / right +0.13) — armoured greaves over a dark frame ──
-  for (const [sx, sd] of [[-0.13, 'L'], [0.13, 'R']]) {
-    put(g, box(0.17, 0.09, 0.20, JT),                sx, 0.045, 0.04, 0, 0, 0, `boot_${sd}`);      // sole
-    put(g, box(0.16, 0.14, 0.30, AW),                 sx, 0.13,  0.04, 0, 0, 0, `boot_${sd}_a`);    // armoured foot
-    put(g, box(0.11, 0.16, 0.13, FR),                 sx, 0.30, -0.01, 0, 0, 0, `boot_${sd}_u`);    // ankle frame
-    put(g, box(0.15 * bulk, 0.34, 0.15 * bulk, AW),   sx, 0.52,  0,    0, 0, 0, `lleg_${sd}`);      // shin greave
-    put(g, box(0.16, 0.13, 0.15, AW),                 sx, 0.72, -0.02, 0, 0, 0, `knee_${sd}`);      // knee cap
-    put(g, box(0.055, 0.05, 0.03, M.glow),            sx, 0.72, -0.11, 0, 0, 0, `knee_${sd}_g`);    // red knee light
-    put(g, box(0.16 * bulk, 0.30, 0.16 * bulk, AW),   sx, 0.95,  0,    0, 0, 0, `thigh_${sd}`);     // thigh plate
-    put(g, box(0.05, 0.10, 0.03, M.glow),             sx + (sd === 'L' ? -0.085 : 0.085), 0.98, -0.05, 0, 0, 0, `thigh_${sd}_g`); // thigh light
+  // ── Legs (left −0.11 / right +0.11) — tapered muscle under armour plates ──
+  for (const [sx, sd] of [[-0.11, 'L'], [0.11, 'R']]) {
+    const out = sd === 'L' ? -1 : 1;
+    put(g, box(0.13, 0.09, 0.19, JT),                 sx, 0.05,  0.05, 0, 0, 0, `boot_${sd}`);     // sole
+    put(g, box(0.14, 0.15, 0.28, AW),                 sx, 0.15,  0.04, 0, 0, 0, `boot_${sd}_a`);   // armoured foot
+    put(g, sph(0.07, JT, 8, 6),                       sx, 0.27,  0,    0, 0, 0, `boot_${sd}_u`);   // ankle ball
+    put(g, tcyl(0.065, 0.10, 0.34, FR),               sx, 0.45,  0,    0, 0, 0, `lleg_${sd}`);     // calf muscle
+    put(g, box(0.12, 0.28, 0.10, AW),                 sx, 0.47, -0.05, 0, 0, 0, `lleg_${sd}_p`);   // shin plate
+    put(g, sph(0.088, JT, 8, 6),                      sx, 0.65,  0,    0, 0, 0, `knee_${sd}`);     // knee ball
+    put(g, box(0.14, 0.13, 0.09, AW),                 sx, 0.66, -0.06, 0, 0, 0, `knee_${sd}_p`);   // knee cap
+    put(g, box(0.05, 0.045, 0.03, M.glow),            sx, 0.66, -0.115, 0, 0, 0, `knee_${sd}_g`);  // knee light
+    put(g, tcyl(0.115 * bulk, 0.09, 0.34, FR),        sx, 0.92,  0,    0, 0, 0, `thigh_${sd}`);    // thigh muscle
+    put(g, box(0.15, 0.28, 0.12, AW),                 sx, 0.94, -0.02, 0, 0, 0, `thigh_${sd}_p`);  // thigh plate
+    put(g, box(0.045, 0.11, 0.03, M.glow),            sx + out * 0.085, 0.95, -0.03, 0, 0, out * 0.1, `thigh_${sd}_gl`); // thigh light
   }
   // ── Pelvis: dark frame + white hip plates + red core ──
-  put(g, box(0.30, 0.16, 0.22, FR), 0, 1.13, 0);
-  for (const s of [-1, 1]) put(g, box(0.10, 0.16, 0.16, AW), s * 0.16, 1.14, -0.01);
-  glowAt(g, M, 0, 1.16, -0.115, 0.05, 0.05, 0.03);
-  // ── Torso: dark endoskeleton frame with layered white plates ──
-  put(g, box(0.26, 0.20, 0.19, FR), 0, 1.32, 0);                                 // abdomen frame
-  for (let i = 0; i < 2; i++) put(g, box(0.22, 0.03, 0.20, A2), 0, 1.27 + i * 0.10, -0.005);  // ab plates
-  glowAt(g, M, 0, 1.30, -0.11, 0.05, 0.07, 0.03);                                 // ab core light
-  put(g, box(0.34 * bulk, 0.26, 0.22 * bulk, FR), 0, 1.55, 0);                    // chest frame
-  // pectoral plates (angled) + sternum + chest core
-  for (const s of [-1, 1]) put(g, box(0.16 * bulk, 0.20, 0.10, AW), s * 0.09, 1.56, -0.12, 0, 0, s * 0.12);
-  put(g, box(0.07, 0.24, 0.09, A2), 0, 1.55, -0.13);                              // sternum
-  glowAt(g, M, 0, 1.58, -0.175, 0.045, 0.06, 0.03);                              // chest core
-  put(g, box(0.40 * bulk, 0.09, 0.23 * bulk, A2), 0, 1.69, 0);                    // collar/yoke
-  // spine + shoulder cables (thin dark cylinders)
-  put(g, box(0.14, 0.26, 0.14, FR), 0, 1.55, 0.10);                               // back unit
-  for (const s of [-1, 1]) put(g, cyl(0.02, 0.20, M.steel, 6), s * 0.16, 1.62, 0.02, 0.3, 0, s * 0.35);
-  // ── Arms (left −0.32 / right +0.32) — white pauldron, dark frame, gauntlet ──
-  for (const [sx, sd] of [[-0.32, 'L'], [0.32, 'R']]) {
-    put(g, box(0.19, 0.16, 0.21, AW),      sx, 1.70, 0, 0, 0, 0, `uarm_${sd}_p`);   // pauldron (static-ish, swings with arm)
-    glowAt(g, M, sx, 1.71, -0.11, 0.045, 0.045, 0.03);
-    put(g, box(0.10, 0.24, 0.10, FR),      sx, 1.50, 0, 0, 0, 0, `uarm_${sd}`);      // upper-arm frame
-    put(g, box(0.11, 0.09, 0.11, JT),      sx, 1.31, 0, 0, 0, 0, `elbow_${sd}`);     // elbow joint
-    put(g, box(0.13, 0.22, 0.12, AW),      sx, 1.11, 0, 0, 0, 0, `farm_${sd}`);      // forearm gauntlet
-    put(g, box(0.035, 0.10, 0.03, M.glow), sx, 1.11, -0.075, 0, 0, 0, `farm_${sd}_g`);
-    put(g, box(0.10, 0.12, 0.09, JT),      sx, 0.90, 0, 0, 0, 0, `hand_${sd}`);      // black mech hand
-    for (let f = 0; f < 3; f++) put(g, box(0.022, 0.06, 0.02, JT), sx - 0.03 + f * 0.03, 0.81, -0.03, 0, 0, 0, `hand_${sd}_f${f}`);
+  put(g, box(0.28, 0.15, 0.21, FR), 0, 1.13, 0);
+  for (const s of [-1, 1]) put(g, box(0.11, 0.17, 0.15, AW), s * 0.15, 1.13, -0.01);   // hip plates
+  glowAt(g, M, 0, 1.15, -0.11, 0.05, 0.05, 0.03);
+  // ── Torso: tapered muscular frame (wide chest → narrow waist) + armour ──
+  put(g, tcyl(0.135, 0.16, 0.20, FR, 14), 0, 1.32, 0);                              // abdomen (narrow waist)
+  for (let i = 0; i < 2; i++) put(g, box(0.18, 0.03, 0.18, A2), 0, 1.28 + i * 0.10, -0.045);  // ab plates
+  glowAt(g, M, 0, 1.31, -0.115, 0.045, 0.06, 0.03);                                 // ab core
+  put(g, box(0.32 * bulk, 0.26, 0.21 * bulk, FR), 0, 1.55, 0);                       // rib cage
+  // Pectorals — flat ANGLED armour plates (not round), split by a sternum groove
+  for (const s of [-1, 1]) put(g, box(0.145 * bulk, 0.17, 0.08, AW), s * 0.088, 1.575, -0.10, -0.12, 0, s * 0.14);
+  put(g, box(0.05, 0.24, 0.085, FR), 0, 1.55, -0.115);                               // sternum groove (dark split)
+  put(g, box(0.03, 0.20, 0.07, A2), 0, 1.55, -0.14);                                 // sternum ridge
+  glowAt(g, M, 0, 1.45, -0.145, 0.04, 0.05, 0.03);                                   // lower-chest core
+  // Trapezius / collar sweeping up to the neck
+  put(g, tcyl(0.10, 0.19 * bulk, 0.12, A2, 12), 0, 1.68, 0);                          // traps (wide at shoulders)
+  put(g, box(0.14, 0.24, 0.15, FR), 0, 1.54, 0.10);                                   // back unit
+  // ── Deltoids (round shoulder muscle) + draping pauldron armour ──
+  for (const [sx, sd] of [[-0.26, 'L'], [0.26, 'R']]) {
+    const out = sd === 'L' ? -1 : 1;
+    put(g, sph(0.12, FR, 10, 8),           sx, 1.62, 0);                              // deltoid muscle
+    // Pauldron cap + trim — STATIC (stay on the shoulder while the arm swings).
+    put(g, box(0.165, 0.135, 0.20, AW),    sx + out * 0.015, 1.645, 0, 0, 0, -out * 0.18);   // pauldron cap
+    put(g, box(0.165, 0.04, 0.205, A2),    sx + out * 0.015, 1.71, 0, 0, 0, -out * 0.18);     // pauldron trim
+    glowAt(g, M, sx + out * 0.05, 1.63, -0.095, 0.04, 0.04, 0.03);
   }
-  // Head
+  // ── Arms (left −0.27 / right +0.27) — rounded muscle + strapped armour ──
+  for (const [sx, sd] of [[-0.27, 'L'], [0.27, 'R']]) {
+    put(g, cap(0.074, 0.16, FR),           sx, 1.45, 0, 0, 0, 0, `uarm_${sd}`);       // bicep
+    put(g, sph(0.062, JT, 8, 6),           sx, 1.26, 0, 0, 0, 0, `elbow_${sd}`);      // elbow
+    put(g, cap(0.062, 0.15, FR),           sx, 1.08, 0, 0, 0, 0, `farm_${sd}`);       // forearm muscle
+    put(g, box(0.115, 0.20, 0.10, AW),     sx, 1.09, -0.03, 0, 0, 0, `farm_${sd}_p`); // forearm gauntlet
+    put(g, box(0.03, 0.09, 0.03, M.glow),  sx, 1.09, -0.095, 0, 0, 0, `farm_${sd}_g`);
+    put(g, box(0.092, 0.12, 0.085, JT),    sx, 0.895, 0, 0, 0, 0, `hand_${sd}`);      // mech hand
+    for (let f = 0; f < 3; f++) put(g, box(0.02, 0.06, 0.02, JT), sx - 0.026 + f * 0.026, 0.81, -0.03, 0, 0, 0, `hand_${sd}_f${f}`);
+  }
+  // Neck + head
+  put(g, cyl(0.06, 0.13, FR, 10), 0, 1.79, 0);
   _skull(g, M);
 }
 
