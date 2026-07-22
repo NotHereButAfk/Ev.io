@@ -157,9 +157,11 @@ function _endoBase(g, M, cfg) {
   // ── Legs (left −0.11 / right +0.11) — tapered muscle under armour plates ──
   for (const [sx, sd] of [[-0.11, 'L'], [0.11, 'R']]) {
     const out = sd === 'L' ? -1 : 1;
-    put(g, box(0.13, 0.09, 0.19, JT),                 sx, 0.05,  0.05, 0, 0, 0, `boot_${sd}`);     // sole
-    put(g, box(0.14, 0.15, 0.28, AW),                 sx, 0.15,  0.04, 0, 0, 0, `boot_${sd}_a`);   // armoured foot
-    put(g, sph(0.07, JT, 8, 6),                       sx, 0.27,  0,    0, 0, 0, `boot_${sd}_u`);   // ankle ball
+    // Foot points FORWARD (−Z): toe projects well past the ankle, short heel.
+    put(g, box(0.135, 0.06, 0.30, JT),                sx, 0.03, -0.05, 0, 0, 0, `boot_${sd}`);     // sole
+    put(g, box(0.14, 0.14, 0.24, AW),                 sx, 0.14, -0.04, 0, 0, 0, `boot_${sd}_a`);   // armoured foot
+    put(g, box(0.125, 0.08, 0.08, AW),                sx, 0.085, -0.20, 0, 0, 0, `boot_${sd}_t`);  // toe cap
+    put(g, sph(0.07, JT, 8, 6),                       sx, 0.27,  0.02, 0, 0, 0, `boot_${sd}_u`);   // ankle ball
     put(g, tcyl(0.065, 0.10, 0.34, FR),               sx, 0.45,  0,    0, 0, 0, `lleg_${sd}`);     // calf muscle
     put(g, box(0.12, 0.28, 0.10, AW),                 sx, 0.47, -0.05, 0, 0, 0, `lleg_${sd}_p`);   // shin plate
     put(g, sph(0.088, JT, 8, 6),                      sx, 0.65,  0,    0, 0, 0, `knee_${sd}`);     // knee ball
