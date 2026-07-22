@@ -19,7 +19,9 @@ const PROVOKE_DURATION = 7;
 
 let nextId = 1;
 
-const ARMOR_TYPES = ['assault', 'recon', 'heavy', 'stealth'];
+// Bots spawn as the cyborg-terminator models — the same low-poly cel-shaded
+// endoskeletons the player uses. Cycling the three chassis keeps the mob varied.
+const ARMOR_TYPES = ['vanguard', 'striker', 'phantom'];
 let _armorIdx = 0;
 
 // Each bot picks the next skin in sequence so the lobby always looks varied.
