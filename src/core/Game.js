@@ -1186,18 +1186,28 @@ export class Game {
     if (!rig) return;
     const moving = speed > 0.6 && p.onGround;
     if (moving) {
-      const swing = Math.sin(p.bobTime) * (p.isSprinting ? 0.85 : 0.55);
+      const t   = p.bobTime;
+      const amp = p.isSprinting ? 0.85 : 0.55;
+      const kA  = p.isSprinting ? 1.15 : 1.0;
+      const swing = Math.sin(t) * amp;
       rig.legL.rotation.x =  swing;
       rig.legR.rotation.x = -swing;
+      // KNEES flex through the swing phase (cos>0 = leg passing forward) so the
+      // stride reads as a real walk instead of a stiff pendulum.
+      if (rig.kneeL) rig.kneeL.rotation.x = -kA * Math.max(0,  Math.cos(t));
+      if (rig.kneeR) rig.kneeR.rotation.x = -kA * Math.max(0, -Math.cos(t));
       rig.armL.rotation.x = -swing * 0.7;
       rig.armR.rotation.x =  swing * 0.7;
+      if (rig.elbowL) rig.elbowL.rotation.x = -0.28 - 0.22 * Math.max(0, -Math.cos(t));
+      if (rig.elbowR) rig.elbowR.rotation.x = -0.28 - 0.22 * Math.max(0,  Math.cos(t));
     } else {
-      // idle breathing — tiny arm sway, legs return to neutral
+      // idle breathing — tiny arm sway, legs return to a soft stand
       const breathe = Math.sin(this.playTime * 1.6) * 0.04;
-      rig.armL.rotation.x += (breathe - rig.armL.rotation.x) * Math.min(1, dt * 4);
-      rig.armR.rotation.x += (breathe - rig.armR.rotation.x) * Math.min(1, dt * 4);
-      rig.legL.rotation.x += (0 - rig.legL.rotation.x) * Math.min(1, dt * 6);
-      rig.legR.rotation.x += (0 - rig.legR.rotation.x) * Math.min(1, dt * 6);
+      const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
+      L(rig.armL, breathe, 4); L(rig.armR, breathe, 4);
+      L(rig.legL, 0, 6); L(rig.legR, 0, 6);
+      L(rig.kneeL, -0.06, 5); L(rig.kneeR, -0.06, 5);
+      L(rig.elbowL, -0.14, 4); L(rig.elbowR, -0.14, 4);
     }
   }
 

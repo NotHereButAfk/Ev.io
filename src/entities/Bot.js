@@ -445,31 +445,38 @@ export class Bot {
 
     // ── Limb rig walk cycle ───────────────────────────────────────────────────
     if (this._rig) {
-      const { armL, armR, legL, legR } = this._rig;
+      const { armL, armR, legL, legR, kneeL, kneeR, elbowL, elbowR } = this._rig;
       const isMoving = !!moveTarget;
 
       // Advance walk timer proportional to movement speed (mirrors player bobTime)
       this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
+      const t = this._walkT;
 
-      const swing   = isMoving ? Math.sin(this._walkT) * 0.55 : 0;
-      const breathe = Math.sin(this._walkT * (isMoving ? 0.22 : 0.28)) * 0.04;
+      const swing   = isMoving ? Math.sin(t) * 0.55 : 0;
+      const breathe = Math.sin(t * (isMoving ? 0.22 : 0.28)) * 0.04;
+      // frame-rate-independent ease toward a target rotation
+      const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
 
       if (isMoving) {
-        // Natural gait: legs stride opposite each other; arms counter-swing
-        legL.rotation.x += ( swing - legL.rotation.x) * Math.min(1, dt * 14);
-        legR.rotation.x += (-swing - legR.rotation.x) * Math.min(1, dt * 14);
-        // AR bots grip the rifle so the weapon arm (armL = anatomical right)
-        // swings less; sword bots swing both arms freely
+        // Thighs stride opposite each other; KNEES flex through the swing phase
+        // (cos>0 = leg passing forward under the body) so the foot lifts and
+        // clears the ground instead of the leg swinging out stiff.
+        L(legL,   swing, 14);  L(legR,  -swing, 14);
+        L(kneeL, -1.0 * Math.max(0,  Math.cos(t)), 16);
+        L(kneeR, -1.0 * Math.max(0, -Math.cos(t)), 16);
+        // Arms counter-swing (AR bots grip the rifle so that arm swings less);
+        // elbows carry a natural bend that deepens as the arm swings back.
         const swL = this._isSwordBot ? -swing * 0.65 : -swing * 0.30;
         const swR = this._isSwordBot ?  swing * 0.65 :  swing * 0.62;
-        armL.rotation.x += (swL - armL.rotation.x) * Math.min(1, dt * 12);
-        armR.rotation.x += (swR - armR.rotation.x) * Math.min(1, dt * 12);
+        L(armL, swL, 12);  L(armR, swR, 12);
+        L(elbowL, -0.28 - 0.22 * Math.max(0, -Math.cos(t)), 10);
+        L(elbowR, -0.28 - 0.22 * Math.max(0,  Math.cos(t)), 10);
       } else {
-        // Idle: gentle breathing sway on arms, legs settle back to neutral
-        armL.rotation.x += (breathe - armL.rotation.x) * Math.min(1, dt * 4);
-        armR.rotation.x += (breathe - armR.rotation.x) * Math.min(1, dt * 4);
-        legL.rotation.x += (0       - legL.rotation.x) * Math.min(1, dt * 6);
-        legR.rotation.x += (0       - legR.rotation.x) * Math.min(1, dt * 6);
+        // Idle: gentle breathing sway on arms; legs/knees settle to a soft stand
+        L(armL, breathe, 4);  L(armR, breathe, 4);
+        L(legL, 0, 6);  L(legR, 0, 6);
+        L(kneeL, -0.06, 5); L(kneeR, -0.06, 5);
+        L(elbowL, -0.14, 4); L(elbowR, -0.14, 4);
       }
     }
   }

@@ -426,6 +426,10 @@ export function applySkinToCharacter(group, skin, armorSkin = null) {
 // ===========================================================================
 const _ARM_RE = /uarm|farm|elbow|hand|shoulder|pau|pvs/i;
 const _LEG_RE = /thigh|lleg|knee|boot|shinp|sole|grv|kn_|knsph|tpl|cg_/i;
+// Lower-limb parts split off onto a second bone (elbow / knee) so limbs BEND
+// instead of swinging rigid — the difference between a natural walk and a march.
+const _ARM_LO = /farm|forearm|hand|elbow|wrist/i;
+const _LEG_LO = /lleg|shin|calf|boot|sole|foot|toe|ankle|knee|grv|kn_|knsph/i;
 
 export function rigCharacterLimbs(group) {
   try {
@@ -435,34 +439,56 @@ export function rigCharacterLimbs(group) {
     group.traverse((o) => { if (o.isMesh && o.name) meshes.push(o); });
     if (!meshes.length) return null; // procedural / unnamed — leave un-rigged
 
-    const buckets = { armL: [], armR: [], legL: [], legR: [] };
+    // Each limb splits into an UPPER set (rides the root pivot) and a LOWER set
+    // (rides the joint pivot, a child of the root).
+    const buckets = {
+      armL: { up: [], lo: [] }, armR: { up: [], lo: [] },
+      legL: { up: [], lo: [] }, legR: { up: [], lo: [] },
+    };
     const wp = new THREE.Vector3();
     for (const m of meshes) {
       m.getWorldPosition(wp);
       const side = wp.x < 0 ? 'L' : 'R';
-      if      (_ARM_RE.test(m.name) && Math.abs(wp.x) > 0.12) buckets['arm' + side].push(m);
-      else if (_LEG_RE.test(m.name) && Math.abs(wp.x) > 0.04) buckets['leg' + side].push(m);
+      if (_ARM_RE.test(m.name) && Math.abs(wp.x) > 0.12) {
+        buckets['arm' + side][_ARM_LO.test(m.name) ? 'lo' : 'up'].push(m);
+      } else if (_LEG_RE.test(m.name) && Math.abs(wp.x) > 0.04) {
+        buckets['leg' + side][_LEG_LO.test(m.name) ? 'lo' : 'up'].push(m);
+      }
     }
 
-    const makePivot = (parts, jointY) => {
-      if (parts.length < 2) return null;
+    // Build a 2-bone limb: a root pivot at rootY and a joint (knee/elbow) pivot
+    // at jointY parented to it. Returns { root, joint } or null if too sparse.
+    const makeLimb = (parts, rootY, jointY) => {
+      const all = [...parts.up, ...parts.lo];
+      if (all.length < 2) return null;
       let ax = 0;
-      for (const m of parts) { m.getWorldPosition(wp); ax += wp.x; }
-      ax /= parts.length;
-      const pivot = new THREE.Group();
-      pivot.position.set(ax, jointY, 0);
-      group.add(pivot);
-      for (const m of parts) pivot.attach(m); // attach() preserves world transform
-      return pivot;
+      for (const m of all) { m.getWorldPosition(wp); ax += wp.x; }
+      ax /= all.length;
+      const root = new THREE.Group();
+      root.position.set(ax, rootY, 0);
+      group.add(root);
+      const joint = new THREE.Group();
+      joint.position.set(0, jointY - rootY, 0);   // local to root → world (ax, jointY, 0)
+      root.add(joint);
+      root.updateWorldMatrix(true, true);
+      for (const m of parts.up) root.attach(m);    // attach() preserves world transform
+      for (const m of parts.lo) joint.attach(m);
+      return { root, joint };
     };
 
+    const legL = makeLimb(buckets.legL, 1.21, 0.62);
+    const legR = makeLimb(buckets.legR, 1.21, 0.62);
+    const armL = makeLimb(buckets.armL, 1.76, 1.28);
+    const armR = makeLimb(buckets.armR, 1.76, 1.28);
+    if (!legL || !legR || !armL || !armR) return null;
+
+    // Back-compatible API: rig.legL/armL are the ROOT (hip/shoulder) pivots, so
+    // existing `rig.legL.rotation.x = …` still swings the whole limb. The new
+    // .kneeL/.kneeR/.elbowL/.elbowR joints add the bend.
     const rig = {
-      armL: makePivot(buckets.armL, 1.76),
-      armR: makePivot(buckets.armR, 1.76),
-      legL: makePivot(buckets.legL, 1.21),
-      legR: makePivot(buckets.legR, 1.21),
+      armL: armL.root, armR: armR.root, legL: legL.root, legR: legR.root,
+      elbowL: armL.joint, elbowR: armR.joint, kneeL: legL.joint, kneeR: legR.joint,
     };
-    if (!rig.armL || !rig.armR || !rig.legL || !rig.legR) return null;
     group.userData.rig = rig;
     return rig;
   } catch (e) {
