@@ -594,6 +594,7 @@ export class Game {
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
     this._playerBody.visible = false;
     this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
+    this._tpsWeaponMesh = null; // old weapon went with the removed body
     this.world.scene.add(this._playerBody);
 
     this.state = 'playing';
@@ -1151,12 +1152,27 @@ export class Game {
   // the procedural fallback body carries no weapon.
   _syncTpsWeapon() {
     const ud = this._playerBody?.userData;
-    if (!ud?.isHuman || !ud.attachWeapon) return;
+    if (!ud) return;
     const def = this.weaponSystem.currentDef;
     if (!def || this._tpsWeaponId === def.id) return;
     this._tpsWeaponId = def.id;
-    const built = buildWeaponModel(def, { procedural: true });
-    ud.attachWeapon(built?.group || null, def.kind === 'melee');
+    // Human soldier: attach to the rigged hand via its own hold system.
+    if (ud.isHuman && ud.attachWeapon) {
+      const built = buildWeaponModel(def, { procedural: true });
+      ud.attachWeapon(built?.group || null, def.kind === 'melee');
+      return;
+    }
+    // Procedural / low-poly (cyborg) body: seat the weapon in front of the chest
+    // where the arm grip pose brings both hands onto it.
+    if (this._tpsWeaponMesh) { this._playerBody.remove(this._tpsWeaponMesh); this._tpsWeaponMesh = null; }
+    const wm = buildWeaponModel(def, { procedural: true })?.group;
+    if (wm) {
+      wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
+      if (def.kind === 'melee') { wm.position.set(-0.22, 1.06, -0.24); wm.rotation.set(-0.70, Math.PI, 0.22); }
+      else                      { wm.position.set(0, 1.15, -0.30);     wm.rotation.set(-0.15, Math.PI, 0); }
+      this._playerBody.add(wm);
+      this._tpsWeaponMesh = wm;
+    }
   }
 
   // Drive the third-person body's walk cycle: swing the rigged arm/leg pivots
@@ -1185,28 +1201,39 @@ export class Game {
     const rig = ud?.rig;
     if (!rig) return;
     const moving = speed > 0.6 && p.onGround;
+    const t = p.bobTime;
+    const L  = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
+    const Lz = (j, tgt, k) => { if (j) j.rotation.z += (tgt - j.rotation.z) * Math.min(1, dt * k); };
+
+    // Legs: stride with knee flex when moving, settle to a soft stand when not.
     if (moving) {
-      const t   = p.bobTime;
       const amp = p.isSprinting ? 0.85 : 0.55;
       const kA  = p.isSprinting ? 1.15 : 1.0;
       const swing = Math.sin(t) * amp;
       rig.legL.rotation.x =  swing;
       rig.legR.rotation.x = -swing;
-      // KNEES flex through the swing phase (cos>0 = leg passing forward) so the
-      // stride reads as a real walk instead of a stiff pendulum.
       if (rig.kneeL) rig.kneeL.rotation.x = -kA * Math.max(0,  Math.cos(t));
       if (rig.kneeR) rig.kneeR.rotation.x = -kA * Math.max(0, -Math.cos(t));
-      rig.armL.rotation.x = -swing * 0.7;
-      rig.armR.rotation.x =  swing * 0.7;
-      if (rig.elbowL) rig.elbowL.rotation.x = -0.28 - 0.22 * Math.max(0, -Math.cos(t));
-      if (rig.elbowR) rig.elbowR.rotation.x = -0.28 - 0.22 * Math.max(0,  Math.cos(t));
     } else {
-      // idle breathing — tiny arm sway, legs return to a soft stand
-      const breathe = Math.sin(this.playTime * 1.6) * 0.04;
-      const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
-      L(rig.armL, breathe, 4); L(rig.armR, breathe, 4);
       L(rig.legL, 0, 6); L(rig.legR, 0, 6);
       L(rig.kneeL, -0.06, 5); L(rig.kneeR, -0.06, 5);
+    }
+
+    // Arms: hold the weapon in a two-handed grip (both hands come onto the gun
+    // seated in front of the chest) when armed with a gun; else free-swing.
+    const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
+    if (isGun) {
+      const sway = (moving ? Math.sin(t) * 0.05 : Math.sin(this.playTime * 1.4) * 0.02);
+      L(rig.armR, 0.92 + sway, 9);  Lz(rig.armR, -0.28, 9);  L(rig.elbowR, -1.45, 9);
+      L(rig.armL, 1.05 - sway, 9);  Lz(rig.armL,  0.33, 9);  L(rig.elbowL, -1.55, 9);
+    } else if (moving) {
+      const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);
+      L(rig.armL, -swing * 0.6, 12);  L(rig.armR, swing * 0.6, 12);
+      L(rig.elbowL, -0.28 - 0.22 * Math.max(0, -Math.cos(t)), 10);
+      L(rig.elbowR, -0.28 - 0.22 * Math.max(0,  Math.cos(t)), 10);
+    } else {
+      const breathe = Math.sin(this.playTime * 1.6) * 0.04;
+      L(rig.armL, breathe, 4); L(rig.armR, breathe, 4);
       L(rig.elbowL, -0.14, 4); L(rig.elbowR, -0.14, 4);
     }
   }

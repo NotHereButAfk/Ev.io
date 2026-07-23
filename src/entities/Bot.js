@@ -146,13 +146,14 @@ export class Bot {
       const { group: wm } = buildWeaponModel(weaponDef, { procedural: true });
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
       if (this._isSwordBot) {
-        // Sword low guard: right hand at mid-chest, blade angled ~40° forward-up
-        wm.position.set(-0.38, 1.00, 0.02);
+        // Sword low guard: right hand out front, blade angled forward-up
+        wm.position.set(-0.22, 1.06, -0.24);
         wm.rotation.set(-0.70, Math.PI, 0.22);
       } else {
-        // AR low-ready: two-handed chest carry, barrel angled ~20° down
-        wm.position.set(-0.40, 0.92, 0.02);
-        wm.rotation.set(-0.35, Math.PI, 0.14);
+        // AR: seated in the two-handed grip in front of the chest (the arm
+        // pose in the walk cycle brings both hands onto it).
+        wm.position.set(0, 1.15, -0.30);
+        wm.rotation.set(-0.15, Math.PI, 0);
       }
       this.mesh.add(wm);
       this._weaponMesh = wm;
@@ -452,31 +453,37 @@ export class Bot {
       this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
       const t = this._walkT;
 
-      const swing   = isMoving ? Math.sin(t) * 0.55 : 0;
-      const breathe = Math.sin(t * (isMoving ? 0.22 : 0.28)) * 0.04;
-      // frame-rate-independent ease toward a target rotation
-      const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
+      const swing = isMoving ? Math.sin(t) * 0.55 : 0;
+      // frame-rate-independent ease toward a target rotation (x / z channels)
+      const L  = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
+      const Lz = (j, tgt, k) => { if (j) j.rotation.z += (tgt - j.rotation.z) * Math.min(1, dt * k); };
 
+      // Legs: thighs stride opposite each other; KNEES flex through the swing
+      // phase (cos>0 = leg passing forward under the body) so the foot lifts and
+      // clears the ground instead of the leg swinging out stiff.
       if (isMoving) {
-        // Thighs stride opposite each other; KNEES flex through the swing phase
-        // (cos>0 = leg passing forward under the body) so the foot lifts and
-        // clears the ground instead of the leg swinging out stiff.
-        L(legL,   swing, 14);  L(legR,  -swing, 14);
+        L(legL, swing, 14);  L(legR, -swing, 14);
         L(kneeL, -1.0 * Math.max(0,  Math.cos(t)), 16);
         L(kneeR, -1.0 * Math.max(0, -Math.cos(t)), 16);
-        // Arms counter-swing (AR bots grip the rifle so that arm swings less);
-        // elbows carry a natural bend that deepens as the arm swings back.
-        const swL = this._isSwordBot ? -swing * 0.65 : -swing * 0.30;
-        const swR = this._isSwordBot ?  swing * 0.65 :  swing * 0.62;
-        L(armL, swL, 12);  L(armR, swR, 12);
-        L(elbowL, -0.28 - 0.22 * Math.max(0, -Math.cos(t)), 10);
-        L(elbowR, -0.28 - 0.22 * Math.max(0,  Math.cos(t)), 10);
       } else {
-        // Idle: gentle breathing sway on arms; legs/knees settle to a soft stand
-        L(armL, breathe, 4);  L(armR, breathe, 4);
         L(legL, 0, 6);  L(legR, 0, 6);
         L(kneeL, -0.06, 5); L(kneeR, -0.06, 5);
-        L(elbowL, -0.14, 4); L(elbowR, -0.14, 4);
+      }
+
+      // Arms: AR bots hold the rifle in a two-handed grip (both hands come onto
+      // the weapon seated in front of the chest), with a small breathing/stride
+      // sway; sword bots free-swing the off-hand.
+      if (!this._isSwordBot) {
+        const sway = (isMoving ? Math.sin(t) * 0.05 : Math.sin(t * 0.4) * 0.025);
+        L(armR, 0.92 + sway, 9);  Lz(armR, -0.28, 9);  L(elbowR, -1.45, 9);
+        L(armL, 1.05 - sway, 9);  Lz(armL,  0.33, 9);  L(elbowL, -1.55, 9);
+      } else if (isMoving) {
+        L(armL, -swing * 0.5, 12);  L(armR, swing * 0.5, 12);
+        L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
+      } else {
+        const breathe = Math.sin(t * 0.28) * 0.04;
+        L(armL, breathe, 4);  L(armR, breathe, 4);
+        L(elbowL, -0.14, 4);  L(elbowR, -0.14, 4);
       }
     }
   }
