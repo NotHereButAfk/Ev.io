@@ -199,9 +199,18 @@ export class Bot {
     this._dying = false;
     this.alive = true;
     this.mesh.visible = true;
-    // Human bots "phase in" on respawn — play the teleport-arrival reform so they
-    // materialise with a braced crouch-and-recover instead of popping in.
-    if (this._isHuman) this.mesh.userData.triggerTeleport?.();
+    // Phase in on respawn instead of popping into existence. Human bots play
+    // the rigged teleport-arrival reform; cyborg/procedural bodies materialise
+    // via a fade + settle (see the spawn-in tick in update()).
+    if (this._isHuman) {
+      this.mesh.userData.triggerTeleport?.();
+    } else {
+      this._spawnT = 0.45;
+      this.mesh.scale.setScalar(1.12);
+      this.mesh.traverse(o => {
+        if (o.isMesh && o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = 0; }
+      });
+    }
   }
 
   _shootAt(player, onAttack, world) {
@@ -263,6 +272,23 @@ export class Bot {
         if (this.respawnTimer <= 0) this.respawnAt(this.world.randomSpawnPoint());
       }
       return;
+    }
+
+    // ── respawn materialize (cyborg phase-in): fade up + settle from a slight
+    //    overshoot so a fresh body arrives instead of popping into place ──────
+    if (this._spawnT > 0) {
+      this._spawnT = Math.max(0, this._spawnT - dt);
+      const p  = 1 - this._spawnT / 0.45;           // 0 → 1
+      const e  = p * (2 - p);                        // ease-out
+      const op = Math.min(1, e * 1.35);
+      this.mesh.scale.setScalar(1.12 - 0.12 * e);    // 1.12 → 1.0
+      this.mesh.traverse(o => {
+        if (o.isMesh && o.material && 'opacity' in o.material) { o.material.transparent = op < 1; o.material.opacity = op; }
+      });
+      if (this._spawnT === 0) {                       // land exactly on full
+        this.mesh.scale.setScalar(1);
+        this.mesh.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material) { o.material.transparent = false; o.material.opacity = 1; } });
+      }
     }
 
     if (this.flashTimer > 0) {

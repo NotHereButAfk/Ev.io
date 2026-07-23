@@ -55,10 +55,14 @@ function _outlineGeo(src, t) {
   return g;
 }
 function _addOutlines(group, t = 0.011) {
+  // Per-MODEL outline material (a clone), so a death fade / spawn fade that sets
+  // opacity on one character's outlines doesn't touch every other character's.
+  const olMat = OUTLINE_MAT.clone();
+  group.userData.outlineMat = olMat;
   const hosts = [];
-  group.traverse(o => { if (o.isMesh && o.material !== OUTLINE_MAT) hosts.push(o); });
+  group.traverse(o => { if (o.isMesh && o.material !== olMat) hosts.push(o); });
   for (const o of hosts) {
-    const ol = new THREE.Mesh(_outlineGeo(o.geometry, t), OUTLINE_MAT);
+    const ol = new THREE.Mesh(_outlineGeo(o.geometry, t), olMat);
     ol.name = 'outline';
     ol.castShadow = false;
     ol.raycast = () => {};
