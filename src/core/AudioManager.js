@@ -1003,27 +1003,8 @@ export class AudioManager {
     noise.connect(lp).connect(ambGain).connect(this.master);
     noise.start();
     this._ambientNoise = noise;
-    this._sirenInterval = setInterval(() => {
-      if (!this._ambientRunning || !this.ctx) return;
-      if (Math.random() > 0.28) return;
-      const t2 = this.ctx.currentTime;
-      const s = this.ctx.createOscillator();
-      s.type = 'sawtooth';
-      s.frequency.setValueAtTime(620, t2);
-      s.frequency.linearRampToValueAtTime(860, t2 + 0.55);
-      s.frequency.linearRampToValueAtTime(620, t2 + 1.1);
-      s.frequency.linearRampToValueAtTime(860, t2 + 1.65);
-      const lp2 = this.ctx.createBiquadFilter();
-      lp2.type = 'lowpass';
-      lp2.frequency.value = 1100;
-      const sGain = this.ctx.createGain();
-      sGain.gain.setValueAtTime(0, t2);
-      sGain.gain.linearRampToValueAtTime(0.019, t2 + 0.18);
-      sGain.gain.setValueAtTime(0.019, t2 + 1.65);
-      sGain.gain.linearRampToValueAtTime(0, t2 + 2.1);
-      s.connect(lp2).connect(sGain).connect(this.master);
-      s.start(t2); s.stop(t2 + 2.2);
-    }, 7000);
+    // (No siren — the arena is an indoor mall, so the wailing two-tone siren
+    // that used to fire here read as a random "woo-woo" for no reason.)
   }
 
   stopAmbientCity() {

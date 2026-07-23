@@ -1084,7 +1084,10 @@ export class Game {
         this._playerBody.position.copy(this.player.position);
         // Face the direction the player is aiming/moving, so the camera
         // (which sits behind the player) sees the character's back.
-        this._playerBody.rotation.y = this.player.yaw;
+        // Procedural / cyborg bodies face −Z by construction; the game's forward
+        // is +Z, so add π (human soldier already faces +Z).
+        this._playerBody.rotation.y = this.player.yaw
+          + (this._playerBody.userData?.isHuman ? 0 : Math.PI);
         this._syncTpsWeapon();
         this._animatePlayerBody(dt);
       }

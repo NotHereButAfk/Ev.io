@@ -303,8 +303,12 @@ export class Bot {
       // both assume rotation.y == atan2(dx, dz). Object3D.lookAt aims the -Z
       // axis instead, which faced the model backwards and played the walk
       // cycle in reverse (moonwalk).
+      // Procedural / cyborg bodies are built with their FRONT on −Z, but the
+      // game's forward is +Z — so add π to face the model's front at the target
+      // (otherwise it walks + aims backward). Human soldier front is already +Z.
       this.mesh.rotation.y = Math.atan2(player.position.x - this.position.x,
-                                        player.position.z - this.position.z);
+                                        player.position.z - this.position.z)
+                             + (this._isHuman ? 0 : Math.PI);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
         // AR bots shoot while closing in; sword bots only melee
@@ -331,7 +335,8 @@ export class Bot {
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
         this.mesh.rotation.y = Math.atan2(this.wanderTarget.x - this.position.x,
-                                          this.wanderTarget.z - this.position.z);
+                                          this.wanderTarget.z - this.position.z)
+                               + (this._isHuman ? 0 : Math.PI);
       }
     }
 

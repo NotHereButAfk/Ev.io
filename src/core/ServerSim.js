@@ -58,29 +58,11 @@ export class ServerSim {
   }
 
   update(dt) {
+    // Roster churn disabled. Once you're in the match the lobby stays put — the
+    // seeded roster from start() holds steady, so the player count is stable and
+    // bots no longer leave/rejoin (which despawned + respawned them mid-fight,
+    // teleporting bots around for no apparent reason).
     if (!this.active) return;
-    this._timer -= dt;
-    if (this._timer > 0) return;
-    this._timer = this._nextGap();
-
-    // Decide join vs leave. Keep at least one pure bot in the lobby so the
-    // arena always has AI opposition, and never exceed capacity.
-    const humans  = this._humanSlots;
-    const botSlots = this.botManager.count - humans;
-
-    // Bias toward joining when the server is bot-heavy, leaving when busy.
-    const canJoin  = botSlots > 1;            // keep ≥1 bot
-    const canLeave = humans > 0;
-    let join;
-    if (canJoin && canLeave) join = Math.random() < 0.5;
-    else if (canJoin)        join = true;
-    else if (canLeave)       join = false;
-    else                     return;          // nothing to do
-
-    if (join) this._playerJoins();
-    else      this._playerLeaves();
-
-    this._pushCount();
   }
 
   // A remote player connects → kick a bot to free its slot, add the player.
