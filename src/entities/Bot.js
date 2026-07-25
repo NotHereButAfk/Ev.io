@@ -154,12 +154,14 @@ export class Bot {
       if (this._isSwordBot) {
         // Sword low guard: right hand out front, blade angled forward-up
         wm.position.set(-0.22, 1.06, -0.24);
-        wm.rotation.set(-0.70, Math.PI, 0.22);
+        wm.rotation.set(-0.70, 0, 0.22);
       } else {
         // AR: seated in the two-handed grip in front of the chest (the arm
-        // pose in the walk cycle brings both hands onto it).
+        // pose in the walk cycle brings both hands onto it). rot.y = 0 so the
+        // muzzle (−Z default) points out the body's front (the body faces its
+        // −Z, then the +π world-facing turns that toward travel).
         wm.position.set(0, 1.15, -0.30);
-        wm.rotation.set(-0.15, Math.PI, 0);
+        wm.rotation.set(-0.15, 0, 0);
       }
       this.mesh.add(wm);
       this._weaponMesh = wm;
@@ -172,7 +174,7 @@ export class Bot {
           new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.95,
                                         blending: THREE.AdditiveBlending, depthWrite: false })
         );
-        flash.position.set(0, 1.17, -0.72);
+        flash.position.set(0, 1.17, -0.92);   // out at the barrel tip (−Z front)
         flash.visible = false;
         flash.renderOrder = 6;
         flash.raycast = () => {};
@@ -508,7 +510,7 @@ export class Bot {
         );
         wm.rotation.set(
           -0.15 + alertPX + this._gunKick * 0.22,       // recoil muzzle climb
-          Math.PI,
+          0,
           sway * 0.5
         );
       } else {
@@ -525,7 +527,7 @@ export class Bot {
         );
         wm.rotation.set(
           -0.70 + alertPX + lungePX,
-          Math.PI,
+          0,
           0.22 + sway * 0.5
         );
       }

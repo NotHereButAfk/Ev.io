@@ -1171,8 +1171,10 @@ export class Game {
     const wm = buildWeaponModel(def, { procedural: true })?.group;
     if (wm) {
       wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
-      if (def.kind === 'melee') { wm.position.set(-0.22, 1.06, -0.24); wm.rotation.set(-0.70, Math.PI, 0.22); }
-      else                      { wm.position.set(0, 1.15, -0.30);     wm.rotation.set(-0.15, Math.PI, 0); }
+      // rot.y = 0: the muzzle (−Z default) points out the body's −Z front, which
+      // the +π world-facing turns toward where the player aims (not backward).
+      if (def.kind === 'melee') { wm.position.set(-0.22, 1.06, -0.24); wm.rotation.set(-0.70, 0, 0.22); }
+      else                      { wm.position.set(0, 1.15, -0.30);     wm.rotation.set(-0.15, 0, 0); }
       this._playerBody.add(wm);
       this._tpsWeaponMesh = wm;
     }
