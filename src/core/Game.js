@@ -1174,7 +1174,7 @@ export class Game {
       // rot.y = 0: the muzzle (−Z default) points out the body's −Z front, which
       // the +π world-facing turns toward where the player aims (not backward).
       if (def.kind === 'melee') { wm.position.set(-0.22, 1.06, -0.24); wm.rotation.set(-0.70, 0, 0.22); }
-      else                      { wm.position.set(0, 1.15, -0.30);     wm.rotation.set(-0.15, 0, 0); }
+      else                      { wm.position.set(0.12, 1.25, -0.04);  wm.rotation.set(-0.07, 0.17, 0.05); }
       this._playerBody.add(wm);
       this._tpsWeaponMesh = wm;
     }
@@ -1228,9 +1228,10 @@ export class Game {
     // seated in front of the chest) when armed with a gun; else free-swing.
     const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
     if (isGun) {
+      // Soldier low-ready: trigger hand back on the grip, support hand forward.
       const sway = (moving ? Math.sin(t) * 0.05 : Math.sin(this.playTime * 1.4) * 0.02);
-      L(rig.armR, 0.92 + sway, 9);  Lz(rig.armR, -0.28, 9);  L(rig.elbowR, -1.45, 9);
-      L(rig.armL, 1.05 - sway, 9);  Lz(rig.armL,  0.33, 9);  L(rig.elbowL, -1.55, 9);
+      L(rig.armR, 0.55 + sway, 9);  Lz(rig.armR, -0.26, 9);  L(rig.elbowR, -1.50, 9);
+      L(rig.armL, 1.22 - sway, 9);  Lz(rig.armL,  0.46, 9);  L(rig.elbowL, -0.98, 9);
     } else if (moving) {
       const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);
       L(rig.armL, -swing * 0.6, 12);  L(rig.armR, swing * 0.6, 12);

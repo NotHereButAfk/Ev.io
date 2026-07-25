@@ -156,29 +156,29 @@ export class Bot {
         wm.position.set(-0.22, 1.06, -0.24);
         wm.rotation.set(-0.70, 0, 0.22);
       } else {
-        // AR: seated in the two-handed grip in front of the chest (the arm
-        // pose in the walk cycle brings both hands onto it). rot.y = 0 so the
-        // muzzle (−Z default) points out the body's front (the body faces its
-        // −Z, then the +π world-facing turns that toward travel).
-        wm.position.set(0, 1.15, -0.30);
-        wm.rotation.set(-0.15, 0, 0);
+        // AR in a soldier low-ready grip (the walk-cycle arm pose lays both
+        // hands on it — trigger hand at the grip, support hand forward). rot.y=0
+        // so the muzzle (−Z default) points out the body's front (which the +π
+        // world-facing then turns toward travel).
+        wm.position.set(0.12, 1.25, -0.04);
+        wm.rotation.set(-0.07, 0.17, 0.05);
       }
       this.mesh.add(wm);
       this._weaponMesh = wm;
       this._weaponBaseZ = wm.position.z;
       if (!this._isSwordBot) {
-        // Muzzle flash — a bright additive burst at the barrel tip, hidden until
-        // the bot fires (the body faces −Z, so the muzzle is out in front on −Z).
+        // Muzzle flash — a bright additive burst parented to the WEAPON at the
+        // barrel tip, so it tracks the muzzle no matter how the gun is posed.
         const flash = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.12),
+          new THREE.OctahedronGeometry(0.11),
           new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.95,
                                         blending: THREE.AdditiveBlending, depthWrite: false })
         );
-        flash.position.set(0, 1.17, -0.92);   // out at the barrel tip (−Z front)
+        flash.position.set(0, 0.03, -0.72);   // weapon-local barrel tip (−Z)
         flash.visible = false;
         flash.renderOrder = 6;
         flash.raycast = () => {};
-        this.mesh.add(flash);
+        wm.add(flash);
         this._muzzleFlash = flash;
       }
     }
@@ -502,16 +502,16 @@ export class Bot {
         // AR seated in the two-handed grip in front of the chest (the arm grip
         // pose brings both hands onto it). Base pos(0, 1.15, −0.30) rot(−0.15, π).
         // Breathe / bob for life; recoil kicks it back + climbs the muzzle.
-        const alertPX = this._alertBlend * -0.08; // level the barrel a touch when alert
+        const alertPX = this._alertBlend * -0.06; // level the barrel when alert
         wm.position.set(
-          0            + sway * 0.3,
-          1.15         + breathe - bob,
-          this._weaponBaseZ + this._gunKick * 0.07     // recoil kick (−Z is forward)
+          0.12         + sway * 0.3,
+          1.25         + breathe - bob,
+          this._weaponBaseZ + this._gunKick * 0.07     // recoil kick
         );
         wm.rotation.set(
-          -0.15 + alertPX + this._gunKick * 0.22,       // recoil muzzle climb
-          0,
-          sway * 0.5
+          -0.07 + alertPX + this._gunKick * 0.22,       // recoil muzzle climb
+          0.17,
+          0.05 + sway * 0.3
         );
       } else {
         // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
@@ -564,8 +564,10 @@ export class Bot {
       // sway; sword bots free-swing the off-hand.
       if (!this._isSwordBot) {
         const sway = (isMoving ? Math.sin(t) * 0.05 : Math.sin(t * 0.4) * 0.025);
-        L(armR, 0.92 + sway, 9);  Lz(armR, -0.28, 9);  L(elbowR, -1.45, 9);
-        L(armL, 1.05 - sway, 9);  Lz(armL,  0.33, 9);  L(elbowL, -1.55, 9);
+        // Soldier low-ready: trigger hand back on the pistol grip (tucked in),
+        // support hand extended forward on the handguard.
+        L(armR, 0.55 + sway, 9);  Lz(armR, -0.26, 9);  L(elbowR, -1.50, 9);
+        L(armL, 1.22 - sway, 9);  Lz(armL,  0.46, 9);  L(elbowL, -0.98, 9);
       } else if (isMoving) {
         L(armL, -swing * 0.5, 12);  L(armR, swing * 0.5, 12);
         L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
