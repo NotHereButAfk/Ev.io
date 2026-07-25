@@ -17,8 +17,6 @@ export class NetClient {
     this.matchDurationMs = null;
     this.roster = []; // [{id, name, kills, score}], includes self
     this._reconnectDelay = RECONNECT_BASE_MS;
-    this._reconnectTimer = null;
-    this._manualClose = false;
     this._name = 'Recruit';
 
     this.onState = null;     // (matchStart, matchDurationMs, roster) => void
@@ -29,8 +27,7 @@ export class NetClient {
 
   connect() {
     if (!this.enabled) { console.info('[net] no VITE_WS_URL configured — using local-only match simulation'); return; }
-    this._manualClose = false;
-    if (this.ws || this._reconnectTimer) return;
+    if (this.ws) return;
     this._open();
   }
 
@@ -47,41 +44,15 @@ export class NetClient {
     ws.onmessage = (ev) => this._onMessage(ev);
     ws.onclose = () => {
       if (this.connected) console.warn('[net] match server connection lost — retrying in background');
-      this.connected = false;
-      this.ws = null;
-      if (!this._manualClose) this._scheduleReconnect();
+      this.connected = false; this.ws = null; this._scheduleReconnect();
     };
     ws.onerror = () => { try { ws.close(); } catch { /* onclose handles reconnect */ } };
   }
 
   _scheduleReconnect() {
-    if (!this.enabled || this._manualClose || this._reconnectTimer) return;
-    this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = null;
-      if (!this._manualClose) this._open();
-    }, this._reconnectDelay);
+    if (!this.enabled) return;
+    setTimeout(() => this._open(), this._reconnectDelay);
     this._reconnectDelay = Math.min(RECONNECT_MAX_MS, this._reconnectDelay * 1.6);
-  }
-
-  disconnect() {
-    this._manualClose = true;
-    if (this._reconnectTimer) {
-      clearTimeout(this._reconnectTimer);
-      this._reconnectTimer = null;
-    }
-    this.connected = false;
-    this.selfId = null;
-    this.matchStart = null;
-    this.matchDurationMs = null;
-    this.roster = [];
-    const ws = this.ws;
-    this.ws = null;
-    if (!ws) return;
-    ws.onopen = null;
-    ws.onmessage = null;
-    ws.onclose = null;
-    ws.onerror = null;
-    try { ws.close(); } catch { /* no-op */ }
   }
 
   _onMessage(ev) {
