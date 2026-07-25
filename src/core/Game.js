@@ -21,6 +21,7 @@ import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
+import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
@@ -319,6 +320,10 @@ export class Game {
       this.player.applyRecoil(amt);
       // Fire recoil kick on the third-person body model.
       this._playerBody?.userData?.triggerFire?.(Math.min(2, amt * 20));
+      // Shooting shoulders the rifle: hold the aim pose for a beat after the
+      // last shot, and kick the gun back.
+      this._tpsAimHold = 1.1;
+      this._tpsGunKick = 1;
     };
 
     this.grenadeSystem.onExplode = (point, radius, damage) => {
@@ -1174,7 +1179,7 @@ export class Game {
       // rot.y = 0: the muzzle (−Z default) points out the body's −Z front, which
       // the +π world-facing turns toward where the player aims (not backward).
       if (def.kind === 'melee') { wm.position.set(-0.22, 1.06, -0.24); wm.rotation.set(-0.70, 0, 0.22); }
-      else                      { wm.position.set(0.12, 1.25, -0.04);  wm.rotation.set(-0.07, 0.17, 0.05); }
+      else                      { restRifleTransform(wm); }
       this._playerBody.add(wm);
       this._tpsWeaponMesh = wm;
     }
@@ -1228,10 +1233,20 @@ export class Game {
     // seated in front of the chest) when armed with a gun; else free-swing.
     const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
     if (isGun) {
-      // Soldier low-ready: trigger hand back on the grip, support hand forward.
-      const sway = (moving ? Math.sin(t) * 0.05 : Math.sin(this.playTime * 1.4) * 0.02);
-      L(rig.armR, 0.55 + sway, 9);  Lz(rig.armR, -0.26, 9);  L(rig.elbowR, -1.50, 9);
-      L(rig.armL, 1.22 - sway, 9);  Lz(rig.armL,  0.46, 9);  L(rig.elbowL, -0.98, 9);
+      // A real soldier's carry: relaxed = rifle laid diagonally across the chest
+      // (stock in the right shoulder, muzzle down-left); shooting or aiming down
+      // sights shoulders it level. applyRifleCarry() blends the two and keeps
+      // both hands welded to the grip + handguard through the whole range.
+      this._tpsAimHold = Math.max(0, (this._tpsAimHold || 0) - dt);
+      this._tpsGunKick = Math.max(0, (this._tpsGunKick || 0) - dt * 7);
+      const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
+      this._tpsAim = (this._tpsAim || 0) + (wantAim - (this._tpsAim || 0)) * Math.min(1, dt * 8);
+      applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
+        sway:    moving ? Math.sin(t) * 0.05 : Math.sin(this.playTime * 1.4) * 0.02,
+        breathe: Math.sin(this.playTime * (moving ? 3.2 : 1.1)) * 0.018,
+        bob:     moving ? Math.abs(Math.sin(t)) * 0.022 : 0,
+        kick:    this._tpsGunKick,
+      });
     } else if (moving) {
       const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);
       L(rig.armL, -swing * 0.6, 12);  L(rig.armR, swing * 0.6, 12);

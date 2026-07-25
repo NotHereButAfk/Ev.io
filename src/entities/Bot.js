@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
+import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 
 // AR-type ranged stats — sword bots skip shooting entirely.
 // Slower fire + short range: bots are not meant to be a real threat.
@@ -156,12 +157,10 @@ export class Bot {
         wm.position.set(-0.22, 1.06, -0.24);
         wm.rotation.set(-0.70, 0, 0.22);
       } else {
-        // AR in a soldier low-ready grip (the walk-cycle arm pose lays both
-        // hands on it — trigger hand at the grip, support hand forward). rot.y=0
-        // so the muzzle (−Z default) points out the body's front (which the +π
-        // world-facing then turns toward travel).
-        wm.position.set(0.12, 1.25, -0.04);
-        wm.rotation.set(-0.07, 0.17, 0.05);
+        // AR in the soldier's across-the-body patrol carry — stock in the right
+        // shoulder, muzzle angled down-left across the chest. applyRifleCarry()
+        // drives it from here and blends up to a shouldered aim when engaged.
+        restRifleTransform(wm);
       }
       this.mesh.add(wm);
       this._weaponMesh = wm;
@@ -229,8 +228,15 @@ export class Bot {
         this._rig[k]?.rotation.set(0, 0, 0);
       }
     }
-    this._gunKick = 0;
-    if (this._weaponMesh) { this._weaponMesh.position.z = this._weaponBaseZ; this._weaponMesh.rotation.x = this._isSwordBot ? -0.70 : -0.15; }
+    this._gunKick   = 0;
+    this._alertBlend = 0;
+    if (this._isSwordBot) {
+      if (this._weaponMesh) { this._weaponMesh.position.z = this._weaponBaseZ; this._weaponMesh.rotation.x = -0.70; }
+    } else {
+      // Snap (dt=1 ⇒ ease factor 1) straight into the patrol carry so the fresh
+      // body doesn't spend its first frames unfolding out of a T-pose.
+      applyRifleCarry(this._rig, this._weaponMesh, 0, 1);
+    }
     // Phase in on respawn instead of popping into existence. Human bots play
     // the rigged teleport-arrival reform; cyborg/procedural bodies materialise
     // via a fade + settle (see the spawn-in tick in update()).
@@ -499,20 +505,14 @@ export class Bot {
       const wm = this._weaponMesh;
 
       if (!this._isSwordBot) {
-        // AR seated in the two-handed grip in front of the chest (the arm grip
-        // pose brings both hands onto it). Base pos(0, 1.15, −0.30) rot(−0.15, π).
-        // Breathe / bob for life; recoil kicks it back + climbs the muzzle.
-        const alertPX = this._alertBlend * -0.06; // level the barrel when alert
-        wm.position.set(
-          0.12         + sway * 0.3,
-          1.25         + breathe - bob,
-          this._weaponBaseZ + this._gunKick * 0.07     // recoil kick
-        );
-        wm.rotation.set(
-          -0.07 + alertPX + this._gunKick * 0.22,       // recoil muzzle climb
-          0.17,
-          0.05 + sway * 0.3
-        );
+        // Rifle + both arms are driven together so the hands stay ON the gun:
+        // relaxed = the across-the-body patrol carry, engaged = shouldered and
+        // levelled down the body's forward axis. Breathe/bob give it life,
+        // _gunKick shoves it back and climbs the muzzle.
+        applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
+          sway: (isMoving ? Math.sin(this._walkT) * 0.05 : Math.sin(this._walkT * 0.4) * 0.025),
+          breathe, bob, kick: this._gunKick,
+        });
       } else {
         // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
         // Lunge THRUSTS the blade forward (−Z is the front) and dips the tip.
@@ -559,15 +559,11 @@ export class Bot {
         L(kneeL, -0.06, 5); L(kneeR, -0.06, 5);
       }
 
-      // Arms: AR bots hold the rifle in a two-handed grip (both hands come onto
-      // the weapon seated in front of the chest), with a small breathing/stride
-      // sway; sword bots free-swing the off-hand.
+      // Arms: AR bots' arms belong to the rifle — applyRifleCarry() (in the
+      // weapon block above) poses both of them onto the grip and handguard, so
+      // nothing to do here. Sword bots free-swing the off-hand.
       if (!this._isSwordBot) {
-        const sway = (isMoving ? Math.sin(t) * 0.05 : Math.sin(t * 0.4) * 0.025);
-        // Soldier low-ready: trigger hand back on the pistol grip (tucked in),
-        // support hand extended forward on the handguard.
-        L(armR, 0.55 + sway, 9);  Lz(armR, -0.26, 9);  L(elbowR, -1.50, 9);
-        L(armL, 1.22 - sway, 9);  Lz(armL,  0.46, 9);  L(elbowL, -0.98, 9);
+        /* arms owned by applyRifleCarry */
       } else if (isMoving) {
         L(armL, -swing * 0.5, 12);  L(armR, swing * 0.5, 12);
         L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
