@@ -1242,10 +1242,9 @@ export class Game {
       const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
       this._tpsAim = (this._tpsAim || 0) + (wantAim - (this._tpsAim || 0)) * Math.min(1, dt * 8);
       applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
-        sway:    moving ? Math.sin(t) * 0.05 : Math.sin(this.playTime * 1.4) * 0.02,
-        breathe: Math.sin(this.playTime * (moving ? 3.2 : 1.1)) * 0.018,
-        bob:     moving ? Math.abs(Math.sin(t)) * 0.022 : 0,
-        kick:    this._tpsGunKick,
+        swing: moving ? Math.sin(t * 2) * (p.isSprinting ? 0.055 : 0.035)
+                      : Math.sin(this.playTime * 1.1) * 0.018,
+        kick:  this._tpsGunKick,
       });
     } else if (moving) {
       const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);

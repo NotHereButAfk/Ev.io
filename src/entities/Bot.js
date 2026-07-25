@@ -507,11 +507,12 @@ export class Bot {
       if (!this._isSwordBot) {
         // Rifle + both arms are driven together so the hands stay ON the gun:
         // relaxed = the across-the-body patrol carry, engaged = shouldered and
-        // levelled down the body's forward axis. Breathe/bob give it life,
-        // _gunKick shoves it back and climbs the muzzle.
+        // levelled down the body's forward axis. `swing` breathes/rides the
+        // stride, _gunKick shoves it back and climbs the muzzle.
         applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
-          sway: (isMoving ? Math.sin(this._walkT) * 0.05 : Math.sin(this._walkT * 0.4) * 0.025),
-          breathe, bob, kick: this._gunKick,
+          swing: isMoving ? Math.sin(this._walkT * 2) * 0.035    // rides the stride
+                          : Math.sin(this._weaponT * 0.28) * 0.018,  // breathing
+          kick: this._gunKick,
         });
       } else {
         // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
