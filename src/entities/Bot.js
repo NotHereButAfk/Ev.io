@@ -85,6 +85,12 @@ export class Bot {
     this._weaponMesh  = null;
     this._rig         = null;
     this._walkT       = Math.random() * Math.PI * 2; // random phase so bots aren't in sync
+    this._targetYaw   = 0;      // desired facing — smoothed each frame (no snap turns)
+    this._yawInit     = false;
+    this._gunKick     = 0;      // recoil impulse, decays
+    this._muzzleT     = 0;      // muzzle-flash visible timer
+    this._muzzleFlash = null;
+    this._weaponBaseZ = 0;
     // Passive AI: only fights back after being attacked.
     this._provoked     = false;
     this._provokeTimer = 0;
@@ -157,6 +163,22 @@ export class Bot {
       }
       this.mesh.add(wm);
       this._weaponMesh = wm;
+      this._weaponBaseZ = wm.position.z;
+      if (!this._isSwordBot) {
+        // Muzzle flash — a bright additive burst at the barrel tip, hidden until
+        // the bot fires (the body faces −Z, so the muzzle is out in front on −Z).
+        const flash = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.12),
+          new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.95,
+                                        blending: THREE.AdditiveBlending, depthWrite: false })
+        );
+        flash.position.set(0, 1.17, -0.72);
+        flash.visible = false;
+        flash.renderOrder = 6;
+        flash.raycast = () => {};
+        this.mesh.add(flash);
+        this._muzzleFlash = flash;
+      }
     }
   }
 
@@ -199,6 +221,14 @@ export class Bot {
     this._dying = false;
     this.alive = true;
     this.mesh.visible = true;
+    // Clear the death-crumple pose off the rig so the fresh body starts neutral.
+    if (this._rig) {
+      for (const k of ['legL', 'legR', 'kneeL', 'kneeR', 'armL', 'armR', 'elbowL', 'elbowR']) {
+        this._rig[k]?.rotation.set(0, 0, 0);
+      }
+    }
+    this._gunKick = 0;
+    if (this._weaponMesh) { this._weaponMesh.position.z = this._weaponBaseZ; this._weaponMesh.rotation.x = this._isSwordBot ? -0.70 : -0.15; }
     // Phase in on respawn instead of popping into existence. Human bots play
     // the rigged teleport-arrival reform; cyborg/procedural bodies materialise
     // via a fade + settle (see the spawn-in tick in update()).
@@ -229,8 +259,16 @@ export class Bot {
       if (this._raycaster.intersectObjects(wMeshes, true).length) return; // blocked by wall
     }
 
-    // Fire recoil animation on rigged humans (procedural bots skip).
+    // Fire feedback: rigged humans use their skeletal recoil; cyborg/procedural
+    // bots get a weapon recoil kick + a muzzle flash (driven in update()).
     this.mesh?.userData?.triggerFire?.(1);
+    this._gunKick = 1;
+    this._muzzleT = 0.05;
+    if (this._muzzleFlash) {
+      this._muzzleFlash.visible = true;
+      this._muzzleFlash.rotation.set(0, 0, Math.random() * Math.PI);
+      this._muzzleFlash.scale.setScalar(0.75 + Math.random() * 0.6);
+    }
 
     // Hit probability falls off with distance
     const hitP = this._accuracy * Math.max(0.1, 1 - dist / (this._botGun.range * 1.5));
@@ -241,14 +279,25 @@ export class Bot {
     // ── death animation ──────────────────────────────────────────────────────
     if (this._dying) {
       this._deathT += dt;
-      const p = Math.min(1, this._deathT / 0.65);
+      const p = Math.min(1, this._deathT / 0.72);
       const eased = p * p;
+      // Legs buckle first (knees give out) and the arms go limp, then the body
+      // topples sideways and sinks — a crumple, not a rigid plank tipping over.
+      if (this._rig) {
+        const buckle = Math.min(1, p * 2.0);
+        if (this._rig.kneeL)  this._rig.kneeL.rotation.x  = -1.2 * buckle;
+        if (this._rig.kneeR)  this._rig.kneeR.rotation.x  = -1.2 * buckle;
+        if (this._rig.legL)   this._rig.legL.rotation.x   =  0.35 * buckle;
+        if (this._rig.legR)   this._rig.legR.rotation.x   =  0.35 * buckle;
+        if (this._rig.armL)   this._rig.armL.rotation.x   = -0.25 * buckle;
+        if (this._rig.armR)   this._rig.armR.rotation.x   = -0.25 * buckle;
+      }
       this.mesh.rotation.z = eased * (Math.PI / 2) * this._deathSide;
-      this.mesh.rotation.x = eased * 0.25;
-      this.mesh.position.y = this._deathBaseY - eased * 0.55;
-      if (p > 0.55) {
-        const fade = 1 - (p - 0.55) / 0.45;
-        this.mesh.traverse(o => { if (o.isMesh && o.material) {
+      this.mesh.rotation.x = eased * 0.3;
+      this.mesh.position.y = this._deathBaseY - eased * 0.5 - Math.min(0.16, p * 0.28);  // knees sink
+      if (p > 0.58) {
+        const fade = 1 - (p - 0.58) / 0.42;
+        this.mesh.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material) {
           o.material.transparent = true;
           o.material.opacity = fade;
         }});
@@ -258,7 +307,7 @@ export class Bot {
         this.mesh.visible = false;
         this.mesh.rotation.set(0, 0, 0);
         this.mesh.position.y = this._deathBaseY;
-        this.mesh.traverse(o => { if (o.isMesh && o.material) {
+        this.mesh.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material) {
           o.material.transparent = false; o.material.opacity = 1;
         }});
         if (!this.noRespawn) this.respawnTimer = RESPAWN_DELAY;
@@ -301,13 +350,10 @@ export class Bot {
       this.bodyMat.emissiveIntensity = 0;
     }
 
-    if (this.lungeTimer > 0) {
-      this.lungeTimer -= dt;
-      const s = 1 + Math.sin((this.lungeTimer / 0.2) * Math.PI) * 0.12;
-      this.mesh.scale.setScalar(s);
-    } else {
-      this.mesh.scale.setScalar(1);
-    }
+    // Melee lunge timer — the swing is conveyed by the weapon thrust (weapon
+    // animation block) rather than a whole-body scale "puff", which also freed
+    // mesh.scale for the respawn materialize.
+    if (this.lungeTimer > 0) this.lungeTimer -= dt;
 
     this._toPlayer.set(player.position.x - this.position.x, 0, player.position.z - this.position.z);
     const toPlayer = this._toPlayer;
@@ -332,9 +378,9 @@ export class Bot {
       // Procedural / cyborg bodies are built with their FRONT on −Z, but the
       // game's forward is +Z — so add π to face the model's front at the target
       // (otherwise it walks + aims backward). Human soldier front is already +Z.
-      this.mesh.rotation.y = Math.atan2(player.position.x - this.position.x,
-                                        player.position.z - this.position.z)
-                             + (this._isHuman ? 0 : Math.PI);
+      this._targetYaw = Math.atan2(player.position.x - this.position.x,
+                                   player.position.z - this.position.z)
+                        + (this._isHuman ? 0 : Math.PI);
       if (distToPlayer > ATTACK_RADIUS * 0.85) {
         moveTarget = toPlayer.normalize();
         // AR bots shoot while closing in; sword bots only melee
@@ -360,9 +406,9 @@ export class Bot {
       this._wanderDir.subVectors(this.wanderTarget, this.position);
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
-        this.mesh.rotation.y = Math.atan2(this.wanderTarget.x - this.position.x,
-                                          this.wanderTarget.z - this.position.z)
-                               + (this._isHuman ? 0 : Math.PI);
+        this._targetYaw = Math.atan2(this.wanderTarget.x - this.position.x,
+                                     this.wanderTarget.z - this.position.z)
+                          + (this._isHuman ? 0 : Math.PI);
       }
     }
 
@@ -372,6 +418,22 @@ export class Bot {
     }
 
     this.mesh.position.set(this.position.x, this.position.y, this.position.z);
+
+    // Smooth turn toward the desired facing — no more instant snap-arounds.
+    if (this._yawInit) {
+      let d = this._targetYaw - this.mesh.rotation.y;
+      d = ((d + Math.PI) % (Math.PI * 2)) - Math.PI;   // shortest way round
+      this.mesh.rotation.y += d * Math.min(1, dt * 9);
+    } else { this.mesh.rotation.y = this._targetYaw; this._yawInit = true; }
+
+    // Recoil impulse decays (the weapon-anim block below applies the kick to the
+    // gun); the muzzle flash flares out and hides.
+    if (this._gunKick > 0) this._gunKick = Math.max(0, this._gunKick - dt * 7);
+    if (this._muzzleT > 0) {
+      this._muzzleT -= dt;
+      if (this._muzzleFlash) this._muzzleFlash.scale.multiplyScalar(1 + dt * 6);
+      if (this._muzzleT <= 0 && this._muzzleFlash) this._muzzleFlash.visible = false;
+    }
 
     if (this.healthBarGroup) {
       const localQuat = this.mesh.quaternion.clone().invert().multiply(camera.quaternion);
@@ -435,37 +497,31 @@ export class Bot {
       const wm = this._weaponMesh;
 
       if (!this._isSwordBot) {
-        // AR rifle animation
-        // Low-ready base:  pos(-0.40, 0.92, 0.02)  rot(-0.35, π, 0.14)
-        // High-ready alert: raise +0.10 Y, pitch up by 0.28 (barrel levels to horizon)
-        const alertY   = this._alertBlend * 0.10;
-        const alertPX  = this._alertBlend * -0.28; // negative = barrel pitches up
-        const lungeZ   = isLunging ? 0.06 : 0;    // thrust forward on melee lunge
-
+        // AR seated in the two-handed grip in front of the chest (the arm grip
+        // pose brings both hands onto it). Base pos(0, 1.15, −0.30) rot(−0.15, π).
+        // Breathe / bob for life; recoil kicks it back + climbs the muzzle.
+        const alertPX = this._alertBlend * -0.08; // level the barrel a touch when alert
         wm.position.set(
-          -0.40 + sway * 0.4,
-          0.92  + breathe + alertY - bob,
-          0.02  + lungeZ
+          0            + sway * 0.3,
+          1.15         + breathe - bob,
+          this._weaponBaseZ + this._gunKick * 0.07     // recoil kick (−Z is forward)
         );
         wm.rotation.set(
-          -0.35 + alertPX,
+          -0.15 + alertPX + this._gunKick * 0.22,       // recoil muzzle climb
           Math.PI,
-          0.14 + sway
+          sway * 0.5
         );
       } else {
-        // Sword animation
-        // Low guard base:  pos(-0.38, 1.00, 0.02)  rot(-0.70, π, 0.22)
-        // High guard alert: raise +0.08 Y, rotate wrist to bring blade more forward (−0.20 X)
-        const alertY   = this._alertBlend * 0.08;
-        const alertPX  = this._alertBlend * -0.20;
-        // Lunge: extend arm forward and lower tip toward target
-        const lungeZ   = isLunging ? 0.14 : 0;
-        const lungePX  = isLunging ? 0.30 : 0; // tip dips on thrust
-
+        // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
+        // Lunge THRUSTS the blade forward (−Z is the front) and dips the tip.
+        const alertY   = this._alertBlend * 0.06;
+        const alertPX  = this._alertBlend * -0.18;
+        const lungeZ   = isLunging ? -0.16 : 0;
+        const lungePX  = isLunging ?  0.35 : 0;
         wm.position.set(
-          -0.38 + sway * 0.3,
-          1.00  + breathe * 1.3 + alertY - bob * 0.8,
-          0.02  + lungeZ
+          -0.22 + sway * 0.3,
+          1.06  + breathe * 1.3 + alertY - bob * 0.8,
+          -0.24 + lungeZ
         );
         wm.rotation.set(
           -0.70 + alertPX + lungePX,
