@@ -210,11 +210,13 @@ export class Game {
     this._wireMenu();
     // Auth is deferred until after the connect sequence
 
-    this.canvas.addEventListener('click', () => {
+    this._onCanvasClick = () => {
       this.audio.resume();
       if (this._menuOpen) this._resume();
-    });
-    window.addEventListener('resize', () => this._onResize());
+    };
+    this._onWindowResize = () => this._onResize();
+    this.canvas.addEventListener('click', this._onCanvasClick);
+    window.addEventListener('resize', this._onWindowResize);
     this.input.onLockChange = (locked) => {
       // Losing pointer lock (e.g. pressing ESC) opens the in-match menu, but the
       // match keeps simulating in the background — this is a multiplayer game.
@@ -228,7 +230,15 @@ export class Game {
   // Release all global event listeners and cancel the render loop.
   dispose() {
     cancelAnimationFrame(this._rafId);
+    clearTimeout(this._connectTimer1);
+    clearTimeout(this._connectTimer2);
+    this._hideMapLoading();
+    this._clearRespawnTimer();
+    this.canvas.removeEventListener('click', this._onCanvasClick);
+    window.removeEventListener('resize', this._onWindowResize);
+    this.input.onLockChange = null;
     this.input.dispose();
+    this.net?.disconnect?.();
     this.renderer.dispose();
     this.botManager.clear();
     this.zombieManager.clear();
@@ -239,9 +249,9 @@ export class Game {
   // ev.io-style boot flow: pulsating logo → map-loading card (map name) → GUI.
   _runConnectSequence() {
     const screen = document.getElementById('connect-screen');
-    setTimeout(() => {
+    this._connectTimer1 = setTimeout(() => {
       screen.classList.add('fade-out');
-      setTimeout(() => {
+      this._connectTimer2 = setTimeout(() => {
         screen.classList.add('hidden');
         this._runMapIntro();
       }, 700);
@@ -879,6 +889,11 @@ export class Game {
     document.getElementById('map-loading')?.classList.add('hidden');
   }
 
+  _clearRespawnTimer() {
+    clearTimeout(this._respawnTimer);
+    this._respawnTimer = null;
+  }
+
   _openMenu() {
     this._menuOpen = true;
     this.mobileControls?.hide();
@@ -886,6 +901,7 @@ export class Game {
   }
 
   _quitToMenu() {
+    this._clearRespawnTimer();
     if (this.state === 'playing' || this.state === 'leaderboard') this._saveStats();
     this._lbTimer = Infinity; // cancel any pending auto-restart
     this._hideMapLoading();
@@ -916,6 +932,7 @@ export class Game {
   }
 
   _restart() {
+    this._clearRespawnTimer();
     this._saveStats();
     this.hud.hideLeaderboard();
     this.menu.hideGameOver();
@@ -958,7 +975,9 @@ export class Game {
 
     // Deathmatch: respawn immediately (infinite lives)
     if (this._isDM) {
-      setTimeout(() => {
+      this._clearRespawnTimer();
+      this._respawnTimer = setTimeout(() => {
+        this._respawnTimer = null;
         this.player.respawn(SPAWN_POINT);
         this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
         this._resetLoadoutHud();   // drop any picked-up power weapon
@@ -971,7 +990,9 @@ export class Game {
     if (this._mode?.lives !== Infinity) {
       this._lives = Math.max(0, this._lives - 1);
       if (this._lives > 0 && this._mode?.waves) {
-        setTimeout(() => {
+        this._clearRespawnTimer();
+        this._respawnTimer = setTimeout(() => {
+          this._respawnTimer = null;
           this.player.respawn(SPAWN_POINT);
           this._resetLoadoutHud();   // drop any picked-up power weapon
           this._refreshModeHUD();
@@ -983,6 +1004,7 @@ export class Game {
   }
 
   _endGame(title, subtitle = '') {
+    this._clearRespawnTimer();
     this._saveStats();
     this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
