@@ -2824,8 +2824,25 @@ export class World {
 
     // Vertical shortcuts echo ev.io's ability-driven movement without forcing
     // them: grav lifts land on the two bridge routes, while ramps remain primary.
-    this._gravLift(0, -42, 9, 15);
-    this._gravLift(0,  42, 9, 15);
+    const lift = (x, z) => {
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.35, 0.34, 20), inset);
+      pad.position.set(x, 0.17, z);
+      pad.receiveShadow = true;
+      this.scene.add(pad);
+      for (const y of [0.38, 3.2, 6.0, 8.75]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.09, 8, 24), cyan);
+        ring.position.set(x, y, z);
+        ring.rotation.x = Math.PI / 2;
+        ring.userData.noHit = true;
+        this.scene.add(ring);
+      }
+      for (const [ox, oz] of [[1.8,0],[-1.8,0],[0,1.8],[0,-1.8]]) {
+        decor(x + ox, 4.5, z + oz, 0.18, 8.5, 0.18, concrete);
+      }
+      this.gravLifts.push({ x, z, r: 1.9, topY: 9, power: 15 });
+    };
+    lift(0, -42);
+    lift(0,  42);
   }
 
   _buildMall() {
