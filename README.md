@@ -6,6 +6,21 @@ plugin, no download — it runs in a tab.
 Live at **[kyrx.live](https://kyrx.live)**, deployed automatically on every push
 to `main`.
 
+| | |
+|---|---|
+| ![Menu](docs/screenshots/menu.png) | ![First person](docs/screenshots/first-person.png) |
+| *Menu — the arena fly-through* | *Free For All, first person* |
+| ![Third person](docs/screenshots/third-person.png) | ![Combat](docs/screenshots/combat.png) |
+| *Third person — the same rig other players see* | *An opponent on the concourse* |
+
+These are captured from a real match, not mocked up. Regenerate them after any
+visual change:
+
+```bash
+npx vite --port 5994 --host 127.0.0.1 --strictPort &
+node tools/screenshots.mjs
+```
+
 ---
 
 ## Run it

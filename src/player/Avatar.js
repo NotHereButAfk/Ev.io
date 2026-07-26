@@ -110,8 +110,12 @@ export class Avatar {
     const moving   = speed > 0.6 && grounded;
     const run = s.sprint ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
 
-    // Facing. Snap on the first frame so a fresh avatar doesn't spin into place.
-    const yaw = (s.yaw || 0) + (this.isHuman ? 0 : Math.PI);
+    // Facing. `yaw` is a CAMERA yaw (the server relays the client's look yaw),
+    // and a three.js camera looks down −Z — so the direction being described is
+    // −(sin yaw, cos yaw). A cyborg body is modelled front-on-−Z and takes it
+    // unchanged; the human soldier faces +Z and needs the π.
+    // Snap on the first frame so a fresh avatar doesn't spin into place.
+    const yaw = (s.yaw || 0) + (this.isHuman ? Math.PI : 0);
     if (!this._yawInit) { g.rotation.y = yaw; this._yawInit = true; }
     else {
       let d = yaw - g.rotation.y;

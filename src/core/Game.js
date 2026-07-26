@@ -1173,12 +1173,17 @@ export class Game {
       this._playerBody.visible = inTPS;
       if (inTPS) {
         this._playerBody.position.copy(this.player.position);
-        // Face the direction the player is aiming/moving, so the camera
-        // (which sits behind the player) sees the character's back.
-        // Procedural / cyborg bodies face −Z by construction; the game's forward
-        // is +Z, so add π (human soldier already faces +Z).
+        // Face the way the camera looks, so from behind you see the character's
+        // BACK. Note the player's yaw is a CAMERA yaw: three.js cameras look
+        // down their own −Z, so the view direction is −(sin yaw, cos yaw), and
+        // Player.update moves along it via `-moveZ`. A cyborg body is modelled
+        // front-on-−Z, which is the same axis, so it takes the yaw unchanged;
+        // the human soldier faces +Z and needs the π.
+        //
+        // Bots are the opposite way round and correctly keep their +π: their
+        // _targetYaw is atan2 of a MOVEMENT vector, not a camera yaw.
         this._playerBody.rotation.y = this.player.yaw
-          + (this._playerBody.userData?.isHuman ? 0 : Math.PI);
+          + (this._playerBody.userData?.isHuman ? Math.PI : 0);
         this._syncTpsWeapon();
         this._animatePlayerBody(dt);
       }
