@@ -29,8 +29,17 @@ before committing. This is how foot planting, hand-to-grip error, bot hit
 rates and weapon-vs-body penetration were all measured — if you change any of
 those, measure them again rather than eyeballing a screenshot.
 
-The full game does **not** boot reliably under swiftshader. Don't conclude
-your change is broken from that; probe the module directly instead.
+The full game **does** boot headlessly under swiftshader — verified. Load `/`,
+`document.querySelector('#auth-guest-btn').click()`, then `#play-btn` (use a JS
+`.click()`; Playwright's actionability check hangs on the canvas overlay). The
+HUD comes up in ~10s. One gotcha: headless never grants pointer lock, so
+`onLockChange(false)` fires and re-opens the pause nav over the match — hide
+`#top-nav`, `#nav-side`, `#share-game`, `#social-icons`, `#center-play` and set
+`game._menuOpen = false` after each interaction, or you're screenshotting the
+menu instead of the game.
+
+`window.__game` is the live Game instance, so you can teleport the player, set
+`_camDist` for third person, or change renderer settings between screenshots.
 
 ---
 
