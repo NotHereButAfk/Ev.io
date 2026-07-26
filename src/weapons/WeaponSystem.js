@@ -206,9 +206,12 @@ export class WeaponSystem {
     this.gloveMat = new THREE.MeshStandardMaterial({
       color: 0x191c22, roughness: 0.52, metalness: 0.12, envMapIntensity: 1.0
     });
-    const gloveSeam = new THREE.MeshStandardMaterial({
+    // Cuff ring — this is where the character's accent colour goes (see
+    // setSkin). Kept as an instance field so the tint can reach it.
+    this.cuffMat = new THREE.MeshStandardMaterial({
       color: 0x0c0e12, roughness: 0.6, metalness: 0.08
     });
+    const gloveSeam = this.cuffMat;
 
     const bx = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     const cy = (r1, r2, h, mat, segs = 12) => {
@@ -280,9 +283,23 @@ export class WeaponSystem {
     this.armGroup = arm;
   }
 
+  /**
+   * Tint the first-person arm to the player's character.
+   *
+   * The sleeve takes the character's SECONDARY (the undersuit / frame), not the
+   * primary. Primary is the armour-plate colour, and on the current chassis
+   * that is near-white (0xe9edf2) — which turned the whole forearm into a
+   * bright white tube filling the corner of the screen. It also overwrote the
+   * dark sleeve the viewmodel was authored with, a 4.5x jump in brightness.
+   * On the actual character the forearm is a dark frame with a plate strapped
+   * over it, so the accent belongs on the cuff, not the whole limb.
+   */
   setSkin(skin) {
-    this.sleeveMat.color.setHex(skin.primary);
-    this.gloveMat.color.setHex(skin.secondary);
+    this.sleeveMat.color.setHex(skin.secondary);
+    this.cuffMat?.color.setHex(skin.primary);      // accent ring only
+    // Glove keeps its authored near-black; nudge it toward the undersuit so it
+    // still reads as part of the same outfit.
+    this.gloveMat.color.setHex(skin.secondary).multiplyScalar(0.45);
   }
 
   /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
