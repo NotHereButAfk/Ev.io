@@ -265,13 +265,16 @@ export class Bot {
     if (dist < 0.5) return;
     this._shootDir.subVectors(this._shootTarget, this._shootFrom).normalize();
 
-    // Line-of-sight check against world geometry
+    // Line-of-sight check against world geometry. Collider VISUALS get a mesh
+    // raycast; the map's bare box colliders (trees, kiosks, benches, escalators
+    // — most of the mall's cover) need their own ray/AABB test, or bots shoot
+    // straight through everything you'd think to hide behind.
     if (world?.colliders?.length) {
       this._raycaster.near = 0.2;
       this._raycaster.far  = dist - 0.5;
       this._raycaster.set(this._shootFrom, this._shootDir);
-      const wMeshes = world.colliders.map(c => c.mesh).filter(Boolean);
-      if (this._raycaster.intersectObjects(wMeshes, true).length) return; // blocked by wall
+      if (this._raycaster.intersectObjects(world.raycastMeshes, true).length) return;
+      if (world.raycastBoxHit(this._raycaster.ray, this._raycaster.far)) return;
     }
 
     // Fire feedback: rigged humans use their skeletal recoil; cyborg/procedural

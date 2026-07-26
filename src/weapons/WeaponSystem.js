@@ -7,6 +7,10 @@ import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 const TRACER_LIFE = 0.07;
 const FLASH_LIFE = 0.05;
 
+// Stand-in "object" for a hit on one of the map's bare box colliders — it has
+// no mesh, but the hit-handling code only ever reads userData off it.
+const _BOX_OBJ = { userData: {} };
+
 // ── smoothing helpers ───────────────────────────────────────────────────────
 // Frame-rate-INDEPENDENT exponential smoothing: the result is identical at any
 // framerate (unlike `x += (t-x)*k*dt`, which jitters when dt varies). `lambda`
@@ -123,6 +127,7 @@ export class WeaponSystem {
     this._pelletDir   = new THREE.Vector3();
     this._farVec      = new THREE.Vector3();
     this._raycaster   = new THREE.Raycaster();
+    this._targets     = [];   // reused raycast target list (no per-shot allocation)
 
     // Shared shell casing geo/mat — created once, reused by every ejected casing
     this._shellGeo = new THREE.CylinderGeometry(0.0048, 0.0035, 0.02, 6);
@@ -654,7 +659,13 @@ export class WeaponSystem {
     this.models.get(def.id).muzzle.getWorldPosition(this._muzzleWorld);
 
     this._raycaster.far = def.range;
-    const targets = [...botMeshes, ...world.colliders.map((c) => c.mesh)];
+    // Bots + collider VISUALS get an exact mesh raycast; the map's bare box
+    // colliders are checked separately (world.raycastBoxHit) and the nearer of
+    // the two wins.
+    this._targets.length = 0;
+    for (const m of botMeshes) this._targets.push(m);
+    for (const m of world.raycastMeshes) this._targets.push(m);
+    const targets = this._targets;
 
     const pelletCount = def.pellets || 1;
     let anyHitBot = false;
@@ -669,7 +680,13 @@ export class WeaponSystem {
       }
       this._raycaster.set(this._camPos, this._pelletDir);
       const hits = this._raycaster.intersectObjects(targets, true);
-      const hit = hits.find((h) => !h.object.userData.noHit);
+      let hit = hits.find((h) => !h.object.userData.noHit);
+      // A bare box in front of the mesh hit blocks the shot (and if nothing was
+      // hit at all, the box IS the hit) — cover you can see now stops bullets.
+      const boxHit = world.raycastBoxHit(this._raycaster.ray, def.range);
+      if (boxHit && (!hit || boxHit.distance < hit.distance)) {
+        hit = { point: boxHit.point, distance: boxHit.distance, object: _BOX_OBJ };
+      }
       if (hit) {
         lastImpact = hit.point;
         const bot = hit.object.userData.bot;
@@ -765,7 +782,7 @@ export class WeaponSystem {
 
   _updateThrownKnives(dt, world, botManager) {
     if (!this.thrownKnives.length) return;
-    const worldMeshes = world.colliders.map((c) => c.mesh);
+    const worldMeshes = world.raycastMeshes;
     const botMeshes = botManager.getRaycastTargets();
     const ray = new THREE.Raycaster();
     const spinAxis = new THREE.Vector3(1, 0, 0);
@@ -784,6 +801,11 @@ export class WeaponSystem {
         .intersectObjects([...botMeshes, ...worldMeshes], true)
         .filter((h) => !h.object.userData.noHit);
       if (hits.length) { hitPoint = hits[0].point; hitBot = hits[0].object.userData.bot; }
+      // Bare box colliders stick the knife too (and win if they're nearer).
+      const kBox = world.raycastBoxHit(ray.ray, ray.far);
+      if (kBox && (!hitPoint || kBox.distance < hits[0].distance)) {
+        hitPoint = kBox.point; hitBot = null;
+      }
 
       const oob = Math.abs(k.pos.x) > world.arenaHalf || Math.abs(k.pos.z) > world.arenaHalf;
       if (!hitPoint && (k.pos.y <= 0.05 || oob || k.life <= 0)) hitPoint = k.pos.clone();
@@ -848,7 +870,7 @@ export class WeaponSystem {
 
   _updateRockets(dt, world, botManager) {
     if (!this.rockets.length) return;
-    const worldMeshes = world.colliders.map((c) => c.mesh);
+    const worldMeshes = world.raycastMeshes;
     const botMeshes = botManager.getRaycastTargets();
     const ray = new THREE.Raycaster();
 
@@ -866,6 +888,9 @@ export class WeaponSystem {
         .intersectObjects([...worldMeshes, ...botMeshes], true)
         .filter((h) => !h.object.userData.noHit);
       if (hits.length) hitPoint = hits[0].point;
+      // Bare box colliders detonate the rocket too (nearest hit wins).
+      const rBox = world.raycastBoxHit(ray.ray, ray.far);
+      if (rBox && (!hitPoint || rBox.distance < hits[0].distance)) hitPoint = rBox.point;
 
       const outOfBounds = Math.abs(r.pos.x) > world.arenaHalf || Math.abs(r.pos.z) > world.arenaHalf;
       if (!hitPoint && (r.pos.y <= 0.05 || outOfBounds)) hitPoint = r.pos.clone();

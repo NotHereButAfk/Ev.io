@@ -4,6 +4,8 @@ import { GameSettings } from '../core/GameSettings.js';
 const ARENA_HALF = 62;
 const TAXI_YELLOW = 0xffcf3d;
 
+const _boxHit = new THREE.Vector3();   // scratch for raycastBoxHit()
+
 // ---------------------------------------------------------------------------
 // Procedural textures
 // ---------------------------------------------------------------------------
@@ -3988,6 +3990,50 @@ export class World {
 
   randomSpawnPoint() {
     return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)].clone();
+  }
+
+  // ── Shooting against the world ──────────────────────────────────────────────
+  // A collider is either backed by a visual (`mesh`) or is a bare box — most of
+  // the mall's cover (trees, benches, kiosks, escalator volumes, railings) is
+  // the latter. The two are complementary and must be tested differently:
+  // meshes get an exact raycast, bare boxes get a ray/AABB test. Feeding a bare
+  // collider's null mesh to Raycaster.intersectObjects() throws, which is what
+  // made every shot fail after this map landed.
+
+  /** Collider meshes, for Raycaster.intersectObjects(). Built once — static. */
+  get raycastMeshes() {
+    if (!this._raycastMeshes) {
+      this._raycastMeshes = this.colliders.map((c) => c.mesh).filter(Boolean);
+    }
+    return this._raycastMeshes;
+  }
+
+  /** Bare (mesh-less) collider boxes, so they still stop bullets. */
+  get raycastBoxes() {
+    if (!this._raycastBoxes) {
+      this._raycastBoxes = this.colliders.filter((c) => !c.mesh).map((c) => c.box);
+    }
+    return this._raycastBoxes;
+  }
+
+  /**
+   * Nearest bare-box hit along a ray, or null.
+   * @param {THREE.Ray} ray
+   * @param {number} far  max distance to consider
+   * @returns {{point: THREE.Vector3, distance: number}|null}
+   */
+  raycastBoxHit(ray, far = Infinity) {
+    let best = null;
+    for (const box of this.raycastBoxes) {
+      // If the shooter is standing inside a box, intersectBox reports the far
+      // EXIT face — which would swallow the shot. Ignore boxes we're already in.
+      if (box.containsPoint(ray.origin)) continue;
+      const p = ray.intersectBox(box, _boxHit);
+      if (!p) continue;
+      const d = ray.origin.distanceTo(p);
+      if (d <= far && (!best || d < best.distance)) best = { point: p.clone(), distance: d };
+    }
+    return best;
   }
 
   /** Resolve horizontal collisions for the player/bot capsule against box colliders. */

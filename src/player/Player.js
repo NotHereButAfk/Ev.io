@@ -245,16 +245,14 @@ export class Player {
       this.camera.getWorldDirection(camDir);
 
       const raycaster = new THREE.Raycaster(camPos, camDir, 0.1, TELEPORT_RANGE);
-      const meshes = world.colliders.map((c) => c.mesh).filter(Boolean);
-      const hits = raycaster.intersectObjects(meshes, true);
+      const hits = raycaster.intersectObjects(world.raycastMeshes, true);
+      // Bare box colliders stop the blink too, so you can't jump into a tree.
+      const boxHit = world.raycastBoxHit(raycaster.ray, TELEPORT_RANGE);
+      let blockAt = hits.length ? hits[0].distance : Infinity;
+      if (boxHit) blockAt = Math.min(blockAt, boxHit.distance);
 
-      let destEye;
-      if (hits.length > 0) {
-        const safeDist = Math.max(0.1, hits[0].distance - 0.9);
-        destEye = camPos.clone().addScaledVector(camDir, safeDist);
-      } else {
-        destEye = camPos.clone().addScaledVector(camDir, TELEPORT_RANGE);
-      }
+      const destEye = camPos.clone().addScaledVector(
+        camDir, blockAt === Infinity ? TELEPORT_RANGE : Math.max(0.1, blockAt - 0.9));
       // Eye → foot position, clamped to ground
       destEye.y -= EYE_HEIGHT;
       destEye.y = Math.max(0, destEye.y);
