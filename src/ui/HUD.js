@@ -290,7 +290,7 @@ export class HUD {
   }
 
   // Post-match leaderboard (outside #hud, so hud.hide() won't touch it).
-  showLeaderboard(rows, playerName, earnedCoins = 0) {
+  showLeaderboard(rows, playerName, earnedCoins = 0, stats = {}) {
     const overlay = document.getElementById('leaderboard-overlay');
     const tbody   = document.getElementById('lb-rows');
     if (!overlay || !tbody) return;
@@ -302,6 +302,36 @@ export class HUD {
     if (winEl && winner) winEl.textContent = winner.name;
     const earnedEl = document.getElementById('lb-earned-val');
     if (earnedEl) earnedEl.textContent = earnedCoins.toLocaleString();
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+    const mins = Math.floor((stats.playTime || 0) / 60);
+    const secs = Math.floor(stats.playTime || 0) % 60;
+    setText('lb-stat-accuracy', `${(stats.accuracy || 0).toFixed(1)}%`);
+    setText('lb-stat-damage', Math.round(stats.damageDealt || 0).toLocaleString());
+    setText('lb-stat-shots', `${stats.shotsFired || 0} / ${stats.hits || 0}`);
+    setText('lb-stat-headshots', stats.headshots || 0);
+    setText('lb-stat-streak', stats.bestStreak || 0);
+    setText('lb-stat-time', `${mins}:${String(secs).padStart(2, '0')}`);
+
+    const views = {
+      leaderboard: document.getElementById('lb-leaderboard-view'),
+      earn: document.getElementById('lb-earn-view'),
+      performance: document.getElementById('lb-performance-view'),
+    };
+    const tabs = overlay.querySelectorAll('[data-lb-tab]');
+    const selectTab = (name) => {
+      Object.entries(views).forEach(([key, view]) => view?.classList.toggle('hidden', key !== name));
+      tabs.forEach((tab) => {
+        const active = tab.dataset.lbTab === name;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+    };
+    tabs.forEach((tab) => { tab.onclick = () => selectTab(tab.dataset.lbTab); });
+    selectTab('leaderboard');
 
     rows.forEach((row, i) => {
       const rank   = i + 1;
