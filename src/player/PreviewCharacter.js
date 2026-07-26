@@ -438,6 +438,12 @@ const _LEG_FT = /boot|sole|foot|toe|ankle/i;
 export function rigCharacterLimbs(group) {
   try {
     group.updateWorldMatrix(true, true);
+    // Work in the GROUP's local space, not world space. Limbs are bucketed
+    // left/right by their x, and callers rig AFTER placing the character — so
+    // reading world positions meant a bot spawned at x=24 had every limb land
+    // in the "right" bucket, the left ones came up empty, and rigging returned
+    // null. Only characters standing near x=0 ever rigged.
+    const _toLocal = new THREE.Matrix4().copy(group.matrixWorld).invert();
 
     const meshes = [];
     group.traverse((o) => { if (o.isMesh && o.name) meshes.push(o); });
@@ -451,7 +457,7 @@ export function rigCharacterLimbs(group) {
     };
     const wp = new THREE.Vector3();
     for (const m of meshes) {
-      m.getWorldPosition(wp);
+      m.getWorldPosition(wp).applyMatrix4(_toLocal);
       const side = wp.x < 0 ? 'L' : 'R';
       if (_ARM_RE.test(m.name) && Math.abs(wp.x) > 0.12) {
         buckets['arm' + side][_ARM_LO.test(m.name) ? 'lo' : 'up'].push(m);
@@ -470,7 +476,7 @@ export function rigCharacterLimbs(group) {
       const all = [...parts.up, ...parts.lo, ...ft];
       if (all.length < 2) return null;
       let ax = 0;
-      for (const m of all) { m.getWorldPosition(wp); ax += wp.x; }
+      for (const m of all) { m.getWorldPosition(wp).applyMatrix4(_toLocal); ax += wp.x; }
       ax /= all.length;
       const root = new THREE.Group();
       root.position.set(ax, rootY, 0);

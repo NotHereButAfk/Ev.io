@@ -131,12 +131,11 @@ export class Avatar {
     }
     if (!this.rig) { g.position.copy(s.position); return; }
 
-    this._walkT += dt * (moving ? Math.max(2, speed) * 1.5 : 1.2);
     this._crouch += ((s.crouch ? 1 : 0) - this._crouch) * Math.min(1, dt * 10);
 
-    const gait = applyWalkCycle(this.rig, {
-      t: this._walkT, moving, run, crouch: this._crouch, dt,
-    });
+    // The stride phase is owned by applyWalkCycle and derived from `speed`.
+    const gait = applyWalkCycle(this.rig, { speed, moving, run, crouch: this._crouch, dt });
+    this._walkT = gait.phase;
     g.position.set(s.position.x, s.position.y + gait.bob, s.position.z);
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
 

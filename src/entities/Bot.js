@@ -607,13 +607,13 @@ export class Bot {
     let gait = _STILL;
     if (this._rig) {
       const isMoving = !!moveTarget;
-      // Advance walk timer proportional to movement speed (mirrors player bobTime)
-      this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
       // Bots move at 2.6-3.8 m/s — a walk to a jog, nowhere near the player's
       // 9.6 m/s sprint. Mapping that narrow band onto the full walk→sprint
       // blend had every bot leaning into a full sprint while ambling.
       const run = THREE.MathUtils.clamp((this.speed - 3.0) / 3.0, 0, 1);
-      gait = applyWalkCycle(this._rig, { t: this._walkT, moving: isMoving, run, dt });
+      // applyWalkCycle owns the stride phase and locks it to ground speed.
+      gait = applyWalkCycle(this._rig, { speed: isMoving ? this.speed : 0, moving: isMoving, run, dt });
+      this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so
       // you can hear someone coming up behind you.
       if (isMoving && this.audio) {

@@ -1307,7 +1307,7 @@ export class Game {
     const run = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
     this._tpsCrouch = (this._tpsCrouch || 0) +
       ((p.isCrouching ? 1 : 0) - (this._tpsCrouch || 0)) * Math.min(1, dt * 10);
-    const gait = applyWalkCycle(rig, { t, moving, run, crouch: this._tpsCrouch, dt });
+    const gait = applyWalkCycle(rig, { speed, moving, run, crouch: this._tpsCrouch, dt });
     this._playerBody.position.y = p.position.y + gait.bob;
     this._playerBody.rotation.x = gait.lean;   // already eased, and bob assumes it
 
