@@ -200,6 +200,7 @@ export class Game {
     this.kills   = 0;
     this.score   = 0;
     this.deaths  = 0;
+    this.matchStats = this._newMatchStats();
     this._sbShown = false;   // in-game scoreboard (hold TAB)
     this._sbStats = {};      // stable per-match bot scores
     this._sbRefreshT = 0;
@@ -326,7 +327,21 @@ export class Game {
 
   // ── Wire callbacks ──────────────────────────────────────────────────────────
 
+  _newMatchStats() {
+    return {
+      shotsFired: 0,
+      hits: 0,
+      headshots: 0,
+      damageDealt: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+    };
+  }
+
   _wireCallbacks() {
+    this.weaponSystem.onShoot = (def) => {
+      if (def?.kind !== 'melee') this.matchStats.shotsFired++;
+    };
     this.weaponSystem.applyRecoilToPlayer = (amt) => {
       this.player.applyRecoil(amt);
       // Fire recoil kick on the third-person body model.
@@ -343,7 +358,10 @@ export class Game {
         const d = enemy.position.distanceTo(point);
         if (d <= radius) {
           const f = THREE.MathUtils.lerp(1, 0.1, THREE.MathUtils.clamp(d / radius, 0, 1));
+          const dealt = Math.min(enemy.health, damage * f);
           const killed = enemy.takeDamage(damage * f);
+          this.matchStats.hits++;
+          this.matchStats.damageDealt += dealt;
           this.hud.flashHitmarker();
           if (killed) {
             this.deathEffects.spawn(enemy.mesh.position, null, null, false);
@@ -354,7 +372,11 @@ export class Game {
     };
 
     this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
+      const dealt = Math.min(enemy.health, dmg);
       const killed = enemy.takeDamage(dmg);
+      this.matchStats.hits++;
+      this.matchStats.damageDealt += dealt;
+      if (meta?.headshot) this.matchStats.headshots++;
       if (this.hud.hitSound !== false) this.audio.playHit();   // accessibility toggle
       this.hud.flashHitmarker(meta?.headshot);
       this.damageNumbers.spawn(this.player.camera, point, dmg, { headshot: meta?.headshot, killed });
@@ -393,6 +415,8 @@ export class Game {
 
   _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {
     this.kills++;
+    this.matchStats.currentStreak++;
+    this.matchStats.bestStreak = Math.max(this.matchStats.bestStreak, this.matchStats.currentStreak);
     const hsTag    = headshot  ? '  🎯 HEADSHOT!' : '';
     const knifeTag = rewardMult > 1 ? `  🔪 KNIFE THROW x${rewardMult.toFixed(1)}!` : '';
 
@@ -520,6 +544,7 @@ export class Game {
     this.kills    = 0;
     this.score    = 0;
     this.deaths   = 0;
+    this.matchStats = this._newMatchStats();
     this._sbStats = {};
     this.playTime = 0;
     this._statsSaved   = false;
@@ -825,7 +850,17 @@ export class Game {
     this.hud.hideDMTimer();
     this.hud.hideScoreboard(); this._sbShown = false;
     this.hud.hideLeaderboard(); // reset in case it was shown before
-    this.hud.showLeaderboard(rows, this.player.name, earnedCoins);
+    const accuracy = this.matchStats.shotsFired > 0
+      ? Math.min(100, (this.matchStats.hits / this.matchStats.shotsFired) * 100)
+      : 0;
+    this.hud.showLeaderboard(rows, this.player.name, earnedCoins, {
+      ...this.matchStats,
+      accuracy,
+      kills: this.kills,
+      deaths: this.deaths,
+      score: this.score,
+      playTime: this.playTime,
+    });
     this.hud.updateLeaderboardCountdown(10, 10);
   }
 
@@ -974,6 +1009,7 @@ export class Game {
 
   _onPlayerDeath() {
     this.deaths++;
+    this.matchStats.currentStreak = 0;
     // Survival: enter downed state instead of immediate death
     if (this._isSurvival) {
       if (this._playerDowned) return; // already downed
