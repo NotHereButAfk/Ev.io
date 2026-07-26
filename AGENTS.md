@@ -5,9 +5,16 @@ Several agents work in this repo at once (Claude, Codex, Copilot — see the
 It is the canonical one: `CLAUDE.md` and `.github/copilot-instructions.md`
 point here rather than keeping their own copies, so it can't drift.
 
-`CLAUDE.md` has the deep project map (what the map is, how the weapons are
-authored, phase history). Read that for orientation. Read THIS for the rules
-that stop us breaking each other's work.
+`README.md` is the human-facing overview of the game. `CLAUDE.md` has the deep
+project map (what the map is, how the weapons are authored, phase history).
+Read those for orientation. Read THIS for the rules that stop us breaking each
+other's work.
+
+`docs/REFERENCE-EVIO.md` records what we do and don't actually know about
+ev.io, the reference game. **No agent here can reach it** — the proxy refuses
+`ev.io:443` — so anything you "know" about it is untestable training data.
+Don't state ev.io behaviour as fact unless that file marks it [known] or the
+owner told you; say "our design choice" instead.
 
 ---
 
