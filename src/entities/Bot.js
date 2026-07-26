@@ -626,7 +626,7 @@ export class Bot {
       // The pelvis drops at full stride and the body leans into the run. Local
       // pitch (the mesh is YXZ-ordered) so the lean follows the facing.
       this.mesh.position.y = this.position.y + gait.bob;
-      this.mesh.rotation.x += (gait.lean - this.mesh.rotation.x) * Math.min(1, dt * 6);
+      this.mesh.rotation.x = gait.lean;        // already eased, and bob assumes it
 
       // Sword bots free-swing the off-hand; AR bots' arms belong to the rifle
       // (applyRifleCarry, below, poses both onto the grip and handguard).

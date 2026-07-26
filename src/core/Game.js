@@ -50,6 +50,10 @@ const SPAWN_POINT = new THREE.Vector3(0, 0, 18);
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
 const RESPAWN_DELAY = 3;
+// How much of your look-pitch the third-person body shows (must match
+// Avatar.js, which drives the copy of you that other players see).
+const TPS_PITCH_FOLLOW = 0.62;
+const TPS_PITCH_LIMIT  = 0.95;
 
 // The arena is an always-on server with a fixed capacity. You take one slot;
 // the rest are filled with bots and simulated remote players (see ServerSim).
@@ -1255,17 +1259,20 @@ export class Game {
     const t = p.bobTime;
     const L  = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
 
-    // Legs / gait — the same cycle the bots run (see Locomotion.js): stride with
-    // knee flex and a rolling ankle, plus the pelvis drop and run lean it hands
-    // back for the body transform.
-    const run  = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
-    const gait = applyWalkCycle(rig, { t, moving, run, dt });
+    // Legs / gait — the same cycle the bots and every remote player run (see
+    // Locomotion.js): stride with knee flex and a rolling ankle, plus the pelvis
+    // drop and run lean it hands back for the body transform.
+    const run = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
+    this._tpsCrouch = (this._tpsCrouch || 0) +
+      ((p.isCrouching ? 1 : 0) - (this._tpsCrouch || 0)) * Math.min(1, dt * 10);
+    const gait = applyWalkCycle(rig, { t, moving, run, crouch: this._tpsCrouch, dt });
     this._playerBody.position.y = p.position.y + gait.bob;
-    this._playerBody.rotation.x +=
-      (gait.lean - this._playerBody.rotation.x) * Math.min(1, dt * 6);
+    this._playerBody.rotation.x = gait.lean;   // already eased, and bob assumes it
 
-    // Arms: hold the weapon in a two-handed grip (both hands come onto the gun
-    // seated in front of the chest) when armed with a gun; else free-swing.
+    // Arms: hold the weapon in a two-handed grip when armed with a gun, else
+    // free-swing. This mirrors Avatar.update() exactly — the body OTHER players
+    // see of you is driven by the same two calls from the same numbers, so your
+    // third-person self and their view of you can't disagree.
     const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
     if (isGun) {
       // A real soldier's carry: relaxed = rifle laid diagonally across the chest
@@ -1276,8 +1283,14 @@ export class Game {
       this._tpsGunKick = Math.max(0, (this._tpsGunKick || 0) - dt * 7);
       const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
       this._tpsAim = (this._tpsAim || 0) + (wantAim - (this._tpsAim || 0)) * Math.min(1, dt * 8);
+      // Look-pitch rides the same common-mode shoulder rotation as the stride,
+      // so your body aims where you're actually looking instead of always flat.
+      const pitchTgt = THREE.MathUtils.clamp(p.pitch * TPS_PITCH_FOLLOW,
+                                             -TPS_PITCH_LIMIT, TPS_PITCH_LIMIT);
+      this._tpsPitch = (this._tpsPitch || 0) + (pitchTgt - (this._tpsPitch || 0)) * Math.min(1, dt * 12);
       applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
-        swing: gait.swing, kick: this._tpsGunKick,
+        swing: gait.swing + this._tpsPitch * this._tpsAim,
+        kick:  this._tpsGunKick,
       });
     } else if (moving) {
       const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);

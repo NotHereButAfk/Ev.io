@@ -10,6 +10,22 @@
 import * as THREE from 'three';
 import { AuthClient } from './AuthClient.js';
 import { DT } from '../sim/MoveSim.js';
+import { Avatar } from '../player/Avatar.js';
+
+// Give each remote a stable look derived from their id, so the same player is
+// the same colour every time you see them.
+const REMOTE_SKINS = [
+  { primary: 0xd1372b, secondary: 0x2b1414 }, { primary: 0x2b6fd1, secondary: 0x14223a },
+  { primary: 0x9050d1, secondary: 0x241433 }, { primary: 0x2fae5a, secondary: 0x0c2a16 },
+  { primary: 0xc9d2d8, secondary: 0x2a3238 }, { primary: 0xe0902c, secondary: 0x33240c },
+];
+const REMOTE_CHASSIS = ['vanguard', 'striker', 'phantom'];
+function hashId(id) {
+  const s = String(id);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
 
 const MOUSE_SENS = 0.0024;
 
@@ -48,17 +64,19 @@ export class AuthNetBridge {
   _remoteAvatar(id) {
     let r = this.remotes.get(id);
     if (r) return r;
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x35e0ff, emissive: 0x00303a, emissiveIntensity: 0.6, roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.9, 4, 12), mat);
-    body.position.y = 0.9; group.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), mat);
-    head.position.y = 1.62; group.add(head);
-    this.scene.add(group);
+    // The SAME Avatar the local third-person body uses — same model, same walk
+    // cycle, same rifle carry. Remote players used to be a cyan capsule with a
+    // sphere head, so what everyone else saw of you bore no relation to what
+    // you saw of yourself.
+    const avatar = new Avatar(this.scene, {
+      skin: REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
+      armorTypeId: REMOTE_CHASSIS[hashId(id) % REMOTE_CHASSIS.length],
+      weaponId: 'm4',
+    });
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'position:absolute;transform:translate(-50%,-100%);font:700 12px monospace;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap';
     this._nameLayer.appendChild(nameEl);
-    r = { group, mat, nameEl };
+    r = { avatar, nameEl, pos: new THREE.Vector3() };
     this.remotes.set(id, r);
     return r;
   }
@@ -114,11 +132,11 @@ export class AuthNetBridge {
     }
 
     // ── render remote players ──
-    this._syncRemotes();
+    this._syncRemotes(dt);
     this._drainEvents();
   }
 
-  _syncRemotes() {
+  _syncRemotes(dt) {
     const seen = new Set();
     const cam = this.player.camera;
     const w = window.innerWidth, h = window.innerHeight;
@@ -126,10 +144,13 @@ export class AuthNetBridge {
     for (const r of this.client.remoteStates()) {
       seen.add(r.id);
       const a = this._remoteAvatar(r.id);
-      a.group.position.set(r.x, r.y, r.z);
-      a.group.rotation.y = r.yaw;
-      a.group.visible = r.alive;
-      a.mat.color.setHex(r.alive ? 0x35e0ff : 0x555b63);
+      a.pos.set(r.x, r.y, r.z);
+      // Speed is left out on purpose: Avatar measures it from the position
+      // delta, so a remote animates off nothing but the snapshot stream.
+      a.avatar.update(dt, {
+        position: a.pos, yaw: r.yaw, pitch: r.pitch || 0,
+        crouch: r.crouch, firing: r.firing, alive: r.alive,
+      });
       // nameplate
       v.set(r.x, r.y + 2.0, r.z).project(cam);
       if (v.z < 1 && r.alive) {
@@ -140,7 +161,7 @@ export class AuthNetBridge {
       } else { a.nameEl.style.display = 'none'; }
     }
     for (const [id, a] of this.remotes) {
-      if (!seen.has(id)) { this.scene.remove(a.group); a.nameEl.remove(); this.remotes.delete(id); }
+      if (!seen.has(id)) { a.avatar.dispose(); a.nameEl.remove(); this.remotes.delete(id); }
     }
   }
 
@@ -158,7 +179,7 @@ export class AuthNetBridge {
 
   disconnect() {
     this.client.disconnect();
-    for (const [, a] of this.remotes) { this.scene.remove(a.group); a.nameEl.remove(); }
+    for (const [, a] of this.remotes) { a.avatar.dispose(); a.nameEl.remove(); }
     this.remotes.clear();
     this._nameLayer?.remove();
   }

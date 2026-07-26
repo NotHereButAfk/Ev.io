@@ -96,7 +96,8 @@ export class AuthClient {
       let r = this.remotes.get(pl.id);
       if (!r) { r = { name: pl.name, buf: [] }; this.remotes.set(pl.id, r); }
       r.name = pl.name;
-      r.buf.push({ t, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, crouch: pl.crouch,
+      r.buf.push({ t, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch || 0,
+                   crouch: pl.crouch, firing: !!pl.firing,
                    alive: pl.alive, health: pl.health });
       if (r.buf.length > 20) r.buf.shift();
     }
@@ -156,7 +157,11 @@ export class AuthClient {
       out.push({
         id, name: r.name, alive: b.alive, health: b.health,
         x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f,
-        yaw: a.yaw + (b.yaw - a.yaw) * f, crouch: b.crouch,
+        // Shortest-way-round on yaw, or an avatar spins the long way through
+        // the whole circle every time someone crosses ±π.
+        yaw: a.yaw + (((b.yaw - a.yaw + Math.PI) % (Math.PI * 2)) - Math.PI) * f,
+        pitch: (a.pitch || 0) + ((b.pitch || 0) - (a.pitch || 0)) * f,
+        crouch: b.crouch, firing: !!b.firing,
       });
     }
     return out;

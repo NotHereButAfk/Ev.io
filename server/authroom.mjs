@@ -171,6 +171,9 @@ export class AuthRoom {
     if (!p || !p.alive) return;
     if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;   // replay/dup
     p.lastFireSeq = msg.seq;
+    // Hold a "firing" flag for ~0.4s so other clients can shoulder this
+    // player's rifle and show the recoil, not just hear about the hit.
+    p._firingTicks = 8;
     p.fireReq = { wid: WEAPONS[msg.wid] ? msg.wid : 'm4',
                   yaw: Number.isFinite(msg.yaw) ? msg.yaw : 0,
                   pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
@@ -323,6 +326,10 @@ export class AuthRoom {
       p.state = step(p.state, cmd.inp, this.simWorld);
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
+      // Pitch is client-owned look state — the sim doesn't use it, but remote
+      // avatars need it or everyone renders as aiming flat at the horizon.
+      if (Number.isFinite(cmd.inp.pitch)) p._lastPitch = cmd.inp.pitch;
+      if (p._firingTicks > 0) p._firingTicks--;
       this._record(p);
     }
 
@@ -357,7 +364,8 @@ export class AuthRoom {
       publicList.push({
         id: p.id, name: p.name, isBot: p.isBot,
         x: p.state.px, y: p.state.py, z: p.state.pz,
-        yaw: p._lastYaw ?? 0, crouch: p.state.crouch, alive: p.alive,
+        yaw: p._lastYaw ?? 0, pitch: p._lastPitch ?? 0,
+        crouch: p.state.crouch, firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
         health: p.health, shield: p.shield,
       });
     }

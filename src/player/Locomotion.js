@@ -80,10 +80,11 @@ function ankleAngle(thigh, knee, p, run) {
  * Drive a rigged body's legs, and report what the torso should do.
  *
  * @param {object} rig  { legL, legR, kneeL, kneeR, ankleL, ankleR }
- * @param {object} o    { t, moving, run (0=walk … 1=sprint), dt }
+ * @param {object} o    { t, moving, run (0=walk … 1=sprint), crouch (0..1), dt }
  * @returns {{bob:number, lean:number, swing:number}}
  *   bob   metres to drop the body by (≤ 0)
- *   lean  radians for the body's local pitch (negative = forward)
+ *   lean  radians for the body's local pitch (already eased — ASSIGN it, do
+ *         not ease it again, or it stops agreeing with `bob`)
  *   swing radians of common-mode shoulder pitch for the rifle carry
  */
 export function applyWalkCycle(rig, o = {}) {
@@ -92,16 +93,27 @@ export function applyWalkCycle(rig, o = {}) {
   const dt  = o.dt ?? 1 / 60;
   const run = clamp01(o.run || 0);
 
+  // Crouching just means deeper knees and a hip tuck. The body height falls out
+  // of the ground solve below on its own — no separate crouch offset to keep in
+  // sync, which is the whole reason the drop is solved rather than tuned.
+  const crouch = clamp01(o.crouch || 0);
+  const cKnee  = -1.05 * crouch;
+  const cHip   =  0.55 * crouch;
+
   if (!o.moving) {
     // Settle into a relaxed stand: knees never fully locked, feet flat.
     const k = Math.min(1, dt * 6);
-    ease(rig.legL, 0, k);        ease(rig.legR, 0, k);
-    ease(rig.kneeL, -0.07, k);   ease(rig.kneeR, -0.07, k);
-    ease(rig.ankleL, 0.02, k);   ease(rig.ankleR, 0.02, k);
+    ease(rig.legL, cHip, k);              ease(rig.legR, cHip, k);
+    ease(rig.kneeL, -0.07 + cKnee, k);    ease(rig.kneeR, -0.07 + cKnee, k);
+    ease(rig.ankleL, 0.02 + 0.5 * crouch, k);
+    ease(rig.ankleR, 0.02 + 0.5 * crouch, k);
+    const standLean = -0.10 * crouch;
+    rig._lean = (rig._lean || 0) + (standLean - (rig._lean || 0)) * Math.min(1, dt * 6);
     return {
       bob: groundBob(rig.legL.rotation.x, rig.kneeL.rotation.x, rig.ankleL?.rotation.x || 0,
-                     rig.legR.rotation.x, rig.kneeR.rotation.x, rig.ankleR?.rotation.x || 0, 0),
-      lean: 0,
+                     rig.legR.rotation.x, rig.kneeR.rotation.x, rig.ankleR?.rotation.x || 0,
+                     rig._lean),
+      lean: rig._lean,
       swing: Math.sin(t * 0.28) * 0.018,   // breathing
     };
   }
@@ -110,10 +122,10 @@ export function applyWalkCycle(rig, o = {}) {
   const kAmp = 0.95 + 0.55 * run;   // knee flex through the swing phase
   const k    = Math.min(1, dt * 16);
 
-  const thighL =  amp * Math.sin(t);
-  const thighR = -amp * Math.sin(t);
-  const kneeL  = -kAmp * Math.max(0,  Math.cos(t)) - 0.10;
-  const kneeR  = -kAmp * Math.max(0, -Math.cos(t)) - 0.10;
+  const thighL =  amp * Math.sin(t) + cHip;
+  const thighR = -amp * Math.sin(t) + cHip;
+  const kneeL  = -kAmp * Math.max(0,  Math.cos(t)) - 0.10 + cKnee;
+  const kneeR  = -kAmp * Math.max(0, -Math.cos(t)) - 0.10 + cKnee;
 
   ease(rig.legL,  thighL, k);  ease(rig.legR,  thighR, k);
   ease(rig.kneeL, kneeL,  k);  ease(rig.kneeR, kneeR,  k);
@@ -121,8 +133,12 @@ export function applyWalkCycle(rig, o = {}) {
   ease(rig.ankleR, ankleAngle(thighR, kneeR, t + Math.PI, run), k);
 
   // Negative = forward. Kept shallow: a walk barely leans, only a real sprint
-  // pitches in noticeably.
-  const lean = -(0.03 + 0.13 * run);
+  // pitches in noticeably. Eased HERE rather than by the caller, because the
+  // ground solve below has to run against the lean that actually gets applied
+  // — solving for the target while the body eases toward it drifts the feet.
+  const leanTarget = -(0.03 + 0.13 * run) - 0.10 * crouch;
+  rig._lean = (rig._lean || 0) + (leanTarget - (rig._lean || 0)) * Math.min(1, dt * 6);
+  const lean = rig._lean;
   // Read the bob back off the joints we just eased into (not the targets), so
   // the body follows the legs exactly even mid-blend.
   const bob = groundBob(
