@@ -3992,6 +3992,26 @@ export class World {
     return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)].clone();
   }
 
+  /**
+   * A random spawn point that isn't in somebody's face — picks the candidate
+   * furthest from the nearest listed occupant, so respawning doesn't drop you
+   * back into the fight that just killed you.
+   * @param {Array<{position: THREE.Vector3, alive?: boolean}>} occupants
+   */
+  safeSpawnPoint(occupants = []) {
+    const live = occupants.filter((o) => o && o.alive !== false && o.position);
+    if (!live.length) return this.randomSpawnPoint();
+    // Score every spawn, then pick at random from the clearest third — always
+    // safe, but not always the same corner on successive deaths.
+    const scored = this.spawnPoints.map((p) => {
+      let nearest = Infinity;
+      for (const o of live) nearest = Math.min(nearest, p.distanceTo(o.position));
+      return { p, nearest };
+    }).sort((a, b) => b.nearest - a.nearest);
+    const top = scored.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
+    return top[Math.floor(Math.random() * top.length)].p.clone();
+  }
+
   // ── Shooting against the world ──────────────────────────────────────────────
   // A collider is either backed by a visual (`mesh`) or is a bare box — most of
   // the mall's cover (trees, benches, kiosks, escalator volumes, railings) is

@@ -120,7 +120,9 @@ export function applyWalkCycle(rig, o = {}) {
   ease(rig.ankleL, ankleAngle(thighL, kneeL, t,           run), k);
   ease(rig.ankleR, ankleAngle(thighR, kneeR, t + Math.PI, run), k);
 
-  const lean = -(0.05 + 0.16 * run);                 // negative = forward
+  // Negative = forward. Kept shallow: a walk barely leans, only a real sprint
+  // pitches in noticeably.
+  const lean = -(0.03 + 0.13 * run);
   // Read the bob back off the joints we just eased into (not the targets), so
   // the body follows the legs exactly even mid-blend.
   const bob = groundBob(

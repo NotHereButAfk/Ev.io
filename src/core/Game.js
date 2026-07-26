@@ -47,6 +47,9 @@ import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.j
 import { PickupSystem } from '../world/PickupSystem.js';
 
 const SPAWN_POINT = new THREE.Vector3(0, 0, 18);
+// Seconds between dying and coming back. The respawn is automatic — the menu
+// that opens on death is just something to look at while you wait.
+const RESPAWN_DELAY = 3;
 
 // The arena is an always-on server with a fixed capacity. You take one slot;
 // the rest are filled with bots and simulated remote players (see ServerSim).
@@ -894,10 +897,15 @@ export class Game {
   _openMenu() {
     this._menuOpen = true;
     this.mobileControls?.hide();
+    // Release the mouse. When ESC opened this the browser already did, but on
+    // death we call it ourselves and the cursor is still captured — you'd see
+    // the menu with no way to click it.
+    this.input.exitPointerLock();
     this.menu.showPause();
   }
 
   _quitToMenu() {
+    clearTimeout(this._respawnTimer);
     if (this.state === 'playing' || this.state === 'leaderboard') this._saveStats();
     this._lbTimer = Infinity; // cancel any pending auto-restart
     this._hideMapLoading();
@@ -971,14 +979,14 @@ export class Game {
       return;
     }
 
-    // Deathmatch: respawn immediately (infinite lives)
+    // Deathmatch: infinite lives. Dying opens the menu and starts a 3s timer;
+    // the respawn then happens on its own whether or not the menu is still up,
+    // and clicking the canvas drops you straight back in (see _resume).
     if (this._isDM) {
-      setTimeout(() => {
-        this.player.respawn(SPAWN_POINT);
-        this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
-        this._resetLoadoutHud();   // drop any picked-up power weapon
-        this.hud.addKillFeed('RESPAWNING...');
-      }, 1200);
+      if (!this._menuOpen) this._openMenu();
+      this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
+      clearTimeout(this._respawnTimer);
+      this._respawnTimer = setTimeout(() => this._respawnPlayer(), RESPAWN_DELAY * 1000);
       return;
     }
 
@@ -986,15 +994,27 @@ export class Game {
     if (this._mode?.lives !== Infinity) {
       this._lives = Math.max(0, this._lives - 1);
       if (this._lives > 0 && this._mode?.waves) {
-        setTimeout(() => {
-          this.player.respawn(SPAWN_POINT);
+        clearTimeout(this._respawnTimer);
+        this._respawnTimer = setTimeout(() => {
+          this.player.respawn(this.world.safeSpawnPoint(this._activeManager?.bots || []));
           this._resetLoadoutHud();   // drop any picked-up power weapon
           this._refreshModeHUD();
-        }, 1500);
+        }, RESPAWN_DELAY * 1000);
         return;
       }
     }
     this._endGame('YOU DIED');
+  }
+
+  // Put the player back in the fight at a spawn point away from everyone else,
+  // so you don't rematerialise in front of whoever just killed you.
+  _respawnPlayer() {
+    if (this.state !== 'playing') return;
+    const point = this.world.safeSpawnPoint(this._activeManager?.bots || []);
+    this.player.respawn(point);
+    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+    this._resetLoadoutHud();   // drop any picked-up power weapon
+    this.hud.addKillFeed('RESPAWNED');
   }
 
   _endGame(title, subtitle = '') {
@@ -1083,7 +1103,10 @@ export class Game {
       const url = authNetTarget();
       this._authNet = url ? new AuthNetBridge(this, url) : null;
     }
-    if (!menuOpen) {
+    // Dead players are frozen where they fell until the respawn timer fires —
+    // clicking back in early shouldn't let a corpse run around and shoot.
+    const dead = this.player.isDead && !this._playerDowned;
+    if (!menuOpen && !dead) {
       if (this._authNet && this._authNet.ready) {
         this._authNet.update(dt, this.input);
       } else if (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled())) {
@@ -1116,8 +1139,9 @@ export class Game {
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
-    // While menu is open or downed, block weapon/grenade input — match still runs.
-    if (!menuOpen && !this._playerDowned) {
+    // While the menu is open, downed, or dead-and-awaiting-respawn, block
+    // weapon/grenade input — the match still runs.
+    if (!menuOpen && !this._playerDowned && !dead) {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
@@ -1125,11 +1149,11 @@ export class Game {
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // grenade input  F = frag  E = smoke
-    if (!menuOpen && this.input.consumeJustPressed('KeyF')) {
+    if (!menuOpen && !dead && this.input.consumeJustPressed('KeyF')) {
       this.grenadeSystem.throwFrag(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
-    if (!menuOpen && this.input.consumeJustPressed('KeyE')) {
+    if (!menuOpen && !dead && this.input.consumeJustPressed('KeyE')) {
       this.grenadeSystem.throwSmoke(this.player.camera);
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
@@ -1234,7 +1258,7 @@ export class Game {
     // Legs / gait — the same cycle the bots run (see Locomotion.js): stride with
     // knee flex and a rolling ankle, plus the pelvis drop and run lean it hands
     // back for the body transform.
-    const run  = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 2.5) / 4.0, 0, 0.7);
+    const run  = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
     const gait = applyWalkCycle(rig, { t, moving, run, dt });
     this._playerBody.position.y = p.position.y + gait.bob;
     this._playerBody.rotation.x +=
