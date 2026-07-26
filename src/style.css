@@ -403,6 +403,42 @@ html, body {
   transition: opacity 0.6s ease-out;
 }
 
+/* ── Directional damage indicator ───────────────────────────────────────────
+   An arc that points at whatever just shot you, pinned around the crosshair.
+   Each hit spawns its own arc so multiple attackers read as separate arrows. */
+#damage-dirs {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 90;
+}
+.dmg-dir {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 0; height: 0;
+  /* rotate() aims it; the child does the offsetting, so rotation is about the
+     crosshair rather than the arc's own centre. */
+  transform: translate(-50%, -50%) rotate(var(--a, 0deg));
+  animation: dmgDirFade 1.15s ease-out forwards;
+}
+.dmg-dir::before {
+  content: '';
+  position: absolute;
+  left: -46px; top: -128px;
+  width: 92px; height: 30px;
+  background: radial-gradient(ellipse at 50% 100%,
+              rgba(255, 60, 50, 0.92) 0%, rgba(255, 90, 60, 0.55) 45%, transparent 72%);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  filter: blur(0.4px);
+}
+@keyframes dmgDirFade {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+:root[data-reduce-motion="1"] .dmg-dir { animation-duration: 0.9s; }
+:root[data-reduce-flashes="1"] .dmg-dir { opacity: 0.5; }
+
 /* Teleport blink flash */
 #teleport-flash {
   position: fixed; inset: 0; pointer-events: none;

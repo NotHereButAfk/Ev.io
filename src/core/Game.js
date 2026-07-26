@@ -102,6 +102,9 @@ export class Game {
     this._buildPostFX();
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
+    this._listenPos   = new THREE.Vector3();   // scratch for the audio listener
+    this._listenFwd   = new THREE.Vector3();
+    this._listenUp    = new THREE.Vector3();
     this.player.audio = this.audio;
     this.player.onTeleport = () => {
       this.audio.playTeleport();
@@ -115,7 +118,7 @@ export class Game {
     // from the scene root, so the camera itself must live in the scene.
     this.world.scene.add(this.player.camera);
     this.deathEffects = new DeathEffectManager(this.world.scene);
-    this.botManager      = new BotManager(this.world, this.world.scene);
+    this.botManager      = new BotManager(this.world, this.world.scene, this.audio);
     this.zombieManager   = new ZombieManager(this.world, this.world.scene, this.audio);
     preloadZombieModel();   // start fetching zombie.glb during the 60s grace period
     this.survivalManager = new SurvivalManager();
@@ -944,11 +947,14 @@ export class Game {
 
   // ── Player damage / death ───────────────────────────────────────────────────
 
-  _onPlayerDamaged(dmg) {
+  _onPlayerDamaged(dmg, from = null) {
     if (this.player.isDead || this._playerDowned) return;
     const died = this.player.takeDamage(dmg);
     this.audio.playHurt();
     this.hud.flashDamage();
+    // Which way did that come from? Without this you get shot by something you
+    // never see and have no idea where to look.
+    if (from) this.hud.showDamageFrom(from, this.player.position, this.player.yaw);
     // Damage flinch on the third-person body model.
     this._playerBody?.userData?.triggerHit?.(0, 1);
     if (died) this._onPlayerDeath();
@@ -1056,6 +1062,14 @@ export class Game {
   _updatePlaying(dt) {
     this.playTime += dt;
 
+    // Put the WebAudio listener on the camera so every positional sound (bot
+    // gunfire, footsteps, deaths) arrives from the direction it happened.
+    const cam = this.player.camera;
+    cam.getWorldPosition(this._listenPos);
+    cam.getWorldDirection(this._listenFwd);
+    this._listenUp.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    this.audio.setListener(this._listenPos, this._listenFwd, this._listenUp);
+
     const menuOpen = this._menuOpen;
 
     // Player input is blocked while the menu overlay is open (no pointer lock),
@@ -1107,7 +1121,7 @@ export class Game {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
-    this._activeManager.update(dt, this.player, this.player.camera, (dmg) => this._onPlayerDamaged(dmg), this.world);
+    this._activeManager.update(dt, this.player, this.player.camera, (dmg, from) => this._onPlayerDamaged(dmg, from), this.world);
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // grenade input  F = frag  E = smoke

@@ -20,7 +20,61 @@ export class AudioManager {
     this._limiter.attack.value = 0.002;
     this._limiter.release.value = 0.16;
     this.master.connect(this._limiter).connect(this.ctx.destination);
+    // Every one-shot emits into `out`. It is the master by default; playAt()
+    // swaps in a positional panner for the duration of one call, which is how
+    // the whole (2D) sound library became spatial without touching 50 synths.
+    this.out = this.master;
     this._initGunBus();
+  }
+
+  // ── 3D sound ────────────────────────────────────────────────────────────────
+
+  /** Point the WebAudio listener at the camera. Call once per frame. */
+  setListener(pos, forward, up) {
+    const l = this.ctx?.listener;
+    if (!l) return;
+    if (l.positionX) {
+      const t = this.ctx.currentTime;
+      l.positionX.setTargetAtTime(pos.x, t, 0.01);
+      l.positionY.setTargetAtTime(pos.y, t, 0.01);
+      l.positionZ.setTargetAtTime(pos.z, t, 0.01);
+      l.forwardX.setTargetAtTime(forward.x, t, 0.01);
+      l.forwardY.setTargetAtTime(forward.y, t, 0.01);
+      l.forwardZ.setTargetAtTime(forward.z, t, 0.01);
+      l.upX.setTargetAtTime(up.x, t, 0.01);
+      l.upY.setTargetAtTime(up.y, t, 0.01);
+      l.upZ.setTargetAtTime(up.z, t, 0.01);
+    } else {                                    // pre-2021 Safari
+      l.setPosition(pos.x, pos.y, pos.z);
+      l.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+    }
+  }
+
+  /**
+   * Play a sound AT a world position: `audio.playAt(p, () => audio.playShot())`.
+   * Anything the callback emits routes through an HRTF panner, so you can hear
+   * which side of you it came from and how far away it is. The gun reverb send
+   * deliberately stays un-panned — the room tail comes from everywhere.
+   */
+  playAt(pos, fn) {
+    if (!this.ctx) return;
+    const p = this.ctx.createPanner();
+    p.panningModel    = 'HRTF';
+    p.distanceModel   = 'inverse';
+    p.refDistance     = 5;     // full volume within 5m
+    p.maxDistance     = 90;
+    p.rolloffFactor   = 1.1;
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; }
+    else p.setPosition(pos.x, pos.y, pos.z);
+    p.connect(this.master);
+
+    const prev = this.out;
+    this.out = p;
+    try { fn(); } finally { this.out = prev; }
+
+    // One-shots are all well under 3s; drop the node afterwards so panners
+    // don't pile up over a match.
+    setTimeout(() => { try { p.disconnect(); } catch {} }, 3000);
   }
 
   // Shared convolution reverb for gunfire — a synthesized arena impulse response
@@ -135,7 +189,7 @@ export class AudioManager {
     const g = P.gain * lvl;
 
     // Per-shot bus: a dry path to the master and a send to the shared arena reverb.
-    const dry = ctx.createGain(); dry.gain.value = 1; dry.connect(this.master);
+    const dry = ctx.createGain(); dry.gain.value = 1; dry.connect(this.out);
     const send = ctx.createGain(); send.gain.value = P.reverb; send.connect(this._gunVerbIn);
     const out = (node) => { node.connect(dry); if (P.reverb > 0) node.connect(send); };
 
@@ -223,7 +277,7 @@ export class AudioManager {
     formant.frequency.value = 1500;
     formant.Q.value = 1.4;
     const gain = this._envGain(0.34, 0.005, 0.2, t);
-    osc.connect(formant).connect(gain).connect(this.master);
+    osc.connect(formant).connect(gain).connect(this.out);
 
     // A soft sub sine doubling an octave down for body.
     const sub = this.ctx.createOscillator();
@@ -231,7 +285,7 @@ export class AudioManager {
     sub.frequency.setValueAtTime(520, t);
     sub.frequency.exponentialRampToValueAtTime(340, t + 0.2);
     const subGain = this._envGain(0.16, 0.005, 0.2, t);
-    sub.connect(subGain).connect(this.master);
+    sub.connect(subGain).connect(this.out);
 
     // Twinkle sparkle on top.
     const spark = this.ctx.createOscillator();
@@ -239,7 +293,7 @@ export class AudioManager {
     spark.frequency.setValueAtTime(2800, t + 0.02);
     spark.frequency.exponentialRampToValueAtTime(4200, t + 0.14);
     const sGain = this._envGain(0.13, 0.002, 0.14, t + 0.02);
-    spark.connect(sGain).connect(this.master);
+    spark.connect(sGain).connect(this.out);
 
     lfo.start(t); osc.start(t); sub.start(t); spark.start(t + 0.02);
     lfo.stop(t + 0.24); osc.stop(t + 0.24); sub.stop(t + 0.24); spark.stop(t + 0.18);
@@ -277,7 +331,7 @@ export class AudioManager {
     const gain = this._envGain(0.32, 0.03, 0.3, t); // soft attack — breathy, not clicky
     osc.connect(f1).connect(mix);
     osc.connect(f2).connect(mix);
-    mix.connect(gain).connect(this.master);
+    mix.connect(gain).connect(this.out);
 
     // Faint breath layer under the voice. The noise buffer is identical every
     // shot, so generate it once and reuse it — one AudioBuffer can back many
@@ -287,7 +341,7 @@ export class AudioManager {
     const bf = this.ctx.createBiquadFilter();
     bf.type = 'bandpass'; bf.frequency.value = 1800; bf.Q.value = 0.8;
     const bGain = this._envGain(0.05, 0.02, 0.16, t);
-    breath.connect(bf).connect(bGain).connect(this.master);
+    breath.connect(bf).connect(bGain).connect(this.out);
 
     lfo.start(t); osc.start(t); breath.start(t);
     lfo.stop(t + 0.36); osc.stop(t + 0.36);
@@ -333,7 +387,7 @@ export class AudioManager {
     const vMix = this.ctx.createGain(); vMix.gain.value = 1;
     voice.connect(f1).connect(vMix);
     voice.connect(f2).connect(vMix);
-    vMix.connect(vGain).connect(this.master);
+    vMix.connect(vGain).connect(this.out);
 
     // "F" fricative — a short high-passed noise hiss right at the front.
     const fric = this.ctx.createBufferSource();
@@ -341,7 +395,7 @@ export class AudioManager {
     const hp = this.ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 3200;
     const fGain = this._envGain(0.16, 0.005, 0.07, t);
-    fric.connect(hp).connect(fGain).connect(this.master);
+    fric.connect(hp).connect(fGain).connect(this.out);
 
     // Fireball launch under the word: sub thump + rising whoosh.
     const sub = this.ctx.createOscillator();
@@ -349,7 +403,7 @@ export class AudioManager {
     sub.frequency.setValueAtTime(120, t + 0.20);
     sub.frequency.exponentialRampToValueAtTime(45, t + 0.55);
     const sGain = this._envGain(0.5, 0.01, 0.4, t + 0.20);
-    sub.connect(sGain).connect(this.master);
+    sub.connect(sGain).connect(this.out);
 
     const whoosh = this.ctx.createBufferSource();
     whoosh.buffer = this._breathNoise();
@@ -359,7 +413,7 @@ export class AudioManager {
     lp.frequency.setValueAtTime(500, t + 0.20);
     lp.frequency.exponentialRampToValueAtTime(3200, t + 0.50);
     const wGain = this._envGain(0.32, 0.03, 0.33, t + 0.20);
-    whoosh.connect(lp).connect(wGain).connect(this.master);
+    whoosh.connect(lp).connect(wGain).connect(this.out);
 
     voice.start(t); voice.stop(t + 0.50);
     fric.start(t);
@@ -391,7 +445,7 @@ export class AudioManager {
     filter.frequency.value = 1200;
     filter.Q.value = 6;
     const gain = this._envGain(0.3, 0.002, 0.16, t);
-    osc.connect(filter).connect(gain).connect(this.master);
+    osc.connect(filter).connect(gain).connect(this.out);
     osc.start(t);
     osc.stop(t + 0.18);
   }
@@ -407,13 +461,13 @@ export class AudioManager {
     filter.frequency.setValueAtTime(2600, t);
     filter.frequency.exponentialRampToValueAtTime(400, t + 0.26);
     const nGain = this._envGain(0.7, 0.003, 0.28, t);
-    noise.connect(filter).connect(nGain).connect(this.master);
+    noise.connect(filter).connect(nGain).connect(this.out);
     const osc = this.ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(160, t);
     osc.frequency.exponentialRampToValueAtTime(50, t + 0.22);
     const oGain = this._envGain(0.55, 0.003, 0.22, t);
-    osc.connect(oGain).connect(this.master);
+    osc.connect(oGain).connect(this.out);
     noise.start(t); osc.start(t);
     noise.stop(t + 0.32); osc.stop(t + 0.26);
   }
@@ -431,7 +485,7 @@ export class AudioManager {
       o.frequency.setValueAtTime(freq, t + dt);
       o.frequency.exponentialRampToValueAtTime(freq * 0.82, t + dt + 0.09);
       const g = this._envGain(0.16, 0.002, 0.09, t + dt);
-      o.connect(g).connect(this.master);
+      o.connect(g).connect(this.out);
       o.start(t + dt); o.stop(t + dt + 0.11);
     }
     // laser body for punch
@@ -440,7 +494,7 @@ export class AudioManager {
     body.frequency.setValueAtTime(980, t);
     body.frequency.exponentialRampToValueAtTime(220, t + 0.13);
     const bGain = this._envGain(0.3, 0.002, 0.13, t);
-    body.connect(bGain).connect(this.master);
+    body.connect(bGain).connect(this.out);
     body.start(t); body.stop(t + 0.15);
     // airy shimmer
     const noise = this.ctx.createBufferSource();
@@ -448,7 +502,7 @@ export class AudioManager {
     const hp = this.ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 5200;
     const nGain = this._envGain(0.12, 0.004, 0.13, t);
-    noise.connect(hp).connect(nGain).connect(this.master);
+    noise.connect(hp).connect(nGain).connect(this.out);
     noise.start(t); noise.stop(t + 0.16);
   }
 
@@ -464,14 +518,14 @@ export class AudioManager {
     sub.frequency.setValueAtTime(120, t);
     sub.frequency.exponentialRampToValueAtTime(28, t + 0.32);
     const sGain = this._envGain(0.85, 0.003, 0.34, t);
-    sub.connect(sGain).connect(this.master);
+    sub.connect(sGain).connect(this.out);
     // gritty mid layer
     const mid = this.ctx.createOscillator();
     mid.type = 'square';
     mid.frequency.setValueAtTime(72, t);
     mid.frequency.exponentialRampToValueAtTime(36, t + 0.24);
     const mGain = this._envGain(0.22, 0.004, 0.24, t);
-    mid.connect(mGain).connect(this.master);
+    mid.connect(mGain).connect(this.out);
     // big slow whoosh
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(0.42);
@@ -480,7 +534,7 @@ export class AudioManager {
     lp.frequency.setValueAtTime(3400, t);
     lp.frequency.exponentialRampToValueAtTime(240, t + 0.38);
     const nGain = this._envGain(0.8, 0.003, 0.4, t);
-    noise.connect(lp).connect(nGain).connect(this.master);
+    noise.connect(lp).connect(nGain).connect(this.out);
     // trailing lava crackles
     for (const dt of [0.08, 0.15, 0.23]) {
       const c = this.ctx.createBufferSource();
@@ -490,7 +544,7 @@ export class AudioManager {
       bp.frequency.value = 1400 + Math.random() * 1400;
       bp.Q.value = 8;
       const cGain = this._envGain(0.18, 0.002, 0.035, t + dt);
-      c.connect(bp).connect(cGain).connect(this.master);
+      c.connect(bp).connect(cGain).connect(this.out);
       c.start(t + dt); c.stop(t + dt + 0.05);
     }
     sub.start(t); mid.start(t); noise.start(t);
@@ -546,7 +600,7 @@ export class AudioManager {
     f2.frequency.setValueAtTime(2600, t);
     f2.frequency.linearRampToValueAtTime(2200, t + 0.30);
     const gain = this._envGain(0.34, 0.012, 0.30, t);
-    osc.connect(f1).connect(f2).connect(gain).connect(this.master);
+    osc.connect(f1).connect(f2).connect(gain).connect(this.out);
 
     // A soft "breath" of noise at the very start ("ny" consonant).
     const breath = this.ctx.createBufferSource();
@@ -554,7 +608,7 @@ export class AudioManager {
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 1.2;
     const bGain = this._envGain(0.10, 0.002, 0.045, t);
-    breath.connect(bp).connect(bGain).connect(this.master);
+    breath.connect(bp).connect(bGain).connect(this.out);
 
     lfo.start(t); osc.start(t); breath.start(t);
     lfo.stop(t + 0.34); osc.stop(t + 0.34); breath.stop(t + 0.06);
@@ -580,14 +634,14 @@ export class AudioManager {
     const formant = this.ctx.createBiquadFilter();
     formant.type = 'bandpass'; formant.frequency.value = 900; formant.Q.value = 2.2;
     const gain = this._envGain(0.32, 0.006, 0.2, t);
-    osc.connect(formant).connect(gain).connect(this.master);
+    osc.connect(formant).connect(gain).connect(this.out);
     // sparkle on top
     const spark = this.ctx.createOscillator();
     spark.type = 'sine';
     spark.frequency.setValueAtTime(3200, t + 0.04);
     spark.frequency.exponentialRampToValueAtTime(4600, t + 0.16);
     const sGain = this._envGain(0.11, 0.002, 0.14, t + 0.04);
-    spark.connect(sGain).connect(this.master);
+    spark.connect(sGain).connect(this.out);
     lfo.start(t); osc.start(t); spark.start(t + 0.04);
     lfo.stop(t + 0.24); osc.stop(t + 0.24); spark.stop(t + 0.2);
   }
@@ -604,13 +658,13 @@ export class AudioManager {
     const formant = this.ctx.createBiquadFilter();
     formant.type = 'bandpass'; formant.frequency.value = 1400; formant.Q.value = 3;
     const gain = this._envGain(0.36, 0.003, 0.13, t);
-    osc.connect(formant).connect(gain).connect(this.master);
+    osc.connect(formant).connect(gain).connect(this.out);
     const breath = this.ctx.createBufferSource();
     breath.buffer = this._noiseBuffer(0.04);
     const bp = this.ctx.createBiquadFilter();
     bp.type = 'highpass'; bp.frequency.value = 2000;
     const bGain = this._envGain(0.12, 0.001, 0.035, t);
-    breath.connect(bp).connect(bGain).connect(this.master);
+    breath.connect(bp).connect(bGain).connect(this.out);
     osc.start(t); breath.start(t);
     osc.stop(t + 0.15); breath.stop(t + 0.05);
   }
@@ -624,7 +678,7 @@ export class AudioManager {
       osc.type = 'sine';
       osc.frequency.value = freq;
       const g = this._envGain(0.16 - i * 0.02, 0.002, 0.16, t + i * 0.025);
-      osc.connect(g).connect(this.master);
+      osc.connect(g).connect(this.out);
       osc.start(t + i * 0.025); osc.stop(t + i * 0.025 + 0.2);
     });
     // airy shimmer tail
@@ -633,7 +687,7 @@ export class AudioManager {
     const hp = this.ctx.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 5000;
     const nGain = this._envGain(0.07, 0.01, 0.18, t + 0.03);
-    noise.connect(hp).connect(nGain).connect(this.master);
+    noise.connect(hp).connect(nGain).connect(this.out);
     noise.start(t + 0.03); noise.stop(t + 0.24);
   }
 
@@ -648,14 +702,14 @@ export class AudioManager {
     filter.frequency.setValueAtTime(900, t);
     filter.frequency.exponentialRampToValueAtTime(70, t + 0.5);
     const noiseGain = this._envGain(0.95, 0.005, 0.55, t);
-    noise.connect(filter).connect(noiseGain).connect(this.master);
+    noise.connect(filter).connect(noiseGain).connect(this.out);
 
     const osc = this.ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(130, t);
     osc.frequency.exponentialRampToValueAtTime(38, t + 0.4);
     const oscGain = this._envGain(0.8, 0.005, 0.42, t);
-    osc.connect(oscGain).connect(this.master);
+    osc.connect(oscGain).connect(this.out);
 
     noise.start(t);
     osc.start(t);
@@ -673,7 +727,7 @@ export class AudioManager {
     filter.frequency.setValueAtTime(1200, t);
     filter.frequency.exponentialRampToValueAtTime(4000, t + 0.18);
     const gain = this._envGain(0.4, 0.01, 0.17, t);
-    noise.connect(filter).connect(gain).connect(this.master);
+    noise.connect(filter).connect(gain).connect(this.out);
     noise.start(t);
     noise.stop(t + 0.2);
   }
@@ -686,7 +740,7 @@ export class AudioManager {
       osc.type = 'square';
       osc.frequency.value = 500;
       const gain = this._envGain(0.18, 0.001, 0.05, t + offset);
-      osc.connect(gain).connect(this.master);
+      osc.connect(gain).connect(this.out);
       osc.start(t + offset);
       osc.stop(t + offset + 0.07);
     });
@@ -700,7 +754,7 @@ export class AudioManager {
     osc.frequency.setValueAtTime(900, t);
     osc.frequency.exponentialRampToValueAtTime(300, t + 0.08);
     const gain = this._envGain(0.3, 0.001, 0.09, t);
-    osc.connect(gain).connect(this.master);
+    osc.connect(gain).connect(this.out);
     osc.start(t);
     osc.stop(t + 0.1);
   }
@@ -713,7 +767,7 @@ export class AudioManager {
       osc.type = 'sawtooth';
       osc.frequency.value = 500 + i * 220;
       const gain = this._envGain(0.22, 0.001, 0.12, t + offset);
-      osc.connect(gain).connect(this.master);
+      osc.connect(gain).connect(this.out);
       osc.start(t + offset);
       osc.stop(t + offset + 0.14);
     });
@@ -727,7 +781,7 @@ export class AudioManager {
     osc.frequency.setValueAtTime(180, t);
     osc.frequency.exponentialRampToValueAtTime(60, t + 0.25);
     const gain = this._envGain(0.3, 0.001, 0.25, t);
-    osc.connect(gain).connect(this.master);
+    osc.connect(gain).connect(this.out);
     osc.start(t);
     osc.stop(t + 0.26);
   }
@@ -739,7 +793,7 @@ export class AudioManager {
     osc.type = 'square';
     osc.frequency.value = 220;
     const gain = this._envGain(0.15, 0.001, 0.04, t);
-    osc.connect(gain).connect(this.master);
+    osc.connect(gain).connect(this.out);
     osc.start(t);
     osc.stop(t + 0.05);
   }
@@ -754,7 +808,7 @@ export class AudioManager {
     osc.frequency.setValueAtTime(sprint ? 90 : 68, t);
     osc.frequency.exponentialRampToValueAtTime(28, t + 0.09);
     const oGain = this._envGain(g, 0.002, 0.09, t);
-    osc.connect(oGain).connect(this.master);
+    osc.connect(oGain).connect(this.out);
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(0.06);
     const nf = this.ctx.createBiquadFilter();
@@ -762,7 +816,7 @@ export class AudioManager {
     nf.frequency.value = sprint ? 1600 : 1100;
     nf.Q.value = 0.5;
     const nGain = this._envGain(g * 0.35, 0.002, 0.05, t);
-    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.connect(nf).connect(nGain).connect(this.out);
     osc.start(t); noise.start(t);
     osc.stop(t + 0.11); noise.stop(t + 0.07);
   }
@@ -778,7 +832,7 @@ export class AudioManager {
     f.frequency.setValueAtTime(900, t);
     f.frequency.exponentialRampToValueAtTime(220, t + 0.10);
     const g = this._envGain(0.11, 0.005, 0.10, t);
-    noise.connect(f).connect(g).connect(this.master);
+    noise.connect(f).connect(g).connect(this.out);
     noise.start(t); noise.stop(t + 0.13);
   }
 
@@ -792,14 +846,14 @@ export class AudioManager {
     osc.frequency.setValueAtTime(hard ? 115 : 78, t);
     osc.frequency.exponentialRampToValueAtTime(24, t + 0.19);
     const oGain = this._envGain(gv, 0.001, 0.19, t);
-    osc.connect(oGain).connect(this.master);
+    osc.connect(oGain).connect(this.out);
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(0.10);
     const nf = this.ctx.createBiquadFilter();
     nf.type = 'lowpass';
     nf.frequency.value = 1400;
     const nGain = this._envGain(gv * 0.45, 0.001, 0.08, t);
-    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.connect(nf).connect(nGain).connect(this.out);
     osc.start(t); noise.start(t);
     osc.stop(t + 0.21); noise.stop(t + 0.11);
   }
@@ -815,7 +869,7 @@ export class AudioManager {
     sweep.frequency.setValueAtTime(280, t);
     sweep.frequency.exponentialRampToValueAtTime(2800, t + 0.08);
     const sweepGain = this._envGain(0.28, 0.002, 0.08, t);
-    sweep.connect(sweepGain).connect(this.master);
+    sweep.connect(sweepGain).connect(this.out);
 
     // Hard pop at the blink moment.
     const pop = this.ctx.createOscillator();
@@ -826,7 +880,7 @@ export class AudioManager {
     popFilter.type = 'lowpass';
     popFilter.frequency.value = 800;
     const popGain = this._envGain(0.45, 0.001, 0.15, t + 0.07);
-    pop.connect(popFilter).connect(popGain).connect(this.master);
+    pop.connect(popFilter).connect(popGain).connect(this.out);
 
     // Resonant shimmer tail.
     const ring = this.ctx.createOscillator();
@@ -834,7 +888,7 @@ export class AudioManager {
     ring.frequency.setValueAtTime(820, t + 0.09);
     ring.frequency.exponentialRampToValueAtTime(340, t + 0.38);
     const ringGain = this._envGain(0.18, 0.003, 0.32, t + 0.09);
-    ring.connect(ringGain).connect(this.master);
+    ring.connect(ringGain).connect(this.out);
 
     sweep.start(t);        pop.start(t + 0.07);  ring.start(t + 0.09);
     sweep.stop(t + 0.10);  pop.stop(t + 0.25);   ring.stop(t + 0.42);
@@ -852,7 +906,7 @@ export class AudioManager {
     f.type = 'lowpass';
     f.frequency.value = 2200;
     const g = this._envGain(0.14, 0.001, 0.07, t);
-    osc.connect(f).connect(g).connect(this.master);
+    osc.connect(f).connect(g).connect(this.out);
     osc.start(t); osc.stop(t + 0.09);
   }
 
@@ -866,7 +920,7 @@ export class AudioManager {
       osc.type = 'sine';
       osc.frequency.value = freq * (0.96 + Math.random() * 0.08);
       const g = this._envGain(0.055 / (i + 1), 0.001, 0.11 - i * 0.02, t);
-      osc.connect(g).connect(this.master);
+      osc.connect(g).connect(this.out);
       osc.start(t); osc.stop(t + 0.14);
     });
     const noise = this.ctx.createBufferSource();
@@ -875,7 +929,7 @@ export class AudioManager {
     nf.type = 'highpass';
     nf.frequency.value = 3200;
     const nGain = this._envGain(0.07, 0.001, 0.03, t);
-    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.connect(nf).connect(nGain).connect(this.out);
     noise.start(t); noise.stop(t + 0.04);
   }
 
@@ -888,7 +942,7 @@ export class AudioManager {
       osc.type = 'square';
       osc.frequency.value = 370 - i * 35;
       const g = this._envGain(0.14, 0.001, 0.06, t + off);
-      osc.connect(g).connect(this.master);
+      osc.connect(g).connect(this.out);
       osc.start(t + off); osc.stop(t + off + 0.08);
     });
   }
@@ -906,7 +960,7 @@ export class AudioManager {
     f.frequency.value = 1700;
     f.Q.value = 1.6;
     const g = this._envGain(0.24, 0.001, 0.065, t);
-    osc.connect(f).connect(g).connect(this.master);
+    osc.connect(f).connect(g).connect(this.out);
     osc.start(t); osc.stop(t + 0.08);
   }
 
@@ -929,7 +983,7 @@ export class AudioManager {
     lp.frequency.setValueAtTime(560, t);
     lp.frequency.exponentialRampToValueAtTime(180, t + 0.65);
     const g = this._envGain(0.25, 0.08, 0.52, t);
-    osc.connect(lp).connect(g).connect(this.master);
+    osc.connect(lp).connect(g).connect(this.out);
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(0.7);
     const nf = this.ctx.createBiquadFilter();
@@ -937,7 +991,7 @@ export class AudioManager {
     nf.frequency.value = 380;
     nf.Q.value = 0.55;
     const nGain = this._envGain(0.16, 0.06, 0.52, t);
-    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.connect(nf).connect(nGain).connect(this.out);
     lfo.start(t); osc.start(t); noise.start(t);
     lfo.stop(t + 0.72); osc.stop(t + 0.72); noise.stop(t + 0.72);
   }
@@ -953,7 +1007,7 @@ export class AudioManager {
     f1.frequency.setValueAtTime(820, t);
     f1.frequency.exponentialRampToValueAtTime(110, t + 0.24);
     const g1 = this._envGain(0.5, 0.002, 0.24, t);
-    noise.connect(f1).connect(g1).connect(this.master);
+    noise.connect(f1).connect(g1).connect(this.out);
     const osc = this.ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(128, t + 0.04);
@@ -962,7 +1016,7 @@ export class AudioManager {
     lp.type = 'lowpass';
     lp.frequency.value = 480;
     const g2 = this._envGain(0.32, 0.01, 0.42, t + 0.04);
-    osc.connect(lp).connect(g2).connect(this.master);
+    osc.connect(lp).connect(g2).connect(this.out);
     noise.start(t); osc.start(t + 0.04);
     noise.stop(t + 0.30); osc.stop(t + 0.52);
   }
@@ -976,14 +1030,14 @@ export class AudioManager {
     osc.frequency.setValueAtTime(195, t);
     osc.frequency.exponentialRampToValueAtTime(48, t + 0.13);
     const g = this._envGain(0.42, 0.001, 0.13, t);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.out);
     const noise = this.ctx.createBufferSource();
     noise.buffer = this._noiseBuffer(0.09);
     const nf = this.ctx.createBiquadFilter();
     nf.type = 'lowpass';
     nf.frequency.value = 1100;
     const nGain = this._envGain(0.28, 0.001, 0.07, t);
-    noise.connect(nf).connect(nGain).connect(this.master);
+    noise.connect(nf).connect(nGain).connect(this.out);
     osc.start(t); noise.start(t);
     osc.stop(t + 0.15); noise.stop(t + 0.10);
   }
@@ -1000,7 +1054,7 @@ export class AudioManager {
     lp.frequency.value = 160;
     const ambGain = this.ctx.createGain();
     ambGain.gain.value = 0.055;
-    noise.connect(lp).connect(ambGain).connect(this.master);
+    noise.connect(lp).connect(ambGain).connect(this.out);
     noise.start();
     this._ambientNoise = noise;
     // (No siren — the arena is an indoor mall, so the wailing two-tone siren

@@ -18,9 +18,10 @@ function randomTag(used) {
 }
 
 export class BotManager {
-  constructor(world, scene) {
+  constructor(world, scene, audio = null) {
     this.world = world;
     this.scene = scene;
+    this.audio = audio;   // bots emit positional gunfire / footsteps / death
     this.bots  = [];
     this._usedTags = new Set();
   }
@@ -40,6 +41,7 @@ export class BotManager {
     const idx   = this.bots.length;
     const point = this.world.spawnPoints[idx % this.world.spawnPoints.length].clone();
     const bot   = new Bot(this.world, point);
+    bot.audio       = this.audio;
     bot.noRespawn   = noRespawn;
     bot.maxHealth   = Math.round(100 * healthMult);
     bot.health      = bot.maxHealth;

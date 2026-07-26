@@ -6,20 +6,47 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
+const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
+const _tmpB = new THREE.Vector3();
 
 // AR-type ranged stats — sword bots skip shooting entirely.
-// Slower fire + short range: bots are not meant to be a real threat.
-const AR_GUN = { damage: 14, fireRate: 0.30, range: 14, spread: 0.07 };
+const AR_GUN = { damage: 11, fireRate: 0.13, range: 34 };
 
-const DETECT_RADIUS = 15;
+const DETECT_RADIUS = 34;      // how far a bot can notice you (needs clear LOS)
 const ATTACK_RADIUS = 1.9;
 const ATTACK_DAMAGE = 7;
 const ATTACK_COOLDOWN = 1.5;
 const RESPAWN_DELAY = 4;
 const RADIUS = 0.5;
-// Bots are passive: they ignore the player until shot, then retaliate for a
-// short window (and even then they aim badly).
+// Aggro persists this long after losing sight of you, so breaking line of
+// sight buys you a few seconds rather than instantly erasing you.
 const PROVOKE_DURATION = 7;
+
+// ── Combat tuning ────────────────────────────────────────────────────────────
+// Bots shoot real rays through the world now, so these are the only knobs that
+// decide how dangerous they are. Aim cone is the big one.
+// Aim error is expressed in METRES AT THE TARGET, not as an angle: a bot
+// "misses by about half a metre, more the further away you are". That reads
+// directly as difficulty, and unlike a fixed angular cone it doesn't make them
+// perfect marksmen at point-blank range (a 3° cone at 5m cannot miss a torso).
+const AIM_ERR_BASE  = 0.62;    // metres of scatter at zero range
+const AIM_ERR_PER_M = 0.045;   // extra metres of scatter per metre of distance
+const AIM_SKILL_MIN = 0.80;    // per-bot multiplier — lower is a better shot
+const AIM_SKILL_MAX = 1.45;
+const REACTION_MIN  = 0.28;    // seconds between seeing you and firing
+const REACTION_MAX  = 0.62;
+const BURST_MIN     = 3;       // rounds per burst
+const BURST_MAX     = 6;
+const BURST_REST    = 0.45;    // pause between bursts (plus jitter)
+const PREFERRED_MIN = 7;       // AR bots hold this range band
+const PREFERRED_MAX = 18;
+const STRAFE_SPEED  = 0.75;    // fraction of run speed used sidestepping
+// Player hitboxes, relative to their feet: a torso capsule-ish sphere and a
+// head. Bots do NOT get a headshot bonus — they just have to hit you.
+const PLAYER_BODY_Y = 1.05, PLAYER_BODY_R = 0.42;
+const PLAYER_HEAD_Y = 1.60, PLAYER_HEAD_R = 0.24;
+// Set to true to restore the old behaviour: bots ignore you until you shoot one.
+const PASSIVE_UNTIL_PROVOKED = false;
 
 let nextId = 1;
 
@@ -82,8 +109,15 @@ export class Bot {
     this._isSwordBot  = Math.random() < 0.40;
     this._botGun      = this._isSwordBot ? null : AR_GUN;
     this._gunTimer    = Math.random() * 0.8;
-    // Deliberately poor aim — bots rarely actually land a shot.
-    this._accuracy    = 0.10 + Math.random() * 0.14;
+    // Per-bot marksmanship multiplier on the aim error. Rolling this per bot is
+    // what makes some of them feel dangerous and others sloppy.
+    this._aimSkill    = AIM_SKILL_MIN + Math.random() * (AIM_SKILL_MAX - AIM_SKILL_MIN);
+    this._burstLeft   = 0;       // rounds remaining in the current burst
+    this._burstRest   = 0;       // pause between bursts
+    this._reactT      = 0;       // reaction delay before a fresh target is engaged
+    this._strafeDir   = Math.random() < 0.5 ? 1 : -1;
+    this._strafeT     = 0;       // time until the next strafe direction change
+    this._footPhase   = 0;       // last walk-cycle phase a footstep played on
     this._weaponT     = Math.random() * Math.PI * 2; // phase offset for variety
     this._alertBlend  = 0;   // 0 = low-ready, 1 = high-ready/aiming
     this._weaponMesh  = null;
@@ -106,6 +140,10 @@ export class Bot {
     this._shootTarget = new THREE.Vector3();
     this._shootDir    = new THREE.Vector3();
     this._raycaster   = new THREE.Raycaster();
+    this._strafeVec   = new THREE.Vector3();
+    this._bulletRay   = new THREE.Ray();
+    this._sphere      = new THREE.Sphere();
+    this._hitPt       = new THREE.Vector3();
 
     this.position = spawnPoint.clone();
 
@@ -208,6 +246,7 @@ export class Bot {
   }
 
   die() {
+    if (this.audio) this.audio.playAt(this.position, () => { this.audio.playHurt(); this.audio.playLand(true); });
     this.alive = false;
     this._dying      = true;
     this._deathT     = 0;
@@ -258,24 +297,31 @@ export class Bot {
     }
   }
 
+  /** Clear line of sight from the bot's eye to the player's chest? */
+  hasLineOfSight(player, world) {
+    this._shootFrom.set(this.position.x, this.position.y + 1.5, this.position.z);
+    this._shootTarget.set(player.position.x, player.position.y + PLAYER_BODY_Y, player.position.z);
+    const dist = this._shootFrom.distanceTo(this._shootTarget);
+    if (dist < 0.5) return true;
+    this._shootDir.subVectors(this._shootTarget, this._shootFrom).normalize();
+    if (!world?.colliders?.length) return true;
+    // Collider VISUALS get a mesh raycast; the map's bare box colliders (trees,
+    // kiosks, benches, escalators — most of the mall's cover) need their own
+    // ray/AABB test, or bots see straight through everything you hide behind.
+    this._raycaster.near = 0.2;
+    this._raycaster.far  = dist - 0.5;
+    this._raycaster.set(this._shootFrom, this._shootDir);
+    if (this._raycaster.intersectObjects(world.raycastMeshes, true).length) return false;
+    if (world.raycastBoxHit(this._raycaster.ray, this._raycaster.far)) return false;
+    return true;
+  }
+
   _shootAt(player, onAttack, world) {
     this._shootFrom.set(this.position.x, this.position.y + 1.5, this.position.z);
-    this._shootTarget.set(player.position.x, player.position.y + 1.0, player.position.z);
+    this._shootTarget.set(player.position.x, player.position.y + PLAYER_BODY_Y, player.position.z);
     const dist = this._shootFrom.distanceTo(this._shootTarget);
     if (dist < 0.5) return;
     this._shootDir.subVectors(this._shootTarget, this._shootFrom).normalize();
-
-    // Line-of-sight check against world geometry. Collider VISUALS get a mesh
-    // raycast; the map's bare box colliders (trees, kiosks, benches, escalators
-    // — most of the mall's cover) need their own ray/AABB test, or bots shoot
-    // straight through everything you'd think to hide behind.
-    if (world?.colliders?.length) {
-      this._raycaster.near = 0.2;
-      this._raycaster.far  = dist - 0.5;
-      this._raycaster.set(this._shootFrom, this._shootDir);
-      if (this._raycaster.intersectObjects(world.raycastMeshes, true).length) return;
-      if (world.raycastBoxHit(this._raycaster.ray, this._raycaster.far)) return;
-    }
 
     // Fire feedback: rigged humans use their skeletal recoil; cyborg/procedural
     // bots get a weapon recoil kick + a muzzle flash (driven in update()).
@@ -287,10 +333,56 @@ export class Bot {
       this._muzzleFlash.rotation.set(0, 0, Math.random() * Math.PI);
       this._muzzleFlash.scale.setScalar(0.75 + Math.random() * 0.6);
     }
+    if (this.audio) this.audio.playAt(this._shootFrom, () => this.audio.playShot('rifle'));
 
-    // Hit probability falls off with distance
-    const hitP = this._accuracy * Math.max(0.1, 1 - dist / (this._botGun.range * 1.5));
-    if (Math.random() < hitP) onAttack(this._botGun.damage);
+    // ── The bullet is a real ray ───────────────────────────────────────────────
+    // Scatter it inside the bot's aim cone, then see what it actually hits. This
+    // is the whole point: cover blocks it, distance widens the cone's footprint,
+    // and strafing makes it miss — none of which a probability roll can express.
+    // Scatter radius in metres at the target, converted to an angle.
+    const spread = (AIM_ERR_BASE + AIM_ERR_PER_M * dist) * this._aimSkill / Math.max(1, dist);
+    _tmpA.set(-this._shootDir.z, 0, this._shootDir.x);              // horizontal ⊥
+    if (_tmpA.lengthSq() < 1e-6) _tmpA.set(1, 0, 0);
+    _tmpA.normalize();
+    _tmpB.crossVectors(this._shootDir, _tmpA).normalize();          // vertical ⊥
+    const ang = Math.random() * Math.PI * 2;
+    const rad = Math.sqrt(Math.random()) * spread;                  // uniform in the disc
+    this._shootDir
+      .addScaledVector(_tmpA, Math.cos(ang) * rad)
+      .addScaledVector(_tmpB, Math.sin(ang) * rad)
+      .normalize();
+
+    this._bulletRay.set(this._shootFrom, this._shootDir);
+    const range = this._botGun.range;
+
+    // Nearest world obstruction along the bullet's actual path.
+    let blockAt = Infinity;
+    if (world?.colliders?.length) {
+      this._raycaster.near = 0.2;
+      this._raycaster.far  = range;
+      this._raycaster.set(this._shootFrom, this._shootDir);
+      const wh = this._raycaster.intersectObjects(world.raycastMeshes, true);
+      if (wh.length) blockAt = wh[0].distance;
+      const bh = world.raycastBoxHit(this._bulletRay, range);
+      if (bh && bh.distance < blockAt) blockAt = bh.distance;
+    }
+
+    // Does it reach the player before that?
+    const hitDist = this._rayHitsPlayer(player, range);
+    if (hitDist !== null && hitDist < blockAt) onAttack(this._botGun.damage, this.position);
+  }
+
+  /** Distance along _bulletRay at which it strikes the player, or null. */
+  _rayHitsPlayer(player, range) {
+    let best = null;
+    for (const [dy, r] of [[PLAYER_BODY_Y, PLAYER_BODY_R], [PLAYER_HEAD_Y, PLAYER_HEAD_R]]) {
+      this._sphere.center.set(player.position.x, player.position.y + dy, player.position.z);
+      this._sphere.radius = r;
+      if (!this._bulletRay.intersectSphere(this._sphere, this._hitPt)) continue;
+      const d = this._bulletRay.origin.distanceTo(this._hitPt);
+      if (d <= range && (best === null || d < best)) best = d;
+    }
+    return best;
   }
 
   update(dt, player, camera, onAttack, world) {
@@ -379,13 +471,34 @@ export class Bot {
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
-    // Passive AI: a bot only engages while provoked (recently shot). Otherwise it
-    // wanders and ignores the player entirely.
+    // ── Awareness ──────────────────────────────────────────────────────────────
+    // A bot acquires you by SEEING you: in range, with clear line of sight. Aggro
+    // then persists for PROVOKE_DURATION, so breaking LOS buys you a few seconds
+    // instead of deleting you from its memory instantly. Getting shot still
+    // aggroes immediately (takeDamage sets _provoked), which is how you pull a
+    // bot that hasn't spotted you.
     if (this._provokeTimer > 0) {
       this._provokeTimer -= dt;
       if (this._provokeTimer <= 0) this._provoked = false;
     }
-    const engaged = this._provoked && !player.isDead && distToPlayer < DETECT_RADIUS;
+    const inRange = !player.isDead && distToPlayer < DETECT_RADIUS;
+    let canSee = false;
+    if (inRange && !PASSIVE_UNTIL_PROVOKED) {
+      // Only pay for the LOS raycast a few times a second per bot.
+      this._losT = (this._losT || 0) - dt;
+      if (this._losT <= 0) {
+        this._losT = 0.12 + Math.random() * 0.1;
+        this._losCache = this.hasLineOfSight(player, world);
+      }
+      canSee = this._losCache;
+      if (canSee) {
+        if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
+        this._provoked = true;
+        this._provokeTimer = PROVOKE_DURATION;
+      }
+    }
+    if (this._reactT > 0) this._reactT -= dt;
+    const engaged = this._provoked && inRange;
 
     let moveTarget = null;
     if (engaged) {
@@ -399,16 +512,48 @@ export class Bot {
       this._targetYaw = Math.atan2(player.position.x - this.position.x,
                                    player.position.z - this.position.z)
                         + (this._isHuman ? 0 : Math.PI);
-      if (distToPlayer > ATTACK_RADIUS * 0.85) {
-        moveTarget = toPlayer.normalize();
-        // AR bots shoot while closing in; sword bots only melee
-        if (this._botGun && distToPlayer < this._botGun.range) {
-          this._gunTimer -= dt;
-          if (this._gunTimer <= 0) {
-            this._gunTimer = this._botGun.fireRate * (0.7 + Math.random() * 0.6);
-            this._shootAt(player, onAttack, world);
-          }
+      if (this._botGun) {
+        // ── Gunfighter movement ──────────────────────────────────────────────
+        // Hold a range band and sidestep across it rather than walking into
+        // your crosshair. Flip the strafe direction periodically (and whenever
+        // a wall stops the sidestep) so the movement isn't a readable pendulum.
+        toPlayer.normalize();
+        this._strafeT -= dt;
+        if (this._strafeT <= 0) {
+          this._strafeT = 1.1 + Math.random() * 1.6;
+          if (Math.random() < 0.45) this._strafeDir *= -1;
         }
+        this._strafeVec.set(-toPlayer.z, 0, toPlayer.x).multiplyScalar(this._strafeDir);
+
+        let advance = 0;
+        if (distToPlayer > PREFERRED_MAX)      advance =  1;    // close the gap
+        else if (distToPlayer < PREFERRED_MIN) advance = -1;    // back off
+        moveTarget = this._strafeVec.multiplyScalar(STRAFE_SPEED)
+          .addScaledVector(toPlayer, advance).normalize();
+
+        // ── Burst fire ────────────────────────────────────────────────────────
+        // Firing in bursts with a beat between them is both fairer and far more
+        // readable than a metronome — you get a window to push or break away.
+        const canFire = canSee && this._reactT <= 0 && distToPlayer < this._botGun.range;
+        if (canFire) {
+          if (this._burstRest > 0) {
+            this._burstRest -= dt;
+          } else {
+            if (this._burstLeft <= 0) {
+              this._burstLeft = BURST_MIN + Math.floor(Math.random() * (BURST_MAX - BURST_MIN + 1));
+            }
+            this._gunTimer -= dt;
+            if (this._gunTimer <= 0) {
+              this._gunTimer = this._botGun.fireRate * (0.9 + Math.random() * 0.2);
+              this._shootAt(player, onAttack, world);
+              if (--this._burstLeft <= 0) this._burstRest = BURST_REST * (0.7 + Math.random() * 0.8);
+            }
+          }
+        } else {
+          this._burstLeft = 0;
+        }
+      } else if (distToPlayer > ATTACK_RADIUS * 0.85) {
+        moveTarget = toPlayer.normalize();       // sword bot: run them down
       } else if (this.attackCooldown <= 0) {
         this.attackCooldown = ATTACK_COOLDOWN;
         this.lungeTimer = 0.2;
@@ -507,6 +652,15 @@ export class Bot {
       // Bots pick a speed in [2.6, 3.8]; map that onto the walk→run blend.
       const run = THREE.MathUtils.clamp((this.speed - 2.7) / 1.1, 0, 1);
       gait = applyWalkCycle(this._rig, { t: this._walkT, moving: isMoving, run, dt });
+      // Footsteps, one per heel strike (twice a stride), placed in the world so
+      // you can hear someone coming up behind you.
+      if (isMoving && this.audio) {
+        const step = Math.floor(this._walkT / Math.PI);
+        if (step !== this._footPhase) {
+          this._footPhase = step;
+          this.audio.playAt(this.position, () => this.audio.playFootstep(run > 0.6));
+        }
+      }
       // The pelvis drops at full stride and the body leans into the run. Local
       // pitch (the mesh is YXZ-ordered) so the lean follows the facing.
       this.mesh.position.y = this.position.y + gait.bob;

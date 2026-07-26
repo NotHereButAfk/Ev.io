@@ -230,6 +230,27 @@ export class HUD {
     this._abilityQ.classList.toggle('ready', ratio >= 1);
   }
 
+  /**
+   * Point an arc at whatever just hit you.
+   * @param {THREE.Vector3} from    world position of the shooter
+   * @param {THREE.Vector3} self    world position of the player
+   * @param {number} yaw            player's facing (game forward is +Z)
+   */
+  showDamageFrom(from, self, yaw) {
+    const host = this._damageDirs || (this._damageDirs = document.getElementById('damage-dirs'));
+    if (!host) return;
+    // Angle to the shooter in world space, minus where we're looking → an angle
+    // relative to the crosshair, with 0° meaning "dead ahead".
+    const world = Math.atan2(from.x - self.x, from.z - self.z);
+    let rel = world - yaw;
+    rel = Math.atan2(Math.sin(rel), Math.cos(rel));        // wrap to ±π
+    const el = document.createElement('div');
+    el.className = 'dmg-dir';
+    el.style.setProperty('--a', `${(-rel * 180) / Math.PI}deg`);
+    host.appendChild(el);
+    setTimeout(() => el.remove(), 1200);
+  }
+
   flashDamage() {
     this.damageFlash.classList.remove('show');
     void this.damageFlash.offsetWidth;

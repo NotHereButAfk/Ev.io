@@ -974,7 +974,7 @@ export class Zombie {
   _fireAt(player, onAttack) {
     const cfg = ARMED_CFG[this.armedType];
     if (Math.random() < cfg.accuracy) {
-      onAttack(cfg.damage);
+      onAttack(cfg.damage, this.position);
     }
     if (this._muzzleFlash) {
       this._muzzleFlash.intensity = 5.5;
@@ -1102,7 +1102,7 @@ export class Zombie {
             this.attackCooldown = ATTACK_COOLDOWN;
             this.lungeTimer     = 0.2;
             if (this.audio) this.audio.playZombieAttack();
-            onAttack(this.attackDamage);
+            onAttack(this.attackDamage, this.position);
           }
         } else if (dist <= cfg.stopRange) {
           // Stand and shoot
@@ -1135,7 +1135,7 @@ export class Zombie {
           this.attackCooldown = ATTACK_COOLDOWN;
           this.lungeTimer     = 0.2;
           if (this.audio) this.audio.playZombieAttack();
-          onAttack(this.attackDamage);
+          onAttack(this.attackDamage, this.position);
         }
       }
     } else if (!this.armedType) {
