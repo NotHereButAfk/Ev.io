@@ -605,19 +605,17 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // REAL SHOPPING MALL: a bright, daylit two-level retail gallery — warm-lit
-    // glass storefronts, a walkable mezzanine around a central light-well, palm
-    // planters, escalators + glass elevators, and a vaulted glass skylight roof
-    // flooding the concourse with daylight. Medium-sized.
+    // OBSERVED EV.IO ARENA: dark monumental bastions against a bright open sky,
+    // red route markings, cyan power panels, steep roof ramps, two bridge lanes,
+    // and a layered central fight space. Built from the gameplay capture rather
+    // than a literal asset rip, so the silhouette and routes are original.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildArenaWalls();      // pale plaster mall shell
-    this._buildMall();            // 2-level concourse, glass storefronts, escalators
-    this._buildGlassRoof();       // vaulted glass skylight — the daylight landmark
+    this._buildEvioArena();
     this._buildSpawnPoints();
 
-    this.previewPedestalPos = new THREE.Vector3(0, 0, 46);
+    this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
 
     // Lock world matrix on every static mesh built above so Three.js skips
     // recomputing it on every frame. Dynamic objects (bots, player, pickups)
@@ -634,32 +632,23 @@ export class World {
   }
 
   _buildLighting() {
-    // SKY LIGHT ONLY. Per request, the scene has no other lights anywhere — no
-    // directional key/fill, no point lights, no shadows. Surfaces are lit by this
-    // single hemisphere (sky) light plus the scene's environment map (IBL) and
-    // emissive accents, which is the cheapest possible lighting to render.
-    // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
-    // the horizon fires rake warm light across the alloy structures.
-    // Bright DAYLIGHT retail interior — a real mall with a glass roof. A strong
-    // warm-white sky fill (daylight bouncing off pale floors and ceilings) plus a
-    // high overhead key simulating sun pouring through the barrel-vault skylight.
-    const hemi = new THREE.HemisphereLight(0xf4f8ff, 0xcfd4d8, 2.15);
+    // Cool open-sky fill keeps the black architecture readable; the warm rim
+    // catches red route edges without flattening the deep canyon shadows.
+    const hemi = new THREE.HemisphereLight(0xa8d9ff, 0x10141c, 1.35);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff6ea, 1.7);
-    key.position.set(10, 160, 30);   // near-vertical: sun through the roof
-    key.castShadow = false;
-    this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xdfeaff, 0.7);
-    fill.position.set(-70, 60, -60);
-    this.scene.add(fill);
+    const sun = new THREE.DirectionalLight(0xe9f6ff, 1.2);
+    sun.position.set(-70, 105, 28);
+    sun.castShadow = false;
+    this.scene.add(sun);
+    const rim = new THREE.DirectionalLight(0xff6048, 0.45);
+    rim.position.set(75, 28, -45);
+    rim.castShadow = false;
+    this.scene.add(rim);
   }
 
   _buildGround() {
-    // Polished cream stone-tile concourse floor — warm pale travertine with a
-    // soft sheen (clearcoat) and a faint tile grout grid, like a real mall.
-    const floor = new THREE.MeshPhysicalMaterial({
-      color: 0xdcd3c2, roughness: 0.35, metalness: 0.0,
-      clearcoat: 0.55, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
+    const floor = new THREE.MeshStandardMaterial({
+      color: 0x171b22, roughness: 0.78, metalness: 0.28, envMapIntensity: 0.45,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -667,26 +656,35 @@ export class World {
     ground.matrixAutoUpdate = false;
     ground.updateMatrix();
     this.scene.add(ground);
-    // faint tile grout seams
-    const grid = new THREE.GridHelper(ARENA_HALF * 2, 44, 0xb7ad99, 0xc7bfad);
-    grid.position.y = 0.03;
+
+    // Broad panel seams keep scale legible while sprinting across the courtyards.
+    const grid = new THREE.GridHelper(ARENA_HALF * 2, 32, 0x3b4654, 0x242b34);
+    grid.position.y = 0.025;
     grid.material.transparent = true;
-    grid.material.opacity = 0.5;
+    grid.material.opacity = 0.34;
     grid.matrixAutoUpdate = false;
     grid.updateMatrix();
     this.scene.add(grid);
   }
 
   _buildSky() {
-    // Clean bright skydome — light blue zenith fading to near-white horizon.
-    // No stars / moon: this is a daylit arena, not a neon night city.
+    const canvas = document.createElement('canvas');
+    canvas.width = 16; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, '#3f8fcb');
+    grad.addColorStop(0.55, '#77b9e4');
+    grad.addColorStop(0.82, '#b9def2');
+    grad.addColorStop(1, '#e5b0a1');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 16, 512);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(420, 32, 16),
       new THREE.MeshBasicMaterial({
-        map: makeSkyGradientTexture(),
-        side: THREE.BackSide,
-        fog: false,
-        depthWrite: false,
+        map: texture, side: THREE.BackSide, fog: false, depthWrite: false,
       })
     );
     sky.matrixAutoUpdate = false;
@@ -2663,6 +2661,173 @@ export class World {
   // light-well. A tiered stone fountain, leafy ficus trees and retail kiosks are
   // the cover. Daylight pours in through the vaulted glass roof (_buildGlassRoof).
   // ═════════════════════════════════════════════════════════════════════════
+  // Recreated from the observed ev.io match: four black bastions connected by
+  // high bridge lanes, a lower command deck, long exposed ramps, red navigation
+  // bands and cyan wall modules. Route geometry is registered in platforms[] so
+  // the same surfaces are walkable by both the legacy controller and MoveSim.
+  _buildEvioArena() {
+    const concrete = new THREE.MeshStandardMaterial({
+      color: 0x20242b, roughness: 0.8, metalness: 0.2, envMapIntensity: 0.45,
+    });
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x0d1015, roughness: 0.72, metalness: 0.42, envMapIntensity: 0.35,
+    });
+    const deck = new THREE.MeshStandardMaterial({
+      color: 0x2d323a, roughness: 0.68, metalness: 0.36, envMapIntensity: 0.5,
+    });
+    const inset = new THREE.MeshStandardMaterial({
+      color: 0x080b10, roughness: 0.5, metalness: 0.62,
+    });
+    const red = this._neonMat(0xff3b24);
+    const cyan = this._neonMat(0x20cfff);
+    const amber = this._neonMat(0xffa12c);
+
+    const solid = (x, y, z, w, h, d, mat = concrete) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this._addCollider(mesh);
+      return mesh;
+    };
+    const decor = (x, y, z, w, h, d, mat = dark, ry = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = ry;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const strip = (x, y, z, w, h, d, mat = red, ry = 0) => {
+      const mesh = decor(x, y, z, w, h, d, mat, ry);
+      mesh.userData.noHit = true;
+      return mesh;
+    };
+
+    // Arena shell: massive dark walls with layered battlements and hot red bands.
+    const wallH = 27, wallT = 2.4, half = ARENA_HALF;
+    solid(0, wallH / 2, -half, half * 2 + wallT * 2, wallH, wallT, dark);
+    solid(0, wallH / 2,  half, half * 2 + wallT * 2, wallH, wallT, dark);
+    solid(-half, wallH / 2, 0, wallT, wallH, half * 2 + wallT * 2, dark);
+    solid( half, wallH / 2, 0, wallT, wallH, half * 2 + wallT * 2, dark);
+    strip(0, 4.2, -half + 1.26, half * 2, 0.24, 0.08);
+    strip(0, 4.2,  half - 1.26, half * 2, 0.24, 0.08);
+    strip(-half + 1.26, 4.2, 0, 0.08, 0.24, half * 2);
+    strip( half - 1.26, 4.2, 0, 0.08, 0.24, half * 2);
+
+    // Wall buttresses make the perimeter read as a city-sized machine.
+    for (let p = -52; p <= 52; p += 13) {
+      decor(p, 10, -half + 2.1, 3.4, 20, 2.4, concrete);
+      decor(p, 10,  half - 2.1, 3.4, 20, 2.4, concrete);
+      decor(-half + 2.1, 10, p, 2.4, 20, 3.4, concrete);
+      decor( half - 2.1, 10, p, 2.4, 20, 3.4, concrete);
+    }
+
+    // Navigation lines mirror the strong red lanes visible on every ramp/roof.
+    for (const x of [-7.2, 7.2]) strip(x, 0.045, 0, 0.16, 0.06, 112);
+    for (const z of [-30, 30]) strip(0, 0.05, z, 112, 0.07, 0.2);
+    for (const x of [-30, 30]) strip(x, 0.05, 0, 0.2, 0.07, 112);
+    // Short white/cyan landing ticks break up the long sight lines.
+    for (let z = -48; z <= 48; z += 12) {
+      strip(-6.5, 0.052, z, 1.2, 0.065, 0.14, cyan);
+      strip( 6.5, 0.052, z, 1.2, 0.065, 0.14, cyan);
+    }
+
+    const addPanelBank = (x, z, faceX) => {
+      const px = x + faceX * 9.08;
+      for (const oz of [-6, -2, 2, 6]) {
+        strip(px, 4.7, z + oz, 0.1, 4.7, 1.15, cyan);
+        decor(px - faceX * 0.08, 4.7, z + oz, 0.16, 5.2, 1.65, inset);
+      }
+      strip(px + faceX * 0.03, 7.55, z, 0.12, 0.28, 15.8, red);
+    };
+
+    const bastion = (x, z) => {
+      // Accessible lower roof at y=9; the narrow upper core leaves a fighting ring.
+      solid(x, 4.45, z, 20, 8.9, 22, concrete);
+      this._platformBox(x, z, 20, 22, 9, deck, 0xff3b24);
+      solid(x, 16.5, z, 9.5, 15, 11, dark);
+      decor(x, 24.8, z, 12.5, 1.4, 14, concrete);
+      decor(x, 27.5, z, 5.5, 6.8, 6.5, dark);
+      // Slab collars and fins create the stepped silhouette seen across the map.
+      decor(x, 11.0, z, 15.5, 1.1, 16, inset);
+      decor(x, 21.0, z, 12.2, 0.9, 13.5, concrete);
+      for (const side of [-1, 1]) {
+        decor(x + side * 7.8, 14.5, z, 1.1, 13, 15, concrete);
+        strip(x + side * 8.36, 14.5, z, 0.12, 9.5, 8.5, red);
+      }
+      addPanelBank(x, z, x < 0 ? 1 : -1);
+      // Roof-edge pickups read as the bright floating nodes from the capture.
+      this._spawnPadMarker(x, z + (z < 0 ? 6.5 : -6.5), 9, 0xff8a2c);
+    };
+
+    bastion(-32, -30);
+    bastion( 32, -30);
+    bastion(-32,  30);
+    bastion( 32,  30);
+
+    // Twin high bridges are the dominant roof route. Their ends meet the four
+    // bastion roofs exactly; outer ramps provide a risky but fast climb.
+    this._platformBox(0, -30, 44, 6, 9, deck, 0xff3b24);
+    this._platformBox(0,  30, 44, 6, 9, deck, 0xff3b24);
+    for (const z of [-30, 30]) {
+      this._rampBox(-52, -42, z - 3, z + 3, 0, 9, 'x', deck, 0xff3b24);
+      this._rampBox( 42,  52, z - 3, z + 3, 9, 0, 'x', deck, 0xff3b24);
+    }
+
+    // Central command deck: four short approaches plus two long spine ramps that
+    // climb into the north/south bridge lanes.
+    this._platformBox(0, 0, 18, 18, 5.5, deck, 0xff3b24);
+    this._rampBox(-19, -9, -3, 3, 0, 5.5, 'x', deck, 0xff3b24);
+    this._rampBox(  9, 19, -3, 3, 5.5, 0, 'x', deck, 0xff3b24);
+    this._rampBox(-3, 3, -19, -9, 0, 5.5, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3,   9, 19, 5.5, 0, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3, -30, -9, 9, 5.5, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3,   9, 30, 5.5, 9, 'z', deck, 0xff3b24);
+
+    // The centre is cover, not a dead flat tabletop.
+    solid(0, 8.5, 0, 5.2, 6, 5.2, inset);
+    for (const a of [0, Math.PI / 2]) {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.13, 8, 28), cyan);
+      halo.position.set(0, 10.8, 0);
+      halo.rotation.set(a === 0 ? Math.PI / 2 : 0, a, 0);
+      halo.userData.noHit = true;
+      this.scene.add(halo);
+      this._spinRings.push({ mesh: halo, speed: a === 0 ? 0.28 : -0.22 });
+    }
+
+    // Ground-level cover clusters produce the short-range corner fights seen in
+    // the recording without sealing the broad rifle lanes.
+    const cover = [
+      [-18, -15, 5, 3.2, 7], [18, -15, 5, 3.2, 7],
+      [-18,  15, 5, 3.2, 7], [18,  15, 5, 3.2, 7],
+      [-47,   0, 7, 4.5, 4], [47,   0, 7, 4.5, 4],
+      [-12, -46, 4, 3.5, 7], [12, -46, 4, 3.5, 7],
+      [-12,  46, 4, 3.5, 7], [12,  46, 4, 3.5, 7],
+    ];
+    for (const [x, z, w, h, d] of cover) {
+      solid(x, h / 2, z, w, h, d, concrete);
+      strip(x, h + 0.035, z, w + 0.12, 0.08, d + 0.12, x === 0 ? cyan : red);
+    }
+
+    // Corner skyline anchors and glowing server-bank faces frame the open sky.
+    for (const [x, z] of [[-53,-52],[53,-52],[-53,52],[53,52]]) {
+      solid(x, 11, z, 10, 22, 10, dark);
+      decor(x, 23.5, z, 13, 3, 13, concrete);
+      for (let i = -1; i <= 1; i++) {
+        const towardX = -Math.sign(x);
+        strip(x + towardX * 5.06, 9 + i * 4.2, z, 0.1, 1.7, 6.2, cyan);
+      }
+      strip(x, 25.1, z, 8, 0.22, 8, amber);
+    }
+
+    // Vertical shortcuts echo ev.io's ability-driven movement without forcing
+    // them: grav lifts land on the two bridge routes, while ramps remain primary.
+    this._gravLift(0, -42, 9, 15);
+    this._gravLift(0,  42, 9, 15);
+  }
+
   _buildMall() {
     // Bright retail palette.
     const frameM  = new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.55, metalness: 0.15 }); // white shopfront frame
@@ -3401,19 +3566,15 @@ export class World {
   }
 
   _buildSpawnPoints() {
-    // Mall spawns: ground concourse + mezzanine. The axis spawns sit inside the
-    // escalator runs' inner ends (±24..34), so they stay closer at ±18.
+    // Ground-level starts sit in the open quadrants and perimeter approach lanes;
+    // nobody spawns inside a bastion base or directly on a ramp trigger.
     const coords = [
-      // ground-floor concourse (around the central fountain)
-      [24, 24], [-24, 24], [24, -24], [-24, -24],
-      [0, 18], [0, -18], [18, 0], [-18, 0],
-      // upper-floor mezzanine balconies (spawn falls onto the y6.6 deck)
-      [0, 46], [0, -46], [46, 0], [-46, 0],
-      [42, 42], [-42, 42], [42, -42], [-42, -42],
+      [0, -52], [0, 52], [-52, 0], [52, 0],
+      [-18, -18], [18, -18], [-18, 18], [18, 18],
+      [-14, -42], [14, -42], [-14, 42], [14, 42],
+      [-42, -14], [-42, 14], [42, -14], [42, 14],
     ];
-    for (const [x, z] of coords) {
-      this.spawnPoints.push(new THREE.Vector3(x, 0, z));
-    }
+    for (const [x, z] of coords) this.spawnPoints.push(new THREE.Vector3(x, 0, z));
   }
 
   // Animate the living city: drive flying traffic along its looping paths.
