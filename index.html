@@ -613,19 +613,42 @@
       <div class="lb-panel">
         <div class="lb-winner"><span id="lb-winner-name">SPARTAN</span> <span class="lb-won">WON</span></div>
         <div class="lb-match-over-sub">FREE FOR ALL &bull; IRON-BASTION</div>
-        <table class="lb-table">
-          <thead><tr>
-            <th class="lb-th-rank">#</th>
-            <th class="lb-th-name">PLAYER</th>
-            <th>SCORE</th>
-            <th>ASSISTS</th>
-            <th>KILLS</th>
-            <th>DEATHS</th>
-            <th>K/D</th>
-          </tr></thead>
-          <tbody id="lb-rows"></tbody>
-        </table>
-        <div class="lb-earned">YOU EARNED <span class="lb-earned-coin">&#9670;</span> <span id="lb-earned-val">0</span></div>
+        <div class="lb-tabs" role="tablist" aria-label="Match results">
+          <button class="lb-tab active" type="button" data-lb-tab="leaderboard">LEADERBOARD</button>
+          <button class="lb-tab" type="button" data-lb-tab="earn">EARN</button>
+          <button class="lb-tab" type="button" data-lb-tab="performance">PERFORMANCE</button>
+        </div>
+        <div id="lb-leaderboard-view" class="lb-view">
+          <table class="lb-table">
+            <thead><tr>
+              <th class="lb-th-rank">#</th>
+              <th class="lb-th-name">PLAYER</th>
+              <th>SCORE</th>
+              <th>ASSISTS</th>
+              <th>KILLS</th>
+              <th>DEATHS</th>
+              <th>K/D</th>
+            </tr></thead>
+            <tbody id="lb-rows"></tbody>
+          </table>
+        </div>
+        <div id="lb-earn-view" class="lb-view hidden">
+          <div class="lb-earn-card">
+            <span class="lb-earn-label">MATCH REWARD</span>
+            <span class="lb-earn-total"><span class="lb-earned-coin">&#9670;</span> <span id="lb-earned-val">0</span></span>
+            <span class="lb-earn-detail">100 completion bonus + 10 per elimination</span>
+          </div>
+        </div>
+        <div id="lb-performance-view" class="lb-view hidden">
+          <div class="lb-performance-grid">
+            <div class="lb-stat"><span>ACCURACY</span><strong id="lb-stat-accuracy">0%</strong></div>
+            <div class="lb-stat"><span>DAMAGE</span><strong id="lb-stat-damage">0</strong></div>
+            <div class="lb-stat"><span>SHOTS / HITS</span><strong id="lb-stat-shots">0 / 0</strong></div>
+            <div class="lb-stat"><span>HEADSHOTS</span><strong id="lb-stat-headshots">0</strong></div>
+            <div class="lb-stat"><span>BEST STREAK</span><strong id="lb-stat-streak">0</strong></div>
+            <div class="lb-stat"><span>TIME ACTIVE</span><strong id="lb-stat-time">0:00</strong></div>
+          </div>
+        </div>
         <!-- Ad: post-match banner — 10-second countdown = captive audience -->
         <div class="ad-slot ad-slot-leaderboard">
           <ins class="adsbygoogle"
