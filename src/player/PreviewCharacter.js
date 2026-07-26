@@ -430,6 +430,10 @@ const _LEG_RE = /thigh|lleg|knee|boot|shinp|sole|grv|kn_|knsph|tpl|cg_/i;
 // instead of swinging rigid — the difference between a natural walk and a march.
 const _ARM_LO = /farm|forearm|hand|elbow|wrist/i;
 const _LEG_LO = /lleg|shin|calf|boot|sole|foot|toe|ankle|knee|grv|kn_|knsph/i;
+// …and the foot splits off again onto a third bone (the ankle) so the sole can
+// stay level through stance and push off at the end of it, instead of the whole
+// foot rotating rigidly with the shin.
+const _LEG_FT = /boot|sole|foot|toe|ankle/i;
 
 export function rigCharacterLimbs(group) {
   try {
@@ -443,7 +447,7 @@ export function rigCharacterLimbs(group) {
     // (rides the joint pivot, a child of the root).
     const buckets = {
       armL: { up: [], lo: [] }, armR: { up: [], lo: [] },
-      legL: { up: [], lo: [] }, legR: { up: [], lo: [] },
+      legL: { up: [], lo: [], ft: [] }, legR: { up: [], lo: [], ft: [] },
     };
     const wp = new THREE.Vector3();
     for (const m of meshes) {
@@ -452,14 +456,18 @@ export function rigCharacterLimbs(group) {
       if (_ARM_RE.test(m.name) && Math.abs(wp.x) > 0.12) {
         buckets['arm' + side][_ARM_LO.test(m.name) ? 'lo' : 'up'].push(m);
       } else if (_LEG_RE.test(m.name) && Math.abs(wp.x) > 0.04) {
-        buckets['leg' + side][_LEG_LO.test(m.name) ? 'lo' : 'up'].push(m);
+        const b = buckets['leg' + side];
+        (_LEG_FT.test(m.name) ? b.ft : _LEG_LO.test(m.name) ? b.lo : b.up).push(m);
       }
     }
 
-    // Build a 2-bone limb: a root pivot at rootY and a joint (knee/elbow) pivot
-    // at jointY parented to it. Returns { root, joint } or null if too sparse.
-    const makeLimb = (parts, rootY, jointY) => {
-      const all = [...parts.up, ...parts.lo];
+    // Build a limb chain: a root pivot at rootY, a joint (knee/elbow) pivot at
+    // jointY parented to it, and — for legs — a third tip pivot (the ankle) at
+    // tipY parented to the joint. Returns { root, joint, tip } or null if too
+    // sparse.
+    const makeLimb = (parts, rootY, jointY, tipY) => {
+      const ft = parts.ft || [];
+      const all = [...parts.up, ...parts.lo, ...ft];
       if (all.length < 2) return null;
       let ax = 0;
       for (const m of all) { m.getWorldPosition(wp); ax += wp.x; }
@@ -470,24 +478,33 @@ export function rigCharacterLimbs(group) {
       const joint = new THREE.Group();
       joint.position.set(0, jointY - rootY, 0);   // local to root → world (ax, jointY, 0)
       root.add(joint);
+      let tip = null;
+      if (tipY != null && ft.length) {
+        tip = new THREE.Group();
+        tip.position.set(0, tipY - jointY, 0);    // local to joint → world (ax, tipY, 0)
+        joint.add(tip);
+      }
       root.updateWorldMatrix(true, true);
       for (const m of parts.up) root.attach(m);    // attach() preserves world transform
       for (const m of parts.lo) joint.attach(m);
-      return { root, joint };
+      for (const m of ft) (tip || joint).attach(m);
+      return { root, joint, tip };
     };
 
-    const legL = makeLimb(buckets.legL, 1.21, 0.62);
-    const legR = makeLimb(buckets.legR, 1.21, 0.62);
+    const legL = makeLimb(buckets.legL, 1.21, 0.62, 0.27);
+    const legR = makeLimb(buckets.legR, 1.21, 0.62, 0.27);
     const armL = makeLimb(buckets.armL, 1.76, 1.28);
     const armR = makeLimb(buckets.armR, 1.76, 1.28);
     if (!legL || !legR || !armL || !armR) return null;
 
     // Back-compatible API: rig.legL/armL are the ROOT (hip/shoulder) pivots, so
-    // existing `rig.legL.rotation.x = …` still swings the whole limb. The new
-    // .kneeL/.kneeR/.elbowL/.elbowR joints add the bend.
+    // existing `rig.legL.rotation.x = …` still swings the whole limb. The
+    // .kneeL/.kneeR/.elbowL/.elbowR joints add the bend, and .ankleL/.ankleR
+    // the foot roll (null on rigs whose feet couldn't be split out).
     const rig = {
       armL: armL.root, armR: armR.root, legL: legL.root, legR: legR.root,
       elbowL: armL.joint, elbowR: armR.joint, kneeL: legL.joint, kneeR: legR.joint,
+      ankleL: legL.tip, ankleR: legR.tip,
     };
     group.userData.rig = rig;
     return rig;

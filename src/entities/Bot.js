@@ -3,6 +3,9 @@ import { buildPreviewCharacter, rigCharacterLimbs } from '../player/PreviewChara
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
+import { applyWalkCycle } from '../player/Locomotion.js';
+
+const _STILL = { bob: 0, lean: 0, swing: 0 };
 
 // AR-type ranged stats — sword bots skip shooting entirely.
 // Slower fire + short range: bots are not meant to be a real threat.
@@ -128,6 +131,9 @@ export class Bot {
     this.healthBarGroup = hpGroup;
 
     this.mesh.position.copy(this.position);
+    // Yaw-first euler order, so the run lean (rotation.x) and the death topple
+    // (rotation.z) tilt about the BODY's axes rather than the world's.
+    this.mesh.rotation.order = 'YXZ';
 
     // Rig limb pivots for the walk cycle (procedural model only; the human model
     // animates via its own skeletal mixer).
@@ -224,7 +230,8 @@ export class Bot {
     this.mesh.visible = true;
     // Clear the death-crumple pose off the rig so the fresh body starts neutral.
     if (this._rig) {
-      for (const k of ['legL', 'legR', 'kneeL', 'kneeR', 'armL', 'armR', 'elbowL', 'elbowR']) {
+      for (const k of ['legL', 'legR', 'kneeL', 'kneeR', 'ankleL', 'ankleR',
+                       'armL', 'armR', 'elbowL', 'elbowR']) {
         this._rig[k]?.rotation.set(0, 0, 0);
       }
     }
@@ -486,6 +493,40 @@ export class Bot {
       ud.armorTick?.(dt);
     }
 
+    // ── Limb rig walk cycle ────────────────────────────────────────────────────
+    // Runs BEFORE the weapon block so the rifle can ride this frame's stride
+    // phase rather than last frame's.
+    let gait = _STILL;
+    if (this._rig) {
+      const isMoving = !!moveTarget;
+      // Advance walk timer proportional to movement speed (mirrors player bobTime)
+      this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
+      // Bots pick a speed in [2.6, 3.8]; map that onto the walk→run blend.
+      const run = THREE.MathUtils.clamp((this.speed - 2.7) / 1.1, 0, 1);
+      gait = applyWalkCycle(this._rig, { t: this._walkT, moving: isMoving, run, dt });
+      // The pelvis drops at full stride and the body leans into the run. Local
+      // pitch (the mesh is YXZ-ordered) so the lean follows the facing.
+      this.mesh.position.y = this.position.y + gait.bob;
+      this.mesh.rotation.x += (gait.lean - this.mesh.rotation.x) * Math.min(1, dt * 6);
+
+      // Sword bots free-swing the off-hand; AR bots' arms belong to the rifle
+      // (applyRifleCarry, below, poses both onto the grip and handguard).
+      if (this._isSwordBot) {
+        const { armL, armR, elbowL, elbowR } = this._rig;
+        const t = this._walkT;
+        const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
+        if (isMoving) {
+          const sw = Math.sin(t) * 0.55;
+          L(armL, -sw * 0.5, 12);  L(armR, sw * 0.5, 12);
+          L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
+        } else {
+          const breathe = Math.sin(t * 0.28) * 0.04;
+          L(armL, breathe, 4);  L(armR, breathe, 4);
+          L(elbowL, -0.14, 4);  L(elbowR, -0.14, 4);
+        }
+      }
+    }
+
     // ── Weapon animation (procedural model only) ───────────────────────────────
     if (this._weaponMesh) {
       const isAlert   = engaged;
@@ -510,9 +551,7 @@ export class Bot {
         // levelled down the body's forward axis. `swing` breathes/rides the
         // stride, _gunKick shoves it back and climbs the muzzle.
         applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
-          swing: isMoving ? Math.sin(this._walkT * 2) * 0.035    // rides the stride
-                          : Math.sin(this._weaponT * 0.28) * 0.018,  // breathing
-          kick: this._gunKick,
+          swing: gait.swing, kick: this._gunKick,
         });
       } else {
         // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
@@ -534,45 +573,5 @@ export class Bot {
       }
     }
 
-    // ── Limb rig walk cycle ───────────────────────────────────────────────────
-    if (this._rig) {
-      const { armL, armR, legL, legR, kneeL, kneeR, elbowL, elbowR } = this._rig;
-      const isMoving = !!moveTarget;
-
-      // Advance walk timer proportional to movement speed (mirrors player bobTime)
-      this._walkT += dt * (isMoving ? this.speed * 1.8 : 1.2);
-      const t = this._walkT;
-
-      const swing = isMoving ? Math.sin(t) * 0.55 : 0;
-      // frame-rate-independent ease toward a target rotation (x / z channels)
-      const L  = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
-      const Lz = (j, tgt, k) => { if (j) j.rotation.z += (tgt - j.rotation.z) * Math.min(1, dt * k); };
-
-      // Legs: thighs stride opposite each other; KNEES flex through the swing
-      // phase (cos>0 = leg passing forward under the body) so the foot lifts and
-      // clears the ground instead of the leg swinging out stiff.
-      if (isMoving) {
-        L(legL, swing, 14);  L(legR, -swing, 14);
-        L(kneeL, -1.0 * Math.max(0,  Math.cos(t)), 16);
-        L(kneeR, -1.0 * Math.max(0, -Math.cos(t)), 16);
-      } else {
-        L(legL, 0, 6);  L(legR, 0, 6);
-        L(kneeL, -0.06, 5); L(kneeR, -0.06, 5);
-      }
-
-      // Arms: AR bots' arms belong to the rifle — applyRifleCarry() (in the
-      // weapon block above) poses both of them onto the grip and handguard, so
-      // nothing to do here. Sword bots free-swing the off-hand.
-      if (!this._isSwordBot) {
-        /* arms owned by applyRifleCarry */
-      } else if (isMoving) {
-        L(armL, -swing * 0.5, 12);  L(armR, swing * 0.5, 12);
-        L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
-      } else {
-        const breathe = Math.sin(t * 0.28) * 0.04;
-        L(armL, breathe, 4);  L(armR, breathe, 4);
-        L(elbowL, -0.14, 4);  L(elbowR, -0.14, 4);
-      }
-    }
   }
 }

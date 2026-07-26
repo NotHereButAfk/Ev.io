@@ -21,6 +21,7 @@ import { rigCharacterLimbs } from '/src/player/PreviewCharacter.js';
 import { buildWeaponModel } from '/src/weapons/WeaponModels.js';
 import { getWeapon } from '/src/weapons/weaponDefs.js';
 import { applyRifleCarry, GRIP_LOCAL, HANDGUARD_LOCAL } from '/src/player/RifleCarry.js';
+import { applyWalkCycle } from '/src/player/Locomotion.js';
 
 const Q = new URLSearchParams(location.search);
 const n = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
@@ -38,6 +39,12 @@ scene.background = new THREE.Color(0x20242c);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 2.2));
 const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 6, 4); scene.add(key);
 const rim = new THREE.DirectionalLight(0x99bbff, 0.9); rim.position.set(-4, 3, -5); scene.add(rim);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(12, 12),
+  new THREE.MeshStandardMaterial({ color: 0x3a4150, roughness: 0.95 }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+scene.add(new THREE.GridHelper(12, 24, 0x5a6376, 0x4a5162));
 
 const body = buildLowPolyCharacter(MODEL);
 scene.add(body);
@@ -145,12 +152,16 @@ const wVerts = [];
   });
 }
 const _p = new THREE.Vector3();
+const _toBody = new THREE.Matrix4();
 let clipWhere = null;
 function clipDepth() {
   body.updateWorldMatrix(true, true);
+  // The solids were captured with the body at the origin, so measure the weapon
+  // in BODY space — the bob/lean the gait applies to the body must not count.
+  _toBody.copy(body.matrixWorld).invert().multiply(wm.matrixWorld);
   let worst = 0; clipWhere = null;
   for (const v of wVerts) {
-    _p.copy(v).applyMatrix4(wm.matrixWorld);
+    _p.copy(v).applyMatrix4(_toBody);
     for (const s of solids) {
       const d = penetration(_p, s);
       if (d > worst) { worst = d; clipWhere = s.box.getCenter(new THREE.Vector3()).toArray().map(x => +x.toFixed(2)); }
@@ -213,26 +224,42 @@ if (Q.has('sweep')) {
   const pick = results[Math.min(results.length - 1, Math.max(0, n('pick', 0)))];
   if (pick) poseInto(pick.p);
 } else {
-  // dt = 1 ⇒ the ease factor saturates, so this lands exactly on the pose.
-  applyRifleCarry(rig, wm, AIM, 1, {
-    swing: WALK ? Math.sin(WALK * 2) * 0.035 : 0,
-    kick:  n('kick', 0),
-  });
-}
-
-if (WALK) {
-  const sw = Math.sin(WALK) * 0.55;
-  rig.legL.rotation.x = sw; rig.legR.rotation.x = -sw;
-  rig.kneeL.rotation.x = -1.0 * Math.max(0,  Math.cos(WALK));
-  rig.kneeR.rotation.x = -1.0 * Math.max(0, -Math.cos(WALK));
+  // dt = 1 ⇒ the ease factor saturates, so these land exactly on the pose.
+  const gait = applyWalkCycle(rig, { t: WALK, moving: !!Q.has('walk'), run: n('run', 0), dt: 1 });
+  body.position.y = gait.bob;
+  body.rotation.order = 'YXZ';
+  body.rotation.x = gait.lean;
+  applyRifleCarry(rig, wm, AIM, 1, { swing: gait.swing, kick: n('kick', 0) });
 }
 
 body.updateWorldMatrix(true, true);
 const handW = {};
-body.traverse((o) => { if (/^hand_[LR]$/.test(o.name)) handW[o.name] = o.getWorldPosition(new THREE.Vector3()); });
+const _inv = new THREE.Matrix4().copy(body.matrixWorld).invert();
+body.traverse((o) => { if (/^hand_[LR]$/.test(o.name))
+  handW[o.name] = o.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv); });
 const gripW = GRIP_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
 const hgW   = HANDGUARD_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
+// Lowest point of either boot, in WORLD space (bob included) — how well the
+// stride keeps the feet on the floor.
+let footLow = Infinity, footHigh = -Infinity;
+{
+  const bb = new THREE.Box3();
+  body.traverse((o) => {
+    if (!o.isMesh || !/^boot_/.test(o.name)) return;
+    bb.setFromObject(o);
+    footLow = Math.min(footLow, bb.min.y);
+  });
+  for (const side of ['L', 'R']) {
+    let lo = Infinity;
+    body.traverse((o) => {
+      if (!o.isMesh || !new RegExp('^boot_' + side).test(o.name)) return;
+      bb.setFromObject(o); lo = Math.min(lo, bb.min.y);
+    });
+    footHigh = Math.max(footHigh, lo);   // the higher of the two planted feet
+  }
+}
 window.__probe = {
+  footLow: +footLow.toFixed(3), footHigh: +footHigh.toFixed(3),
   gripErr: handW.hand_R ? +handW.hand_R.distanceTo(gripW).toFixed(4) : null,
   hgErr:   handW.hand_L ? +handW.hand_L.distanceTo(hgW).toFixed(4)   : null,
   clip:    +clipDepth().toFixed(4), where: clipWhere,
@@ -245,7 +272,7 @@ if (Q.has('dbg')) {
 }
 
 const cam = new THREE.PerspectiveCamera(28, (W / NV) / H, 0.1, 100);
-const target = new THREE.Vector3(0, 1.05, 0);
+const target = new THREE.Vector3(0, 0.95, 0);
 const angles = ANG >= 0 ? [{ a: ANG, e: 0.08 }] : [
   { a: Math.PI,        e: 0.06 },   // model's FRONT (-Z)
   { a: Math.PI * 0.72, e: 0.10 },   // three-quarter
@@ -253,7 +280,7 @@ const angles = ANG >= 0 ? [{ a: ANG, e: 0.08 }] : [
 ];
 renderer.setScissorTest(true);
 angles.forEach((v, i) => {
-  const r = 3.9;
+  const r = 4.4;
   cam.position.set(
     target.x + Math.sin(v.a) * Math.cos(v.e) * r,
     target.y + Math.sin(v.e) * r + 0.15,

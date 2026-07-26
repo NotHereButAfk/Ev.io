@@ -22,6 +22,7 @@ import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
+import { applyWalkCycle } from '../player/Locomotion.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
@@ -597,6 +598,8 @@ export class Game {
     // The human soldier animates via its own skeleton; only the procedural
     // block character needs the limb-pivot rig.
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
+    // Yaw-first, so the run lean (rotation.x) pitches about the body's own axis.
+    this._playerBody.rotation.order = 'YXZ';
     this._playerBody.visible = false;
     this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
     this._tpsWeaponMesh = null; // old weapon went with the removed body
@@ -1213,21 +1216,15 @@ export class Game {
     const moving = speed > 0.6 && p.onGround;
     const t = p.bobTime;
     const L  = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
-    const Lz = (j, tgt, k) => { if (j) j.rotation.z += (tgt - j.rotation.z) * Math.min(1, dt * k); };
 
-    // Legs: stride with knee flex when moving, settle to a soft stand when not.
-    if (moving) {
-      const amp = p.isSprinting ? 0.85 : 0.55;
-      const kA  = p.isSprinting ? 1.15 : 1.0;
-      const swing = Math.sin(t) * amp;
-      rig.legL.rotation.x =  swing;
-      rig.legR.rotation.x = -swing;
-      if (rig.kneeL) rig.kneeL.rotation.x = -kA * Math.max(0,  Math.cos(t));
-      if (rig.kneeR) rig.kneeR.rotation.x = -kA * Math.max(0, -Math.cos(t));
-    } else {
-      L(rig.legL, 0, 6); L(rig.legR, 0, 6);
-      L(rig.kneeL, -0.06, 5); L(rig.kneeR, -0.06, 5);
-    }
+    // Legs / gait — the same cycle the bots run (see Locomotion.js): stride with
+    // knee flex and a rolling ankle, plus the pelvis drop and run lean it hands
+    // back for the body transform.
+    const run  = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 2.5) / 4.0, 0, 0.7);
+    const gait = applyWalkCycle(rig, { t, moving, run, dt });
+    this._playerBody.position.y = p.position.y + gait.bob;
+    this._playerBody.rotation.x +=
+      (gait.lean - this._playerBody.rotation.x) * Math.min(1, dt * 6);
 
     // Arms: hold the weapon in a two-handed grip (both hands come onto the gun
     // seated in front of the chest) when armed with a gun; else free-swing.
@@ -1242,9 +1239,7 @@ export class Game {
       const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
       this._tpsAim = (this._tpsAim || 0) + (wantAim - (this._tpsAim || 0)) * Math.min(1, dt * 8);
       applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
-        swing: moving ? Math.sin(t * 2) * (p.isSprinting ? 0.055 : 0.035)
-                      : Math.sin(this.playTime * 1.1) * 0.018,
-        kick:  this._tpsGunKick,
+        swing: gait.swing, kick: this._tpsGunKick,
       });
     } else if (moving) {
       const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);
