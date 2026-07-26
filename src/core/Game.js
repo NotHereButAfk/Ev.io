@@ -360,7 +360,6 @@ export class Game {
           const f = THREE.MathUtils.lerp(1, 0.1, THREE.MathUtils.clamp(d / radius, 0, 1));
           const dealt = Math.min(enemy.health, damage * f);
           const killed = enemy.takeDamage(damage * f);
-          this.matchStats.hits++;
           this.matchStats.damageDealt += dealt;
           this.hud.flashHitmarker();
           if (killed) {
