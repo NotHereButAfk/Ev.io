@@ -1,5 +1,11 @@
 # KYX.IO — project notes (for Claude / new sessions)
 
+> **Working alongside other agents?** Read [`AGENTS.md`](AGENTS.md) first —
+> it's the shared contract (Claude / Codex / Copilot all work in this repo) and
+> lists the invariants that break silently, the verification commands, and the
+> git rules for a `main` that several agents push to. This file is the project
+> map; that one is the rules.
+
 A Three.js browser FPS (an **ev.io**-style arena shooter), built with **Vite**.
 Deployed to **Hostinger** (static site) via a GitHub Action on every push to `main`.
 
