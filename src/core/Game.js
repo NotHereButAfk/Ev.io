@@ -340,7 +340,9 @@ export class Game {
 
   _wireCallbacks() {
     this.weaponSystem.onShoot = (def) => {
-      if (def?.kind !== 'melee') this.matchStats.shotsFired++;
+      // Count PELLETS, not trigger pulls: onHitBot fires once per pellet, so a
+      // shotgun (pellets: 8) otherwise scores 8 hits against 1 shot.
+      if (def?.kind !== 'melee') this.matchStats.shotsFired += (def?.pellets || 1);
     };
     this.weaponSystem.applyRecoilToPlayer = (amt) => {
       this.player.applyRecoil(amt);
@@ -373,9 +375,14 @@ export class Game {
     this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
       const dealt = Math.min(enemy.health, dmg);
       const killed = enemy.takeDamage(dmg);
-      this.matchStats.hits++;
+      // Accuracy is about aimed rounds. Melee swings, thrown knives and rocket
+      // splash all reach this callback too, and none of them fires onShoot —
+      // counting them made every one of those a free hit with no shot behind it.
+      if (meta?.hitscan) {
+        this.matchStats.hits++;
+        if (meta?.headshot) this.matchStats.headshots++;
+      }
       this.matchStats.damageDealt += dealt;
-      if (meta?.headshot) this.matchStats.headshots++;
       if (this.hud.hitSound !== false) this.audio.playHit();   // accessibility toggle
       this.hud.flashHitmarker(meta?.headshot);
       this.damageNumbers.spawn(this.player.camera, point, dmg, { headshot: meta?.headshot, killed });
@@ -850,7 +857,7 @@ export class Game {
     this.hud.hideScoreboard(); this._sbShown = false;
     this.hud.hideLeaderboard(); // reset in case it was shown before
     const accuracy = this.matchStats.shotsFired > 0
-      ? Math.min(100, (this.matchStats.hits / this.matchStats.shotsFired) * 100)
+      ? ((this.matchStats.hits / this.matchStats.shotsFired) * 100)
       : 0;
     this.hud.showLeaderboard(rows, this.player.name, earnedCoins, {
       ...this.matchStats,

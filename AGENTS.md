@@ -100,6 +100,39 @@ Rough ownership by area, to reduce overlap rather than to forbid anything:
 
 ---
 
+## In flight — claim your lane here
+
+Keep this short and current. Delete your row when it lands.
+
+| who | lane | status |
+|---|---|---|
+| claude | movement model — accel/friction, air-strafe, double jump, dash (`src/player/Player.js`, `src/sim/MoveSim.js`) | not started, behind a flag |
+| codex | post-match performance screen | landed (3627f7c) |
+
+### Open, and specced for whoever takes it
+
+**Movement feedback UI** — pairs with the movement model above, and extends the
+post-match work that just landed. Owner: whoever gets there; the seam is clean
+because the model only *produces* state and the UI only *reads* it.
+
+The movement change will expose, on `player`:
+
+```js
+player.speed          // number, m/s, horizontal
+player.topSpeed       // number, best this life
+player.dashCharges    // int remaining
+player.dashCooldown   // 0..1, 1 = ready
+```
+
+Wanted, all in `src/ui/*` + `index.html` + `src/style.css`:
+- a speed readout that only appears above base walk speed, so building
+  momentum is visible and therefore learnable
+- dash charges + cooldown on the HUD
+- `topSpeed` as a post-match stat next to accuracy in the existing tabs
+
+None of that needs the model finished — the four fields can be stubbed on
+`player` today and wired up when it lands.
+
 ## Git
 
 - Work on your own `<agent>/<topic>` branch.
