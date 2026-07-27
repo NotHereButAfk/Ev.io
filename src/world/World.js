@@ -497,10 +497,10 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    // Sci-fi battlefield dusk: dark indigo sky with a smoky teal-grey haze so
-    // distant structures dissolve into battle smoke rather than white mist.
-    this.scene.background = new THREE.Color(0x16233f);
-    this.scene.fog = new THREE.Fog(0x2a3644, 110, 400); // battle-smoke haze
+    // Jinx and the daylight ev.io arenas use a clean blue horizon so the warm
+    // concrete silhouettes and luminous route accents stay readable at speed.
+    this.scene.background = new THREE.Color(0x78b9e7);
+    this.scene.fog = new THREE.Fog(0x8cb9d5, 150, 430);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -632,18 +632,18 @@ export class World {
   }
 
   _buildLighting() {
-    // Cool open-sky fill keeps the black architecture readable; the warm rim
-    // catches red route edges without flattening the deep canyon shadows.
-    const hemi = new THREE.HemisphereLight(0xa8d9ff, 0x10141c, 1.35);
+    // Bright neutral daylight is the most consistent ev.io presentation: pale
+    // sky fill, a warm key, and just enough cool rim for dark technical bases.
+    const hemi = new THREE.HemisphereLight(0xc6e6ff, 0x353039, 1.25);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xe9f6ff, 1.2);
-    sun.position.set(-70, 105, 28);
+    const sun = new THREE.DirectionalLight(0xfff1dc, 1.15);
+    sun.position.set(-78, 118, 42);
     sun.castShadow = false;
     this.scene.add(sun);
-    const rim = new THREE.DirectionalLight(0xff6048, 0.45);
-    rim.position.set(75, 28, -45);
-    rim.castShadow = false;
-    this.scene.add(rim);
+    const skyRim = new THREE.DirectionalLight(0x72cfff, 0.34);
+    skyRim.position.set(65, 38, -62);
+    skyRim.castShadow = false;
+    this.scene.add(skyRim);
   }
 
   _buildGround() {
@@ -672,10 +672,10 @@ export class World {
     canvas.width = 16; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0, '#3f8fcb');
-    grad.addColorStop(0.55, '#77b9e4');
-    grad.addColorStop(0.82, '#b9def2');
-    grad.addColorStop(1, '#e5b0a1');
+    grad.addColorStop(0, '#3f96e9');
+    grad.addColorStop(0.48, '#69b4ef');
+    grad.addColorStop(0.8, '#add8f2');
+    grad.addColorStop(1, '#e8edf0');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 16, 512);
     const texture = new THREE.CanvasTexture(canvas);
@@ -2665,7 +2665,7 @@ export class World {
   // high bridge lanes, a lower command deck, long exposed ramps, red navigation
   // bands and cyan wall modules. Route geometry is registered in platforms[] so
   // the same surfaces are walkable by both the legacy controller and MoveSim.
-  _buildEvioArena() {
+  _buildLegacyEvioArena() {
     const concrete = new THREE.MeshStandardMaterial({
       color: 0x20242b, roughness: 0.8, metalness: 0.2, envMapIntensity: 0.45,
     });
@@ -2843,6 +2843,367 @@ export class World {
     };
     lift(0, -42);
     lift(0,  42);
+  }
+
+  // Jinx is the layout and material anchor. Rook, Depot, Vestige and Momentum
+  // contribute the shared ev.io language: chunky low-poly massing, framed wall
+  // modules, luminous route cues, multi-height combat loops and open sky canyons.
+  _buildEvioArena() {
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0x827873, roughness: 0.88, metalness: 0.04, envMapIntensity: 0.5,
+    });
+    const paleStone = new THREE.MeshStandardMaterial({
+      color: 0xa1968f, roughness: 0.86, metalness: 0.03, envMapIntensity: 0.48,
+    });
+    const warmTrim = new THREE.MeshStandardMaterial({
+      color: 0x352c2f, roughness: 0.78, metalness: 0.1, envMapIntensity: 0.42,
+    });
+    const brick = new THREE.MeshStandardMaterial({
+      color: 0x5f3a37, roughness: 0.92, metalness: 0.01,
+    });
+    const brickDark = new THREE.MeshStandardMaterial({
+      color: 0x472f31, roughness: 0.94, metalness: 0.01,
+    });
+    const tech = new THREE.MeshStandardMaterial({
+      color: 0x171a20, roughness: 0.64, metalness: 0.5, envMapIntensity: 0.55,
+    });
+    const techMid = new THREE.MeshStandardMaterial({
+      color: 0x2c3038, roughness: 0.62, metalness: 0.42, envMapIntensity: 0.52,
+    });
+    const inset = new THREE.MeshStandardMaterial({
+      color: 0x090c11, roughness: 0.46, metalness: 0.64,
+    });
+    const bridgeTop = new THREE.MeshStandardMaterial({
+      color: 0x866a65, roughness: 0.8, metalness: 0.08,
+    });
+    const red = this._neonMat(0xef3828);
+    const cyan = this._neonMat(0x18c7ff);
+    const gold = this._neonMat(0xd8c83b);
+
+    const solid = (x, y, z, w, h, d, mat = stone) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this._addCollider(mesh);
+      return mesh;
+    };
+    const decor = (x, y, z, w, h, d, mat = warmTrim, ry = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = ry;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const strip = (x, y, z, w, h, d, mat = red, ry = 0) =>
+      decor(x, y, z, w, h, d, mat, ry);
+    const octagon = (x, y, z, radius, h, mat = stone) => {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, h, 8),
+        mat
+      );
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = Math.PI / 8;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const diamond = (x, y, z, axis = 'z', mat = cyan, size = 0.62) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, 0.11), mat);
+      mesh.position.set(x, y, z);
+      if (axis === 'x') mesh.rotation.y = Math.PI / 2;
+      mesh.rotation.z = Math.PI / 4;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+
+    const ribbedBank = (x, y, z, span, h, axis = 'x', cyanEvery = 4) => {
+      const alongX = axis === 'x';
+      decor(x, y, z, alongX ? span : 0.28, h, alongX ? 0.28 : span, inset);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const count = Math.max(5, Math.floor(span / 1.35));
+      for (let i = 0; i < count; i++) {
+        const offset = -span / 2 + (i + 0.5) * span / count;
+        decor(
+          alongX ? frontX + offset : frontX,
+          y,
+          alongX ? frontZ : frontZ + offset,
+          alongX ? 0.28 : 0.24,
+          h * 0.92,
+          alongX ? 0.24 : 0.28,
+          i % cyanEvery === 1 ? cyan : techMid
+        );
+      }
+    };
+
+    const brickBand = (x, y, z, span, h, axis = 'x') => {
+      const alongX = axis === 'x';
+      decor(x, y, z, alongX ? span : 0.3, h, alongX ? 0.3 : span, brickDark);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const cols = Math.max(4, Math.floor(span / 2.25));
+      const rows = Math.max(2, Math.floor(h / 1.35));
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const along = -span / 2 + (col + 0.5) * span / cols +
+            (row % 2 ? span / cols / 2 : 0);
+          if (along > span / 2 - 0.2) continue;
+          const yy = y - h / 2 + (row + 0.5) * h / rows;
+          decor(
+            alongX ? frontX + along : frontX,
+            yy,
+            alongX ? frontZ : frontZ + along,
+            alongX ? span / cols - 0.12 : 0.08,
+            h / rows - 0.1,
+            alongX ? 0.08 : span / cols - 0.12,
+            (row + col) % 3 === 0 ? brickDark : brick
+          );
+        }
+      }
+    };
+
+    const circuitPanel = (x, y, z, w, h, axis = 'z') => {
+      const alongX = axis === 'z';
+      decor(x, y, z, alongX ? w : 0.24, h, alongX ? 0.24 : w, techMid);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const edge = w / 2 - 0.52;
+      for (const s of [-1, 1]) {
+        strip(
+          alongX ? frontX + s * edge : frontX,
+          y,
+          alongX ? frontZ : frontZ + s * edge,
+          alongX ? 0.12 : 0.08,
+          h * 0.76,
+          alongX ? 0.08 : 0.12,
+          gold
+        );
+      }
+      strip(
+        frontX, y + h * 0.27, frontZ,
+        alongX ? w * 0.58 : 0.08, 0.1, alongX ? 0.08 : w * 0.58,
+        gold
+      );
+      strip(
+        frontX, y - h * 0.27, frontZ,
+        alongX ? w * 0.36 : 0.08, 0.1, alongX ? 0.08 : w * 0.36,
+        gold
+      );
+      for (let i = -2; i <= 2; i++) {
+        const along = i * (w * 0.105);
+        strip(
+          alongX ? frontX + along : frontX,
+          y,
+          alongX ? frontZ : frontZ + along,
+          alongX ? 0.12 : 0.08,
+          h * (i === 0 ? 0.62 : 0.42),
+          alongX ? 0.08 : 0.12,
+          cyan
+        );
+      }
+    };
+
+    // The layered city shell frames blue sky instead of reading as a flat box.
+    const half = ARENA_HALF;
+    const shell = [
+      [0, 7, -half, 126, 14, 2.4],
+      [0, 7,  half, 126, 14, 2.4],
+      [-half, 7, 0, 2.4, 14, 126],
+      [ half, 7, 0, 2.4, 14, 126],
+    ];
+    for (const [x, y, z, w, h, d] of shell) solid(x, y, z, w, h, d, tech);
+    for (let p = -52; p <= 52; p += 13) {
+      decor(p, 8, -half + 1.3, 2.8, 16, 1.4, stone);
+      decor(p, 8,  half - 1.3, 2.8, 16, 1.4, stone);
+      decor(-half + 1.3, 8, p, 1.4, 16, 2.8, stone);
+      decor( half - 1.3, 8, p, 1.4, 16, 2.8, stone);
+    }
+    for (const side of [-1, 1]) {
+      strip(0, 2.4, side * (half - 1.22), 118, 0.18, 0.08, red);
+      strip(side * (half - 1.22), 2.4, 0, 0.08, 0.18, 118, red);
+      strip(0, 12.2, side * (half - 1.22), 112, 0.12, 0.08, gold);
+      strip(side * (half - 1.22), 12.2, 0, 0.08, 0.12, 112, gold);
+    }
+
+    const tower = (x, z, scale = 1, innerX = -Math.sign(x), innerZ = -Math.sign(z)) => {
+      const baseW = 17 * scale;
+      const baseD = 18 * scale;
+      const roofY = 9.5;
+
+      // Playable black technical base and roof ring.
+      solid(x, 4.65, z, baseW, 9.3, baseD, tech);
+      this._platformBox(x, z, baseW + 2.2, baseD + 2.2, roofY, warmTrim, 0xef3828);
+      decor(x, 10.15, z, baseW + 3.6, 1.3, baseD + 3.6, warmTrim);
+      decor(x, 11.0, z, baseW + 1.8, 0.55, baseD + 1.8, paleStone);
+
+      // Ribbed server banks face the combat lanes.
+      ribbedBank(
+        x + innerX * (baseW / 2 + 0.15), 5.0, z,
+        baseD * 0.72, 6.4, 'z', 3
+      );
+      ribbedBank(
+        x, 5.0, z + innerZ * (baseD / 2 + 0.15),
+        baseW * 0.7, 6.4, 'x', 4
+      );
+
+      // Warm octagonal upper towers, brick infill and layered cornices.
+      const radius = 7.1 * scale;
+      octagon(x, 16.2, z, radius, 10.4, stone);
+      octagon(x, 21.8, z, radius + 0.6, 1.0, warmTrim);
+      octagon(x, 23.0, z, radius + 0.25, 1.15, paleStone);
+      octagon(x, 27.2, z, radius * 0.82, 7.2, brick);
+      octagon(x, 31.0, z, radius * 0.98, 0.9, warmTrim);
+      octagon(x, 32.0, z, radius * 0.78, 1.05, paleStone);
+
+      brickBand(
+        x, 27.1, z + innerZ * (radius * 0.82 + 0.07),
+        radius * 1.05, 4.7, 'x'
+      );
+      circuitPanel(
+        x, 16.2, z + innerZ * (radius + 0.08),
+        radius * 1.18, 5.0, 'z'
+      );
+      circuitPanel(
+        x + innerX * (radius + 0.08), 16.2, z,
+        radius * 1.18, 5.0, 'x'
+      );
+      diamond(x, 17.0, z + innerZ * (radius + 0.2), 'z', cyan, 0.7);
+      diamond(x + innerX * (radius + 0.2), 17.0, z, 'x', cyan, 0.7);
+
+      solid(x - innerX * 2.4, roofY + 1.5, z, 2.2, 3.0, 5.2, stone);
+      strip(
+        x + innerX * (baseW / 2 + 1.16), roofY + 0.08, z,
+        0.14, 0.12, baseD * 0.72, red
+      );
+      this._spawnPadMarker(
+        x + innerX * 2.6, z + innerZ * 3.2, roofY, 0x18c7ff
+      );
+    };
+
+    tower(-35, -32, 1.03, 1, 1);
+    tower( 35, -32, 0.96, -1, 1);
+    tower(-35,  32, 0.96, 1, -1);
+    tower( 35,  32, 1.03, -1, -1);
+
+    // Slim skyline towers tighten the side canyons without blocking the floor.
+    const skylineTower = (x, z, innerX) => {
+      solid(x, 5.3, z, 12, 10.6, 15, tech);
+      this._platformBox(x, z, 14, 17, 10.65, techMid, 0xef3828);
+      ribbedBank(x + innerX * 6.12, 5.2, z, 10.5, 7.8, 'z', 3);
+      octagon(x, 18.0, z, 6.4, 14.0, stone);
+      octagon(x, 25.4, z, 7.0, 1.0, warmTrim);
+      octagon(x, 28.4, z, 5.4, 5.0, brick);
+      octagon(x, 31.3, z, 6.3, 0.8, paleStone);
+      circuitPanel(x + innerX * 6.35, 17.4, z, 7.4, 4.2, 'x');
+    };
+    skylineTower(-53, 0, 1);
+    skylineTower( 53, 0, -1);
+
+    // Low central deck and four approaches support jump/slide/teleport movement.
+    this._platformBox(0, 0, 20, 18, 5.2, bridgeTop, 0xef3828);
+    this._rampBox(-20, -10, -4.5, 4.5, 0, 5.2, 'x', techMid, 0xef3828);
+    this._rampBox( 10,  20, -4.5, 4.5, 5.2, 0, 'x', techMid, 0xef3828);
+    this._rampBox(-4.5, 4.5, -20, -10, 0, 5.2, 'z', techMid, 0xef3828);
+    this._rampBox(-4.5, 4.5,  10,  20, 5.2, 0, 'z', techMid, 0xef3828);
+    solid(0, 7.7, 0, 5.4, 5.0, 5.4, stone);
+    octagon(0, 10.55, 0, 3.9, 0.42, tech);
+    const centreRing = new THREE.Mesh(
+      new THREE.TorusGeometry(2.85, 0.14, 8, 28),
+      cyan
+    );
+    centreRing.position.set(0, 10.82, 0);
+    centreRing.rotation.x = Math.PI / 2;
+    centreRing.userData.noHit = true;
+    this.scene.add(centreRing);
+    this._spinRings.push({ mesh: centreRing, speed: 0.2 });
+
+    // Broad Jinx bridges use muted-rose tops, dark undersides and flared ends.
+    for (const z of [-32, 32]) {
+      this._platformBox(0, z, 52, 6.4, 9.5, bridgeTop, 0xef3828);
+      decor(0, 8.55, z, 50, 1.15, 5.0, tech);
+      decor(-25.7, 9.2, z, 4.2, 1.8, 8.4, warmTrim);
+      decor( 25.7, 9.2, z, 4.2, 1.8, 8.4, warmTrim);
+      for (let x = -21; x <= 21; x += 7) {
+        decor(x, 8.1, z, 0.45, 3.2, 4.8, techMid);
+      }
+      strip(0, 9.62, z - 3.13, 49, 0.13, 0.12, red);
+      strip(0, 9.62, z + 3.13, 49, 0.13, 0.12, red);
+    }
+
+    // The north/south spine changes level twice rather than making one sniper rail.
+    this._platformBox(0, -24, 6.2, 12, 5.2, bridgeTop, 0xef3828);
+    this._platformBox(0,  24, 6.2, 12, 5.2, bridgeTop, 0xef3828);
+    this._rampBox(-3.1, 3.1, -32, -18, 9.5, 5.2, 'z', bridgeTop, 0xef3828);
+    this._rampBox(-3.1, 3.1,  18,  32, 5.2, 9.5, 'z', bridgeTop, 0xef3828);
+
+    // Recessed red lanes are Jinx's navigation signature; cyan ticks mark joins.
+    for (const x of [-8.0, 8.0]) strip(x, 0.055, 0, 0.18, 0.08, 112, red);
+    for (const z of [-32, 32]) strip(0, 0.055, z, 112, 0.08, 0.18, red);
+    for (const x of [-34, 34]) strip(x, 0.058, 0, 0.18, 0.08, 104, red);
+    for (let z = -48; z <= 48; z += 12) {
+      strip(-7.25, 0.062, z, 1.15, 0.075, 0.16, cyan);
+      strip( 7.25, 0.062, z, 1.15, 0.075, 0.16, cyan);
+    }
+
+    // Asymmetric low cover prevents the four quadrants feeling copy-pasted.
+    const cover = [
+      [-19,-15,6,3.4,4], [17,-14,4,5.2,7],
+      [-18, 15,4,5.2,7], [20, 16,6,3.4,4],
+      [-49,-18,5,4.5,8], [48,-17,8,3.2,5],
+      [-48, 18,8,3.2,5], [49, 18,5,4.5,8],
+      [-15,-50,7,3.0,4], [16,-49,4,4.2,7],
+      [-16, 49,4,4.2,7], [15, 50,7,3.0,4],
+    ];
+    for (let i = 0; i < cover.length; i++) {
+      const [x, z, w, h, d] = cover[i];
+      solid(x, h / 2, z, w, h, d, i % 3 === 0 ? stone : techMid);
+      strip(
+        x, h + 0.04, z, w + 0.12, 0.08, d + 0.12,
+        i % 4 === 1 ? cyan : red
+      );
+    }
+
+    // Vestige-like geometric punctuation using Jinx's diamond/server motif.
+    for (const z of [-52, -39, 39, 52]) {
+      circuitPanel(-half + 1.16, 9.4, z, 7.0, 6.0, 'x');
+      circuitPanel( half - 1.16, 9.4, z, 7.0, 6.0, 'x');
+      diamond(-half + 1.02, 9.4, z, 'x', cyan, 0.76);
+      diamond( half - 1.02, 9.4, z, 'x', cyan, 0.76);
+    }
+
+    // Optional lifts land on the central deck; all destinations also have ramps.
+    const lift = (x, z, topY) => {
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.05, 2.35, 0.34, 12),
+        tech
+      );
+      pad.position.set(x, 0.17, z);
+      pad.receiveShadow = true;
+      this.scene.add(pad);
+      for (const y of [0.45, topY * 0.38, topY * 0.7, topY - 0.35]) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(1.72, 0.09, 8, 20),
+          cyan
+        );
+        ring.position.set(x, y, z);
+        ring.rotation.x = Math.PI / 2;
+        ring.userData.noHit = true;
+        this.scene.add(ring);
+      }
+      for (const [ox, oz] of [[1.85,0],[-1.85,0],[0,1.85],[0,-1.85]]) {
+        decor(x + ox, topY / 2, z + oz, 0.16, topY - 0.4, 0.16, paleStone);
+      }
+      this.gravLifts.push({ x, z, r: 1.9, topY, power: 15 });
+    };
+    lift(-13, 0, 5.2);
+    lift( 13, 0, 5.2);
   }
 
   _buildMall() {
@@ -3975,11 +4336,21 @@ export class World {
     deck.castShadow = true;
     deck.receiveShadow = true;
     this.scene.add(deck);
-    // glowing edge trim
+    // Four narrow edge strips. The previous single full-size neon slab washed
+    // the whole platform red and hid the material underneath.
     const nm = this._neonMat(trimColor);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.08, d + 0.3), nm);
-    band.position.set(cx, y + 0.02, cz);
-    this.scene.add(band);
+    for (const z of [cz - d / 2 - 0.06, cz + d / 2 + 0.06]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.08, 0.12), nm);
+      band.position.set(cx, y + 0.02, z);
+      band.userData.noHit = true;
+      this.scene.add(band);
+    }
+    for (const x of [cx - w / 2 - 0.06, cx + w / 2 + 0.06]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, d + 0.06), nm);
+      band.position.set(x, y + 0.02, cz);
+      band.userData.noHit = true;
+      this.scene.add(band);
+    }
     // support pillar(s) down to the ground for a grounded look
     const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0c1420, roughness: 0.4, metalness: 0.8 });
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, y, 8), pillarMat);

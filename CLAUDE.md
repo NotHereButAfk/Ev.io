@@ -46,15 +46,18 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the active map is now an original **ev.io-inspired
-  megastructure arena** reconstructed from a gameplay capture. It replaces the
-  mall constructor path with `_buildEvioArena()`: four dark accessible bastions
-  at y=9, twin high bridge lanes, a y=5.5 central command deck, long spine ramps,
-  outer risk/reward climbs, two industrial grav lifts, ground cover clusters,
-  red route bands, cyan server-bank panels and a bright open sky. Every playable
-  roof/ramp is registered in `platforms[]`; solid bases and the perimeter use
-  `colliders[]`. Spawns stay on clear ground approaches. The old mall, city,
-  winter-town and legacy arena builders remain defined but are not called.
+- `src/world/World.js` — the active map is a **Jinx-led ev.io arena
+  recreation**, identified from the gameplay capture and rebuilt from official
+  Jinx, Rook, Depot, Vestige and Momentum visual references. `_buildEvioArena()`
+  uses warm octagonal concrete/brick towers over black ribbed server bases,
+  gold/cyan circuit panels, muted-rose bridges with narrow red edge lighting,
+  a split-height central spine, four tower roofs, asymmetric ground cover, two
+  optional grav lifts and a clear blue arena-sky silhouette. The route topology
+  stays native to this game: every playable roof/ramp is registered in
+  `platforms[]`; solid bases and the lowered perimeter use `colliders[]`.
+  `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
+  comparison. The old mall, city, winter-town and legacy arena builders remain
+  defined but are not called.
 - `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
