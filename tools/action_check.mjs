@@ -11,7 +11,7 @@
 // control rig doing the same thing WITHOUT the action. A pose that forgets to
 // apply something scores zero and fails, which is exactly the bug class here —
 // silence rather than a wrong number.
-import { applyWalkCycle } from '../src/player/Locomotion.js';
+import { applyWalkCycle, groundPerCycle } from '../src/player/Locomotion.js';
 import { applyRifleCarry } from '../src/player/RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry, ACTION_TIME } from '../src/player/Actions.js';
 
@@ -169,6 +169,90 @@ for (const [name, key, what] of [
   } else {
     results.push({ name: 'flinch restarts', moved: 1, limit: 1, ok: true, what: 'a second hit resets it' });
   }
+}
+
+// ── the zombie shamble ──────────────────────────────────────────────────────
+// Different rig, different (deliberately limping) cycle, same requirement: the
+// legs have to cover the ground the body travels. This measures the pose itself
+// — how much ground one cycle delivers — because the zombie's phase is advanced
+// by distance, so given a sane number here the feet plant by construction. It
+// shipped delivering 4% of what it needed.
+{
+  const ZG = { hipWeak: 0.45, hipStrong: 0.62, kneeWeak: 0.55, kneeStrong: 0.70 };
+  const ZL = { hipY: 1.06, thigh: 0.48, shin: 0.42, soleY: -0.102, toeZ: -0.10, heelZ: 0.18 };
+  const shamble = (S) => (p) => [
+    -Math.sin(p) * ZG.hipWeak * S,  -Math.max(0, -Math.cos(p)) * ZG.kneeWeak * S,   -Math.sin(p) * 0.08,
+     Math.sin(p) * ZG.hipStrong * S, -Math.max(0, Math.cos(p)) * ZG.kneeStrong * S,  Math.sin(p) * 0.10,
+  ];
+  for (const [name, stride, speed] of [['shambler', 1.0, 1.95], ['runner', 0.85, 3.22], ['brute', 1.30, 1.40]]) {
+    const per = groundPerCycle(ZL, shamble(stride));
+    const cadence = speed / per;                    // cycles per second
+    // Legs that deliver almost nothing per cycle force an absurd cadence; the
+    // shipped pose needed 4.3 cycles/s at a walk and ran at 0.5.
+    const ok = per > 0.4 && cadence < 6;
+    if (!ok) failures++;
+    results.push({ name: `zombie ${name}`, moved: per, limit: 0.4, ok,
+                   what: `${per.toFixed(2)}m per cycle → ${cadence.toFixed(1)} cycles/s at ${speed} m/s` });
+  }
+  // End-to-end: advance the phase by distance the way Zombie._animate does and
+  // measure what the planted foot actually does, at a true 60Hz. The in-game
+  // reading is useless here — headless runs the sim at a couple of frames a
+  // second and a shambler cycles twice a second, so any two samples straddle
+  // most of a stride.
+  {
+    const S = 1.0, speed = 1.95, dt = 1 / 60;
+    const perCycle = groundPerCycle(ZL, shamble(S));
+    const pose = shamble(S);
+    const at = (cy, cz, th, kn, an) => {
+      let y = cy, z = cz, c, s;
+      c = Math.cos(an); s = Math.sin(an); [y, z] = [y * c - z * s, y * s + z * c];
+      y -= ZL.shin;
+      c = Math.cos(kn); s = Math.sin(kn); [y, z] = [y * c - z * s, y * s + z * c];
+      y -= ZL.thigh;
+      c = Math.cos(th); s = Math.sin(th); [y, z] = [y * c - z * s, y * s + z * c];
+      return { y: y + ZL.hipY, z };
+    };
+    let phase = 0, bz = 0, prev = null, num = 0, den = 0;
+    for (let i = 0; i < 1200; i++) {
+      const dist = speed * dt;
+      bz -= dist;                                   // forward is -Z
+      phase += ((Math.PI * 2) / perCycle) * dist;
+      const q = pose(phase);
+      const leg = (o) => {
+        const th = q[o], kn = q[o + 1], an = q[o + 2];
+        return { low: Math.min(at(ZL.soleY, ZL.heelZ, th, kn, an).y,
+                               at(ZL.soleY, ZL.toeZ, th, kn, an).y),
+                 az: bz + at(0, 0, th, kn, an).z };
+      };
+      const L = leg(0), R = leg(3);
+      const cur = { L, R };
+      if (prev && i > 120) for (const k of ['L', 'R']) {
+        const other = k === 'L' ? 'R' : 'L';
+        const w = 1 / (1 + Math.exp(-((prev[other].low + cur[other].low)
+                                    - (prev[k].low + cur[k].low)) / 0.02));
+        num += w * -(cur[k].az - prev[k].az);       // travel along -Z
+        den += w * dist;
+      }
+      prev = cur;
+    }
+    const slip = den ? num / den : 1;
+    const ok = Math.abs(slip) < 0.25;
+    if (!ok) failures++;
+    results.push({ name: 'zombie planted-foot slip', moved: slip, limit: 0.25, ok,
+                   what: ok ? 'feet plant, body moves over them'
+                            : `slides ${(slip * 100).toFixed(0)}% of the way` });
+  }
+
+  // A knee that folds forwards, or bends through the stance instead of the
+  // swing, is what made the shipped cycle net out to nothing.
+  const shipped = (p) => [
+    -Math.sin(p) * 0.18,  Math.max(0, Math.sin(p)) * 0.28, -Math.sin(p) * 0.08,
+     Math.sin(p) * 0.30,  Math.max(0, -Math.sin(p)) * 0.38, Math.sin(p) * 0.10,
+  ];
+  const old = groundPerCycle(ZL, shipped);
+  results.push({ name: 'zombie knee phasing', moved: old < 0.4 ? 1 : 0, limit: 1, ok: old < 0.4,
+                 what: `the knees-through-stance version nets ${old.toFixed(2)}m — kept as a guard` });
+  if (!(old < 0.4)) failures++;
 }
 
 // ── report ──────────────────────────────────────────────────────────────────

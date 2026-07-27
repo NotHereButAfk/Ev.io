@@ -1,10 +1,31 @@
 import * as THREE from 'three';
+import { groundPerCycle } from '../player/Locomotion.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const DETECT_RADIUS   = 22;
 const ATTACK_RADIUS   = 1.7;
 const ATTACK_COOLDOWN = 1.5;
 const RADIUS          = 0.5;
+
+// ── the shamble ──────────────────────────────────────────────────────────────
+// Amplitudes for the asymmetric limp: one leg drags, the other drives.
+//
+// The knees are NEGATIVE and keyed off cosine, and both of those are load-
+// bearing. A knee only folds backwards, so a positive rotation here bends it
+// the wrong way; and it has to bend through its own leg's FORWARD SWING, which
+// for a hip on sin(t) is where cos(t) leads it. Shipped, they were positive and
+// keyed on sin(t) — bending through the stance instead of the swing, which
+// lifts the foot exactly when it should be planted. Combined with a phase that
+// ignored ground speed entirely, the horde covered 4% of its travel with its
+// feet and skated the other 96%.
+//
+// Legs this length can't deliver more than about a metre of ground per cycle,
+// which is what sets the cadence once the phase is driven off distance.
+const ZGAIT = { hipWeak: 0.45, hipStrong: 0.62, kneeWeak: 0.55, kneeStrong: 0.70 };
+// Leg geometry, from _buildLeg: hip y=1.06, knee -0.48, ankle -0.42, and a
+// 0.20 x 0.10 x 0.28 foot box at (0, -0.052, 0.04) under the ankle.
+const ZLEG = { hipY: 1.06, thigh: 0.48, shin: 0.42,
+               soleY: -0.102, toeZ: -0.10, heelZ: 0.18 };
 
 // Ranged attack configs per weapon type
 const ARMED_CFG = {
@@ -48,10 +69,10 @@ const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 // glow, fast and frail. brute: scaled up, blood-red glow, slow and tanky.
 // Armed zombies always use the shambler look (they need the full kit).
 const VARIANTS = {
-  shambler: { speed: 1.0,  hp: 1.0, dmg: 1.0, scale: 1.0,  anim: 1.0 },
-  runner:   { speed: 1.65, hp: 0.6, dmg: 0.8, scale: 0.94, anim: 1.7, glow: 0x3aff5e,
+  shambler: { speed: 1.0,  hp: 1.0, dmg: 1.0, scale: 1.0,  anim: 1.0, stride: 1.0 },
+  runner:   { speed: 1.65, hp: 0.6, dmg: 0.8, scale: 0.94, anim: 1.7, stride: 0.85, glow: 0x3aff5e,
               hide: /PlateChest|PlateCollar|PlateBack|PlatePack|PlateAb|PlateBelt|PlateName|PlateAntenna|Pauldron|GreaveThigh|GreaveShin|GuardKnee|PouchCanteen|TrimChest|TrimAb|TrimRail|TrimPauld|TrimBuckle|SocketSeam|SocketNameBand/ },
-  brute:    { speed: 0.72, hp: 2.4, dmg: 1.8, scale: 1.22, anim: 0.75, glow: 0xff2e18 },
+  brute:    { speed: 0.72, hp: 2.4, dmg: 1.8, scale: 1.22, anim: 0.75, stride: 1.30, glow: 0xff2e18 },
 };
 
 // ─── GLB model loader (preloaded once, shared across all zombie instances) ────
@@ -682,6 +703,28 @@ export class Zombie {
     const V = VARIANTS[armedType ? 'shambler' : variant] ?? VARIANTS.shambler;
     this.variant      = armedType ? 'shambler' : variant;
     this._animMul     = V.anim;
+    // Variant stride: a brute takes long slow strides, a runner short quick
+    // ones. This is what carries the variants' character now that the cadence
+    // is a consequence of speed rather than a dial — the same distance covered
+    // in fewer, bigger steps or more, smaller ones.
+    this._strideScale = V.stride ?? 1;
+    // How much ground this zombie's own legs actually cover in one cycle, so
+    // the phase can be advanced by distance travelled. Measured off the pose it
+    // will really play, not assumed.
+    this._groundPerCycle = groundPerCycle(ZLEG, (p) => {
+      const S = this._strideScale;
+      return [
+        -Math.sin(p) * ZGAIT.hipWeak * S,
+        -Math.max(0, -Math.cos(p)) * ZGAIT.kneeWeak * S,
+        -Math.sin(p) * 0.08,
+         Math.sin(p) * ZGAIT.hipStrong * S,
+        -Math.max(0, Math.cos(p)) * ZGAIT.kneeStrong * S,
+         Math.sin(p) * 0.10,
+      ];
+    });
+    // Seeded on the first animated frame — `position` is assigned further down.
+    this._prevAnimX = null;
+    this._prevAnimZ = 0;
     this.id           = _nextId++;
     this.world        = world;
     this.maxHealth    = Math.round(80 * hpMult * V.hp);
@@ -840,8 +883,27 @@ export class Zombie {
     // The phase advances UNEVENLY — a quick push on the driving stride, a slow
     // drag between — which reads as a lurching shamble instead of a metronome.
     const P = this._profile;
-    const lurch = isMoving ? (1 + 0.5 * Math.sin(this._animPhase)) : 1;
-    this._animPhase += dt * (isMoving ? 3.2 : 1.0) * (this._animMul ?? 1) * (P?.gaitMul ?? 1) * lurch;
+    // The phase advances with the DISTANCE COVERED, not on a clock. It used to
+    // run at a flat 3.2 rad/s regardless of how fast the thing was actually
+    // travelling, so a shambler moving 1.95 m/s needed 3.83m of ground per
+    // cycle out of legs that deliver 0.9 — the feet slid ~96% of the way and
+    // the whole horde glided. Driving it off distance also keeps the lurch
+    // honest for free: the body surges further on the strong stride, so the
+    // legs get further through their cycle in that same moment.
+    // Measured from where the body ACTUALLY ended up, not from the velocity it
+    // intended. Collision resolution runs after the move, and in a wave of
+    // eight converging on the same target they spend most of their time
+    // shouldering into each other — intent and displacement come apart, and
+    // the difference is exactly the amount the feet would slide.
+    if (this._prevAnimX === null) { this._prevAnimX = this.position.x; this._prevAnimZ = this.position.z; }
+    const dx = this.position.x - this._prevAnimX, dz = this.position.z - this._prevAnimZ;
+    this._prevAnimX = this.position.x; this._prevAnimZ = this.position.z;
+    if (isMoving) {
+      const perCycle = this._groundPerCycle * Math.max(0.2, this._moveBlend ?? 1);
+      this._animPhase += ((Math.PI * 2) / perCycle) * Math.hypot(dx, dz);
+    } else {
+      this._animPhase += dt * 1.0 * (P?.gaitMul ?? 1);      // idle sway
+    }
     const t = this._animPhase;
 
     // Forward SURGE from the gait — velocity peaks on the strong stride (used
@@ -868,11 +930,13 @@ export class Zombie {
     const mb = this._moveBlend;
 
     // Walk cycle — asymmetric shamble (one leg limps, the other drives),
-    // amplitude-scaled by the move blend.
-    wk.hip.rotation.x   = -Math.sin(t) * 0.18 * mb;
-    st.hip.rotation.x   =  Math.sin(t) * 0.30 * mb;
-    wk.knee.rotation.x  =  Math.max(0,  Math.sin(t)) * 0.28 * mb;
-    st.knee.rotation.x  =  Math.max(0, -Math.sin(t)) * 0.38 * mb;
+    // amplitude-scaled by the move blend. See ZGAIT for why the knees are
+    // negative and keyed off cosine.
+    const S = this._strideScale * mb;
+    wk.hip.rotation.x   = -Math.sin(t) * ZGAIT.hipWeak * S;
+    st.hip.rotation.x   =  Math.sin(t) * ZGAIT.hipStrong * S;
+    wk.knee.rotation.x  = -Math.max(0, -Math.cos(t)) * ZGAIT.kneeWeak * S;
+    st.knee.rotation.x  = -Math.max(0,  Math.cos(t)) * ZGAIT.kneeStrong * S;
     wk.ankle.rotation.x = -Math.sin(t) * 0.08 * mb;
     st.ankle.rotation.x =  Math.sin(t) * 0.10 * mb;
     // Pelvis bob + torso sway (idle keeps a faint sway, walk swells it).

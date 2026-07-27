@@ -186,6 +186,51 @@ function blendPose(out, reach, tuck, up, ext, push) {
   }
 }
 
+/**
+ * Ground covered per full cycle by ANY two-legged pose built from the same
+ * hip→knee→ankle chain, measured the way groundPerStep measures the player's:
+ * each ankle's travel while its own foot is bearing weight.
+ *
+ * Exported because the zombies need it and were skating badly without it —
+ * their phase advanced at a fixed rate per second with no reference to how fast
+ * they were actually moving, so the feet slid ~70% of the way. Their rig has
+ * different proportions and a completely different (deliberately asymmetric,
+ * limping) cycle, so what is shared is the measurement, not the pose.
+ *
+ * @param {object} g  { hipY, thigh, shin, soleY, heelZ, toeZ } leg geometry
+ * @param {(p:number)=>number[]} poseAt  phase → [thighL,kneeL,ankleL,thighR,kneeR,ankleR]
+ * @param {number} [samples]
+ * @returns {number} metres per full cycle (both steps)
+ */
+export function groundPerCycle(g, poseAt, samples = 128) {
+  const EPS = 0.01;                       // soft stance weight, metres
+  // Sole corner (or, at cy=cz=0, the ankle) for one leg.
+  const at = (cy, cz, thigh, knee, ankle) => {
+    let y = cy, z = cz, c, s;
+    c = Math.cos(ankle); s = Math.sin(ankle); [y, z] = [y * c - z * s, y * s + z * c];
+    y -= g.shin;
+    c = Math.cos(knee);  s = Math.sin(knee);  [y, z] = [y * c - z * s, y * s + z * c];
+    y -= g.thigh;
+    c = Math.cos(thigh); s = Math.sin(thigh); [y, z] = [y * c - z * s, y * s + z * c];
+    return { y: y + g.hipY, z };
+  };
+  const legOf = (q, i) => {
+    const th = q[i], kn = q[i + 1], an = q[i + 2];
+    const h = at(g.soleY, g.heelZ, th, kn, an), t = at(g.soleY, g.toeZ, th, kn, an);
+    return { low: Math.min(h.y, t.y), az: at(0, 0, th, kn, an).z };
+  };
+  const dp = (Math.PI * 2) / samples;
+  let total = 0;
+  for (let i = 0; i < samples; i++) {
+    const p = i * dp;
+    const a = poseAt(p), b = poseAt(p + dp);
+    const aL = legOf(a, 0), aR = legOf(a, 3), bL = legOf(b, 0), bR = legOf(b, 3);
+    const wL = 1 / (1 + Math.exp(-(aR.low - aL.low) / EPS));
+    total += wL * (bL.az - aL.az) + (1 - wL) * (bR.az - aR.az);
+  }
+  return Math.max(0.15, total);
+}
+
 // Frame-rate-independent ease toward a target on one channel.
 function ease(joint, tgt, k) {
   if (joint) joint.rotation.x += (tgt - joint.rotation.x) * k;

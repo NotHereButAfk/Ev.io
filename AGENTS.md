@@ -83,6 +83,19 @@ measures the ANKLE's travel across stance off the actual pose. Not the contact
 point — that migrates heel→toe as the foot rolls, and a rolling foot is not a
 sliding one.
 
+**2d. Zombies have their own rig and their own cycle, but the same rule.**
+`Zombie._animate` advances its phase by the DISTANCE the body actually moved
+(measured from the position delta — collision resolution runs after the move,
+and a wave of them spends most of its time shouldering into each other, so
+intent and displacement come apart). The metres-per-cycle that converts one to
+the other comes from `groundPerCycle()` in `Locomotion.js`, exported for this.
+Two things had to be true before that worked, and both are easy to get wrong
+again: a knee only folds BACKWARDS (negative), and it has to bend through its
+own leg's forward swing — for a hip on `sin(t)` that is `-max(0, cos(t))`, not
+`max(0, sin(t))`, which bends it through the stance and lifts the foot exactly
+when it should be planted. Shipped, the horde covered 4% of its travel with its
+feet and skated the other 96%.
+
 **2c. If it is an ACTION, it has to animate.** Reload, weapon swap, grenade
 throw, melee swing, slide and taking a hit all shipped at some point moving
 nothing at all. Adding a new one means adding its pose, not just its effect.

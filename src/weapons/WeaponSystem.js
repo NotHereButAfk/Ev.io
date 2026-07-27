@@ -1178,17 +1178,31 @@ export class WeaponSystem {
     const bobV = Math.sin(this._bobPhase * 2) * this._bobAmt;
     const bobH = Math.sin(this._bobPhase) * this._bobAmt * 0.55;
 
+    // Reload: the gun comes down and rolls over so the mag well faces you, with
+    // a jolt as the bolt goes home. Reading the reload's OWN timer rather than
+    // starting another one keeps this in step with the audio and with the
+    // third-person body, which animates the same reload from the same number.
+    // Without it the first-person view did nothing at all through a reload —
+    // just the HUD counter and a sound.
+    const rTime = def.reloadTime || 0;
+    const reloadP = (st.isReloading && rTime > 0)
+      ? THREE.MathUtils.clamp(1 - st.reloadTimer / rTime, 0, 1) : 0;
+    const rBell = reloadP > 0 ? Math.sin(Math.PI * reloadP) : 0;
+    const rack  = reloadP > 0 ? Math.exp(-Math.pow((reloadP - 0.62) / 0.055, 2)) : 0;
+
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
     const adsShiftX    = -this.scopeT * 0.32;
     const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
-    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH;
-    const tgtY = -0.26 + sprintRaiseY + bobV;
+    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH + 0.05 * rBell;
+    const tgtY = -0.26 + sprintRaiseY + bobV - 0.17 * rBell - 0.03 * rack;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
-    this._mountRot.x = expDamp(this._mountRot.x, this._sprintT * 0.22, 14, dt);
-    this._mountRot.z = expDamp(this._mountRot.z, this._sprintT * -1.0, 14, dt);
+    this._mountRot.x = expDamp(this._mountRot.x,
+      this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack, 14, dt);
+    this._mountRot.z = expDamp(this._mountRot.z,
+      this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, -0.5);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;
