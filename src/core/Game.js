@@ -1312,7 +1312,20 @@ export class Game {
     const run = p.isSprinting ? 1 : THREE.MathUtils.clamp((speed - 3.0) / 6.0, 0, 0.45);
     this._tpsCrouch = (this._tpsCrouch || 0) +
       ((p.isCrouching ? 1 : 0) - (this._tpsCrouch || 0)) * Math.min(1, dt * 10);
-    const gait = applyWalkCycle(rig, { speed, moving, run, crouch: this._tpsCrouch, dt });
+    // Travel direction in the body's own frame. The body faces local -Z and is
+    // yawed by the camera yaw, so forward is (-sin, -cos) and right is
+    // (cos, -sin). Without this the legs stride forward while you strafe or
+    // backpedal — the feet then just ride along with the body.
+    const bsn = Math.sin(p.yaw), bcs = Math.cos(p.yaw);
+    let dirF = 1, dirR = 0;
+    if (speed > 0.6) {
+      dirF = (p.velocity.x * -bsn + p.velocity.z * -bcs) / speed;
+      dirR = (p.velocity.x *  bcs + p.velocity.z * -bsn) / speed;
+    }
+    const gait = applyWalkCycle(rig, {
+      speed, moving, run, crouch: this._tpsCrouch, dt, dirF, dirR,
+      grounded: p.onGround, vy: p.velocity.y,
+    });
     this._playerBody.position.y = p.position.y + gait.bob;
     this._playerBody.rotation.x = gait.lean;   // already eased, and bob assumes it
 

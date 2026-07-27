@@ -23,6 +23,7 @@ owner told you; say "our design choice" instead.
 ```
 npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
+npm run test:gait             # walk cycle: foot planting in every direction, jump pose
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -66,6 +67,20 @@ nearest wins. Never `colliders.map(c => c.mesh)`.
 Assign it (`mesh.rotation.x = gait.lean`). Do not ease it again. The returned
 `bob` was solved for that exact lean; easing toward it separately drifts the
 feet up to 5cm through the floor.
+
+**2b. `applyWalkCycle()` needs to be told which way the body is TRAVELLING.**
+Pass `dirF`/`dirR` — the velocity's components along the body's own forward
+(−Z) and right (+X), normalised. Anything that always faces where it is going
+(the bots) can omit them. A **player cannot**: they strafe and backpedal while
+still facing their aim, and without this the legs run a forward stride while
+the body slides sideways, so the feet travel with the body instead of planting
+(measured slip 1.0 strafing, 1.5 backpedalling — the "animations are running
+backwards" bug). Pass `grounded`/`vy` too, or a jump has no pose and the legs
+just freeze in mid-air. `npm run test:gait` covers all of it.
+→ Do NOT hand-tune the stride rate. It is derived from `groundPerStep()`, which
+measures the ANKLE's travel across stance off the actual pose. Not the contact
+point — that migrates heel→toe as the foot rolls, and a rolling foot is not a
+sliding one.
 
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform.**
 Don't pose `armL/armR/elbowL/elbowR` anywhere else for a gun-carrying body —

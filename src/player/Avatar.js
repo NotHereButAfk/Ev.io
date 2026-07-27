@@ -55,6 +55,7 @@ export class Avatar {
     this._yawInit = false;
     this._prevPos = new THREE.Vector3();
     this._hasPrev = false;
+    this._lastDirPos = new THREE.Vector3();
   }
 
   setWeapon(id) {
@@ -137,8 +138,28 @@ export class Avatar {
 
     this._crouch += ((s.crouch ? 1 : 0) - this._crouch) * Math.min(1, dt * 10);
 
+    // Which way this body is travelling relative to the way it is FACING —
+    // without it the legs run a forward stride while the character strafes or
+    // backpedals, and the feet travel with the body instead of planting.
+    // The body faces local -Z, so after its yaw forward is (-sin, -cos) and
+    // right is (cos, -sin).
+    const sn = Math.sin(yaw), cs = Math.cos(yaw);
+    let dirF = 1, dirR = 0;
+    if (speed > 0.6) {
+      _v.copy(s.position).sub(this._lastDirPos); _v.y = 0;
+      const m = _v.length();
+      if (m > 1e-5) {
+        dirF = (_v.x * -sn + _v.z * -cs) / m;
+        dirR = (_v.x *  cs + _v.z * -sn) / m;
+      }
+    }
+    this._lastDirPos.copy(s.position);
+
     // The stride phase is owned by applyWalkCycle and derived from `speed`.
-    const gait = applyWalkCycle(this.rig, { speed, moving, run, crouch: this._crouch, dt });
+    const gait = applyWalkCycle(this.rig, {
+      speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
+      grounded, vy: s.vy || 0,
+    });
     this._walkT = gait.phase;
     g.position.set(s.position.x, s.position.y + gait.bob, s.position.z);
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
