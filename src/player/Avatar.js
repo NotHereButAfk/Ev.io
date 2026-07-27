@@ -4,6 +4,7 @@ import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
+import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // One character body, driven entirely by a state struct.
@@ -94,9 +95,14 @@ export class Avatar {
    * @param {number} dt
    * @param {object} s  {
    *   position: Vector3, yaw, pitch, speed?, sprint?, grounded?, crouch?,
-   *   firing?, alive?
+   *   firing?, alive?, vy?, sliding?, reload?, swing?, throwing?, hit?
    * }  speed is optional — omitted, it is measured from the position delta,
    *    which is how a remote player (who only sends positions) is animated.
+   *
+   *  The action fields come in two shapes. `reload` and `swing` are 0→1
+   *  progresses owned by the weapon, passed straight through. `throwing` and
+   *  `hit` are edge-triggered: a rising edge starts a one-shot here, so a
+   *  snapshot only has to carry a boolean rather than a synchronised clock.
    */
   update(dt, s) {
     const g = this.group;
@@ -168,16 +174,36 @@ export class Avatar {
     }
     this._lastDirPos.copy(s.position);
 
+    // One-shot actions. `swap` has no clock of its own, so notice the weapon
+    // changing; `reload` and `melee` are progresses owned by the weapon and
+    // passed straight through.
+    if (this._lastWeaponId !== undefined && this._lastWeaponId !== this.weaponId) {
+      triggerAction(this.rig, 'swap');
+    }
+    this._lastWeaponId = this.weaponId;
+    if (s.throwing && !this._wasThrowing) triggerAction(this.rig, 'throw');
+    this._wasThrowing = !!s.throwing;
+    if (s.hit && !this._wasHit) triggerAction(this.rig, 'flinch');
+    this._wasHit = !!s.hit;
+    const act = tickActions(this.rig, dt);
+
     // The stride phase is owned by applyWalkCycle and derived from `speed`.
     const gait = applyWalkCycle(this.rig, {
       speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
-      grounded, vy: s.vy || 0,
+      grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
     });
     this._walkT = gait.phase;
     g.position.set(s.position.x, s.position.y + gait.bob, s.position.z);
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
 
-    if (this.isMelee || !this.weapon) return;
+    if (this.isMelee) {
+      applyMeleeCarry(this.rig, this.weapon, {
+        swing: s.swing, moving, phase: gait.phase, run, dt,
+        throwP: act.throw, flinch: act.flinch,
+      });
+      return;
+    }
+    if (!this.weapon) return;
 
     // Shoulder the rifle while firing, drift back to the patrol carry after.
     this._aimHold = Math.max(0, (this._aimHold || 0) - dt);
@@ -197,6 +223,7 @@ export class Avatar {
     applyRifleCarry(this.rig, this.weapon, this._aim, dt, {
       swing: gait.swing + this._pitch * this._aim,
       kick:  this._kick,
+      reload: s.reload || 0, swap: act.swap, flinch: act.flinch, throwP: act.throw,
     });
   }
 

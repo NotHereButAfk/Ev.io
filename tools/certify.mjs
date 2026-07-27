@@ -29,6 +29,10 @@ const AUTO = [
     fn: () => { const r = run('npm run build'); return { ok: r.ok && /built in/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G2', phase: 'Phase 3', name: 'Deterministic movement (fixtures + parity + golden)',
     fn: () => { const r = run('npm run test:move'); return { ok: r.ok && /all fixtures passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-GAIT', phase: '—', name: 'Walk cycle plants in every direction, jump has a pose',
+    fn: () => { const r = run('npm run test:gait'); return { ok: r.ok && /all gait checks passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-ACT', phase: '—', name: 'Every action moves the body',
+    fn: () => { const r = run('npm run test:actions'); return { ok: r.ok && /all action checks passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',
     fn: () => { const r = run('node authnet_test.mjs', join(root, 'server')); const m = r.out.match(/(\d+) passed, (\d+) failed/);
                 return { ok: !!m && m[2] === '0', detail: m ? `${m[1]} authority/abuse proofs pass` : tail(r.out) }; } },

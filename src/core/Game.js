@@ -23,6 +23,7 @@ import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
+import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
@@ -1014,7 +1015,13 @@ export class Game {
     if (from) this.hud.showDamageFrom(from, this.player.position, this.player.yaw);
     // Damage flinch on the third-person body model.
     this._playerBody?.userData?.triggerHit?.(0, 1);
+    triggerAction(this._playerBody?.userData?.rig, 'flinch');
     if (died) this._onPlayerDeath();
+  }
+
+  /** Wind the off arm up and lob — see Actions.js. */
+  _throwAnim() {
+    triggerAction(this._playerBody?.userData?.rig, 'throw');
   }
 
   _onPlayerDeath() {
@@ -1205,11 +1212,17 @@ export class Game {
 
     // grenade input  F = frag  E = smoke
     if (!menuOpen && !dead && this.input.consumeJustPressed('KeyF')) {
+      const had = this.grenadeSystem.frags;
       this.grenadeSystem.throwFrag(this.player.camera);
+      // Only animate a throw that actually happened — out of grenades, the
+      // arm shouldn't wind up and lob nothing.
+      if (this.grenadeSystem.frags < had) this._throwAnim();
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
     if (!menuOpen && !dead && this.input.consumeJustPressed('KeyE')) {
+      const had = this.grenadeSystem.smokes;
       this.grenadeSystem.throwSmoke(this.player.camera);
+      if (this.grenadeSystem.smokes < had) this._throwAnim();
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
     this.grenadeSystem.update(dt, this.player);
@@ -1329,6 +1342,7 @@ export class Game {
     const gait = applyWalkCycle(rig, {
       speed, moving, run, crouch: this._tpsCrouch, dt, dirF, dirR,
       grounded: p.onGround, vy: p.velocity.y,
+      slide: p.isSliding ? 1 : 0,
     });
     this._playerBody.position.y = p.position.y + gait.bob;
     this._playerBody.rotation.x = gait.lean;   // already eased, and bob assumes it
@@ -1337,6 +1351,22 @@ export class Game {
     // free-swing. This mirrors Avatar.update() exactly — the body OTHER players
     // see of you is driven by the same two calls from the same numbers, so your
     // third-person self and their view of you can't disagree.
+    // ── one-shot actions ──────────────────────────────────────────────────
+    // A weapon swap has no timer of its own, so notice the index changing —
+    // that catches the number keys, the wheel and a floor pickup alike.
+    if (this._tpsSlot !== this.weaponSystem.currentIndex) {
+      if (this._tpsSlot !== undefined) triggerAction(rig, 'swap');
+      this._tpsSlot = this.weaponSystem.currentIndex;
+    }
+    const act = tickActions(rig, dt);
+    // A reload already has a clock — the weapon's own. Reading it rather than
+    // starting a second one means the pose can't drift out of step with the
+    // reload it is meant to be showing.
+    const wst = this.weaponSystem.currentState;
+    const rTime = this.weaponSystem.currentDef?.reloadTime || 0;
+    const reload = (wst?.isReloading && rTime > 0)
+      ? THREE.MathUtils.clamp(1 - wst.reloadTimer / rTime, 0, 1) : 0;
+
     const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
     if (isGun) {
       // A real soldier's carry: relaxed = rifle laid diagonally across the chest
@@ -1355,16 +1385,15 @@ export class Game {
       applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
         swing: gait.swing + this._tpsPitch * this._tpsAim,
         kick:  this._tpsGunKick,
+        reload, swap: act.swap, flinch: act.flinch, throwP: act.throw,
       });
-    } else if (moving) {
-      const swing = Math.sin(t) * (p.isSprinting ? 0.85 : 0.55);
-      L(rig.armL, -swing * 0.6, 12);  L(rig.armR, swing * 0.6, 12);
-      L(rig.elbowL, -0.28 - 0.22 * Math.max(0, -Math.cos(t)), 10);
-      L(rig.elbowR, -0.28 - 0.22 * Math.max(0,  Math.cos(t)), 10);
     } else {
-      const breathe = Math.sin(this.playTime * 1.6) * 0.04;
-      L(rig.armL, breathe, 4); L(rig.armR, breathe, 4);
-      L(rig.elbowL, -0.14, 4); L(rig.elbowR, -0.14, 4);
+      // Blade: windup, slash, recover — the same phase the first-person view
+      // swings on, so both views of the strike agree.
+      applyMeleeCarry(rig, this._tpsWeaponMesh, {
+        swing: this.weaponSystem.swingPhase,
+        moving, phase: t, run, dt, throwP: act.throw, flinch: act.flinch,
+      });
     }
   }
 

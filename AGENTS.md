@@ -24,6 +24,7 @@ owner told you; say "our design choice" instead.
 npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
 npm run test:gait             # walk cycle: foot planting in every direction, jump pose
+npm run test:actions          # every action moves the body
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -82,12 +83,29 @@ measures the ANKLE's travel across stance off the actual pose. Not the contact
 point — that migrates heel→toe as the foot rolls, and a rolling foot is not a
 sliding one.
 
-**3. `applyRifleCarry()` owns both arms *and* the weapon transform.**
+**2c. If it is an ACTION, it has to animate.** Reload, weapon swap, grenade
+throw, melee swing, slide and taking a hit all shipped at some point moving
+nothing at all. Adding a new one means adding its pose, not just its effect.
+→ Continuous state (crouching, sliding, airborne) is an option on
+`applyWalkCycle`. One-shots with no clock of their own (throw, swap, flinch) go
+through `triggerAction()` / `tickActions()` in `Actions.js`. One-shots that DO
+have a clock somewhere else — a reload runs off the weapon's `reloadTimer`, a
+melee strike off its `swingPhase` — pass that progress straight through; do not
+start a second timer, it will drift out of step with the thing it depicts.
+`npm run test:actions` fails on any action whose pose is identical to not doing
+it, which is the actual failure mode: silence, not a wrong number.
+
+**3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
+`applyMeleeCarry()` owns them for a blade.
 Don't pose `armL/armR/elbowL/elbowR` anywhere else for a gun-carrying body —
 the hands are IK'd onto the grip and handguard every frame and will slide off.
 Anything that should move the rifle *without* changing the grip (breathing,
 stride, recoil, look-pitch) goes through the `swing` option, which is a
 common-mode shoulder rotation the arms follow for free.
+A blade has no IK, so `applyMeleeCarry()` derives the weapon's position FROM
+the arm angles rather than keying it alongside them. Key both separately and
+you get exactly what the first attempt at the swing did: the sword tracking a
+perfectly good arc a forearm's length away from the arm swinging it.
 
 **4. Facing conventions.** Low-poly bodies are modelled facing **−Z**; game
 forward is **+Z** → add `π` to their yaw. A weapon's muzzle is its own local

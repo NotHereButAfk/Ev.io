@@ -372,6 +372,30 @@ export function applyWalkCycle(rig, o = {}) {
     ankleL += 0.18 * absorb; ankleR += 0.18 * absorb;
   }
 
+  // ── slide ──────────────────────────────────────────────────────────────────
+  // A sprint-slide used to run the ordinary stride, so the character sprinted
+  // along at knee height with its legs still cycling. It is a held pose, not a
+  // cycle: lead leg thrown out straight in front, trailing leg folded under,
+  // body low and tipped back over it. The height falls out of the ground solve
+  // on its own — the folded leg is what puts the hips down there.
+  rig._slide = (rig._slide || 0) + (clamp01(o.slide || 0) - (rig._slide || 0)) * Math.min(1, dt * 11);
+  const slide = rig._slide;
+  if (slide > 0.001) {
+    if (rig._slideLead === undefined || slide < 0.02) {
+      rig._slideLead = Math.sin(t) >= 0 ? 1 : -1;
+    }
+    const s = (base, tgt) => base + (tgt - base) * slide;
+    const leadT = 1.02, leadK = -0.16, leadA = 0.30;   // out in front, heel down
+    const trailT = 0.10, trailK = -1.90, trailA = -0.10;  // folded under the hips
+    if (rig._slideLead > 0) {
+      thighL = s(thighL, leadT + cHip);  kneeL = s(kneeL, leadK);  ankleL = s(ankleL, leadA);
+      thighR = s(thighR, trailT + cHip); kneeR = s(kneeR, trailK); ankleR = s(ankleR, trailA);
+    } else {
+      thighR = s(thighR, leadT + cHip);  kneeR = s(kneeR, leadK);  ankleR = s(ankleR, leadA);
+      thighL = s(thighL, trailT + cHip); kneeL = s(kneeL, trailK); ankleL = s(ankleL, trailA);
+    }
+  }
+
   if (rig.legL)   rig.legL.rotation.x   = thighL;
   if (rig.legR)   rig.legR.rotation.x   = thighR;
   if (rig.kneeL)  rig.kneeL.rotation.x  = kneeL;
@@ -401,7 +425,8 @@ export function applyWalkCycle(rig, o = {}) {
   // curves of their own, and easing them would lag the legs they belong to.
   const leanTarget = (-(0.03 + 0.13 * run) * mb * (moving ? dirF : 1)) - 0.10 * crouch;
   rig._lean = (rig._lean || 0) + (leanTarget - (rig._lean || 0)) * Math.min(1, dt * 6);
-  const lean = rig._lean - 0.16 * absorb + 0.09 * air * rig._airPush;
+  // Slide tips the torso BACK over the trailing leg (positive = back here).
+  const lean = rig._lean - 0.16 * absorb + 0.09 * air * rig._airPush + 0.30 * slide;
   // Airborne the feet are tucked, so there is no ground contact to solve for —
   // fade the drop out, or the body would sink to keep the raised soles at zero.
   const bob = groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw) * (1 - air);
