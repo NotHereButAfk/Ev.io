@@ -123,7 +123,7 @@ Keep this short and current. Delete your row when it lands.
 | who | lane | status |
 |---|---|---|
 | claude | movement model — accel/friction, air-strafe, double jump, dash (`src/player/Player.js`, `src/sim/MoveSim.js`) | not started, behind a flag |
-| codex | Jinx-led ev.io arena recreation (`src/world/World.js`) | in progress: official Jinx/Rook/Depot/Vestige/Momentum reference pass |
+| codex | Jinx-led ev.io arena recreation (`src/world/World.js`) | ready for gameplay playtest on `codex/evio-arena-recreation` (`4ce62e5`) |
 | codex | post-match performance screen | landed (3627f7c) |
 
 ### Open, and specced for whoever takes it
