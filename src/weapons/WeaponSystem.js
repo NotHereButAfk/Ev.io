@@ -46,6 +46,10 @@ function createTracerMesh() {
   return new THREE.Mesh(geo, mat);
 }
 
+// How far in front of the eye the viewmodel sits. Far enough that no part of
+// any gun in the arsenal reaches back inside the camera's near plane.
+const VIEWMODEL_Z = -0.58;
+
 export class WeaponSystem {
   constructor(camera, scene, audio) {
     this.camera = camera;
@@ -148,7 +152,10 @@ export class WeaponSystem {
     this.weaponMount = new THREE.Object3D();
     // Tucked lower-right and scaled down so the gun frames the corner of the
     // screen instead of blocking a third of the view (ev.io-style proportion).
-    this.weaponMount.position.set(0.30, -0.28, -0.52);
+    // Held 0.58m out rather than 0.52: the stock reaches back most of that
+    // distance, and any closer put it inside the camera's near plane, where it
+    // was silently sliced away. See Player.js's near-plane note.
+    this.weaponMount.position.set(0.30, -0.28, -0.58);
     this.weaponMount.scale.setScalar(0.74);
     this.camera.add(this.weaponMount);
 
@@ -1203,7 +1210,7 @@ export class WeaponSystem {
       this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
-    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, -0.5);
+    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;
 
