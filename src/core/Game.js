@@ -22,7 +22,7 @@ import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
-import { applyWalkCycle } from '../player/Locomotion.js';
+import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
@@ -116,6 +116,10 @@ export class Game {
     this.player.onTeleport = () => {
       this.audio.playTeleport();
       this.hud.flashTeleport();
+      // Blink covers 22m between one frame and the next, and the pads put you
+      // down grounded — either way nothing in the gait has cause to react, so
+      // the body would just slide to the far end. Play the jump arc over it.
+      triggerHop(this._playerBody?.userData?.rig);
     };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     // Hide FPS viewmodel during menu — it floats in the scene otherwise.

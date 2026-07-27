@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from './PreviewCharacter.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
-import { applyWalkCycle } from './Locomotion.js';
+import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,6 +26,11 @@ const _v = new THREE.Vector3();
 // the arms invert when someone looks at their feet.
 const PITCH_FOLLOW = 0.62;
 const PITCH_LIMIT  = 0.95;    // radians (~54°)
+
+// A position jump bigger than this in a single frame can't be running — the
+// fastest anyone moves is a 9.6 m/s sprint, which is 0.16m per frame at 60Hz
+// and under 0.5m even on a badly stuttering one.
+const TELEPORT_STEP = 3.0;    // metres
 
 export class Avatar {
   /**
@@ -82,6 +87,9 @@ export class Avatar {
   /** Recoil pulse — call when this character fires. */
   fire() { this._kick = 1; this._aimHold = 1.1; }
 
+  /** Play the jump arc — call when this character blinks or takes a pad. */
+  hop() { triggerHop(this.rig); }
+
   /**
    * @param {number} dt
    * @param {object} s  {
@@ -98,14 +106,19 @@ export class Avatar {
     // Speed: measured from movement when not supplied, so a network snapshot
     // animates identically to a local controller without sending a velocity.
     let speed = s.speed;
-    if (speed === undefined) {
-      if (this._hasPrev && dt > 0) {
-        _v.copy(s.position).sub(this._prevPos); _v.y = 0;
-        speed = _v.length() / dt;
-      } else speed = 0;
-    }
+    let jumped = 0;
+    if (this._hasPrev) {
+      _v.copy(s.position).sub(this._prevPos); _v.y = 0;
+      jumped = _v.length();
+      if (speed === undefined) speed = dt > 0 ? jumped / dt : 0;
+    } else if (speed === undefined) speed = 0;
     this._prevPos.copy(s.position);
     this._hasPrev = true;
+
+    // A jump of metres in one frame is a blink or a teleport pad, not running.
+    // Measuring speed off it would read as a huge sprint for one frame, and the
+    // body would slide the whole way; play the jump arc over it instead.
+    if (jumped > TELEPORT_STEP) { speed = 0; this.hop(); }
 
     const grounded = s.grounded !== false;
     const moving   = speed > 0.6 && grounded;

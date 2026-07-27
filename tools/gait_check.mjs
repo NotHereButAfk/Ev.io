@@ -19,7 +19,7 @@
 // shared code with Locomotion.js it would agree with it by construction and
 // check nothing. Cross-check that it is right: the lowest sole comes out at
 // exactly 0mm, which is what groundBob() independently solves for.
-import { applyWalkCycle } from '../src/player/Locomotion.js';
+import { applyWalkCycle, triggerHop, HOP_SECONDS } from '../src/player/Locomotion.js';
 
 const HIP_Y = 1.21, KNEE_Y = 0.62, ANKLE_Y = 0.27;
 const THIGH_L = HIP_Y - KNEE_Y, SHIN_L = KNEE_Y - ANKLE_Y;
@@ -135,6 +135,8 @@ console.log('\nairborne pose');
   const dt = 1 / 60;
   for (let i = 0; i < 120; i++) applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: true });
 
+  // Which leg leads is picked at takeoff from the live stride, so read both and
+  // track whichever one it chose.
   let vy = 9.5;
   const frames = [];
   for (let i = 0; i < 60; i++) {
@@ -142,36 +144,114 @@ console.log('\nairborne pose');
     const g = applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: false, vy });
     // `air` defaulted, so a build that stopped reporting it fails a check
     // rather than throwing here.
-    frames.push({ thigh: rig.legL.rotation.x, knee: rig.kneeL.rotation.x,
-      air: g.air || 0, bob: g.bob, vy });
+    frames.push({
+      air: g.air || 0, bob: g.bob, vy, lead: rig._airLead,
+      thigh: rig.legL.rotation.x, knee: rig.kneeL.rotation.x,
+      // the leading leg, whichever side it landed on
+      lThigh: rig._airLead > 0 ? rig.legL.rotation.x : rig.legR.rotation.x,
+      lKnee:  rig._airLead > 0 ? rig.kneeL.rotation.x : rig.kneeR.rotation.x,
+      lAnkle: rig._airLead > 0 ? rig.ankleL.rotation.x : rig.ankleR.rotation.x,
+    });
   }
-  const spread  = Math.max(...frames.map((f) => f.thigh)) - Math.min(...frames.map((f) => f.thigh));
-  const tuck    = Math.min(...frames.map((f) => f.knee));       // deepest, on the way up
-  const last    = frames[frames.length - 1];
+  const spread = Math.max(...frames.map((f) => f.thigh)) - Math.min(...frames.map((f) => f.thigh));
+  const tuckI  = frames.reduce((b, f, i) => (f.lKnee < frames[b].lKnee ? i : b), 0);
+  const tuck   = frames[tuckI].lKnee;
+  const last   = frames[frames.length - 1];
+  // Push-off: toes pointed and the leg near straight, before any of the tuck.
+  const pushI  = frames.reduce((b, f, i) => (f.lAnkle < frames[b].lAnkle ? i : b), 0);
+  const push   = frames[pushI];
+
   console.log('   airborne blend reaches %s, thigh moves %s rad', last.air.toFixed(2), spread.toFixed(2));
-  console.log('   knee tucks to %s rad, then unfolds to %s by the time it is falling',
-    tuck.toFixed(2), last.knee.toFixed(2));
+  console.log('   push-off  f%d  ankle %s rad (toes pointed), knee %s (near straight)',
+    pushI, push.lAnkle.toFixed(2), push.lKnee.toFixed(2));
+  console.log('   tuck      f%d  knee %s rad', tuckI, tuck.toFixed(2));
+  console.log('   reach     f%d  knee %s rad, ankle %s (toes up)',
+    frames.length - 1, last.lKnee.toFixed(2), last.lAnkle.toFixed(2));
+
   check(last.air > 0.9, 'airborne blend never engages');
   check(spread > 0.15, `legs are frozen in mid-air (thigh moves only ${spread.toFixed(3)} rad)`);
   check(tuck < -0.9, `no knee tuck on the way up (deepest ${tuck.toFixed(2)} rad)`);
   check(last.vy < -4, 'test did not reach the falling half of the jump');
-  check(last.knee > tuck + 0.3,
-    `legs do not extend for the landing (knee ${tuck.toFixed(2)} → ${last.knee.toFixed(2)})`);
+  check(last.lKnee > tuck + 0.3,
+    `legs do not extend for the landing (knee ${tuck.toFixed(2)} → ${last.lKnee.toFixed(2)})`);
   check(Math.abs(last.bob) < 0.02,
     'the ground drop is still applied in mid-air (feet are tucked — nothing to stand on)');
+  // The drive off the floor must come FIRST and must be a real extension. A
+  // pose driven only by vertical speed is fully tucked at takeoff and fails
+  // both of these.
+  check(push.lAnkle < -0.15,
+    `no push-off — toes never point (lowest ankle ${push.lAnkle.toFixed(2)} rad)`);
+  check(push.lKnee > -0.45,
+    `the leg is already folded during the push-off (knee ${push.lKnee.toFixed(2)} rad)`);
+  check(pushI < tuckI, `push-off (f${pushI}) does not precede the tuck (f${tuckI})`);
+  check(last.lAnkle > 0.2, `toes do not turn up to land (ankle ${last.lAnkle.toFixed(2)} rad)`);
+  const swapped = frames.some((f) => f.lead !== frames[0].lead);
+  check(!swapped, 'the leading leg swaps in mid-air');
 
-  // landing absorb, then back to a normal stride
-  const beforeLanding = rig.kneeL.rotation.x;
-  let landKnee = 0;
-  for (let i = 0; i < 4; i++) {
-    applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: true, vy: 0 });
-    landKnee = Math.min(landKnee, rig.kneeL.rotation.x);
+  // Landing absorb, measured against a control rig walking the same stride in
+  // the same phase. Comparing to "the knee before the jump" would be comparing
+  // to an arbitrary point in a cycle that swings a full radian on its own.
+  const ctrl = newRig();
+  ctrl._walkT = rig._walkT; ctrl._moveBlend = 1; ctrl._lean = rig._lean;
+  let deepest = 0;
+  for (let i = 0; i < 20; i++) {
+    applyWalkCycle(rig,  { speed: 6.2, moving: true, run: 0, dt, grounded: true, vy: 0 });
+    applyWalkCycle(ctrl, { speed: 6.2, moving: true, run: 0, dt, grounded: true, vy: 0 });
+    deepest = Math.min(deepest, rig.kneeL.rotation.x - ctrl.kneeL.rotation.x);
   }
-  console.log('   landing knee bend %s rad (from %s)', landKnee.toFixed(2), beforeLanding.toFixed(2));
-  check(landKnee < beforeLanding - 0.2, 'landing is not absorbed');
+  console.log('   landing absorb: knee %s rad below the same stride unjumped', deepest.toFixed(2));
+  check(deepest < -0.2, `landing is not absorbed (only ${deepest.toFixed(2)} rad below the stride)`);
   for (let i = 0; i < 120; i++) applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: true });
   check(Math.abs(applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: true }).air) < 0.01,
     'airborne blend does not clear after landing');
+}
+
+// ── a blink has to look like something ──────────────────────────────────────
+// It arrives grounded with no vertical speed, so nothing in the gait has any
+// reason to react — the body would slide the 22m. triggerHop plays the arc over
+// it while `grounded` stays true throughout.
+console.log('\nteleport hop (grounded the whole time)');
+{
+  // Two rigs walking the same stride in the same phase; only one blinks. Every
+  // number below is the DIFFERENCE, so nothing depends on where in the cycle
+  // the hop happened to land. The phases stay locked because the stride rate is
+  // solved from `_lean`, which the hop does not touch.
+  const dt = 1 / 60;
+  const walk = { speed: 6.2, moving: true, run: 0, dt, grounded: true, vy: 0 };
+  const hop = newRig(), ctrl = newRig();
+  for (let i = 0; i < 120; i++) { applyWalkCycle(hop, walk); applyWalkCycle(ctrl, walk); }
+  check(Math.abs(hop._walkT - ctrl._walkT) < 1e-9, 'control rig is out of phase — test is invalid');
+
+  triggerHop(hop);
+  const f = [];
+  for (let i = 0; i < Math.ceil(HOP_SECONDS / dt) + 45; i++) {
+    const g = applyWalkCycle(hop, walk);            // grounded: true throughout
+    applyWalkCycle(ctrl, walk);
+    f.push({ air: g.air || 0,
+      dKnee:  Math.min(hop.kneeL.rotation.x - ctrl.kneeL.rotation.x,
+                       hop.kneeR.rotation.x - ctrl.kneeR.rotation.x),
+      dAnkle: Math.min(hop.ankleL.rotation.x - ctrl.ankleL.rotation.x,
+                       hop.ankleR.rotation.x - ctrl.ankleR.rotation.x) });
+  }
+  const peak    = Math.max(...f.map((x) => x.air));
+  const tucked  = Math.min(...f.map((x) => x.dKnee));
+  const toes    = Math.min(...f.map((x) => x.dAnkle));
+  const airOut  = f.findIndex((x, i) => i > 5 && x.air < 0.5);
+  const absorb  = Math.min(...f.slice(airOut, airOut + 25).map((x) => x.dKnee));
+  const settled = f[f.length - 1];
+
+  console.log('   airborne blend peaks at %s, back down by f%d', peak.toFixed(2), airOut);
+  console.log('   vs. the same stride unjumped: knee %s rad, toes %s rad',
+    tucked.toFixed(2), toes.toFixed(2));
+  console.log('   landing absorb %s rad, settles to %s', absorb.toFixed(2), settled.dKnee.toFixed(3));
+
+  check(peak > 0.9, 'triggerHop does not lift the body off the ground pose');
+  check(tucked < -0.5, `triggerHop never tucks (knee only ${tucked.toFixed(2)} rad off the stride)`);
+  check(toes < -0.15, 'triggerHop has no push-off');
+  check(airOut > 20, `the hop is over before it reads (${airOut} frames)`);
+  check(absorb < -0.2, `the hop does not land — no absorb (${absorb.toFixed(2)} rad)`);
+  check(settled.air < 0.01, 'the hop never clears');
+  check(Math.abs(settled.dKnee) < 0.02, 'the rig does not return to its stride after a hop');
 }
 
 // A body that never told us which way it is going (the bots) must be unchanged.

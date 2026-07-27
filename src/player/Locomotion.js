@@ -24,6 +24,32 @@
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+// How long a triggered hop takes to play out, and the vertical speed it
+// pretends to have. Roughly a real jump: 9.5 m/s under 20 m/s² is airborne for
+// about 0.95s, and a blink should read as a shorter, sharper version of that.
+export const HOP_SECONDS = 0.46;
+const HOP_PEAK = 8.5;
+
+/**
+ * Play the whole jump arc without actually leaving the ground.
+ *
+ * A blink covers 22m between one frame and the next. The character arrives
+ * grounded with no vertical speed, so nothing in the gait has any reason to
+ * react and it just slides to the far end. Same for the teleport pads, which
+ * put you down grounded by design. Call this and the body pushes off, tucks and
+ * lands as if it had jumped there.
+ *
+ * @param {object} rig
+ * @param {number} [seconds]
+ */
+export function triggerHop(rig, seconds = HOP_SECONDS) {
+  if (!rig) return;
+  rig._hopT = seconds;
+  rig._hopFor = seconds;
+  rig._airT = 0;
+  rig._airLead = undefined;      // re-pick the leading leg from the live stride
+}
+
 // ── leg geometry, straight off the low-poly model ────────────────────────────
 const HIP_Y = 1.21, KNEE_Y = 0.62, ANKLE_Y = 0.27;
 const THIGH_L = HIP_Y - KNEE_Y;      // 0.59
@@ -140,6 +166,26 @@ function groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw = 
   return -lo;
 }
 
+// The three airborne key poses, per leg, as [thigh, knee, ankle] — positive
+// ankle is toes up. Leading leg and trailing leg are separate: a jump with both
+// legs doing the same thing is a cartoon.
+//                            thigh   knee  ankle
+const TUCK_LEAD   = [  0.80, -1.45,  0.02];
+const TUCK_TRAIL  = [ -0.36, -0.60,  0.12];
+const REACH_LEAD  = [  0.18, -0.20,  0.36];
+const REACH_TRAIL = [ -0.14, -0.32,  0.30];
+const EXT_LEAD    = [ -0.26, -0.12, -0.44];   // toes pointed, driving off the floor
+const EXT_TRAIL   = [ -0.50, -0.08, -0.36];
+const _poseLead = [0, 0, 0], _poseTrail = [0, 0, 0];
+
+// reach →(up)→ tuck, then →(push)→ extend, written into `out`.
+function blendPose(out, reach, tuck, up, ext, push) {
+  for (let i = 0; i < 3; i++) {
+    const arc = reach[i] + (tuck[i] - reach[i]) * up;
+    out[i] = arc + (ext[i] - arc) * push;
+  }
+}
+
 // Frame-rate-independent ease toward a target on one channel.
 function ease(joint, tgt, k) {
   if (joint) joint.rotation.x += (tgt - joint.rotation.x) * k;
@@ -254,36 +300,76 @@ export function applyWalkCycle(rig, o = {}) {
 
   // ── airborne ───────────────────────────────────────────────────────────────
   // A jump used to fall out of `moving`, so the legs simply eased to a stand in
-  // mid-flight and the character froze. Give it an actual pose: knees come up on
-  // the way up, legs reach down for the floor on the way down, and the landing
-  // is absorbed with a knee bend rather than a snap back to the stride.
-  const airTarget = o.grounded === false ? 1 : 0;
+  // mid-flight and the character froze. It needs a pose — and specifically it
+  // needs THREE, in sequence, rather than one blend driven by vertical speed:
+  //
+  //   EXTEND  the drive off the floor. Legs straight, toes pointed. This one
+  //           has to run off its own clock, because vertical speed is at its
+  //           maximum here and cannot tell the push-off apart from the rise —
+  //           a pose that is purely a function of vy is already fully tucked
+  //           the instant it leaves the ground, which skips the push entirely
+  //           and reads like the character was yanked upward on a wire.
+  //   TUCK    knees come up as the body rises.
+  //   REACH   legs unfold and the toes turn up to meet the floor.
+  //
+  // A hop can also be played without leaving the ground at all — triggerHop().
+  rig._hopT = Math.max(0, (rig._hopT || 0) - dt);
+  const hopping = rig._hopT > 0;
+  const airTarget = (o.grounded === false || hopping) ? 1 : 0;
   const prevAir = rig._air || 0;
-  rig._air = prevAir + (airTarget - prevAir) * Math.min(1, dt * 12);
+  // Fast in, slower out: a push-off is not a gradual thing, but the recovery on
+  // the far side of a landing is.
+  rig._air = prevAir + (airTarget - prevAir) * Math.min(1, dt * (airTarget ? 40 : 12));
   // Landing: fires on the transition back to the ground, decays away.
   if (airTarget === 0 && prevAir > 0.5) rig._land = 1;
   rig._land = Math.max(0, (rig._land || 0) - dt * 4);
+  rig._airT = airTarget ? (rig._airT || 0) + dt : 0;
   const air = rig._air;
+  const absorb = (rig._land || 0) * (rig._land || 0);   // sharp at touchdown
 
   if (air > 0.001) {
-    // -1 falling … +1 rising. Scaled by a typical jump speed, not the actual
+    // A triggered hop has no real vertical speed, so it plays the arc off the
+    // clock instead — full up at the start, full down at the end.
+    const vy = hopping
+      ? HOP_PEAK * (2 * (rig._hopT / (rig._hopFor || HOP_SECONDS)) - 1)
+      : (o.vy || 0);
+    // -1 falling … +1 rising, against a typical jump rather than the actual
     // one, so a long fall doesn't wind the pose past its extreme.
-    const rise = Math.max(-1, Math.min(1, (o.vy || 0) / 8));
-    const up   = (rise + 1) / 2;                       // 1 at takeoff, 0 landing
-    // Tuck on the way up (lead knee high, trail leg extended behind), then
-    // spread and reach for the ground on the way down.
-    const jThighL = -0.30 + 1.05 * up,  jKneeL = -0.30 - 1.05 * up;
-    const jThighR = -0.30 + 0.45 * up,  jKneeR = -0.30 - 0.35 * up;
-    const jAnkle  = 0.30 - 0.25 * up;                  // toes up to land on
+    // Saturating below the peak speed, so the tuck is at full depth for most of
+    // the rise instead of only at the one instant vy is at its maximum — which
+    // is the instant the push-off owns anyway.
+    const up   = clamp01((Math.max(-1, Math.min(1, vy / 6.5)) + 1) / 2);
+    // Held flat for the first 50ms, then let go quickly. Without the plateau the
+    // decay overlaps the airborne blend still fading in, the two dilute each
+    // other, and the extension only reaches about half strength — the push-off
+    // stops reading. Decaying slowly is just as bad the other way: it bleeds a
+    // straight leg into the tuck and costs it a quarter of its depth.
+    const push = Math.exp(-Math.max(0, rig._airT - 0.05) / 0.07);
+
+    // Whichever leg was forward at takeoff stays forward. You leave the ground
+    // off one foot, and a running jump that swaps legs in mid-air reads as a
+    // stumble.
+    if (rig._airLead === undefined || prevAir < 0.02) {
+      rig._airLead = Math.sin(t) >= 0 ? 1 : -1;
+    }
+
+    blendPose(_poseLead,  REACH_LEAD,  TUCK_LEAD,  up, EXT_LEAD,  push);
+    blendPose(_poseTrail, REACH_TRAIL, TUCK_TRAIL, up, EXT_TRAIL, push);
+    const pL = rig._airLead > 0 ? _poseLead : _poseTrail;
+    const pR = rig._airLead > 0 ? _poseTrail : _poseLead;
+
     const a = (base, jump) => base + (jump - base) * air;
-    thighL = a(thighL, jThighL + cHip); thighR = a(thighR, jThighR + cHip);
-    kneeL  = a(kneeL,  jKneeL + cKnee); kneeR  = a(kneeR,  jKneeR + cKnee);
-    ankleL = a(ankleL, jAnkle);         ankleR = a(ankleR, jAnkle);
+    thighL = a(thighL, pL[0] + cHip);  thighR = a(thighR, pR[0] + cHip);
+    kneeL  = a(kneeL,  pL[1] + cKnee); kneeR  = a(kneeR,  pR[1] + cKnee);
+    ankleL = a(ankleL, pL[2]);         ankleR = a(ankleR, pR[2]);
+    rig._airPush = push;
+  } else {
+    rig._airPush = 0;
   }
-  if (rig._land > 0.001) {
-    const absorb = rig._land * rig._land;              // sharp at touchdown
-    kneeL -= 0.55 * absorb; kneeR -= 0.55 * absorb;
+  if (absorb > 0.001) {
+    kneeL  -= 0.55 * absorb; kneeR  -= 0.55 * absorb;
     thighL += 0.22 * absorb; thighR += 0.22 * absorb;
+    ankleL += 0.18 * absorb; ankleR += 0.18 * absorb;
   }
 
   if (rig.legL)   rig.legL.rotation.x   = thighL;
@@ -309,9 +395,13 @@ export function applyWalkCycle(rig, o = {}) {
   // HERE rather than by the caller, because the ground solve below has to run
   // against the lean that actually gets applied — solving for the target while
   // the body eases toward it drifts the feet.
+  // The torso follows the legs, or the landing reads as a knee bend bolted onto
+  // a rigid mannequin: pitch into the compression on touchdown, and tip back a
+  // little over the drive off the floor. Not eased — both are already smooth
+  // curves of their own, and easing them would lag the legs they belong to.
   const leanTarget = (-(0.03 + 0.13 * run) * mb * (moving ? dirF : 1)) - 0.10 * crouch;
   rig._lean = (rig._lean || 0) + (leanTarget - (rig._lean || 0)) * Math.min(1, dt * 6);
-  const lean = rig._lean;
+  const lean = rig._lean - 0.16 * absorb + 0.09 * air * rig._airPush;
   // Airborne the feet are tucked, so there is no ground contact to solve for —
   // fade the drop out, or the body would sink to keep the raised soles at zero.
   const bob = groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw) * (1 - air);
