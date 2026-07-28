@@ -543,9 +543,9 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    // Winter-Graveyard's sunrise is warm at the horizon and mauve overhead.
-    this.scene.background = new THREE.Color(0xdba5b6);
-    this.scene.fog = new THREE.Fog(0xd8c4cd, 105, 260);
+    // Daytime Rook uses an almost white horizon over a clean pale-blue sky.
+    this.scene.background = new THREE.Color(0xcfe9ef);
+    this.scene.fog = new THREE.Fog(0xc8d7dc, 145, 360);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -650,12 +650,12 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // Official ev.io Winter-Graveyard (node 644): a snow basin framed by a
-    // monumental sealed gate, crescent ribs, graves, cliffs and a raised keep.
+    // Official ev.io Daytime Rook (node 755): interlocking dark monoliths,
+    // suspended masses, recessed stairs and compact multilevel combat lanes.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildWinterGraveyard();
+    this._buildRookArena();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
@@ -675,21 +675,21 @@ export class World {
   }
 
   _buildLighting() {
-    const hemi = new THREE.HemisphereLight(0xffdfd1, 0x554956, 1.32);
+    const hemi = new THREE.HemisphereLight(0xf4fbff, 0x41464d, 1.45);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffd7aa, 1.45);
-    sun.position.set(72, 86, -95);
+    const sun = new THREE.DirectionalLight(0xfff4df, 1.58);
+    sun.position.set(-82, 118, 66);
     sun.castShadow = false;
     this.scene.add(sun);
-    const skyRim = new THREE.DirectionalLight(0xc99ad5, 0.38);
-    skyRim.position.set(-75, 46, 54);
+    const skyRim = new THREE.DirectionalLight(0x8fd7ff, 0.28);
+    skyRim.position.set(72, 42, -64);
     skyRim.castShadow = false;
     this.scene.add(skyRim);
   }
 
   _buildGround() {
     const floor = new THREE.MeshStandardMaterial({
-      color: 0xeee5ec, roughness: 1, metalness: 0, envMapIntensity: 0.22,
+      color: 0xaeb4b8, roughness: 0.82, metalness: 0.12, envMapIntensity: 0.42,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -698,17 +698,17 @@ export class World {
     ground.updateMatrix();
     this.scene.add(ground);
 
-    // Sparse mauve wind streaks keep the otherwise white floor readable.
-    const drift = new THREE.MeshBasicMaterial({ color: 0xcbbcc8, transparent: true, opacity: 0.22 });
-    for (const [x, z, w, r] of [
-      [-28, 19, 22, -0.12], [9, 31, 30, 0.08], [-4, -10, 26, -0.04],
-      [27, -24, 18, 0.14], [-31, -35, 16, 0.05],
-    ]) {
-      const streak = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.32), drift);
-      streak.rotation.x = -Math.PI / 2;
-      streak.rotation.z = r;
-      streak.position.set(x, 0.025, z);
-      this.scene.add(streak);
+    // Rook's floor is made from broad square panels with restrained bevel lines.
+    const seam = new THREE.MeshBasicMaterial({ color: 0x727a82, transparent: true, opacity: 0.42 });
+    for (let p = -54; p <= 54; p += 12) {
+      const sx = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 120), seam);
+      sx.rotation.x = -Math.PI / 2;
+      sx.position.set(p, 0.026, 0);
+      this.scene.add(sx);
+      const sz = new THREE.Mesh(new THREE.PlaneGeometry(120, 0.09), seam);
+      sz.rotation.x = -Math.PI / 2;
+      sz.position.set(0, 0.027, p);
+      this.scene.add(sz);
     }
   }
 
@@ -717,11 +717,10 @@ export class World {
     canvas.width = 16; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0, '#8b6f89');
-    grad.addColorStop(0.32, '#b981aa');
-    grad.addColorStop(0.66, '#efb7a8');
-    grad.addColorStop(0.86, '#ffd8ad');
-    grad.addColorStop(1, '#fff0cf');
+    grad.addColorStop(0, '#69bfe3');
+    grad.addColorStop(0.42, '#a7ddeb');
+    grad.addColorStop(0.76, '#dff4f4');
+    grad.addColorStop(1, '#fffdf5');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 16, 512);
     const texture = new THREE.CanvasTexture(canvas);
@@ -4121,6 +4120,270 @@ export class World {
     ring.position.set(x, 2.3, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
   }
 
+  // Daytime Rook, rebuilt from the complete official node 755 reference.
+  // The visual hierarchy is deliberately asymmetric: a suspended left mass,
+  // a diagonal-braced central tower, a stepped right facade and a sunken stair.
+  _buildRookArena() {
+    const mats = {
+      floor: new THREE.MeshStandardMaterial({ color: 0xb4b7b7, roughness: 0.78, metalness: 0.12 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0x535250, roughness: 0.78, metalness: 0.12 }),
+      wallLight: new THREE.MeshStandardMaterial({ color: 0x74736e, roughness: 0.76, metalness: 0.1 }),
+      wallDark: new THREE.MeshStandardMaterial({ color: 0x343840, roughness: 0.7, metalness: 0.22 }),
+      trim: new THREE.MeshStandardMaterial({ color: 0x202633, roughness: 0.58, metalness: 0.38 }),
+      inset: new THREE.MeshStandardMaterial({ color: 0x8b7d6e, roughness: 0.9, metalness: 0.02 }),
+      recess: new THREE.MeshStandardMaterial({ color: 0x171c24, roughness: 0.72, metalness: 0.28 }),
+      stair: new THREE.MeshStandardMaterial({ color: 0x75473d, roughness: 0.86, metalness: 0.04 }),
+      gold: new THREE.MeshStandardMaterial({
+        color: 0xc9b56c, roughness: 0.48, metalness: 0.18,
+        emissive: 0x6f4718, emissiveIntensity: 0.16,
+      }),
+      cyan: new THREE.MeshStandardMaterial({
+        color: 0x8deaff, roughness: 0.3, metalness: 0.2,
+        emissive: 0x3dc8ef, emissiveIntensity: 0.85,
+      }),
+    };
+
+    const add = (mesh, collider = false) => {
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      if (collider) this._addCollider(mesh);
+      else this.scene.add(mesh);
+      return mesh;
+    };
+    const box = (w, h, d, mat, x, y, z, collider = false, walkable = false) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      add(mesh, collider);
+      if (walkable) {
+        this.platforms.push({
+          minX: x - w / 2, maxX: x + w / 2,
+          minZ: z - d / 2, maxZ: z + d / 2,
+          y0: y + h / 2 + 0.04, y1: y + h / 2 + 0.04,
+        });
+      }
+      return mesh;
+    };
+    const decor = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(rx, ry, rz);
+      mesh.userData.noHit = true;
+      return add(mesh);
+    };
+    const ramp = (minX, maxX, minZ, maxZ, y0, y1, axis, mat = mats.floor) => {
+      const w = maxX - minX, d = maxZ - minZ;
+      const run = axis === 'x' ? w : d;
+      const rise = y1 - y0;
+      const len = Math.hypot(run, rise);
+      const mesh = new THREE.Mesh(
+        axis === 'x' ? new THREE.BoxGeometry(len, 0.5, d) : new THREE.BoxGeometry(w, 0.5, len),
+        mat
+      );
+      mesh.position.set((minX + maxX) / 2, (y0 + y1) / 2, (minZ + maxZ) / 2);
+      const a = Math.atan2(rise, run);
+      if (axis === 'x') mesh.rotation.z = -a;
+      else mesh.rotation.x = a;
+      add(mesh);
+      this.platforms.push({ minX, maxX, minZ, maxZ, y0, y1, axis });
+      return mesh;
+    };
+    const pod = (x, y, z, axis = 'z', colorMat = mats.gold) => {
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1.15, 6), mats.trim);
+      shell.position.set(x, y, z);
+      if (axis === 'z') shell.rotation.x = Math.PI / 2;
+      else shell.rotation.z = Math.PI / 2;
+      add(shell);
+      const lens = new THREE.Mesh(new THREE.BoxGeometry(
+        axis === 'x' ? 0.12 : 0.46, 0.22, axis === 'z' ? 0.12 : 0.46
+      ), colorMat);
+      lens.position.set(
+        x + (axis === 'x' ? -0.62 : 0),
+        y,
+        z + (axis === 'z' ? 0.62 : 0)
+      );
+      add(lens);
+    };
+    const faceFrame = (x, y, z, w, h, axis = 'z') => {
+      const alongZ = axis === 'z';
+      decor(alongZ ? w : 0.34, h, alongZ ? 0.34 : w, mats.wallDark, x, y, z);
+      for (const s of [-1, 1]) {
+        decor(
+          alongZ ? 0.7 : 0.28, h + 0.8, alongZ ? 0.28 : 0.7, mats.trim,
+          alongZ ? x + s * (w / 2 - 0.35) : x,
+          y,
+          alongZ ? z : z + s * (w / 2 - 0.35)
+        );
+      }
+      decor(
+        alongZ ? w : 0.28, 0.65, alongZ ? 0.28 : w, mats.trim,
+        x, y + h / 2 - 0.32, z
+      );
+    };
+
+    // ── Enclosing shell and the distant circular objective gate ────────────
+    box(126, 18, 4, mats.wallDark, 0, 9, -61, true);
+    box(126, 12, 4, mats.wallLight, 0, 6, 61, true);
+    box(4, 18, 126, mats.wallDark, -61, 9, 0, true);
+    box(4, 18, 126, mats.wall, 61, 9, 0, true);
+
+    box(54, 26, 6, mats.wall, 0, 13, -57, true);
+    box(22, 15, 0.8, mats.recess, 0, 8, -53.6);
+    for (const x of [-21, -15, 15, 21]) box(3.2, 22, 2.2, mats.trim, x, 12, -53.8);
+    const gateRing = new THREE.Mesh(new THREE.TorusGeometry(5.4, 0.75, 8, 28), mats.wallLight);
+    gateRing.position.set(0, 8.5, -52.9);
+    add(gateRing);
+    const gateCore = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 4.0, 0.55, 12), mats.wallDark);
+    gateCore.position.set(0, 8.5, -53.1);
+    gateCore.rotation.x = Math.PI / 2;
+    add(gateCore);
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      const light = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.7, 0.18), mats.gold);
+      light.position.set(Math.cos(a) * 3.2, 8.5 + Math.sin(a) * 3.2, -52.72);
+      light.rotation.z = a;
+      add(light);
+    }
+
+    // ── Huge suspended left block: Rook's dominant silhouette ─────────────
+    box(11, 15, 20, mats.wallDark, -51, 7.5, -14, true);
+    box(10, 16, 16, mats.wallDark, -25, 8, -14, true);
+    box(36, 18, 28, mats.wall, -38, 24, -14, true, true);
+    box(39, 2.4, 31, mats.trim, -38, 33.7, -14);
+    box(30, 9, 0.8, mats.inset, -38, 23, 0.35);
+    for (const x of [-50, -38, -26]) {
+      decor(2.4, 14, 1.0, mats.trim, x, 23, 0.85);
+      pod(x, 17.2, 1.45, 'z');
+    }
+    // Tapered underside and front lip, visible while running beneath it.
+    decor(29, 2.4, 19, mats.inset, -38, 14.9, -14, 0.18, 0, 0);
+    decor(38, 2.0, 3.2, mats.trim, -38, 15.7, 0.5);
+    for (const x of [-49, -37, -25]) decor(2.2, 7.5, 2.2, mats.wallLight, x, 10.5, -1.0);
+
+    // Angular left foreground bastion and the luminous Rook-style sigil.
+    box(18, 30, 25, mats.wallDark, -53, 15, 32, true, true);
+    box(15, 18, 0.8, mats.wall, -53, 17, 18.9);
+    const sigil = new THREE.Group();
+    for (const [x, y, w, h, rz] of [
+      [0, 2.8, 5.4, 0.65, 0], [-3.3, 0.5, 0.55, 5.2, 0.18],
+      [3.3, 0.5, 0.55, 5.2, -0.18], [0, 0.2, 3.0, 0.55, 0],
+      [-1.2, -1.1, 0.55, 2.4, -0.75], [1.2, -1.1, 0.55, 2.4, 0.75],
+    ]) {
+      const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.16), mats.gold);
+      part.position.set(x, y, 0);
+      part.rotation.z = rz;
+      sigil.add(part);
+    }
+    sigil.position.set(-53, 20, 18.35);
+    this.scene.add(sigil);
+    pod(-57.8, 9, 18.5, 'z');
+
+    // ── Central-right monolith with its unmistakable diagonal brace ────────
+    box(23, 38, 25, mats.wall, 17, 19, -10, true, true);
+    box(25, 3, 27, mats.trim, 17, 38.2, -10);
+    faceFrame(17, 16, 2.7, 17, 17, 'z');
+    decor(4.0, 31, 1.25, mats.trim, 18.5, 17, 3.55, 0, 0, -0.58);
+    decor(2.0, 18, 1.0, mats.wallLight, 8.3, 16, 3.65);
+    pod(18, 10, 4.0, 'z');
+    pod(11.2, 30, 4.0, 'z');
+    // A wraparound balcony gives the monolith a real high-control route.
+    box(31, 1.4, 8, mats.floor, 17, 10.3, 6.2, true, true);
+    decor(31, 0.35, 0.35, mats.gold, 17, 11.15, 10.05);
+
+    // ── Right stepped facade with the large E-shaped relief ────────────────
+    box(22, 29, 49, mats.wall, 49, 14.5, -3, true, true);
+    box(4, 31, 51, mats.trim, 38.8, 15.5, -3);
+    for (const z of [-20, -5, 10]) faceFrame(37.7, 11, z, 10, 13, 'x');
+    // Oversized horizontal relief bars on the inner face.
+    for (const [z, len] of [[-21, 13], [-12, 8], [-2, 12], [9, 7], [19, 12]]) {
+      decor(0.65, 2.2, len, mats.trim, 37.35, 16.5, z);
+    }
+    pod(37.0, 7.2, -25, 'x');
+    pod(37.0, 7.2, 20, 'x');
+
+    // A second right skyline slab creates the tight outer service canyon.
+    box(12, 37, 22, mats.wallDark, 55, 18.5, 39, true, true);
+    box(14, 2.1, 24, mats.trim, 55, 38.3, 39);
+    for (const y of [8, 18, 28]) decor(0.8, 1.4, 14, mats.wallLight, 48.6, y, 39);
+
+    // ── Mid-height route: bridge, ramp and underpass around the monoliths ───
+    box(25, 1.4, 7, mats.floor, -4, 9.3, -18, true, true);
+    decor(25, 0.35, 0.35, mats.gold, -4, 10.15, -14.7);
+    box(12, 9, 7, mats.wallDark, -16, 4.5, -18, true);
+    ramp(-7, 1, -36, -21, 0, 9.0, 'z', mats.floor);
+    ramp(-20, -10, -7, 7, 0, 9.0, 'x', mats.floor);
+    box(17, 1.3, 10, mats.floor, -1, 9.25, 0, true, true);
+    ramp(29, 39, 8, 18, 9.0, 0, 'x', mats.floor);
+    box(18, 1.3, 10, mats.floor, 30, 9.25, -32, true, true);
+    box(12, 8.6, 10, mats.wallDark, 37, 4.3, -32, true);
+
+    // ── Recessed rust-red stairwell in the foreground ──────────────────────
+    box(18, 0.25, 20, mats.recess, 8, 0.12, 38);
+    box(2.0, 5.5, 21, mats.wallDark, -2, 2.75, 38, true);
+    box(2.0, 5.5, 21, mats.wallDark, 18, 2.75, 38, true);
+    const stairCount = 11;
+    for (let i = 0; i < stairCount; i++) {
+      const y = 0.22 + i * 0.36;
+      const z = 46 - i * 1.28;
+      box(15.5, 0.42, 1.45, mats.stair, 8, y, z);
+      this.platforms.push({
+        minX: 0.25, maxX: 15.75, minZ: z - 0.73, maxZ: z + 0.73,
+        y0: y + 0.23, y1: y + 0.23,
+      });
+      if (i % 3 === 1) decor(0.7, 0.12, 0.3, mats.gold, 0.7, y + 0.28, z);
+    }
+    box(20, 1.2, 13, mats.floor, 8, 4.8, 26, true, true);
+
+    // Left circular landing and stacked trim rings visible in the reference.
+    const landing = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.8, 2.2, 12), mats.wall);
+    landing.position.set(-48, 1.1, 49);
+    add(landing, true);
+    this.platforms.push({ minX: -56, maxX: -40, minZ: 41, maxZ: 57, y0: 2.24, y1: 2.24 });
+    for (const [r, y, tube, mat] of [[9.7, 0.3, 0.25, mats.trim], [9.2, 2.25, 0.18, mats.gold]]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 8, 36), mat);
+      ring.position.set(-48, y, 49);
+      ring.rotation.x = Math.PI / 2;
+      add(ring);
+    }
+
+    // ── Ground cover that echoes Rook's square crates and short terminals ───
+    for (const [x, z, w, h, d, mat] of [
+      [-23, 22, 5, 3.2, 5, mats.wallDark], [-10, 12, 3.5, 4.2, 3.5, mats.wall],
+      [29, 30, 6, 2.5, 4, mats.wallDark], [27, -44, 5, 3.5, 5, mats.wall],
+      [-32, -45, 6, 2.7, 4, mats.wallDark], [-5, -39, 3.5, 4.5, 3.5, mats.wall],
+    ]) {
+      box(w, h, d, mat, x, h / 2, z, true, h <= 3.2);
+      decor(w * 0.55, 0.18, d + 0.06, mats.gold, x, h * 0.68, z);
+    }
+
+    // Small recessed wall lamps repeat at human scale to sell the map's size.
+    for (const [x, y, z, axis] of [
+      [-57.8, 5, -40, 'z'], [-57.8, 5, 5, 'z'], [-57.8, 5, 47, 'z'],
+      [57.8, 6, -38, 'z'], [57.8, 6, 14, 'z'], [57.8, 6, 48, 'z'],
+      [-20, 5, -54, 'z'], [22, 5, -54, 'z'],
+    ]) pod(x, y, z, axis);
+
+    // Node 755 identifies Dust as the environment effect. Keep it sparse so it
+    // reads in sunbeams without turning the bright map into visual noise.
+    const dustCount = Math.floor(260 * this._lod);
+    const dustPos = new Float32Array(dustCount * 3);
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3] = (Math.random() - 0.5) * 122;
+      dustPos[i * 3 + 1] = 0.5 + Math.random() * 38;
+      dustPos[i * 3 + 2] = (Math.random() - 0.5) * 122;
+    }
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    const dust = new THREE.Points(
+      dustGeo,
+      new THREE.PointsMaterial({
+        color: 0xe6d5b6, size: 0.1, transparent: true, opacity: 0.32, depthWrite: false,
+      })
+    );
+    dust.frustumCulled = false;
+    this.scene.add(dust);
+    this._dustField = dust;
+  }
+
   // Winter-Graveyard, rebuilt from the complete official node 644 reference.
   // The original .evmap is a proprietary binary, so this is a geometry-level
   // recreation of the full visible composition rather than an asset import.
@@ -4499,13 +4762,13 @@ export class World {
   }
 
   _buildSpawnPoints() {
-    // Winter-Graveyard starts cover the central burial ground and the two
-    // asymmetric flanks without placing anyone inside the cliffs or keep.
+    // Rook starts are distributed across the open ground corridors and under
+    // the suspended block, clear of the central monolith and recessed stairs.
     const coords = [
-      [0, 50], [-25, 44], [24, 43], [-38, 30],
-      [-12, 29], [12, 26], [31, 25], [-34, 8],
-      [-12, 6], [15, 4], [33, -3], [-30, -14],
-      [-8, -19], [17, -22], [-24, -41], [22, -43],
+      [-20, 51], [27, 50], [-31, 39], [30, 38],
+      [-25, 24], [-8, 20], [24, 20], [-47, 9],
+      [-8, 4], [31, 3], [-48, -31], [-17, -31],
+      [3, -39], [18, -45], [-45, -48], [48, -46],
     ];
     for (const [x, z] of coords) this.spawnPoints.push(new THREE.Vector3(x, 0, z));
   }
@@ -4514,6 +4777,17 @@ export class World {
   // Called every frame by Game.js (both gameplay and the menu fly-through).
   update(dt) {
     this._clock += dt;
+    if (this._dustField) {
+      const attr = this._dustField.geometry.attributes.position;
+      const p = attr.array;
+      for (let i = 0; i < p.length; i += 3) {
+        p[i] += dt * (0.08 + (i % 5) * 0.025);
+        p[i + 1] += dt * (0.015 + (i % 7) * 0.004);
+        if (p[i] > 61) p[i] = -61;
+        if (p[i + 1] > 40) p[i + 1] = 0.5;
+      }
+      attr.needsUpdate = true;
+    }
     if (this._snowfall) {
       const attr = this._snowfall.geometry.attributes.position;
       const p = attr.array;

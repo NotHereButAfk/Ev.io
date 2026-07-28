@@ -183,12 +183,12 @@ export class Game {
 
     // Cinematic spectator waypoints (pos + lookAt) for the fly-through
     this._camWpts = [
-      { p: new THREE.Vector3( -8,  5,  52), t: new THREE.Vector3(  0, 11, -48) },
-      { p: new THREE.Vector3(-42,  7,  20), t: new THREE.Vector3(  3,  7, -30) },
-      { p: new THREE.Vector3(-18, 11, -10), t: new THREE.Vector3(  0, 12, -52) },
-      { p: new THREE.Vector3( 24,  8, -21), t: new THREE.Vector3(  0, 12, -49) },
-      { p: new THREE.Vector3( 40, 25,   8), t: new THREE.Vector3( 11,  5, -22) },
-      { p: new THREE.Vector3( 17, 14,  45), t: new THREE.Vector3( 31, 15, -15) },
+      { p: new THREE.Vector3(-14,  6,  50), t: new THREE.Vector3(  0, 10, -36) },
+      { p: new THREE.Vector3( 30,  7,  46), t: new THREE.Vector3( 10, 12, -10) },
+      { p: new THREE.Vector3( 34, 10, -44), t: new THREE.Vector3(  0,  8, -53) },
+      { p: new THREE.Vector3(-15,  7, -45), t: new THREE.Vector3(-30, 15, -12) },
+      { p: new THREE.Vector3(-15,  7,  36), t: new THREE.Vector3(-38, 20, -14) },
+      { p: new THREE.Vector3(  0, 25,  50), t: new THREE.Vector3( 15, 15, -10) },
     ];
     this._camSeg     = 0;
     this._camSegTime = 0;
@@ -267,7 +267,7 @@ export class Game {
     }, 2000);
   }
 
-  // Show the Winter-Graveyard loading card over the fly-through,
+  // Show the Daytime Rook loading card over the fly-through,
   // then reveal the main menu GUI.
   _runMapIntro() {
     const el = document.getElementById('map-loading');
@@ -276,7 +276,7 @@ export class Game {
       const mode    = document.getElementById('ml-mode');
       const players = document.getElementById('ml-players');
       const tip     = document.getElementById('ml-tip');
-      if (region)  region.textContent  = 'Arctic Sector';
+      if (region)  region.textContent  = 'Rook Sector';
       if (mode)    mode.textContent     = 'Loading map…';
       if (players) players.textContent  = 'Spectating';
       if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
