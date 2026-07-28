@@ -1,11 +1,49 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
-import { buildLowPolyCharacter, isLowPolyId } from './LowPolyModels.js';
+import { ARMOR_LOOKS, buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
+import { buildLowPolyCharacter, getLowPolyPalette, isLowPolyId } from './LowPolyModels.js';
 
 // ── Blender-built Spartan GLB (the white/orange armoured soldier) ────────────
 let _spartanTemplate = null, _spartanLoading = false;
 const _spartanCbs = [];
+
+/**
+ * Resolve the equipped character's authored palette for the first-person arm.
+ * This keeps FPS and third-person views on one source of truth even though
+ * low-poly cyborgs, legacy soldiers and cosmetic armour use different data.
+ */
+export function resolveViewmodelPalette(skin, armorTypeId = 'vanguard', armorSkin = null) {
+  if (armorSkin) {
+    const glove = new THREE.Color(armorSkin.secondary).multiplyScalar(0.42).getHex();
+    return {
+      plate: armorSkin.primary,
+      sleeve: armorSkin.secondary,
+      glove,
+      accent: armorSkin.emissive ?? armorSkin.primary,
+    };
+  }
+
+  if (isLowPolyId(armorTypeId)) {
+    const pal = getLowPolyPalette(armorTypeId);
+    return {
+      // Use the authored secondary plate tone on the close-up gauntlet. The
+      // broad chest colour is intentionally brighter and blows out to white
+      // under the first-person camera's fill light.
+      plate: pal.armor2,
+      sleeve: pal.frame,
+      glove: pal.joint,
+      accent: pal.glow,
+    };
+  }
+
+  const look = ARMOR_LOOKS[armorTypeId] || ARMOR_LOOKS.assault;
+  return {
+    plate: look.body,
+    sleeve: skin?.secondary ?? 0x3a4048,
+    glove: 0x15181d,
+    accent: look.visor,
+  };
+}
 export function preloadSpartanModel(onLoad) {
   if (onLoad) _spartanCbs.push(onLoad);
   if (_spartanTemplate) { onLoad?.(); return; }

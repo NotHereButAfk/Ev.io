@@ -20,7 +20,12 @@ import { GameSettings } from './GameSettings.js';
 import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
-import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
+import {
+  buildPreviewCharacter,
+  applySkinToCharacter,
+  resolveViewmodelPalette,
+  rigCharacterLimbs,
+} from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
@@ -525,6 +530,9 @@ export class Game {
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.previewCharacter.visible = true;
     this.world.scene.add(this.previewCharacter);
+    this.weaponSystem.setArmAppearance(resolveViewmodelPalette(
+      this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin
+    ));
   }
 
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
@@ -532,8 +540,11 @@ export class Game {
     this.audio.resume();
     this.selectedSkin      = getSkin(skinId);
     this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
+    this.selectedArmorType = armorTypeId || this.selectedArmorType || 'vanguard';
     applySkinToCharacter(this.previewCharacter, this.selectedSkin, this.selectedArmorSkin);
-    this.weaponSystem.setSkin(this.selectedSkin);
+    this.weaponSystem.setArmAppearance(resolveViewmodelPalette(
+      this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin
+    ));
 
     // Equip exactly the chosen gun + melee for this match.
     this.weaponSystem.setLoadout(Loadout.getGun(), Loadout.getMelee());

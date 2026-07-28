@@ -84,6 +84,9 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   role (def energyColor). Skins are MAIN-weapon only (Armory.canSkin:
   m4/magnum/battlerifle/energyshotgun/plasmarifle); the Night Market sells
   armor + gun skins only (no sword skins). Viewmodel mount is scaled 0.74.
+  The first-person arm palette is resolved from the equipped character model:
+  cyborg plate/frame/joint/glow colours come from `LowPolyModels.js`, legacy
+  armour comes from `HumanSoldier.js`, and cosmetic armour overrides both.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
   (green/cyan/amber bars, coin popups, weapon wheel, top-center reload progress,
