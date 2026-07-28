@@ -135,6 +135,52 @@ function makeStoreSignTexture(name, bg, fg) {
   return tex;
 }
 
+// High-contrast arena wayfinding. The reference galleries use oversized
+// environmental lettering as a landmark, so these panels favour short,
+// readable callouts over ad-like decoration.
+function makeArenaSignTexture(kicker, label, accent = '#28d4ff') {
+  const w = 768, h = 224;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = '#11161c';
+  g.fillRect(0, 0, w, h);
+
+  g.fillStyle = accent;
+  g.fillRect(0, 0, 20, h);
+  g.fillRect(42, 28, 112, 8);
+  g.fillRect(w - 120, h - 38, 82, 8);
+
+  g.strokeStyle = '#60717b';
+  g.lineWidth = 5;
+  g.strokeRect(10, 10, w - 20, h - 20);
+  g.strokeStyle = accent;
+  g.lineWidth = 2;
+  g.strokeRect(28, 28, w - 56, h - 56);
+
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#a7b8c1';
+  g.font = '700 34px Arial, Helvetica, sans-serif';
+  g.fillText(kicker.toUpperCase(), 58, 67);
+  g.fillStyle = '#f2f6f7';
+  g.font = '900 82px Arial, Helvetica, sans-serif';
+  g.fillText(label.toUpperCase(), 55, 142);
+
+  g.fillStyle = accent;
+  g.beginPath();
+  g.moveTo(w - 96, 70);
+  g.lineTo(w - 48, 112);
+  g.lineTo(w - 96, 154);
+  g.lineTo(w - 80, 112);
+  g.closePath();
+  g.fill();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 // Vertical promo banner / board: stacked lines of big lettering.
 function makeBannerTexture(lines, bg, fg) {
   const w = 256, h = 384;
@@ -2876,9 +2922,17 @@ export class World {
     const bridgeTop = new THREE.MeshStandardMaterial({
       color: 0x866a65, roughness: 0.8, metalness: 0.08,
     });
+    const redChannel = new THREE.MeshStandardMaterial({
+      color: 0x741f1b, roughness: 0.8, metalness: 0.12,
+      emissive: 0x260504, emissiveIntensity: 0.34,
+    });
+    const ochre = new THREE.MeshStandardMaterial({
+      color: 0xa5652f, roughness: 0.84, metalness: 0.05,
+    });
     const red = this._neonMat(0xef3828);
     const cyan = this._neonMat(0x18c7ff);
     const gold = this._neonMat(0xd8c83b);
+    const orange = this._neonMat(0xff9b35);
 
     const solid = (x, y, z, w, h, d, mat = stone) => {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -2921,6 +2975,28 @@ export class World {
       mesh.userData.noHit = true;
       this.scene.add(mesh);
       return mesh;
+    };
+    const signTextures = new Map();
+    const signPanel = (
+      kicker, label, accent, x, y, z, w, h, ry = 0
+    ) => {
+      const key = `${kicker}|${label}|${accent}`;
+      let tex = signTextures.get(key);
+      if (!tex) {
+        tex = makeArenaSignTexture(kicker, label, accent);
+        signTextures.set(key, tex);
+      }
+      const backing = decor(x, y, z, w + 0.7, h + 0.7, 0.38, tech, ry);
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
+      );
+      panel.position.set(x, y, z);
+      panel.rotation.y = ry;
+      panel.translateZ(0.22);
+      panel.userData.noHit = true;
+      this.scene.add(panel);
+      return { backing, panel };
     };
 
     const ribbedBank = (x, y, z, span, h, axis = 'x', cyanEvery = 4) => {
@@ -3103,8 +3179,26 @@ export class World {
       octagon(x, 31.3, z, 6.3, 0.8, paleStone);
       circuitPanel(x + innerX * 6.35, 17.4, z, 7.4, 4.2, 'x');
     };
-    skylineTower(-53, 0, 1);
-    skylineTower( 53, 0, -1);
+    // Pulling these inward opens two compressed outer service canyons. Their
+    // narrowness contrasts the broad central court without sealing a flank.
+    skylineTower(-48, 0, 1);
+    skylineTower( 48, 0, -1);
+
+    // The western service canyon uses the orange/cyan panel language visible
+    // across several ev.io arenas. Frames are visual only; the 6.8 m floor
+    // gap between tower and perimeter remains fully traversable.
+    for (const z of [-8.2, 0, 8.2]) {
+      const frame = decor(-57.4, 5.4, z, 6.7, 0.62, 0.72, ochre);
+      frame.rotation.z = (z / 8.2) * 0.035;
+    }
+    for (const z of [-6.0, -2.0, 2.0, 6.0]) {
+      strip(-54.12, 3.9, z, 0.12, 4.8, 0.34, z < 0 ? orange : cyan);
+      strip(-60.72, 3.9, z, 0.12, 4.8, 0.34, z < 0 ? cyan : orange);
+    }
+    signPanel('B-12  //  SIDE ROUTE', 'TRANSIT', '#ff9b35',
+      -54.18, 8.0, 0, 6.8, 2.0, -Math.PI / 2);
+    signPanel('C-07  //  SIDE ROUTE', 'REACTOR', '#28d4ff',
+       54.18, 8.0, 0, 6.8, 2.0, Math.PI / 2);
 
     // Low central deck and four approaches support jump/slide/teleport movement.
     this._platformBox(0, 0, 20, 18, 5.2, bridgeTop, 0xef3828);
@@ -3123,6 +3217,42 @@ export class World {
     centreRing.userData.noHit = true;
     this.scene.add(centreRing);
     this._spinRings.push({ mesh: centreRing, speed: 0.2 });
+
+    // A compact objective beacon gives the central deck a readable focal prop
+    // without becoming waist-high cover or breaking the cross-map sightlines.
+    const objectiveCore = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.82, 0),
+      new THREE.MeshStandardMaterial({
+        color: 0xc9f7ff, roughness: 0.22, metalness: 0.24,
+        emissive: 0x18c7ff, emissiveIntensity: 1.8,
+      })
+    );
+    objectiveCore.position.set(0, 12.55, 0);
+    objectiveCore.userData.noHit = true;
+    this.scene.add(objectiveCore);
+    this._spinRings.push({ mesh: objectiveCore, speed: 0.42 });
+    for (const [radius, tube, tilt, speed] of [
+      [1.52, 0.09, 0, 0.55],
+      [1.24, 0.07, Math.PI / 2, -0.72],
+    ]) {
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 8, 28),
+        radius > 1.4 ? cyan : gold
+      );
+      halo.position.set(0, 12.55, 0);
+      halo.rotation.x = tilt;
+      halo.userData.noHit = true;
+      this.scene.add(halo);
+      this._spinRings.push({ mesh: halo, speed });
+    }
+    for (let i = 0; i < 4; i++) {
+      const angle = i * Math.PI / 2;
+      const fin = decor(
+        Math.cos(angle) * 3.2, 11.9, Math.sin(angle) * 3.2,
+        0.38, 2.9, 1.1, i % 2 ? warmTrim : paleStone, -angle
+      );
+      fin.rotation.z = i % 2 ? -0.22 : 0.22;
+    }
 
     // Broad Jinx bridges use muted-rose tops, dark undersides and flared ends.
     for (const z of [-32, 32]) {
@@ -3152,6 +3282,16 @@ export class World {
       strip( 7.25, 0.062, z, 1.15, 0.075, 0.16, cyan);
     }
 
+    // The northern approach is a strong red material channel rather than a
+    // glowing floor slab. It terminates at the map's halo landmark and doubles
+    // as quick route-reading from the centre.
+    decor(0, 0.035, 52.0, 7.2, 0.06, 17.2, redChannel);
+    strip(-3.62, 0.078, 52.0, 0.12, 0.08, 17.2, red);
+    strip( 3.62, 0.078, 52.0, 0.12, 0.08, 17.2, red);
+    for (const z of [45.0, 49.5, 54.0, 58.5]) {
+      strip(0, 0.082, z, 3.8, 0.06, 0.12, gold);
+    }
+
     // Asymmetric low cover prevents the four quadrants feeling copy-pasted.
     const cover = [
       [-19,-15,6,3.4,4], [17,-14,4,5.2,7],
@@ -3177,6 +3317,44 @@ export class World {
       diamond(-half + 1.02, 9.4, z, 'x', cyan, 0.76);
       diamond( half - 1.02, 9.4, z, 'x', cyan, 0.76);
     }
+
+    // A giant segmented halo creates the memorable framed vista seen in the
+    // reference arena galleries. It is scenic and non-colliding, with the
+    // playable red channel remaining open beneath it.
+    const gateZ = half - 3.7;
+    const gateY = 20.0;
+    const haloOuter = new THREE.Mesh(
+      new THREE.TorusGeometry(10.6, 0.62, 10, 48),
+      ochre
+    );
+    haloOuter.position.set(0, gateY, gateZ);
+    haloOuter.userData.noHit = true;
+    this.scene.add(haloOuter);
+    const haloInner = new THREE.Mesh(
+      new THREE.TorusGeometry(9.65, 0.13, 8, 48),
+      gold
+    );
+    haloInner.position.set(0, gateY, gateZ - 0.38);
+    haloInner.userData.noHit = true;
+    this.scene.add(haloInner);
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2;
+      const segment = decor(
+        Math.cos(a) * 10.55,
+        gateY + Math.sin(a) * 10.55,
+        gateZ + 0.25,
+        1.4, 2.5, 1.2,
+        i % 3 === 0 ? paleStone : warmTrim
+      );
+      segment.rotation.z = a + Math.PI / 2;
+    }
+    decor(-11.2, 9.2, gateZ, 3.0, 18.4, 3.2, stone);
+    decor( 11.2, 9.2, gateZ, 3.0, 18.4, 3.2, stone);
+    for (const x of [-11.2, 11.2]) {
+      strip(x, 8.7, gateZ - 1.64, 0.22, 11.5, 0.1, cyan);
+    }
+    signPanel('A-03  //  CENTRAL ROUTE', 'NEXUS', '#28d4ff',
+      0, 14.0, gateZ - 1.75, 10.6, 2.45, Math.PI);
 
     // Optional lifts land on the central deck; all destinations also have ramps.
     const lift = (x, z, topY) => {
@@ -3947,8 +4125,8 @@ export class World {
     // Ground-level starts sit in the open quadrants and perimeter approach lanes;
     // nobody spawns inside a bastion base or directly on a ramp trigger.
     const coords = [
-      [0, -52], [0, 52], [-52, 0], [52, 0],
-      [-18, -18], [18, -18], [-18, 18], [18, 18],
+      [0, -52], [0, 52], [-58, 0], [58, 0],
+      [-18, -18], [18, -18], [-18, 21], [18, 21],
       [-14, -42], [14, -42], [-14, 42], [14, 42],
       [-42, -14], [-42, 14], [42, -14], [42, 14],
     ];

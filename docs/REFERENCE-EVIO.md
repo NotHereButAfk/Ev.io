@@ -5,15 +5,17 @@ here get justified with "that's how ev.io does it" fairly often, so this file
 exists to record how much of that is actually knowledge and how much is
 guesswork.
 
-**Why it matters.** No agent working in this repo can reach ev.io — outbound
-HTTPS is restricted to a package-registry allowlist, and `ev.io:443` is refused
-at the proxy. Anything an agent "knows" about it comes from training data:
-second-hand, undated, and impossible to check from inside the sandbox. The game
-has also been live and patched since ~2021, so even accurate recollections may
-describe a version that no longer exists.
+**Why it matters.** Access differs by tool and session. Shell HTTPS has been
+restricted in some environments, but on 2026-07-27 the Codex in-app browser
+reached official ev.io map pages and third-party gameplay galleries/videos.
+Those sources are now recorded below. They verify visible art direction, not
+movement constants, damage values, exact dimensions, or current live balance.
+The game has also been live and patched since ~2021, so undated footage may
+show an older build.
 
-The repo owner can play it. Agents cannot. **When those two disagree, the owner
-is right.**
+The repo owner can play the live game and supplied a gameplay-observation
+session. **When current owner observation and older web media disagree, use the
+owner's observation.**
 
 ---
 
@@ -22,6 +24,7 @@ is right.**
 Everything below is tagged:
 
 - **[known]** — widely and consistently documented; safe to rely on
+- **[verified]** — directly inspected in a linked source on the date recorded
 - **[likely]** — probably true, but not verified against the live game
 - **[unverified]** — plausible recollection; do NOT build numbers on this
 - **[ours]** — a decision this project made, not something ev.io does
@@ -42,6 +45,44 @@ Everything below is tagged:
 - **[likely]** Vertical maps with grav lifts / jump pads, and a short-range
   dash or blink on a key.
 - **[likely]** A sniper rifle is a signature weapon.
+
+## Verified visual reference pass — 2026-07-27
+
+Directly inspected sources:
+
+- **[verified]** Official ev.io map pages and their large map images:
+  [Jinx](https://ev.io/node/752), [Rook](https://ev.io/node/755),
+  [Depot](https://ev.io/node/634), [Vestige](https://ev.io/node/661), and
+  [Momentum](https://ev.io/node/682).
+- **[verified]** The [Browser Craft ev.io page](https://browsercraft.com/game/ev-dot-io)
+  exposes six 640x360 gameplay stills and embeds three YouTube gameplay videos
+  (`HwdzCEbgxEQ`, `65nU5yZxavw`, `hMx-QmsWV7o`).
+- **[verified]** A fourth embedded gameplay clip was inspected from the
+  [Play123 ev.io page](https://www.jeux123.fr/jeu/ev-io)
+  (`79pVgYAvpd8`).
+- **[owner-observed]** The owner supplied live gameplay for Codex to watch.
+  The arena used for this project's layout pass was identified as Jinx, then
+  cross-checked against the official Jinx image above.
+
+Visible motifs that repeat across those sources:
+
+- **[verified]** Chunky modular walls and towers frame open sky/voids rather
+  than forming one continuous indoor box.
+- **[verified]** Narrow cyan, red, gold, or orange route accents sit on edges,
+  seams, and wall slits; most structural surfaces stay matte.
+- **[verified]** Maps mix broad combat courts with compressed side canyons,
+  elevated bridges/ramps, and framed long vistas.
+- **[verified]** Large focal props—circular platforms, statues/plinths, halo
+  gates, or portal rings—make a route recognizable at a glance.
+- **[verified]** Oversized environmental signs/logos and asymmetric accent
+  zones help orient players.
+- **[verified]** Material families include pale/white stone, warm tan or orange
+  segmented panels, dark technical bases, and occasional saturated red floor
+  channels.
+
+Implementation boundary: these cues justify this project's visual treatment.
+They do **not** verify exact ev.io layouts, scale, collision, spawn locations,
+or gameplay constants.
 
 ## What we do NOT know
 
@@ -68,14 +109,11 @@ Recording these so the same mistake isn't repeated:
   hard 9.6 m/s cap means no momentum and no skill expression in movement — but
   it should never have been dressed up as a fact about ev.io.
 
-- **`src/world/World.js` arena, described in CLAUDE.md as "reconstructed from a
-  gameplay capture" (`codex/evio-arena-recreation`).** If a capture was supplied
-  by the owner, that's accurate. If not, no agent in this repo could have
-  observed one, and the wording should be softened to "ev.io-inspired original".
-  **Unconfirmed either way — worth settling, because future agents will read it
-  as sourced.** The map is good on its own merits regardless: measured frame
-  clipping dropped from 16.3% to 0.1% versus the mall it replaced, enemies read
-  clearly against it, and it introduces no runtime errors.
+- **`src/world/World.js` arena, described in CLAUDE.md as reconstructed from a
+  gameplay capture (`codex/evio-arena-recreation`).** **Settled 2026-07-27:**
+  the owner supplied gameplay for Codex to observe; the layout was identified
+  as Jinx and cross-checked against the official Jinx image. It remains a
+  recreation adapted to this game's topology, not a measurement-perfect copy.
 
 ---
 
@@ -91,13 +129,14 @@ would actually change what gets built. One line each is plenty.
 - [ ] How big is the viewmodel on screen compared to ours?
 - [ ] Anything about it that feels good and obviously isn't in our game yet?
 
-A short screen recording answers most of this faster than writing it out, and
-an agent can read frames from a file even though it can't reach the site.
+A short screen recording answers most of this faster than writing it out.
+Agents can also compare supplied frames against the linked visual sources
+above.
 
 ---
 
 ## The rule
 
 **Don't state ev.io behaviour as fact in code comments, commit messages or docs
-unless it's tagged [known] here or the owner told you.** Write "our design
-choice" instead — it's honest, and it ages better than a claim nobody can check.
+unless it's tagged [known]/[verified] here or the owner told you.** Write "our
+design choice" instead — visual evidence is not evidence for mechanics.

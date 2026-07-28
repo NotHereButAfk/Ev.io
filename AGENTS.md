@@ -11,10 +11,12 @@ Read those for orientation. Read THIS for the rules that stop us breaking each
 other's work.
 
 `docs/REFERENCE-EVIO.md` records what we do and don't actually know about
-ev.io, the reference game. **No agent here can reach it** — the proxy refuses
-`ev.io:443` — so anything you "know" about it is untestable training data.
-Don't state ev.io behaviour as fact unless that file marks it [known] or the
-owner told you; say "our design choice" instead.
+ev.io, the reference game. A Jul 2026 Codex browser session reached official
+map pages plus third-party gameplay stills and embedded videos; the exact
+sources and limits are recorded there. Visual evidence still does not verify
+movement or weapon constants. Don't state ev.io behaviour as fact unless that
+file marks it [known]/[verified] or the owner told you; say "our design choice"
+instead.
 
 ---
 
@@ -123,7 +125,7 @@ Keep this short and current. Delete your row when it lands.
 | who | lane | status |
 |---|---|---|
 | claude | movement model — accel/friction, air-strafe, double jump, dash (`src/player/Player.js`, `src/sim/MoveSim.js`) | not started, behind a flag |
-| codex | Jinx-led ev.io arena recreation (`src/world/World.js`) | ready for gameplay playtest on `codex/evio-arena-recreation` (`4ce62e5`) |
+| codex | Jinx-led ev.io arena recreation (`src/world/World.js`) | ready for gameplay playtest on `codex/evio-arena-recreation` |
 | codex | post-match performance screen | landed (3627f7c) |
 
 ### Open, and specced for whoever takes it

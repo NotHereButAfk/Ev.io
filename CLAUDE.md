@@ -52,9 +52,14 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   uses warm octagonal concrete/brick towers over black ribbed server bases,
   gold/cyan circuit panels, muted-rose bridges with narrow red edge lighting,
   a split-height central spine, four tower roofs, asymmetric ground cover, two
-  optional grav lifts and a clear blue arena-sky silhouette. The route topology
-  stays native to this game: every playable roof/ramp is registered in
-  `platforms[]`; solid bases and the lowered perimeter use `colliders[]`.
+  optional grav lifts and a clear blue arena-sky silhouette. A Jul 2026
+  video/gallery pass added a segmented northern halo gate, a matte-red route
+  channel, oversized NEXUS/TRANSIT/REACTOR wayfinding, a rotating objective
+  beacon, and narrow orange/cyan flank canyons. The east/west flank spawns now
+  sit safely in those canyons instead of overlapping the skyline bases. The
+  route topology stays native to this game: every playable roof/ramp is
+  registered in `platforms[]`; solid bases and the lowered perimeter use
+  `colliders[]`.
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
