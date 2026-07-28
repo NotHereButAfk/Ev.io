@@ -47,15 +47,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
 - `src/world/World.js` — the active map is an official-image-led recreation of
-  **ev.io Winter-Graveyard** from [node 644](https://ev.io/node/644).
-  `_buildWinterGraveyard()` builds the complete visible composition: snow basin
-  and grave field, monumental sealed rear gate, nested crescent ribs and wreath,
-  raised right-side keep and parapet, left canyon cliffs, snowbank lanes,
-  holiday props, lit bare trees, warm mauve sunrise and live snowfall. The
-  proprietary `.evmap` file was downloaded for identification but is not parsed
-  or shipped. The route topology stays native to this game: walkable keep
-  surfaces and ramps are registered in `platforms[]`; solid walls, cliffs and
-  selected cover use `colliders[]`.
+  **ev.io Daytime Rook** from [node 755](https://ev.io/node/755).
+  `_buildRookArena()` builds the complete visible composition: a huge suspended
+  left mass with an underpass, a diagonal-braced central monolith, stepped right
+  facade, distant circular gate, recessed rust-red stairs, pale panel floor,
+  gold route lamps and the page's documented Dust environment effect. The
+  proprietary `RookLit_0.evmap` was downloaded for identification but is not
+  parsed or shipped. Walkable bridges, stairs, ramps and roof surfaces are
+  registered in `platforms[]`; walls, supports and cover use `colliders[]`.
+  `_buildWinterGraveyard()` preserves the previous node-644 map for comparison.
   `_buildEvioArena()` preserves the previous Jinx-led pass for comparison.
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain

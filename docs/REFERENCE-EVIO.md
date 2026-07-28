@@ -59,6 +59,11 @@ Directly inspected sources:
   official large image and `XmasGraveyard_1.evmap` download were inspected
   directly. The page identifies the Snow environment effect and Arctic
   background track.
+- **[verified]** The owner subsequently supplied
+  [Daytime Rook](https://ev.io/node/755) as the new active-map target. Its
+  official `RookLitJPEG_0.jpg` large image and `RookLit_0.evmap` download were
+  inspected directly. The page identifies Dust as its environment effect and
+  lists CTF, Deathmatch, Instagib and Team Deathmatch.
 - **[verified]** The [Browser Craft ev.io page](https://browsercraft.com/game/ev-dot-io)
   exposes six 640x360 gameplay stills and embeds three YouTube gameplay videos
   (`HwdzCEbgxEQ`, `65nU5yZxavw`, `hMx-QmsWV7o`).
@@ -146,12 +151,13 @@ Recording these so the same mistake isn't repeated:
   as Jinx and cross-checked against the official Jinx image. It remains a
   recreation adapted to this game's topology, not a measurement-perfect copy.
 
-- **Active map target.** **Settled 2026-07-27:** the owner replaced the Jinx-led
-  active arena with the full Winter-Graveyard composition from official ev.io
-  node 644. Use that page and its large image as the primary map reference;
-  do not mix in unrelated YouTube-map geometry for this pass. The `.evmap`
-  download is proprietary binary, so the implementation is a visual/layout
-  recreation in Three.js rather than a direct asset conversion.
+- **Active map target.** **Updated 2026-07-27:** the owner replaced the
+  Winter-Graveyard active arena with the full Daytime Rook composition from
+  official ev.io node 755. Use that page and its large image as the primary map
+  reference; do not mix in unrelated YouTube-map geometry for this pass.
+  Winter-Graveyard remains as an inactive builder. Both `.evmap` downloads are
+  proprietary binary, so the implementations are visual/layout recreations in
+  Three.js rather than direct asset conversions.
 
 ---
 
