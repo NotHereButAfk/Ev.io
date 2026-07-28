@@ -97,6 +97,8 @@ export class WeaponSystem {
     this._mountPos = new THREE.Vector3(0.32, -0.26, -0.5);
     this._mountRot = new THREE.Vector3(0, 0, 0);
     this._raiseT = 1;                         // 0=just switched (lowered) → 1=up
+    this._wasGrounded = true;                 // viewmodel landing impulse edge
+    this._landT = 0;                          // 0.22s settle after touching down
 
     this.tracers = [];
     this.rockets = [];
@@ -218,6 +220,9 @@ export class WeaponSystem {
     this.cuffMat = new THREE.MeshStandardMaterial({
       color: 0x0c0e12, roughness: 0.6, metalness: 0.08
     });
+    this.armPlateMat = new THREE.MeshStandardMaterial({
+      color: 0x657080, roughness: 0.5, metalness: 0.26, envMapIntensity: 0.8
+    });
     const gloveSeam = this.cuffMat;
 
     const bx = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -235,6 +240,14 @@ export class WeaponSystem {
     forearm.rotation.x = 1.18;
     forearm.position.set(0, -0.055, 0.19);
     arm.add(forearm);
+
+    // A compact armour plate carries the equipped character's authored colour.
+    // The sleeve remains dark, so this reads as the player's gauntlet instead
+    // of the old bright-white tube filling the bottom of the screen.
+    const forearmPlate = bx(0.068, 0.02, 0.14, this.armPlateMat);
+    forearmPlate.rotation.x = -0.34;
+    forearmPlate.position.set(0, -0.008, 0.17);
+    arm.add(forearmPlate);
 
     // Sleeve cuff detail ring
     const cuff = new THREE.Mesh(
@@ -293,20 +306,27 @@ export class WeaponSystem {
   /**
    * Tint the first-person arm to the player's character.
    *
-   * The sleeve takes the character's SECONDARY (the undersuit / frame), not the
-   * primary. Primary is the armour-plate colour, and on the current chassis
-   * that is near-white (0xe9edf2) — which turned the whole forearm into a
-   * bright white tube filling the corner of the screen. It also overwrote the
-   * dark sleeve the viewmodel was authored with, a 4.5x jump in brightness.
-   * On the actual character the forearm is a dark frame with a plate strapped
-   * over it, so the accent belongs on the cuff, not the whole limb.
+   * Compatibility path for the legacy two-colour character skin. Equipped
+   * armour uses setArmAppearance() with the model's authored plate, frame,
+   * joint and glow colours instead.
    */
   setSkin(skin) {
-    this.sleeveMat.color.setHex(skin.secondary);
-    this.cuffMat?.color.setHex(skin.primary);      // accent ring only
-    // Glove keeps its authored near-black; nudge it toward the undersuit so it
-    // still reads as part of the same outfit.
-    this.gloveMat.color.setHex(skin.secondary).multiplyScalar(0.45);
+    this.setArmAppearance({
+      plate: skin.primary,
+      sleeve: skin.secondary,
+      glove: new THREE.Color(skin.secondary).multiplyScalar(0.45).getHex(),
+      accent: skin.primary,
+    });
+  }
+
+  /** Apply the exact equipped character palette to the first-person gauntlet. */
+  setArmAppearance({ plate, sleeve, glove, accent }) {
+    this.armPlateMat.color.setHex(plate);
+    this.sleeveMat.color.setHex(sleeve);
+    this.gloveMat.color.setHex(glove);
+    this.cuffMat.color.setHex(accent);
+    this.cuffMat.emissive.setHex(accent);
+    this.cuffMat.emissiveIntensity = 0.35;
   }
 
   /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
@@ -458,6 +478,8 @@ export class WeaponSystem {
     this.kickRotX = 0;
     this.swingPhase = 1;
     this.scopeT = 0;
+    this._wasGrounded = true;
+    this._landT = 0;
     this._knifeCooldown = 0;
     this._prevRightMouse = false;
     this.camera.fov = baseFov;
@@ -1067,6 +1089,16 @@ export class WeaponSystem {
     }
 
     const def = this.currentDef;
+    // A quick dip on touchdown gives jumps and grav-lifts visible weight in
+    // first person. It is intentionally small—the camera already has its own
+    // head motion—and only the viewmodel receives this impulse.
+    const grounded = player?.onGround !== false;
+    if (grounded && !this._wasGrounded) this._landT = 0.22;
+    this._wasGrounded = grounded;
+    if (this._landT > 0) this._landT = Math.max(0, this._landT - dt);
+    const landP = this._landT > 0 ? 1 - this._landT / 0.22 : 1;
+    const landPulse = this._landT > 0 ? Math.sin(landP * Math.PI) : 0;
+
     const mouseJustPressed = input.mouseDown && !this.prevMouseDown;
     const triggerPulled = def.automatic ? input.mouseDown : mouseJustPressed;
 
@@ -1117,6 +1149,7 @@ export class WeaponSystem {
     const raiseTilt = (1 - this._raiseT) * 0.9;
     this.kickGroup.position.set(this.kickPos.x, this.kickPos.y - raiseDrop, this.kickPos.z);
     this.kickGroup.rotation.x = this.kickRotX - raiseTilt;
+    if (def.kind !== 'melee') this.kickGroup.rotation.y = 0;
 
     // sword swing animation — windup → fast diagonal slash → recover
     if (def.kind === 'melee' && this.swingPhase < 1) {
@@ -1159,6 +1192,28 @@ export class WeaponSystem {
       const swayB   = Math.cos(this._idleT * 1.1) * 0.003 * breatheAmt;
       this.kickGroup.position.y += breathe;
       this.kickGroup.rotation.z = swayB;
+
+      // Three readable reload beats: lower/roll the rifle, seat the magazine,
+      // then snap it back to ready. The whole viewmodel moves as one rigid
+      // object, so authored weapon geometry never needs weapon-specific bones.
+      if (st.isReloading) {
+        const p = THREE.MathUtils.clamp(
+          1 - st.reloadTimer / Math.max(0.01, def.reloadTime), 0, 1
+        );
+        const smooth = (x) => x * x * (3 - 2 * x);
+        const enter = smooth(THREE.MathUtils.clamp(p / 0.18, 0, 1));
+        const exit = 1 - smooth(THREE.MathUtils.clamp((p - 0.74) / 0.26, 0, 1));
+        const hold = enter * exit;
+        const seat = Math.sin(
+          THREE.MathUtils.clamp((p - 0.36) / 0.30, 0, 1) * Math.PI
+        );
+        this.kickGroup.position.x += hold * 0.075;
+        this.kickGroup.position.y -= hold * 0.20 + seat * 0.025;
+        this.kickGroup.position.z += hold * 0.055;
+        this.kickGroup.rotation.x += hold * 0.30 + seat * 0.07;
+        this.kickGroup.rotation.y += hold * 0.16;
+        this.kickGroup.rotation.z -= hold * 0.52 + seat * 0.08;
+      }
     }
 
     // viewmodel look-sway: smooth the raw mouse delta into a VELOCITY first
@@ -1202,14 +1257,19 @@ export class WeaponSystem {
     const adsShiftX    = -this.scopeT * 0.32;
     const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
+    // Reload (mine) and the landing pulse (Codex's) are independent offsets on
+    // the same mount, so they simply sum.
     const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH + 0.05 * rBell;
-    const tgtY = -0.26 + sprintRaiseY + bobV - 0.17 * rBell - 0.03 * rack;
+    const tgtY = -0.26 + sprintRaiseY + bobV
+      - 0.17 * rBell - 0.03 * rack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack, 14, dt);
+      this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
+    // VIEWMODEL_Z, not -0.5: the stock reaches back far enough that 0.5m put it
+    // inside the camera's near plane, where it was silently sliced away.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;
@@ -1269,6 +1329,11 @@ export class WeaponSystem {
       magAmmo: st.magAmmo,
       reserveAmmo: st.reserveAmmo,
       isReloading: st.isReloading,
+      reloadProgress: st.isReloading
+        ? THREE.MathUtils.clamp(1 - st.reloadTimer / Math.max(0.01, def.reloadTime), 0, 1)
+        : 0,
+      reloadRemaining: Math.max(0, st.reloadTimer),
+      reloadDuration: def.reloadTime || 0,
       currentIndex: this.currentIndex,
       slots: this.loadout.map((w, i) => ({ key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee' }))
     };

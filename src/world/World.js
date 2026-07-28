@@ -135,6 +135,52 @@ function makeStoreSignTexture(name, bg, fg) {
   return tex;
 }
 
+// High-contrast arena wayfinding. The reference galleries use oversized
+// environmental lettering as a landmark, so these panels favour short,
+// readable callouts over ad-like decoration.
+function makeArenaSignTexture(kicker, label, accent = '#28d4ff') {
+  const w = 768, h = 224;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = '#11161c';
+  g.fillRect(0, 0, w, h);
+
+  g.fillStyle = accent;
+  g.fillRect(0, 0, 20, h);
+  g.fillRect(42, 28, 112, 8);
+  g.fillRect(w - 120, h - 38, 82, 8);
+
+  g.strokeStyle = '#60717b';
+  g.lineWidth = 5;
+  g.strokeRect(10, 10, w - 20, h - 20);
+  g.strokeStyle = accent;
+  g.lineWidth = 2;
+  g.strokeRect(28, 28, w - 56, h - 56);
+
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#a7b8c1';
+  g.font = '700 34px Arial, Helvetica, sans-serif';
+  g.fillText(kicker.toUpperCase(), 58, 67);
+  g.fillStyle = '#f2f6f7';
+  g.font = '900 82px Arial, Helvetica, sans-serif';
+  g.fillText(label.toUpperCase(), 55, 142);
+
+  g.fillStyle = accent;
+  g.beginPath();
+  g.moveTo(w - 96, 70);
+  g.lineTo(w - 48, 112);
+  g.lineTo(w - 96, 154);
+  g.lineTo(w - 80, 112);
+  g.closePath();
+  g.fill();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 // Vertical promo banner / board: stacked lines of big lettering.
 function makeBannerTexture(lines, bg, fg) {
   const w = 256, h = 384;
@@ -497,10 +543,9 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    // Sci-fi battlefield dusk: dark indigo sky with a smoky teal-grey haze so
-    // distant structures dissolve into battle smoke rather than white mist.
-    this.scene.background = new THREE.Color(0x16233f);
-    this.scene.fog = new THREE.Fog(0x2a3644, 110, 400); // battle-smoke haze
+    // Winter-Graveyard's sunrise is warm at the horizon and mauve overhead.
+    this.scene.background = new THREE.Color(0xdba5b6);
+    this.scene.fog = new THREE.Fog(0xd8c4cd, 105, 260);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -605,19 +650,15 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // REAL SHOPPING MALL: a bright, daylit two-level retail gallery — warm-lit
-    // glass storefronts, a walkable mezzanine around a central light-well, palm
-    // planters, escalators + glass elevators, and a vaulted glass skylight roof
-    // flooding the concourse with daylight. Medium-sized.
+    // Official ev.io Winter-Graveyard (node 644): a snow basin framed by a
+    // monumental sealed gate, crescent ribs, graves, cliffs and a raised keep.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildArenaWalls();      // pale plaster mall shell
-    this._buildMall();            // 2-level concourse, glass storefronts, escalators
-    this._buildGlassRoof();       // vaulted glass skylight — the daylight landmark
+    this._buildWinterGraveyard();
     this._buildSpawnPoints();
 
-    this.previewPedestalPos = new THREE.Vector3(0, 0, 46);
+    this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
 
     // Lock world matrix on every static mesh built above so Three.js skips
     // recomputing it on every frame. Dynamic objects (bots, player, pickups)
@@ -634,32 +675,21 @@ export class World {
   }
 
   _buildLighting() {
-    // SKY LIGHT ONLY. Per request, the scene has no other lights anywhere — no
-    // directional key/fill, no point lights, no shadows. Surfaces are lit by this
-    // single hemisphere (sky) light plus the scene's environment map (IBL) and
-    // emissive accents, which is the cheapest possible lighting to render.
-    // Battlefield dusk: cool blue-steel sky light with a low, hot ember key —
-    // the horizon fires rake warm light across the alloy structures.
-    // Bright DAYLIGHT retail interior — a real mall with a glass roof. A strong
-    // warm-white sky fill (daylight bouncing off pale floors and ceilings) plus a
-    // high overhead key simulating sun pouring through the barrel-vault skylight.
-    const hemi = new THREE.HemisphereLight(0xf4f8ff, 0xcfd4d8, 2.15);
+    const hemi = new THREE.HemisphereLight(0xffdfd1, 0x554956, 1.32);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff6ea, 1.7);
-    key.position.set(10, 160, 30);   // near-vertical: sun through the roof
-    key.castShadow = false;
-    this.scene.add(key);
-    const fill = new THREE.DirectionalLight(0xdfeaff, 0.7);
-    fill.position.set(-70, 60, -60);
-    this.scene.add(fill);
+    const sun = new THREE.DirectionalLight(0xffd7aa, 1.45);
+    sun.position.set(72, 86, -95);
+    sun.castShadow = false;
+    this.scene.add(sun);
+    const skyRim = new THREE.DirectionalLight(0xc99ad5, 0.38);
+    skyRim.position.set(-75, 46, 54);
+    skyRim.castShadow = false;
+    this.scene.add(skyRim);
   }
 
   _buildGround() {
-    // Polished cream stone-tile concourse floor — warm pale travertine with a
-    // soft sheen (clearcoat) and a faint tile grout grid, like a real mall.
-    const floor = new THREE.MeshPhysicalMaterial({
-      color: 0xdcd3c2, roughness: 0.35, metalness: 0.0,
-      clearcoat: 0.55, clearcoatRoughness: 0.3, envMapIntensity: 0.7,
+    const floor = new THREE.MeshStandardMaterial({
+      color: 0xeee5ec, roughness: 1, metalness: 0, envMapIntensity: 0.22,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -667,26 +697,40 @@ export class World {
     ground.matrixAutoUpdate = false;
     ground.updateMatrix();
     this.scene.add(ground);
-    // faint tile grout seams
-    const grid = new THREE.GridHelper(ARENA_HALF * 2, 44, 0xb7ad99, 0xc7bfad);
-    grid.position.y = 0.03;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.5;
-    grid.matrixAutoUpdate = false;
-    grid.updateMatrix();
-    this.scene.add(grid);
+
+    // Sparse mauve wind streaks keep the otherwise white floor readable.
+    const drift = new THREE.MeshBasicMaterial({ color: 0xcbbcc8, transparent: true, opacity: 0.22 });
+    for (const [x, z, w, r] of [
+      [-28, 19, 22, -0.12], [9, 31, 30, 0.08], [-4, -10, 26, -0.04],
+      [27, -24, 18, 0.14], [-31, -35, 16, 0.05],
+    ]) {
+      const streak = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.32), drift);
+      streak.rotation.x = -Math.PI / 2;
+      streak.rotation.z = r;
+      streak.position.set(x, 0.025, z);
+      this.scene.add(streak);
+    }
   }
 
   _buildSky() {
-    // Clean bright skydome — light blue zenith fading to near-white horizon.
-    // No stars / moon: this is a daylit arena, not a neon night city.
+    const canvas = document.createElement('canvas');
+    canvas.width = 16; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, '#8b6f89');
+    grad.addColorStop(0.32, '#b981aa');
+    grad.addColorStop(0.66, '#efb7a8');
+    grad.addColorStop(0.86, '#ffd8ad');
+    grad.addColorStop(1, '#fff0cf');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 16, 512);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(420, 32, 16),
       new THREE.MeshBasicMaterial({
-        map: makeSkyGradientTexture(),
-        side: THREE.BackSide,
-        fog: false,
-        depthWrite: false,
+        map: texture, side: THREE.BackSide, fog: false, depthWrite: false,
       })
     );
     sky.matrixAutoUpdate = false;
@@ -2663,6 +2707,683 @@ export class World {
   // light-well. A tiered stone fountain, leafy ficus trees and retail kiosks are
   // the cover. Daylight pours in through the vaulted glass roof (_buildGlassRoof).
   // ═════════════════════════════════════════════════════════════════════════
+  // Recreated from the observed ev.io match: four black bastions connected by
+  // high bridge lanes, a lower command deck, long exposed ramps, red navigation
+  // bands and cyan wall modules. Route geometry is registered in platforms[] so
+  // the same surfaces are walkable by both the legacy controller and MoveSim.
+  _buildLegacyEvioArena() {
+    const concrete = new THREE.MeshStandardMaterial({
+      color: 0x20242b, roughness: 0.8, metalness: 0.2, envMapIntensity: 0.45,
+    });
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x0d1015, roughness: 0.72, metalness: 0.42, envMapIntensity: 0.35,
+    });
+    const deck = new THREE.MeshStandardMaterial({
+      color: 0x2d323a, roughness: 0.68, metalness: 0.36, envMapIntensity: 0.5,
+    });
+    const inset = new THREE.MeshStandardMaterial({
+      color: 0x080b10, roughness: 0.5, metalness: 0.62,
+    });
+    const red = this._neonMat(0xff3b24);
+    const cyan = this._neonMat(0x20cfff);
+    const amber = this._neonMat(0xffa12c);
+
+    const solid = (x, y, z, w, h, d, mat = concrete) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this._addCollider(mesh);
+      return mesh;
+    };
+    const decor = (x, y, z, w, h, d, mat = dark, ry = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = ry;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const strip = (x, y, z, w, h, d, mat = red, ry = 0) => {
+      const mesh = decor(x, y, z, w, h, d, mat, ry);
+      mesh.userData.noHit = true;
+      return mesh;
+    };
+
+    // Arena shell: massive dark walls with layered battlements and hot red bands.
+    const wallH = 27, wallT = 2.4, half = ARENA_HALF;
+    solid(0, wallH / 2, -half, half * 2 + wallT * 2, wallH, wallT, dark);
+    solid(0, wallH / 2,  half, half * 2 + wallT * 2, wallH, wallT, dark);
+    solid(-half, wallH / 2, 0, wallT, wallH, half * 2 + wallT * 2, dark);
+    solid( half, wallH / 2, 0, wallT, wallH, half * 2 + wallT * 2, dark);
+    strip(0, 4.2, -half + 1.26, half * 2, 0.24, 0.08);
+    strip(0, 4.2,  half - 1.26, half * 2, 0.24, 0.08);
+    strip(-half + 1.26, 4.2, 0, 0.08, 0.24, half * 2);
+    strip( half - 1.26, 4.2, 0, 0.08, 0.24, half * 2);
+
+    // Wall buttresses make the perimeter read as a city-sized machine.
+    for (let p = -52; p <= 52; p += 13) {
+      decor(p, 10, -half + 2.1, 3.4, 20, 2.4, concrete);
+      decor(p, 10,  half - 2.1, 3.4, 20, 2.4, concrete);
+      decor(-half + 2.1, 10, p, 2.4, 20, 3.4, concrete);
+      decor( half - 2.1, 10, p, 2.4, 20, 3.4, concrete);
+    }
+
+    // Navigation lines mirror the strong red lanes visible on every ramp/roof.
+    for (const x of [-7.2, 7.2]) strip(x, 0.045, 0, 0.16, 0.06, 112);
+    for (const z of [-30, 30]) strip(0, 0.05, z, 112, 0.07, 0.2);
+    for (const x of [-30, 30]) strip(x, 0.05, 0, 0.2, 0.07, 112);
+    // Short white/cyan landing ticks break up the long sight lines.
+    for (let z = -48; z <= 48; z += 12) {
+      strip(-6.5, 0.052, z, 1.2, 0.065, 0.14, cyan);
+      strip( 6.5, 0.052, z, 1.2, 0.065, 0.14, cyan);
+    }
+
+    const addPanelBank = (x, z, faceX) => {
+      const px = x + faceX * 9.08;
+      for (const oz of [-6, -2, 2, 6]) {
+        strip(px, 4.7, z + oz, 0.1, 4.7, 1.15, cyan);
+        decor(px - faceX * 0.08, 4.7, z + oz, 0.16, 5.2, 1.65, inset);
+      }
+      strip(px + faceX * 0.03, 7.55, z, 0.12, 0.28, 15.8, red);
+    };
+
+    const bastion = (x, z) => {
+      // Accessible lower roof at y=9; the narrow upper core leaves a fighting ring.
+      solid(x, 4.45, z, 20, 8.9, 22, concrete);
+      this._platformBox(x, z, 20, 22, 9, deck, 0xff3b24);
+      solid(x, 16.5, z, 9.5, 15, 11, dark);
+      decor(x, 24.8, z, 12.5, 1.4, 14, concrete);
+      decor(x, 27.5, z, 5.5, 6.8, 6.5, dark);
+      // Slab collars and fins create the stepped silhouette seen across the map.
+      decor(x, 11.0, z, 15.5, 1.1, 16, inset);
+      decor(x, 21.0, z, 12.2, 0.9, 13.5, concrete);
+      for (const side of [-1, 1]) {
+        decor(x + side * 7.8, 14.5, z, 1.1, 13, 15, concrete);
+        strip(x + side * 8.36, 14.5, z, 0.12, 9.5, 8.5, red);
+      }
+      addPanelBank(x, z, x < 0 ? 1 : -1);
+      // Roof-edge pickups read as the bright floating nodes from the capture.
+      this._spawnPadMarker(x, z + (z < 0 ? 6.5 : -6.5), 9, 0xff8a2c);
+    };
+
+    bastion(-32, -30);
+    bastion( 32, -30);
+    bastion(-32,  30);
+    bastion( 32,  30);
+
+    // Twin high bridges are the dominant roof route. Their ends meet the four
+    // bastion roofs exactly; outer ramps provide a risky but fast climb.
+    this._platformBox(0, -30, 44, 6, 9, deck, 0xff3b24);
+    this._platformBox(0,  30, 44, 6, 9, deck, 0xff3b24);
+    for (const z of [-30, 30]) {
+      this._rampBox(-52, -42, z - 3, z + 3, 0, 9, 'x', deck, 0xff3b24);
+      this._rampBox( 42,  52, z - 3, z + 3, 9, 0, 'x', deck, 0xff3b24);
+    }
+
+    // Central command deck: four short approaches plus two long spine ramps that
+    // climb into the north/south bridge lanes.
+    this._platformBox(0, 0, 18, 18, 5.5, deck, 0xff3b24);
+    this._rampBox(-19, -9, -3, 3, 0, 5.5, 'x', deck, 0xff3b24);
+    this._rampBox(  9, 19, -3, 3, 5.5, 0, 'x', deck, 0xff3b24);
+    this._rampBox(-3, 3, -19, -9, 0, 5.5, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3,   9, 19, 5.5, 0, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3, -30, -9, 9, 5.5, 'z', deck, 0xff3b24);
+    this._rampBox(-3, 3,   9, 30, 5.5, 9, 'z', deck, 0xff3b24);
+
+    // The centre is cover, not a dead flat tabletop.
+    solid(0, 8.5, 0, 5.2, 6, 5.2, inset);
+    for (const a of [0, Math.PI / 2]) {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.13, 8, 28), cyan);
+      halo.position.set(0, 10.8, 0);
+      halo.rotation.set(a === 0 ? Math.PI / 2 : 0, a, 0);
+      halo.userData.noHit = true;
+      this.scene.add(halo);
+      this._spinRings.push({ mesh: halo, speed: a === 0 ? 0.28 : -0.22 });
+    }
+
+    // Ground-level cover clusters produce the short-range corner fights seen in
+    // the recording without sealing the broad rifle lanes.
+    const cover = [
+      [-18, -15, 5, 3.2, 7], [18, -15, 5, 3.2, 7],
+      [-18,  15, 5, 3.2, 7], [18,  15, 5, 3.2, 7],
+      [-47,   0, 7, 4.5, 4], [47,   0, 7, 4.5, 4],
+      [-12, -46, 4, 3.5, 7], [12, -46, 4, 3.5, 7],
+      [-12,  46, 4, 3.5, 7], [12,  46, 4, 3.5, 7],
+    ];
+    for (const [x, z, w, h, d] of cover) {
+      solid(x, h / 2, z, w, h, d, concrete);
+      strip(x, h + 0.035, z, w + 0.12, 0.08, d + 0.12, x === 0 ? cyan : red);
+    }
+
+    // Corner skyline anchors and glowing server-bank faces frame the open sky.
+    for (const [x, z] of [[-53,-52],[53,-52],[-53,52],[53,52]]) {
+      solid(x, 11, z, 10, 22, 10, dark);
+      decor(x, 23.5, z, 13, 3, 13, concrete);
+      for (let i = -1; i <= 1; i++) {
+        const towardX = -Math.sign(x);
+        strip(x + towardX * 5.06, 9 + i * 4.2, z, 0.1, 1.7, 6.2, cyan);
+      }
+      strip(x, 25.1, z, 8, 0.22, 8, amber);
+    }
+
+    // Vertical shortcuts echo ev.io's ability-driven movement without forcing
+    // them: grav lifts land on the two bridge routes, while ramps remain primary.
+    const lift = (x, z) => {
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.35, 0.34, 20), inset);
+      pad.position.set(x, 0.17, z);
+      pad.receiveShadow = true;
+      this.scene.add(pad);
+      for (const y of [0.38, 3.2, 6.0, 8.75]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.09, 8, 24), cyan);
+        ring.position.set(x, y, z);
+        ring.rotation.x = Math.PI / 2;
+        ring.userData.noHit = true;
+        this.scene.add(ring);
+      }
+      for (const [ox, oz] of [[1.8,0],[-1.8,0],[0,1.8],[0,-1.8]]) {
+        decor(x + ox, 4.5, z + oz, 0.18, 8.5, 0.18, concrete);
+      }
+      this.gravLifts.push({ x, z, r: 1.9, topY: 9, power: 15 });
+    };
+    lift(0, -42);
+    lift(0,  42);
+  }
+
+  // Jinx is the layout and material anchor. Rook, Depot, Vestige and Momentum
+  // contribute the shared ev.io language: chunky low-poly massing, framed wall
+  // modules, luminous route cues, multi-height combat loops and open sky canyons.
+  _buildEvioArena() {
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0x827873, roughness: 0.88, metalness: 0.04, envMapIntensity: 0.5,
+    });
+    const paleStone = new THREE.MeshStandardMaterial({
+      color: 0xa1968f, roughness: 0.86, metalness: 0.03, envMapIntensity: 0.48,
+    });
+    const warmTrim = new THREE.MeshStandardMaterial({
+      color: 0x352c2f, roughness: 0.78, metalness: 0.1, envMapIntensity: 0.42,
+    });
+    const brick = new THREE.MeshStandardMaterial({
+      color: 0x5f3a37, roughness: 0.92, metalness: 0.01,
+    });
+    const brickDark = new THREE.MeshStandardMaterial({
+      color: 0x472f31, roughness: 0.94, metalness: 0.01,
+    });
+    const tech = new THREE.MeshStandardMaterial({
+      color: 0x171a20, roughness: 0.64, metalness: 0.5, envMapIntensity: 0.55,
+    });
+    const techMid = new THREE.MeshStandardMaterial({
+      color: 0x2c3038, roughness: 0.62, metalness: 0.42, envMapIntensity: 0.52,
+    });
+    const inset = new THREE.MeshStandardMaterial({
+      color: 0x090c11, roughness: 0.46, metalness: 0.64,
+    });
+    const bridgeTop = new THREE.MeshStandardMaterial({
+      color: 0x866a65, roughness: 0.8, metalness: 0.08,
+    });
+    const redChannel = new THREE.MeshStandardMaterial({
+      color: 0x741f1b, roughness: 0.8, metalness: 0.12,
+      emissive: 0x260504, emissiveIntensity: 0.34,
+    });
+    const ochre = new THREE.MeshStandardMaterial({
+      color: 0xa5652f, roughness: 0.84, metalness: 0.05,
+    });
+    const red = this._neonMat(0xef3828);
+    const cyan = this._neonMat(0x18c7ff);
+    const gold = this._neonMat(0xd8c83b);
+    const orange = this._neonMat(0xff9b35);
+
+    const solid = (x, y, z, w, h, d, mat = stone) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this._addCollider(mesh);
+      return mesh;
+    };
+    const decor = (x, y, z, w, h, d, mat = warmTrim, ry = 0) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = ry;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const strip = (x, y, z, w, h, d, mat = red, ry = 0) =>
+      decor(x, y, z, w, h, d, mat, ry);
+    const octagon = (x, y, z, radius, h, mat = stone) => {
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius, radius, h, 8),
+        mat
+      );
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = Math.PI / 8;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const diamond = (x, y, z, axis = 'z', mat = cyan, size = 0.62) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, 0.11), mat);
+      mesh.position.set(x, y, z);
+      if (axis === 'x') mesh.rotation.y = Math.PI / 2;
+      mesh.rotation.z = Math.PI / 4;
+      mesh.userData.noHit = true;
+      this.scene.add(mesh);
+      return mesh;
+    };
+    const signTextures = new Map();
+    const signPanel = (
+      kicker, label, accent, x, y, z, w, h, ry = 0
+    ) => {
+      const key = `${kicker}|${label}|${accent}`;
+      let tex = signTextures.get(key);
+      if (!tex) {
+        tex = makeArenaSignTexture(kicker, label, accent);
+        signTextures.set(key, tex);
+      }
+      const backing = decor(x, y, z, w + 0.7, h + 0.7, 0.38, tech, ry);
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })
+      );
+      panel.position.set(x, y, z);
+      panel.rotation.y = ry;
+      panel.translateZ(0.22);
+      panel.userData.noHit = true;
+      this.scene.add(panel);
+      return { backing, panel };
+    };
+
+    const ribbedBank = (x, y, z, span, h, axis = 'x', cyanEvery = 4) => {
+      const alongX = axis === 'x';
+      decor(x, y, z, alongX ? span : 0.28, h, alongX ? 0.28 : span, inset);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const count = Math.max(5, Math.floor(span / 1.35));
+      for (let i = 0; i < count; i++) {
+        const offset = -span / 2 + (i + 0.5) * span / count;
+        decor(
+          alongX ? frontX + offset : frontX,
+          y,
+          alongX ? frontZ : frontZ + offset,
+          alongX ? 0.28 : 0.24,
+          h * 0.92,
+          alongX ? 0.24 : 0.28,
+          i % cyanEvery === 1 ? cyan : techMid
+        );
+      }
+    };
+
+    const brickBand = (x, y, z, span, h, axis = 'x') => {
+      const alongX = axis === 'x';
+      decor(x, y, z, alongX ? span : 0.3, h, alongX ? 0.3 : span, brickDark);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const cols = Math.max(4, Math.floor(span / 2.25));
+      const rows = Math.max(2, Math.floor(h / 1.35));
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const along = -span / 2 + (col + 0.5) * span / cols +
+            (row % 2 ? span / cols / 2 : 0);
+          if (along > span / 2 - 0.2) continue;
+          const yy = y - h / 2 + (row + 0.5) * h / rows;
+          decor(
+            alongX ? frontX + along : frontX,
+            yy,
+            alongX ? frontZ : frontZ + along,
+            alongX ? span / cols - 0.12 : 0.08,
+            h / rows - 0.1,
+            alongX ? 0.08 : span / cols - 0.12,
+            (row + col) % 3 === 0 ? brickDark : brick
+          );
+        }
+      }
+    };
+
+    const circuitPanel = (x, y, z, w, h, axis = 'z') => {
+      const alongX = axis === 'z';
+      decor(x, y, z, alongX ? w : 0.24, h, alongX ? 0.24 : w, techMid);
+      const frontX = alongX ? x : x - Math.sign(x) * 0.18;
+      const frontZ = alongX ? z - Math.sign(z) * 0.18 : z;
+      const edge = w / 2 - 0.52;
+      for (const s of [-1, 1]) {
+        strip(
+          alongX ? frontX + s * edge : frontX,
+          y,
+          alongX ? frontZ : frontZ + s * edge,
+          alongX ? 0.12 : 0.08,
+          h * 0.76,
+          alongX ? 0.08 : 0.12,
+          gold
+        );
+      }
+      strip(
+        frontX, y + h * 0.27, frontZ,
+        alongX ? w * 0.58 : 0.08, 0.1, alongX ? 0.08 : w * 0.58,
+        gold
+      );
+      strip(
+        frontX, y - h * 0.27, frontZ,
+        alongX ? w * 0.36 : 0.08, 0.1, alongX ? 0.08 : w * 0.36,
+        gold
+      );
+      for (let i = -2; i <= 2; i++) {
+        const along = i * (w * 0.105);
+        strip(
+          alongX ? frontX + along : frontX,
+          y,
+          alongX ? frontZ : frontZ + along,
+          alongX ? 0.12 : 0.08,
+          h * (i === 0 ? 0.62 : 0.42),
+          alongX ? 0.08 : 0.12,
+          cyan
+        );
+      }
+    };
+
+    // The layered city shell frames blue sky instead of reading as a flat box.
+    const half = ARENA_HALF;
+    const shell = [
+      [0, 7, -half, 126, 14, 2.4],
+      [0, 7,  half, 126, 14, 2.4],
+      [-half, 7, 0, 2.4, 14, 126],
+      [ half, 7, 0, 2.4, 14, 126],
+    ];
+    for (const [x, y, z, w, h, d] of shell) solid(x, y, z, w, h, d, tech);
+    for (let p = -52; p <= 52; p += 13) {
+      decor(p, 8, -half + 1.3, 2.8, 16, 1.4, stone);
+      decor(p, 8,  half - 1.3, 2.8, 16, 1.4, stone);
+      decor(-half + 1.3, 8, p, 1.4, 16, 2.8, stone);
+      decor( half - 1.3, 8, p, 1.4, 16, 2.8, stone);
+    }
+    for (const side of [-1, 1]) {
+      strip(0, 2.4, side * (half - 1.22), 118, 0.18, 0.08, red);
+      strip(side * (half - 1.22), 2.4, 0, 0.08, 0.18, 118, red);
+      strip(0, 12.2, side * (half - 1.22), 112, 0.12, 0.08, gold);
+      strip(side * (half - 1.22), 12.2, 0, 0.08, 0.12, 112, gold);
+    }
+
+    const tower = (x, z, scale = 1, innerX = -Math.sign(x), innerZ = -Math.sign(z)) => {
+      const baseW = 17 * scale;
+      const baseD = 18 * scale;
+      const roofY = 9.5;
+
+      // Playable black technical base and roof ring.
+      solid(x, 4.65, z, baseW, 9.3, baseD, tech);
+      this._platformBox(x, z, baseW + 2.2, baseD + 2.2, roofY, warmTrim, 0xef3828);
+      decor(x, 10.15, z, baseW + 3.6, 1.3, baseD + 3.6, warmTrim);
+      decor(x, 11.0, z, baseW + 1.8, 0.55, baseD + 1.8, paleStone);
+
+      // Ribbed server banks face the combat lanes.
+      ribbedBank(
+        x + innerX * (baseW / 2 + 0.15), 5.0, z,
+        baseD * 0.72, 6.4, 'z', 3
+      );
+      ribbedBank(
+        x, 5.0, z + innerZ * (baseD / 2 + 0.15),
+        baseW * 0.7, 6.4, 'x', 4
+      );
+
+      // Warm octagonal upper towers, brick infill and layered cornices.
+      const radius = 7.1 * scale;
+      octagon(x, 16.2, z, radius, 10.4, stone);
+      octagon(x, 21.8, z, radius + 0.6, 1.0, warmTrim);
+      octagon(x, 23.0, z, radius + 0.25, 1.15, paleStone);
+      octagon(x, 27.2, z, radius * 0.82, 7.2, brick);
+      octagon(x, 31.0, z, radius * 0.98, 0.9, warmTrim);
+      octagon(x, 32.0, z, radius * 0.78, 1.05, paleStone);
+
+      brickBand(
+        x, 27.1, z + innerZ * (radius * 0.82 + 0.07),
+        radius * 1.05, 4.7, 'x'
+      );
+      circuitPanel(
+        x, 16.2, z + innerZ * (radius + 0.08),
+        radius * 1.18, 5.0, 'z'
+      );
+      circuitPanel(
+        x + innerX * (radius + 0.08), 16.2, z,
+        radius * 1.18, 5.0, 'x'
+      );
+      diamond(x, 17.0, z + innerZ * (radius + 0.2), 'z', cyan, 0.7);
+      diamond(x + innerX * (radius + 0.2), 17.0, z, 'x', cyan, 0.7);
+
+      solid(x - innerX * 2.4, roofY + 1.5, z, 2.2, 3.0, 5.2, stone);
+      strip(
+        x + innerX * (baseW / 2 + 1.16), roofY + 0.08, z,
+        0.14, 0.12, baseD * 0.72, red
+      );
+      this._spawnPadMarker(
+        x + innerX * 2.6, z + innerZ * 3.2, roofY, 0x18c7ff
+      );
+    };
+
+    tower(-35, -32, 1.03, 1, 1);
+    tower( 35, -32, 0.96, -1, 1);
+    tower(-35,  32, 0.96, 1, -1);
+    tower( 35,  32, 1.03, -1, -1);
+
+    // Slim skyline towers tighten the side canyons without blocking the floor.
+    const skylineTower = (x, z, innerX) => {
+      solid(x, 5.3, z, 12, 10.6, 15, tech);
+      this._platformBox(x, z, 14, 17, 10.65, techMid, 0xef3828);
+      ribbedBank(x + innerX * 6.12, 5.2, z, 10.5, 7.8, 'z', 3);
+      octagon(x, 18.0, z, 6.4, 14.0, stone);
+      octagon(x, 25.4, z, 7.0, 1.0, warmTrim);
+      octagon(x, 28.4, z, 5.4, 5.0, brick);
+      octagon(x, 31.3, z, 6.3, 0.8, paleStone);
+      circuitPanel(x + innerX * 6.35, 17.4, z, 7.4, 4.2, 'x');
+    };
+    // Pulling these inward opens two compressed outer service canyons. Their
+    // narrowness contrasts the broad central court without sealing a flank.
+    skylineTower(-48, 0, 1);
+    skylineTower( 48, 0, -1);
+
+    // The western service canyon uses the orange/cyan panel language visible
+    // across several ev.io arenas. Frames are visual only; the 6.8 m floor
+    // gap between tower and perimeter remains fully traversable.
+    for (const z of [-8.2, 0, 8.2]) {
+      const frame = decor(-57.4, 5.4, z, 6.7, 0.62, 0.72, ochre);
+      frame.rotation.z = (z / 8.2) * 0.035;
+    }
+    for (const z of [-6.0, -2.0, 2.0, 6.0]) {
+      strip(-54.12, 3.9, z, 0.12, 4.8, 0.34, z < 0 ? orange : cyan);
+      strip(-60.72, 3.9, z, 0.12, 4.8, 0.34, z < 0 ? cyan : orange);
+    }
+    signPanel('B-12  //  SIDE ROUTE', 'TRANSIT', '#ff9b35',
+      -54.18, 8.0, 0, 6.8, 2.0, -Math.PI / 2);
+    signPanel('C-07  //  SIDE ROUTE', 'REACTOR', '#28d4ff',
+       54.18, 8.0, 0, 6.8, 2.0, Math.PI / 2);
+
+    // Low central deck and four approaches support jump/slide/teleport movement.
+    this._platformBox(0, 0, 20, 18, 5.2, bridgeTop, 0xef3828);
+    this._rampBox(-20, -10, -4.5, 4.5, 0, 5.2, 'x', techMid, 0xef3828);
+    this._rampBox( 10,  20, -4.5, 4.5, 5.2, 0, 'x', techMid, 0xef3828);
+    this._rampBox(-4.5, 4.5, -20, -10, 0, 5.2, 'z', techMid, 0xef3828);
+    this._rampBox(-4.5, 4.5,  10,  20, 5.2, 0, 'z', techMid, 0xef3828);
+    solid(0, 7.7, 0, 5.4, 5.0, 5.4, stone);
+    octagon(0, 10.55, 0, 3.9, 0.42, tech);
+    const centreRing = new THREE.Mesh(
+      new THREE.TorusGeometry(2.85, 0.14, 8, 28),
+      cyan
+    );
+    centreRing.position.set(0, 10.82, 0);
+    centreRing.rotation.x = Math.PI / 2;
+    centreRing.userData.noHit = true;
+    this.scene.add(centreRing);
+    this._spinRings.push({ mesh: centreRing, speed: 0.2 });
+
+    // A compact objective beacon gives the central deck a readable focal prop
+    // without becoming waist-high cover or breaking the cross-map sightlines.
+    const objectiveCore = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.82, 0),
+      new THREE.MeshStandardMaterial({
+        color: 0xc9f7ff, roughness: 0.22, metalness: 0.24,
+        emissive: 0x18c7ff, emissiveIntensity: 1.8,
+      })
+    );
+    objectiveCore.position.set(0, 12.55, 0);
+    objectiveCore.userData.noHit = true;
+    this.scene.add(objectiveCore);
+    this._spinRings.push({ mesh: objectiveCore, speed: 0.42 });
+    for (const [radius, tube, tilt, speed] of [
+      [1.52, 0.09, 0, 0.55],
+      [1.24, 0.07, Math.PI / 2, -0.72],
+    ]) {
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, tube, 8, 28),
+        radius > 1.4 ? cyan : gold
+      );
+      halo.position.set(0, 12.55, 0);
+      halo.rotation.x = tilt;
+      halo.userData.noHit = true;
+      this.scene.add(halo);
+      this._spinRings.push({ mesh: halo, speed });
+    }
+    for (let i = 0; i < 4; i++) {
+      const angle = i * Math.PI / 2;
+      const fin = decor(
+        Math.cos(angle) * 3.2, 11.9, Math.sin(angle) * 3.2,
+        0.38, 2.9, 1.1, i % 2 ? warmTrim : paleStone, -angle
+      );
+      fin.rotation.z = i % 2 ? -0.22 : 0.22;
+    }
+
+    // Broad Jinx bridges use muted-rose tops, dark undersides and flared ends.
+    for (const z of [-32, 32]) {
+      this._platformBox(0, z, 52, 6.4, 9.5, bridgeTop, 0xef3828);
+      decor(0, 8.55, z, 50, 1.15, 5.0, tech);
+      decor(-25.7, 9.2, z, 4.2, 1.8, 8.4, warmTrim);
+      decor( 25.7, 9.2, z, 4.2, 1.8, 8.4, warmTrim);
+      for (let x = -21; x <= 21; x += 7) {
+        decor(x, 8.1, z, 0.45, 3.2, 4.8, techMid);
+      }
+      strip(0, 9.62, z - 3.13, 49, 0.13, 0.12, red);
+      strip(0, 9.62, z + 3.13, 49, 0.13, 0.12, red);
+    }
+
+    // The north/south spine changes level twice rather than making one sniper rail.
+    this._platformBox(0, -24, 6.2, 12, 5.2, bridgeTop, 0xef3828);
+    this._platformBox(0,  24, 6.2, 12, 5.2, bridgeTop, 0xef3828);
+    this._rampBox(-3.1, 3.1, -32, -18, 9.5, 5.2, 'z', bridgeTop, 0xef3828);
+    this._rampBox(-3.1, 3.1,  18,  32, 5.2, 9.5, 'z', bridgeTop, 0xef3828);
+
+    // Recessed red lanes are Jinx's navigation signature; cyan ticks mark joins.
+    for (const x of [-8.0, 8.0]) strip(x, 0.055, 0, 0.18, 0.08, 112, red);
+    for (const z of [-32, 32]) strip(0, 0.055, z, 112, 0.08, 0.18, red);
+    for (const x of [-34, 34]) strip(x, 0.058, 0, 0.18, 0.08, 104, red);
+    for (let z = -48; z <= 48; z += 12) {
+      strip(-7.25, 0.062, z, 1.15, 0.075, 0.16, cyan);
+      strip( 7.25, 0.062, z, 1.15, 0.075, 0.16, cyan);
+    }
+
+    // The northern approach is a strong red material channel rather than a
+    // glowing floor slab. It terminates at the map's halo landmark and doubles
+    // as quick route-reading from the centre.
+    decor(0, 0.035, 52.0, 7.2, 0.06, 17.2, redChannel);
+    strip(-3.62, 0.078, 52.0, 0.12, 0.08, 17.2, red);
+    strip( 3.62, 0.078, 52.0, 0.12, 0.08, 17.2, red);
+    for (const z of [45.0, 49.5, 54.0, 58.5]) {
+      strip(0, 0.082, z, 3.8, 0.06, 0.12, gold);
+    }
+
+    // Asymmetric low cover prevents the four quadrants feeling copy-pasted.
+    const cover = [
+      [-19,-15,6,3.4,4], [17,-14,4,5.2,7],
+      [-18, 15,4,5.2,7], [20, 16,6,3.4,4],
+      [-49,-18,5,4.5,8], [48,-17,8,3.2,5],
+      [-48, 18,8,3.2,5], [49, 18,5,4.5,8],
+      [-15,-50,7,3.0,4], [16,-49,4,4.2,7],
+      [-16, 49,4,4.2,7], [15, 50,7,3.0,4],
+    ];
+    for (let i = 0; i < cover.length; i++) {
+      const [x, z, w, h, d] = cover[i];
+      solid(x, h / 2, z, w, h, d, i % 3 === 0 ? stone : techMid);
+      strip(
+        x, h + 0.04, z, w + 0.12, 0.08, d + 0.12,
+        i % 4 === 1 ? cyan : red
+      );
+    }
+
+    // Vestige-like geometric punctuation using Jinx's diamond/server motif.
+    for (const z of [-52, -39, 39, 52]) {
+      circuitPanel(-half + 1.16, 9.4, z, 7.0, 6.0, 'x');
+      circuitPanel( half - 1.16, 9.4, z, 7.0, 6.0, 'x');
+      diamond(-half + 1.02, 9.4, z, 'x', cyan, 0.76);
+      diamond( half - 1.02, 9.4, z, 'x', cyan, 0.76);
+    }
+
+    // A giant segmented halo creates the memorable framed vista seen in the
+    // reference arena galleries. It is scenic and non-colliding, with the
+    // playable red channel remaining open beneath it.
+    const gateZ = half - 3.7;
+    const gateY = 20.0;
+    const haloOuter = new THREE.Mesh(
+      new THREE.TorusGeometry(10.6, 0.62, 10, 48),
+      ochre
+    );
+    haloOuter.position.set(0, gateY, gateZ);
+    haloOuter.userData.noHit = true;
+    this.scene.add(haloOuter);
+    const haloInner = new THREE.Mesh(
+      new THREE.TorusGeometry(9.65, 0.13, 8, 48),
+      gold
+    );
+    haloInner.position.set(0, gateY, gateZ - 0.38);
+    haloInner.userData.noHit = true;
+    this.scene.add(haloInner);
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2;
+      const segment = decor(
+        Math.cos(a) * 10.55,
+        gateY + Math.sin(a) * 10.55,
+        gateZ + 0.25,
+        1.4, 2.5, 1.2,
+        i % 3 === 0 ? paleStone : warmTrim
+      );
+      segment.rotation.z = a + Math.PI / 2;
+    }
+    decor(-11.2, 9.2, gateZ, 3.0, 18.4, 3.2, stone);
+    decor( 11.2, 9.2, gateZ, 3.0, 18.4, 3.2, stone);
+    for (const x of [-11.2, 11.2]) {
+      strip(x, 8.7, gateZ - 1.64, 0.22, 11.5, 0.1, cyan);
+    }
+    signPanel('A-03  //  CENTRAL ROUTE', 'NEXUS', '#28d4ff',
+      0, 14.0, gateZ - 1.75, 10.6, 2.45, Math.PI);
+
+    // Optional lifts land on the central deck; all destinations also have ramps.
+    const lift = (x, z, topY) => {
+      const pad = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.05, 2.35, 0.34, 12),
+        tech
+      );
+      pad.position.set(x, 0.17, z);
+      pad.receiveShadow = true;
+      this.scene.add(pad);
+      for (const y of [0.45, topY * 0.38, topY * 0.7, topY - 0.35]) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(1.72, 0.09, 8, 20),
+          cyan
+        );
+        ring.position.set(x, y, z);
+        ring.rotation.x = Math.PI / 2;
+        ring.userData.noHit = true;
+        this.scene.add(ring);
+      }
+      for (const [ox, oz] of [[1.85,0],[-1.85,0],[0,1.85],[0,-1.85]]) {
+        decor(x + ox, topY / 2, z + oz, 0.16, topY - 0.4, 0.16, paleStone);
+      }
+      this.gravLifts.push({ x, z, r: 1.9, topY, power: 15 });
+    };
+    lift(-13, 0, 5.2);
+    lift( 13, 0, 5.2);
+  }
+
   _buildMall() {
     // Bright retail palette.
     const frameM  = new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.55, metalness: 0.15 }); // white shopfront frame
@@ -3400,26 +4121,415 @@ export class World {
     ring.position.set(x, 2.3, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
   }
 
-  _buildSpawnPoints() {
-    // Mall spawns: ground concourse + mezzanine. The axis spawns sit inside the
-    // escalator runs' inner ends (±24..34), so they stay closer at ±18.
-    const coords = [
-      // ground-floor concourse (around the central fountain)
-      [24, 24], [-24, 24], [24, -24], [-24, -24],
-      [0, 18], [0, -18], [18, 0], [-18, 0],
-      // upper-floor mezzanine balconies (spawn falls onto the y6.6 deck)
-      [0, 46], [0, -46], [46, 0], [-46, 0],
-      [42, 42], [-42, 42], [42, -42], [-42, -42],
-    ];
-    for (const [x, z] of coords) {
-      this.spawnPoints.push(new THREE.Vector3(x, 0, z));
+  // Winter-Graveyard, rebuilt from the complete official node 644 reference.
+  // The original .evmap is a proprietary binary, so this is a geometry-level
+  // recreation of the full visible composition rather than an asset import.
+  _buildWinterGraveyard() {
+    const mats = {
+      snow: new THREE.MeshStandardMaterial({ color: 0xf2e9ef, roughness: 1 }),
+      snowShade: new THREE.MeshStandardMaterial({ color: 0xd6c8d2, roughness: 1 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0x9b8294, roughness: 0.94 }),
+      stoneLight: new THREE.MeshStandardMaterial({ color: 0xb6a0ae, roughness: 0.92 }),
+      stoneDark: new THREE.MeshStandardMaterial({ color: 0x665365, roughness: 0.96 }),
+      recess: new THREE.MeshStandardMaterial({ color: 0x342b3b, roughness: 1 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xc99c39, roughness: 0.7, metalness: 0.18 }),
+      green: new THREE.MeshStandardMaterial({ color: 0x2c7a32, roughness: 0.82 }),
+      bark: new THREE.MeshStandardMaterial({ color: 0x43352f, roughness: 1 }),
+      rock: new THREE.MeshStandardMaterial({ color: 0x887486, roughness: 1 }),
+      red: new THREE.MeshStandardMaterial({ color: 0xc8313b, roughness: 0.68 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xf8eef2, roughness: 0.8 }),
+      ginger: new THREE.MeshStandardMaterial({ color: 0xb7783e, roughness: 0.9 }),
+      wire: new THREE.MeshBasicMaterial({ color: 0x29212b }),
+    };
+
+    const add = (mesh, collider = false) => {
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      if (collider) this._addCollider(mesh);
+      else this.scene.add(mesh);
+      return mesh;
+    };
+    const box = (w, h, d, mat, x, y, z, collider = false, walkable = false) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      add(mesh, collider);
+      if (walkable) {
+        this.platforms.push({
+          minX: x - w / 2, maxX: x + w / 2,
+          minZ: z - d / 2, maxZ: z + d / 2,
+          y0: y + h / 2 + 0.04, y1: y + h / 2 + 0.04,
+        });
+      }
+      return mesh;
+    };
+    const cylinderBetween = (a, b, radius, mat, segments = 7) => {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.86, radius, dir.length(), segments),
+        mat
+      );
+      mesh.position.copy(a).add(b).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      return add(mesh);
+    };
+    const ramp = (minX, maxX, minZ, maxZ, y0, y1, axis, mat) => {
+      const w = maxX - minX;
+      const d = maxZ - minZ;
+      const run = axis === 'x' ? w : d;
+      const rise = y1 - y0;
+      const len = Math.hypot(run, rise);
+      const mesh = new THREE.Mesh(
+        axis === 'x' ? new THREE.BoxGeometry(len, 0.55, d) : new THREE.BoxGeometry(w, 0.55, len),
+        mat
+      );
+      mesh.position.set((minX + maxX) / 2, (y0 + y1) / 2, (minZ + maxZ) / 2);
+      const angle = Math.atan2(rise, run);
+      if (axis === 'x') mesh.rotation.z = -angle;
+      else mesh.rotation.x = angle;
+      add(mesh);
+      this.platforms.push({ minX, maxX, minZ, maxZ, y0, y1, axis });
+      return mesh;
+    };
+
+    // ── Monumental sealed gate and rear curtain wall ───────────────────────
+    box(126, 20, 5, mats.stoneDark, 0, 10, -59.5, true);
+    box(42, 30, 5.8, mats.stone, 0, 15, -57.5, true);
+    box(34, 23, 0.7, mats.recess, 0, 11.5, -54.25);
+    box(25, 18, 0.5, mats.stoneDark, 0, 9, -53.8);
+
+    // Layered gate frame and the vertical gold-lit ribs visible in the source.
+    for (const [w, h, x] of [[2.2, 25, -16], [2.2, 25, 16], [1.2, 21, -12.5], [1.2, 21, 12.5]]) {
+      box(w, h, 1.15, mats.stoneLight, x, h / 2 + 1.2, -53.6);
     }
+    for (const x of [-9.3, -6.2, 6.2, 9.3]) box(0.42, 15.5, 0.32, mats.gold, x, 8.3, -53.32);
+    box(18, 1.4, 0.9, mats.stoneLight, 0, 18.1, -53.45);
+    const gateCrown = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 12.5, 0.75, 8, 1, false, 0, Math.PI), mats.stoneLight);
+    gateCrown.rotation.x = Math.PI / 2;
+    gateCrown.rotation.z = Math.PI / 2;
+    gateCrown.position.set(0, 18.1, -53.55);
+    gateCrown.scale.set(1, 0.62, 1);
+    add(gateCrown);
+
+    // Buttresses, arrow slits, panel relief and continuous battlements.
+    for (const x of [-52, -39, -26, 26, 39, 52]) {
+      box(5.5, 23, 7.2, mats.stone, x, 11.5, -57, true);
+      box(1.5, 15, 1, mats.stoneLight, x, 10.2, -53.15);
+      box(0.75, 3.6, 0.28, mats.gold, x, 9.8, -52.55);
+    }
+    for (let x = -59; x <= 59; x += 6) {
+      box(3.2, 3.2, 4.8, x % 12 === 1 ? mats.stoneLight : mats.stone, x, 21.6, -58.6);
+    }
+
+    // The map's signature nested crescent/rib monument in front of the gate.
+    for (let i = 0; i < 7; i++) {
+      const radius = 8.5 + i * 1.18;
+      const rib = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, 0.23 + i * 0.025, 7, 48, Math.PI * 1.53),
+        i < 2 ? mats.snow : mats.stoneLight
+      );
+      rib.position.set(-1.8 + i * 0.25, 7.7, -48.2 + i * 0.42);
+      rib.rotation.z = -0.2 - i * 0.012;
+      add(rib);
+      const tipAngle = Math.PI * 1.53 - 0.02;
+      const tx = rib.position.x + Math.cos(tipAngle + rib.rotation.z) * radius;
+      const ty = rib.position.y + Math.sin(tipAngle + rib.rotation.z) * radius;
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.2, 6), mats.stoneLight);
+      tip.position.set(tx, ty, rib.position.z);
+      tip.rotation.z = 0.35;
+      add(tip);
+    }
+
+    // Central holiday wreath and bow.
+    const wreath = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.58, 8, 24), mats.green);
+    wreath.position.set(0, 11.6, -46.65);
+    add(wreath);
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2;
+      const colors = [0xff3b47, 0x49ef75, 0xffdc48, 0x57d8ff];
+      const bulbMat = new THREE.MeshBasicMaterial({ color: colors[i % colors.length] });
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), bulbMat);
+      bulb.position.set(Math.cos(a) * 2.56, Math.sin(a) * 2.56, 0.5);
+      wreath.add(bulb);
+    }
+    const bowL = box(1.65, 1.15, 0.35, mats.red, -0.8, 8.85, -46.35);
+    bowL.rotation.z = 0.45;
+    const bowR = box(1.65, 1.15, 0.35, mats.red, 0.8, 8.85, -46.35);
+    bowR.rotation.z = -0.45;
+
+    // ── Raised right-side keep, arches and playable parapet ────────────────
+    box(11, 20, 93, mats.stone, 52.5, 10, -4.5, true, true);
+    box(6.5, 5, 94, mats.stoneDark, 57.5, 22.5, -4.5, true);
+    for (let z = -45; z <= 40; z += 10) {
+      box(5.2, 3.2, 5.3, mats.stoneLight, 49.4, 21.65, z);
+    }
+    for (const z of [-39, -23, -7, 9, 25]) {
+      box(0.3, 7.3, 8.4, mats.recess, 46.82, 8.0, z);
+      box(1.35, 15.6, 1.5, mats.stoneLight, 46.45, 8.2, z - 5.0);
+      box(1.35, 15.6, 1.5, mats.stoneLight, 46.45, 8.2, z + 5.0);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.65, 6, 18, Math.PI), mats.stoneLight);
+      arch.position.set(46.55, 11.7, z);
+      arch.rotation.y = Math.PI / 2;
+      add(arch);
+    }
+    // Bridge from the keep toward the gate and a broad snow ramp onto it.
+    box(28, 2.1, 8, mats.stoneLight, 36, 16.2, -34, true, true);
+    box(28, 0.55, 0.5, mats.snow, 36, 17.55, -30.2);
+    ramp(40, 47, -4, 19, 0, 20.05, 'z', mats.stoneLight);
+    box(1.1, 6.4, 24, mats.stone, 39.45, 3.2, 7.5, true);
+
+    // Keep tower and angular crown above the right skyline.
+    box(16, 12, 17, mats.stoneDark, 50, 27, -32, true, true);
+    box(12, 6, 13, mats.stone, 50, 36, -32, true);
+    for (const x of [44, 50, 56]) {
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.1, 7, 4), mats.stoneDark);
+      spire.position.set(x, 42.5, -32);
+      spire.rotation.y = Math.PI / 4;
+      add(spire);
+    }
+
+    // ── Left canyon wall and the enclosing snow cliffs ─────────────────────
+    box(5, 20, 116, mats.rock, -60, 10, 0, true);
+    box(120, 12, 5, mats.rock, 0, 6, 60, true);
+    const cliffData = [
+      [-54, -46, 11, 15, 10], [-51, -31, 9, 12, 13], [-55, -15, 12, 18, 12],
+      [-52, 5, 10, 13, 15], [-55, 24, 11, 16, 12], [-51, 43, 8, 11, 14],
+      [-40, 54, 12, 8, 11], [-20, 57, 10, 7, 8], [20, 57, 11, 8, 9],
+    ];
+    for (let i = 0; i < cliffData.length; i++) {
+      const [x, z, sx, sy, sz] = cliffData[i];
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(3.5, 0), mats.rock);
+      rock.scale.set(sx / 7, sy / 7, sz / 7);
+      rock.position.set(x, sy * 0.44, z);
+      rock.rotation.set(i * 0.17, i * 0.41, i * 0.09);
+      add(rock);
+      this.colliders.push({
+        box: new THREE.Box3(
+          new THREE.Vector3(x - sx * 0.44, 0, z - sz * 0.44),
+          new THREE.Vector3(x + sx * 0.44, sy * 0.9, z + sz * 0.44)
+        ),
+        mesh: null,
+      });
+      const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(2.7, 1), mats.snow);
+      cap.scale.set(sx / 8, 0.48, sz / 8);
+      cap.position.set(x - 0.3, sy * 0.83, z);
+      add(cap);
+    }
+
+    // ── Snowbanks shape the three ground-level combat lanes ────────────────
+    const bankData = [
+      [-33, -38, 13, 2.6, 7, 0.12], [-18, -29, 11, 2.1, 5, -0.15],
+      [18, -25, 14, 2.4, 6, 0.18], [32, -15, 9, 2.0, 6, -0.08],
+      [-28, -2, 12, 2.2, 5, 0.1], [-7, 8, 15, 1.8, 5, -0.06],
+      [24, 18, 12, 2.1, 6, 0.18], [-29, 31, 14, 2.6, 8, -0.2],
+      [5, 42, 17, 2.0, 6, 0.08], [38, 40, 8, 2.4, 8, 0.2],
+    ];
+    for (let i = 0; i < bankData.length; i++) {
+      const [x, z, sx, sy, sz, ry] = bankData[i];
+      const bank = new THREE.Mesh(new THREE.IcosahedronGeometry(2.8, 1), i % 3 ? mats.snow : mats.snowShade);
+      bank.scale.set(sx / 5.6, sy / 5.6, sz / 5.6);
+      bank.position.set(x, sy * 0.34, z);
+      bank.rotation.set(0, ry, 0);
+      add(bank);
+      if (i === 0 || i === 2 || i === 7) {
+        this.colliders.push({
+          box: new THREE.Box3(
+            new THREE.Vector3(x - sx * 0.42, 0, z - sz * 0.42),
+            new THREE.Vector3(x + sx * 0.42, sy * 0.75, z + sz * 0.42)
+          ),
+          mesh: null,
+        });
+      }
+    }
+
+    // Angular boulder cover scattered through the basin.
+    for (const [x, z, s, r] of [
+      [-37, 14, 2.7, 0.2], [-16, 28, 2.2, 1.0], [12, 17, 2.1, 0.5],
+      [35, 30, 2.6, 0.8], [-6, -16, 1.8, 0.1], [28, -40, 2.4, 1.2],
+    ]) {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), mats.rock);
+      rock.scale.set(1.15, 0.75, 0.9);
+      rock.rotation.set(0.12, r, 0.2);
+      rock.position.set(x, s * 0.58, z);
+      add(rock);
+      this.colliders.push({
+        box: new THREE.Box3(
+          new THREE.Vector3(x - s, 0, z - s * 0.78),
+          new THREE.Vector3(x + s, s * 1.2, z + s * 0.78)
+        ),
+        mesh: null,
+      });
+      const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.82, 1), mats.snow);
+      cap.scale.set(1.05, 0.35, 0.8);
+      cap.position.set(x, s * 1.03, z);
+      add(cap);
+    }
+
+    // ── Graveyard markers across the central approach ──────────────────────
+    const graveData = [
+      [-24, 40, 0.1], [-10, 35, -0.08], [15, 37, 0.08], [29, 34, -0.12],
+      [-34, 22, 0.1], [-17, 19, -0.06], [5, 24, 0.06], [21, 8, -0.08],
+      [-24, 1, 0.12], [2, -1, -0.08], [-12, -18, 0.06], [16, -15, -0.1],
+      [-26, -33, 0.08], [8, -33, -0.04], [27, -29, 0.1],
+    ];
+    for (let i = 0; i < graveData.length; i++) {
+      const [x, z, tilt] = graveData[i];
+      const group = new THREE.Group();
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.75, 0.38), i % 3 ? mats.stoneDark : mats.stone);
+      slab.position.y = 1.15;
+      group.add(slab);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.575, 0.575, 0.38, 8, 1, false, 0, Math.PI), slab.material);
+      crown.rotation.x = Math.PI / 2;
+      crown.rotation.z = Math.PI / 2;
+      crown.position.y = 2.02;
+      group.add(crown);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.28, 0.75), mats.snowShade);
+      foot.position.y = 0.14;
+      group.add(foot);
+      group.position.set(x, 0, z);
+      group.rotation.z = tilt;
+      group.rotation.y = (i % 5 - 2) * 0.12;
+      add(group);
+      if (i % 3 === 0) {
+        this.colliders.push({
+          box: new THREE.Box3(
+            new THREE.Vector3(x - 0.65, 0, z - 0.45),
+            new THREE.Vector3(x + 0.65, 2.2, z + 0.45)
+          ),
+          mesh: null,
+        });
+      }
+    }
+
+    // ── Candy cane and gingerbread holiday props on the right bank ─────────
+    const cane = new THREE.Group();
+    const caneStem = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 7, 10), mats.white);
+    caneStem.position.y = 3.5;
+    cane.add(caneStem);
+    const caneHook = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.43, 9, 24, Math.PI), mats.white);
+    caneHook.position.set(-1.7, 7, 0);
+    caneHook.rotation.z = Math.PI;
+    cane.add(caneHook);
+    for (let y = 0.8; y < 6.9; y += 1.2) {
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.12, 5, 10), mats.red);
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.y = y;
+      cane.add(stripe);
+    }
+    cane.position.set(34, 1, 14);
+    cane.rotation.set(0.08, -0.35, -0.12);
+    add(cane);
+
+    const ginger = new THREE.Group();
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(2.1, 3.1, 0.55), mats.ginger);
+    torso.position.y = 3.1;
+    ginger.add(torso);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.65, 10), mats.ginger);
+    head.rotation.x = Math.PI / 2;
+    head.position.y = 5.3;
+    ginger.add(head);
+    cylinderBetween(new THREE.Vector3(37.4, 4, 13.7), new THREE.Vector3(40.2, 4.8, 13.7), 0.35, mats.ginger);
+    cylinderBetween(new THREE.Vector3(37.4, 4, 13.7), new THREE.Vector3(34.8, 5, 13.7), 0.35, mats.ginger);
+    ginger.position.set(37.4, 0.5, 13.7);
+    add(ginger);
+
+    // ── Bare trees and strings of colored holiday bulbs ────────────────────
+    const bulbColors = [0xff4054, 0x53ff7f, 0x42c7ff, 0xffdb45];
+    const lightString = (a, b, count = 12) => {
+      cylinderBetween(a, b, 0.035, mats.wire, 5);
+      for (let i = 0; i <= count; i++) {
+        const p = a.clone().lerp(b, i / count);
+        p.y -= Math.sin(i / count * Math.PI) * 0.45;
+        const bulb = new THREE.Mesh(
+          new THREE.ConeGeometry(0.11, 0.34, 5),
+          new THREE.MeshBasicMaterial({ color: bulbColors[i % bulbColors.length] })
+        );
+        bulb.position.copy(p);
+        bulb.rotation.z = Math.PI;
+        add(bulb);
+      }
+    };
+    const bareTree = (x, y, z, scale = 1) => {
+      const root = new THREE.Vector3(x, y, z);
+      const trunkTop = new THREE.Vector3(x + 0.4 * scale, y + 7.2 * scale, z);
+      cylinderBetween(root, trunkTop, 0.34 * scale, mats.bark);
+      const ends = [
+        new THREE.Vector3(x - 3.2 * scale, y + 10.4 * scale, z + 0.6),
+        new THREE.Vector3(x + 3.8 * scale, y + 11.2 * scale, z - 0.3),
+        new THREE.Vector3(x - 1.1 * scale, y + 13.2 * scale, z),
+      ];
+      for (let i = 0; i < ends.length; i++) {
+        const fork = new THREE.Vector3(x + (i - 1) * 0.6, y + 6.2 * scale, z);
+        cylinderBetween(fork, ends[i], 0.2 * scale, mats.bark);
+        const twig = ends[i].clone().add(new THREE.Vector3((i - 1) * 1.5, 2 * scale, (i % 2 ? 1 : -1) * scale));
+        cylinderBetween(ends[i], twig, 0.11 * scale, mats.bark, 5);
+      }
+      lightString(
+        new THREE.Vector3(x - 2.7 * scale, y + 9.7 * scale, z + 0.68),
+        new THREE.Vector3(x + 3.25 * scale, y + 10.5 * scale, z - 0.28),
+        9
+      );
+    };
+    bareTree(49, 38, -31, 0.72);
+    bareTree(50, 20.1, 22, 0.62);
+    bareTree(-39, 20, -53, 0.58);
+    bareTree(-47, 9, 38, 0.52);
+    lightString(new THREE.Vector3(-18, 19.5, -53), new THREE.Vector3(18, 19.5, -53), 25);
+    lightString(new THREE.Vector3(47, 17, -45), new THREE.Vector3(47, 17, 37), 34);
+
+    // Gentle snowfall across the full arena; low quality uses a smaller field.
+    const snowCount = Math.floor(620 * this._lod);
+    const positions = new Float32Array(snowCount * 3);
+    for (let i = 0; i < snowCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 122;
+      positions[i * 3 + 1] = 1 + Math.random() * 42;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 122;
+    }
+    const snowGeo = new THREE.BufferGeometry();
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const snow = new THREE.Points(
+      snowGeo,
+      new THREE.PointsMaterial({
+        color: 0xffffff, size: this._quality === 'high' ? 0.19 : 0.14,
+        transparent: true, opacity: 0.78, depthWrite: false,
+      })
+    );
+    snow.frustumCulled = false;
+    this.scene.add(snow);
+    this._snowfall = snow;
+  }
+
+  _buildSpawnPoints() {
+    // Winter-Graveyard starts cover the central burial ground and the two
+    // asymmetric flanks without placing anyone inside the cliffs or keep.
+    const coords = [
+      [0, 50], [-25, 44], [24, 43], [-38, 30],
+      [-12, 29], [12, 26], [31, 25], [-34, 8],
+      [-12, 6], [15, 4], [33, -3], [-30, -14],
+      [-8, -19], [17, -22], [-24, -41], [22, -43],
+    ];
+    for (const [x, z] of coords) this.spawnPoints.push(new THREE.Vector3(x, 0, z));
   }
 
   // Animate the living city: drive flying traffic along its looping paths.
   // Called every frame by Game.js (both gameplay and the menu fly-through).
   update(dt) {
     this._clock += dt;
+    if (this._snowfall) {
+      const attr = this._snowfall.geometry.attributes.position;
+      const p = attr.array;
+      for (let i = 0; i < p.length; i += 3) {
+        p[i] += dt * 0.34;
+        p[i + 1] -= dt * (2.15 + (i % 9) * 0.08);
+        if (p[i + 1] < 0.2) {
+          p[i] = (Math.random() - 0.5) * 122;
+          p[i + 1] = 38 + Math.random() * 7;
+          p[i + 2] = (Math.random() - 0.5) * 122;
+        } else if (p[i] > 61) {
+          p[i] = -61;
+        }
+      }
+      attr.needsUpdate = true;
+    }
     for (const v of this._airVehicles) {
       const g = v.group;
       if (v.kind === 'orbit') {
@@ -3797,11 +4907,21 @@ export class World {
     deck.castShadow = true;
     deck.receiveShadow = true;
     this.scene.add(deck);
-    // glowing edge trim
+    // Four narrow edge strips. The previous single full-size neon slab washed
+    // the whole platform red and hid the material underneath.
     const nm = this._neonMat(trimColor);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.08, d + 0.3), nm);
-    band.position.set(cx, y + 0.02, cz);
-    this.scene.add(band);
+    for (const z of [cz - d / 2 - 0.06, cz + d / 2 + 0.06]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.08, 0.12), nm);
+      band.position.set(cx, y + 0.02, z);
+      band.userData.noHit = true;
+      this.scene.add(band);
+    }
+    for (const x of [cx - w / 2 - 0.06, cx + w / 2 + 0.06]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, d + 0.06), nm);
+      band.position.set(x, y + 0.02, cz);
+      band.userData.noHit = true;
+      this.scene.add(band);
+    }
     // support pillar(s) down to the ground for a grounded look
     const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0c1420, roughness: 0.4, metalness: 0.8 });
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, y, 8), pillarMat);

@@ -20,7 +20,12 @@ import { GameSettings } from './GameSettings.js';
 import { DeathEffectManager } from '../effects/DeathEffects.js';
 import { getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
-import { buildPreviewCharacter, applySkinToCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
+import {
+  buildPreviewCharacter,
+  applySkinToCharacter,
+  resolveViewmodelPalette,
+  rigCharacterLimbs,
+} from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
@@ -121,6 +126,7 @@ export class Game {
       // down grounded — either way nothing in the gait has cause to react, so
       // the body would just slide to the far end. Play the jump arc over it.
       triggerHop(this._playerBody?.userData?.rig);
+      this._playerBody?.userData?.triggerTeleport?.();
     };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     // Hide FPS viewmodel during menu — it floats in the scene otherwise.
@@ -182,12 +188,12 @@ export class Game {
 
     // Cinematic spectator waypoints (pos + lookAt) for the fly-through
     this._camWpts = [
-      { p: new THREE.Vector3(-30,  9, -22), t: new THREE.Vector3(  5, 3,   0) },
-      { p: new THREE.Vector3( 18,  5, -58), t: new THREE.Vector3( -6, 4,  16) },
-      { p: new THREE.Vector3( 62, 15,  24), t: new THREE.Vector3(  0, 4, -10) },
-      { p: new THREE.Vector3(-14,  7,  62), t: new THREE.Vector3( 20, 3,   0) },
-      { p: new THREE.Vector3(  4, 22,  -3), t: new THREE.Vector3( 42, 1,  40) },
-      { p: new THREE.Vector3(-58,  6,  10), t: new THREE.Vector3( 10, 5,   0) },
+      { p: new THREE.Vector3( -8,  5,  52), t: new THREE.Vector3(  0, 11, -48) },
+      { p: new THREE.Vector3(-42,  7,  20), t: new THREE.Vector3(  3,  7, -30) },
+      { p: new THREE.Vector3(-18, 11, -10), t: new THREE.Vector3(  0, 12, -52) },
+      { p: new THREE.Vector3( 24,  8, -21), t: new THREE.Vector3(  0, 12, -49) },
+      { p: new THREE.Vector3( 40, 25,   8), t: new THREE.Vector3( 11,  5, -22) },
+      { p: new THREE.Vector3( 17, 14,  45), t: new THREE.Vector3( 31, 15, -15) },
     ];
     this._camSeg     = 0;
     this._camSegTime = 0;
@@ -266,7 +272,7 @@ export class Game {
     }, 2000);
   }
 
-  // Show the map-loading card (IRON-BASTION + map name) over the fly-through,
+  // Show the Winter-Graveyard loading card over the fly-through,
   // then reveal the main menu GUI.
   _runMapIntro() {
     const el = document.getElementById('map-loading');
@@ -275,7 +281,7 @@ export class Game {
       const mode    = document.getElementById('ml-mode');
       const players = document.getElementById('ml-players');
       const tip     = document.getElementById('ml-tip');
-      if (region)  region.textContent  = 'Bastion Sector';
+      if (region)  region.textContent  = 'Arctic Sector';
       if (mode)    mode.textContent     = 'Loading map…';
       if (players) players.textContent  = 'Spectating';
       if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
@@ -426,6 +432,7 @@ export class Game {
 
   _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {
     this.kills++;
+    this.hud.showKillConfirm(headshot, 100 * rewardMult);
     this.matchStats.currentStreak++;
     this.matchStats.bestStreak = Math.max(this.matchStats.bestStreak, this.matchStats.currentStreak);
     const hsTag    = headshot  ? '  🎯 HEADSHOT!' : '';
@@ -528,6 +535,9 @@ export class Game {
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.previewCharacter.visible = true;
     this.world.scene.add(this.previewCharacter);
+    this.weaponSystem.setArmAppearance(resolveViewmodelPalette(
+      this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin
+    ));
   }
 
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
@@ -535,8 +545,11 @@ export class Game {
     this.audio.resume();
     this.selectedSkin      = getSkin(skinId);
     this.selectedArmorSkin = getArmorSkin(Shop.getEquipped());
+    this.selectedArmorType = armorTypeId || this.selectedArmorType || 'vanguard';
     applySkinToCharacter(this.previewCharacter, this.selectedSkin, this.selectedArmorSkin);
-    this.weaponSystem.setSkin(this.selectedSkin);
+    this.weaponSystem.setArmAppearance(resolveViewmodelPalette(
+      this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin
+    ));
 
     // Equip exactly the chosen gun + melee for this match.
     this.weaponSystem.setLoadout(Loadout.getGun(), Loadout.getMelee());

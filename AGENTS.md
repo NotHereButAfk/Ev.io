@@ -11,10 +11,12 @@ Read those for orientation. Read THIS for the rules that stop us breaking each
 other's work.
 
 `docs/REFERENCE-EVIO.md` records what we do and don't actually know about
-ev.io, the reference game. **No agent here can reach it** — the proxy refuses
-`ev.io:443` — so anything you "know" about it is untestable training data.
-Don't state ev.io behaviour as fact unless that file marks it [known] or the
-owner told you; say "our design choice" instead.
+ev.io, the reference game. A Jul 2026 Codex browser session reached official
+map pages plus third-party gameplay stills and embedded videos; the exact
+sources and limits are recorded there. Visual evidence still does not verify
+movement or weapon constants. Don't state ev.io behaviour as fact unless that
+file marks it [known]/[verified] or the owner told you; say "our design choice"
+instead.
 
 ---
 

@@ -81,6 +81,12 @@ const PALETTES = {
               steel: 0x8f9099, bone: 0x6f7078, glow: 0xff2f26, bulk: 0.92 },   // dark graphite
 };
 
+// Shared with the first-person viewmodel so the arm seen by the owner uses the
+// same armour/frame/joint/accent colours as their third-person cyborg.
+export function getLowPolyPalette(id) {
+  return PALETTES[id] || PALETTES.vanguard;
+}
+
 function _mats(pal) {
   // Body materials carry a self-emissive floor so cel shadows keep their hue
   // instead of crushing to black on large flat plates under ACES tone mapping.

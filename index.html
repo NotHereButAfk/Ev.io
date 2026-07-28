@@ -468,8 +468,8 @@
     <!-- ===================== MAP LOADING SCREEN (ev.io style) ===================== -->
     <div id="map-loading" class="hidden">
       <div class="ml-panel">
-        <div class="ml-name">IRON-<br/>BASTION</div>
-        <div class="ml-region">Auto</div>
+        <div class="ml-name">WINTER-<br/>GRAVEYARD</div>
+        <div class="ml-region" id="ml-region">Arctic Sector</div>
         <div class="ml-mode" id="ml-mode">Deathmatch</div>
         <div class="ml-players" id="ml-players">8 players</div>
         <div class="ml-tip" id="ml-tip">TIP: press Q to blink-teleport forward</div>
@@ -510,6 +510,11 @@
         <span></span><span></span><span></span><span></span>
       </div>
       <div id="hitmarker"></div>
+      <div id="kill-confirm" class="hidden" aria-live="polite">
+        <span class="kill-confirm-icon" aria-hidden="true">&#9760;</span>
+        <span id="kill-confirm-title">ELIMINATION</span>
+        <span id="kill-confirm-score">+100</span>
+      </div>
       <div id="damage-flash"></div>
       <!-- Directional damage arcs: which way the shot that just hit you came
            from. Rotated around the crosshair by HUD.showDamageFrom(). -->
@@ -552,7 +557,13 @@
       <div id="weapon-wrap" class="hud-panel">
         <div id="weapon-name">SIDEARM</div>
         <div id="ammo-text">12 / 60</div>
-        <div id="reload-text" class="hidden">RELOADING...</div>
+        <div id="reload-text" class="hidden">
+          <div class="reload-copy">
+            <span>RELOADING</span>
+            <span id="reload-time">0.0s</span>
+          </div>
+          <div class="reload-track"><div id="reload-progress"></div></div>
+        </div>
       </div>
 
       <div id="score-wrap" class="hud-panel">
@@ -612,7 +623,7 @@
     <div id="leaderboard-overlay" class="hidden">
       <div class="lb-panel">
         <div class="lb-winner"><span id="lb-winner-name">SPARTAN</span> <span class="lb-won">WON</span></div>
-        <div class="lb-match-over-sub">FREE FOR ALL &bull; IRON-BASTION</div>
+        <div class="lb-match-over-sub">FREE FOR ALL &bull; WINTER-GRAVEYARD</div>
         <div class="lb-tabs" role="tablist" aria-label="Match results">
           <button class="lb-tab active" type="button" data-lb-tab="leaderboard">LEADERBOARD</button>
           <button class="lb-tab" type="button" data-lb-tab="earn">EARN</button>

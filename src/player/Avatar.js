@@ -20,8 +20,6 @@ import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 // controller, or a network snapshot of somebody else — makes no difference.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const _v = new THREE.Vector3();
-
 // How much of your look-pitch the body shows. Not 1.0: a real shooter's head
 // and spine absorb part of it, and pinning the rifle to the full ±90° makes
 // the arms invert when someone looks at their feet.
@@ -48,6 +46,7 @@ export class Avatar {
     // Yaw-first, so the run lean pitches about the body's own axis.
     this.group.rotation.order = 'YXZ';
     scene.add(this.group);
+    this._baseScale = this.group.scale.clone();
 
     this.weaponId = null;
     this.weapon   = null;
@@ -62,6 +61,12 @@ export class Avatar {
     this._prevPos = new THREE.Vector3();
     this._hasPrev = false;
     this._lastDirPos = new THREE.Vector3();
+    this._alive = true;
+    this._dying = false;
+    this._deathT = 0;
+    this._deathSide = this.group.id % 2 ? 1 : -1;
+    this._spawnT = 0;
+    this._firePulseT = 0;
   }
 
   setWeapon(id) {
@@ -106,25 +111,79 @@ export class Avatar {
    */
   update(dt, s) {
     const g = this.group;
-    if (s.alive === false) { g.visible = false; return; }
+    const alive = s.alive !== false;
+
+    // Keep a body on screen long enough for a kill to read. The server already
+    // owns alive/dead state; this visual fall never changes collision, timing,
+    // or respawn authority.
+    if (!alive) {
+      if (this._alive) {
+        this._dying = true;
+        this._deathT = 0;
+        this._deathSide *= -1;
+        this._firePulseT = 0;
+        this._kick = 0;
+        this._aimHold = 0;
+      }
+      this._alive = false;
+      this._hasPrev = false;
+      if (!this._dying) { g.visible = false; return; }
+
+      this._deathT += dt;
+      const p = THREE.MathUtils.clamp(this._deathT / 0.72, 0, 1);
+      const fall = 1 - Math.pow(1 - p, 3);
+      g.visible = true;
+      g.position.set(
+        s.position.x + this._deathSide * fall * 0.16,
+        s.position.y - fall * 0.48,
+        s.position.z
+      );
+      g.rotation.x = 0;
+      g.rotation.z = this._deathSide * fall * 1.28;
+      g.scale.copy(this._baseScale).multiplyScalar(1 - fall * 0.04);
+      if (p >= 1) {
+        this._dying = false;
+        g.visible = false;
+      }
+      return;
+    }
+
+    if (!this._alive) {
+      this._alive = true;
+      this._spawnT = 0.42;
+      this._hasPrev = false;
+      g.rotation.x = 0;
+      g.rotation.z = 0;
+      g.userData?.triggerTeleport?.();
+    }
     g.visible = true;
 
     // Speed: measured from movement when not supplied, so a network snapshot
     // animates identically to a local controller without sending a velocity.
+    let moveX = 0, moveZ = 0;
+    if (this._hasPrev && dt > 0) {
+      moveX = (s.position.x - this._prevPos.x) / dt;
+      moveZ = (s.position.z - this._prevPos.z) / dt;
+    }
     let speed = s.speed;
-    let jumped = 0;
-    if (this._hasPrev) {
-      _v.copy(s.position).sub(this._prevPos); _v.y = 0;
-      jumped = _v.length();
-      if (speed === undefined) speed = dt > 0 ? jumped / dt : 0;
-    } else if (speed === undefined) speed = 0;
+    if (speed === undefined) speed = Math.hypot(moveX, moveZ);
+    // The RAW per-frame step, not the per-second speed above. A jump of metres
+    // in a single frame is a blink or a teleport pad, not running: measuring
+    // speed off it reads as an absurd sprint for one frame and the body slides
+    // the whole way. Play the jump arc over it instead.
+    const stepped = this._hasPrev ? Math.hypot(moveX, moveZ) * dt : 0;
     this._prevPos.copy(s.position);
     this._hasPrev = true;
+    if (stepped > TELEPORT_STEP) { speed = 0; this.hop(); }
 
-    // A jump of metres in one frame is a blink or a teleport pad, not running.
-    // Measuring speed off it would read as a huge sprint for one frame, and the
-    // body would slide the whole way; play the jump arc over it instead.
-    if (jumped > TELEPORT_STEP) { speed = 0; this.hop(); }
+    if (this._spawnT > 0) {
+      this._spawnT = Math.max(0, this._spawnT - dt);
+      const p = 1 - this._spawnT / 0.42;
+      const settle = p * p * (3 - 2 * p);
+      g.scale.copy(this._baseScale).multiplyScalar(1 + (1 - settle) * 0.08);
+    } else {
+      g.scale.copy(this._baseScale);
+    }
 
     const grounded = s.grounded !== false;
     const moving   = speed > 0.6 && grounded;
@@ -147,8 +206,18 @@ export class Avatar {
     if (this.isHuman) {
       const ud = g.userData;
       g.position.copy(s.position);
-      ud.setLocomotion?.(speed, grounded, !!s.sprint, 0);
+      const viewYaw = s.yaw || 0;
+      const cs = Math.cos(viewYaw), sn = Math.sin(viewYaw);
+      const strafe = speed > 0.2
+        ? -(moveX * cs - moveZ * sn) / Math.max(1, speed)
+        : 0;
+      ud.setLocomotion?.(speed, grounded, !!s.sprint, strafe);
       ud.setAim?.(s.pitch || 0, 0);
+      this._firePulseT = Math.max(0, this._firePulseT - dt);
+      if (s.firing && this._firePulseT <= 0) {
+        ud.triggerFire?.(1);
+        this._firePulseT = 0.09;
+      }
       ud.mixer?.update(dt);
       ud.armorTick?.(dt);
       return;
@@ -208,6 +277,11 @@ export class Avatar {
     // Shoulder the rifle while firing, drift back to the patrol carry after.
     this._aimHold = Math.max(0, (this._aimHold || 0) - dt);
     if (s.firing) this._aimHold = 1.1;
+    this._firePulseT = Math.max(0, this._firePulseT - dt);
+    if (s.firing && this._firePulseT <= 0) {
+      this._kick = 1;
+      this._firePulseT = 0.09;
+    }
     this._kick = Math.max(0, this._kick - dt * 7);
     const want = (this._aimHold > 0 || s.aiming) ? 1 : 0;
     this._aim += (want - this._aim) * Math.min(1, dt * 8);
