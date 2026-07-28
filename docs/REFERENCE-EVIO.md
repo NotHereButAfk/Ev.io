@@ -80,6 +80,32 @@ Visible motifs that repeat across those sources:
   segmented panels, dark technical bases, and occasional saturated red floor
   channels.
 
+Visible animation and combat-feedback cues:
+
+- **[verified]** The first-person weapon stays low-right with restrained
+  movement sway and small, responsive recoil rather than large constant bob.
+- **[verified]** Reloading is a readable state: the weapon lowers out of its
+  ready pose while a top-center progress bar advances, then returns to aim.
+- **[verified]** Hits show floating damage values. Eliminations add a central
+  skull/kill confirmation and a separate score value; headshots receive a
+  stronger central callout.
+- **[verified]** Kill-feed entries remain at the upper left while the central
+  confirmation supplies the immediate action/reward beat.
+- **[verified]** Respawn footage visibly announces a short invincibility period.
+  This is evidence for a gameplay feature, not enough evidence to invent its
+  timing or add it without server-authoritative support.
+
+These cues were checked frame-by-frame in
+[`65nU5yZxavw`](https://www.youtube.com/watch?v=65nU5yZxavw),
+[`HwdzCEbgxEQ`](https://www.youtube.com/watch?v=HwdzCEbgxEQ), and
+[`hMx-QmsWV7o`](https://www.youtube.com/watch?v=hMx-QmsWV7o) on 2026-07-27.
+
+**[ours, implemented 2026-07-27]** The game now answers those visible cues with
+a three-beat rigid-viewmodel reload, timed reload bar, viewmodel landing impulse,
+central elimination/headshot score confirmation, shared remote fire recoil,
+short visual-only death fall, and teleport-style respawn reform. Mechanics and
+server timing remain unchanged.
+
 Implementation boundary: these cues justify this project's visual treatment.
 They do **not** verify exact ev.io layouts, scale, collision, spawn locations,
 or gameplay constants.

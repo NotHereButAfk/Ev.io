@@ -510,6 +510,11 @@
         <span></span><span></span><span></span><span></span>
       </div>
       <div id="hitmarker"></div>
+      <div id="kill-confirm" class="hidden" aria-live="polite">
+        <span class="kill-confirm-icon" aria-hidden="true">&#9760;</span>
+        <span id="kill-confirm-title">ELIMINATION</span>
+        <span id="kill-confirm-score">+100</span>
+      </div>
       <div id="damage-flash"></div>
       <!-- Directional damage arcs: which way the shot that just hit you came
            from. Rotated around the crosshair by HUD.showDamageFrom(). -->
@@ -552,7 +557,13 @@
       <div id="weapon-wrap" class="hud-panel">
         <div id="weapon-name">SIDEARM</div>
         <div id="ammo-text">12 / 60</div>
-        <div id="reload-text" class="hidden">RELOADING...</div>
+        <div id="reload-text" class="hidden">
+          <div class="reload-copy">
+            <span>RELOADING</span>
+            <span id="reload-time">0.0s</span>
+          </div>
+          <div class="reload-track"><div id="reload-progress"></div></div>
+        </div>
       </div>
 
       <div id="score-wrap" class="hud-panel">

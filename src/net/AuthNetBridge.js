@@ -170,7 +170,11 @@ export class AuthNetBridge {
     for (const e of this.client.drainEvents()) {
       if (e.e === 'hit' && e.by === me) this.game.hud?.flashHitmarker?.(e.head);
       else if (e.e === 'kill') {
-        if (e.by === me) this.game.hud?.flashHitmarker?.(true);
+        if (e.by === me) {
+          this.game.hud?.flashHitmarker?.(e.head);
+          this.game.hud?.showKillConfirm?.(e.head, 100);
+          if (e.head) this.game.hud?.showHeadshotFlair?.();
+        }
         const tag = e.head ? ' 🎯' : '';
         this.game.hud?.addKillFeed?.(`${e.byName} eliminated ${e.victimName}${tag}`);
       }

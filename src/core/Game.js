@@ -116,6 +116,7 @@ export class Game {
     this.player.onTeleport = () => {
       this.audio.playTeleport();
       this.hud.flashTeleport();
+      this._playerBody?.userData?.triggerTeleport?.();
     };
     this.weaponSystem = new WeaponSystem(this.player.camera, this.world.scene, this.audio);
     // Hide FPS viewmodel during menu — it floats in the scene otherwise.
@@ -421,6 +422,7 @@ export class Game {
 
   _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {
     this.kills++;
+    this.hud.showKillConfirm(headshot, 100 * rewardMult);
     this.matchStats.currentStreak++;
     this.matchStats.bestStreak = Math.max(this.matchStats.bestStreak, this.matchStats.currentStreak);
     const hsTag    = headshot  ? '  🎯 HEADSHOT!' : '';

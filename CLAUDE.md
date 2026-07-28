@@ -67,6 +67,10 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
+  `Avatar.js` is the shared local/remote visible-state path: snapshot movement
+  drives speed and strafe, automatic fire produces repeated recoil, death holds
+  a short fall instead of popping out, and respawn triggers the same reform beat
+  used by teleporting human bodies.
 - `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
   loader + procedural builders). The arsenal's models are **Blender-authored
   GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers — box/cyl/row +
@@ -85,7 +89,8 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   armor + gun skins only (no sword skins). Viewmodel mount is scaled 0.74.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
-  (green/cyan/amber bars, coin popups, weapon wheel), `Nameplates.js`,
+  (green/cyan/amber bars, coin popups, weapon wheel, top-center reload progress,
+  and central elimination/headshot confirmation), `Nameplates.js`,
   `DamageNumbers.js`, `WeaponThumbnails.js` (renders skinned guns to dataURLs).
 - `public/*.glb` — soldier, player, spartan, weapons, zombie models.
 - `src/core/NetClient.js` — optional WebSocket client for the 24/7 match

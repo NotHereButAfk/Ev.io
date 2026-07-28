@@ -15,6 +15,8 @@ export class HUD {
     this.weaponName  = document.getElementById('weapon-name');
     this.ammoText    = document.getElementById('ammo-text');
     this.reloadText  = document.getElementById('reload-text');
+    this.reloadProgress = document.getElementById('reload-progress');
+    this.reloadTime     = document.getElementById('reload-time');
     this.killCount   = document.getElementById('kill-count');
     this.scoreCount  = document.getElementById('score-count');
     this.serverPop      = document.getElementById('server-pop');
@@ -22,6 +24,9 @@ export class HUD {
     this.serverPopMax   = document.getElementById('server-pop-max');
     this.weaponSlots = document.getElementById('weapon-slots');
     this.hitmarker   = document.getElementById('hitmarker');
+    this.killConfirm      = document.getElementById('kill-confirm');
+    this.killConfirmTitle = document.getElementById('kill-confirm-title');
+    this.killConfirmScore = document.getElementById('kill-confirm-score');
     this.damageFlash = document.getElementById('damage-flash');
     this.killfeed    = document.getElementById('killfeed');
     this.modeInfo    = document.getElementById('mode-info');
@@ -35,6 +40,7 @@ export class HUD {
     this._abilityQ         = document.getElementById('ability-q');
     this._joinNotification = document.getElementById('join-notification');
     this._hitmarkerTimeout    = null;
+    this._killConfirmTimeout  = null;
     this._damageTimeout       = null;
     this._waveBannerTimer     = null;
     this._streakTimeout       = null;
@@ -186,6 +192,13 @@ export class HUD {
       ? '∞'
       : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
     this.reloadText.classList.toggle('hidden', !weaponInfo.isReloading);
+    if (this.reloadProgress) {
+      const reloadPct = Math.max(0, Math.min(1, weaponInfo.reloadProgress || 0));
+      this.reloadProgress.style.width = `${reloadPct * 100}%`;
+    }
+    if (this.reloadTime) {
+      this.reloadTime.textContent = `${Math.max(0, weaponInfo.reloadRemaining || 0).toFixed(1)}s`;
+    }
 
     this.killCount.textContent  = kills;
     this.scoreCount.textContent = score;
@@ -205,6 +218,21 @@ export class HUD {
     if (headshot) this.hitmarker.classList.add('headshot');
     clearTimeout(this._hitmarkerTimeout);
     this._hitmarkerTimeout = setTimeout(() => this.hitmarker.classList.remove('show', 'headshot'), 160);
+  }
+
+  showKillConfirm(headshot = false, points = 100) {
+    if (!this.killConfirm) return;
+    clearTimeout(this._killConfirmTimeout);
+    this.killConfirmTitle.textContent = headshot ? 'HEADSHOT' : 'ELIMINATION';
+    this.killConfirmScore.textContent = `+${Math.round(points)}`;
+    this.killConfirm.classList.remove('hidden', 'show', 'headshot');
+    void this.killConfirm.offsetWidth;
+    this.killConfirm.classList.add('show');
+    if (headshot) this.killConfirm.classList.add('headshot');
+    this._killConfirmTimeout = setTimeout(() => {
+      this.killConfirm.classList.remove('show', 'headshot');
+      this.killConfirm.classList.add('hidden');
+    }, 1150);
   }
 
   showHeadshotFlair() {
