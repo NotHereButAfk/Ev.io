@@ -110,6 +110,7 @@ export class Player {
     this._staminaRegenDelay = 0;
     this._shieldRegenDelay  = 0;
     this.position.copy(position);
+    if (Number.isFinite(position.spawnYaw)) this.yaw = position.spawnYaw;
     this.velocity.set(0, 0, 0);
     this.recoilPitch = 0; this.recoilPitchVel = 0;
     this.recoilYaw = 0;   this.recoilYawVel = 0;

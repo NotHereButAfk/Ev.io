@@ -1,7 +1,10 @@
 import * as THREE from 'three';
+import { Capsule } from 'three/addons/math/Capsule.js';
+import { Octree } from 'three/addons/math/Octree.js';
 import { GameSettings } from '../core/GameSettings.js';
+import { loadEvMap } from './EvMapLoader.js';
 
-const ARENA_HALF = 62;
+const ARENA_HALF = 128;
 const TAXI_YELLOW = 0xffcf3d;
 
 const _boxHit = new THREE.Vector3();   // scratch for raycastBoxHit()
@@ -550,6 +553,15 @@ export class World {
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
     this.spawnPoints = [];
+    this.usesMeshCollision = true;
+    this._mapOctree = null;
+    this._mapBounds = null;
+    this._groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+    this._playerCapsule = new Capsule(
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      0.45,
+    );
 
     // a few shared facade textures to keep memory sane
     this._facadeTex = [0, 1, 2, 3, 4, 5].map((i) => makeFacadeTexture(i));
@@ -650,28 +662,43 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // Official ev.io Daytime Rook (node 755): interlocking dark monoliths,
-    // suspended masses, recessed stairs and compact multilevel combat lanes.
+    // Official ev.io Daytime Rook (node 755). Its native binary is decoded
+    // below; no procedural arena geometry is active.
     this._buildLighting();
-    this._buildGround();
-    this._buildSky();
-    this._buildRookArena();
-    this._buildSpawnPoints();
+    this.spawnPoints.push(new THREE.Vector3(0, 3, 0));
+    this.previewPedestalPos = new THREE.Vector3(0, 3, 0);
+    this.ready = this._loadOfficialRook();
+  }
 
-    this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
+  async _loadOfficialRook() {
+    const map = await loadEvMap('/maps/RookLit_0.evmap');
+    this.scene.add(map.root);
+    this._evMapRoot = map.root;
+    this._evMapColliderRoot = map.colliderRoot;
+    this._raycastMeshes = map.raycastMeshes;
+    this._mapOctree = new Octree().fromGraphNode(map.colliderRoot);
+    this._mapBounds = map.bounds;
 
-    // Lock world matrix on every static mesh built above so Three.js skips
-    // recomputing it on every frame. Dynamic objects (bots, player, pickups)
-    // are added later by Game.js and are not affected.
-    this.scene.traverse((obj) => {
-      if (obj.isMesh && obj.matrixAutoUpdate) {
-        obj.matrixAutoUpdate = false;
-        obj.updateMatrix();
+    if (map.spawnPoints.length) this.spawnPoints = map.spawnPoints;
+    const maxXZ = Math.max(
+      Math.abs(map.bounds.min.x),
+      Math.abs(map.bounds.max.x),
+      Math.abs(map.bounds.min.z),
+      Math.abs(map.bounds.max.z),
+    );
+    this.arenaHalf = Math.ceil(maxXZ + 4);
+
+    const previewSpawn = this.spawnPoints.find((p) => p.y <= 3.1) ?? this.spawnPoints[0];
+    this.previewPedestalPos.copy(previewSpawn);
+
+    map.root.traverse((object) => {
+      if (object.isMesh && object.matrixAutoUpdate) {
+        object.matrixAutoUpdate = false;
+        object.updateMatrix();
       }
     });
-    // Re-enable matrix updates on meshes we animate every frame (the lock above
-    // would otherwise freeze their spin).
-    for (const r of this._spinRings) r.mesh.matrixAutoUpdate = true;
+
+    return map;
   }
 
   _buildLighting() {
@@ -5344,6 +5371,20 @@ export class World {
   // ground floor.
   groundHeightAt(x, z, prevY, newY) {
     const STEP_UP = 0.55, GRACE = 0.06;
+    if (this._mapOctree) {
+      const originY = Math.max(prevY, newY) + STEP_UP + GRACE;
+      this._groundRay.origin.set(x, originY, z);
+      const hit = this._mapOctree.rayIntersect(this._groundRay);
+      if (hit) {
+        const normal = hit.triangle.getNormal(_boxHit);
+        const top = hit.position.y;
+        const crossed = prevY >= top - GRACE && newY <= top + GRACE;
+        const stepping = newY <= top + STEP_UP && newY >= top - 0.8;
+        if (normal.y > 0.35 && (crossed || stepping)) return top;
+      }
+      return -100;
+    }
+
     let support = 0;
     for (const p of this.platforms) {
       if (x < p.minX || x > p.maxX || z < p.minZ || z > p.maxZ) continue;
@@ -5383,7 +5424,13 @@ export class World {
   }
 
   randomSpawnPoint() {
-    return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)].clone();
+    return this._cloneSpawn(this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)]);
+  }
+
+  _cloneSpawn(point) {
+    const clone = point.clone();
+    if (Number.isFinite(point.spawnYaw)) clone.spawnYaw = point.spawnYaw;
+    return clone;
   }
 
   /**
@@ -5403,7 +5450,7 @@ export class World {
       return { p, nearest };
     }).sort((a, b) => b.nearest - a.nearest);
     const top = scored.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
-    return top[Math.floor(Math.random() * top.length)].p.clone();
+    return this._cloneSpawn(top[Math.floor(Math.random() * top.length)].p);
   }
 
   // ── Shooting against the world ──────────────────────────────────────────────
@@ -5452,6 +5499,16 @@ export class World {
 
   /** Resolve horizontal collisions for the player/bot capsule against box colliders. */
   resolveCollisions(position, radius) {
+    if (this._mapOctree) {
+      const capsule = this._playerCapsule;
+      capsule.radius = radius;
+      capsule.start.set(position.x, position.y + radius, position.z);
+      capsule.end.set(position.x, position.y + 1.7 - radius, position.z);
+      const hit = this._mapOctree.capsuleIntersect(capsule);
+      if (hit) position.addScaledVector(hit.normal, hit.depth);
+      return position;
+    }
+
     for (const { box } of this.colliders) {
       const closestX = Math.max(box.min.x, Math.min(position.x, box.max.x));
       const closestZ = Math.max(box.min.z, Math.min(position.z, box.max.z));

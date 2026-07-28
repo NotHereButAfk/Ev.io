@@ -52,7 +52,6 @@ import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
-const SPAWN_POINT = new THREE.Vector3(0, 0, 18);
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
 const RESPAWN_DELAY = 3;
@@ -274,7 +273,7 @@ export class Game {
 
   // Show the Daytime Rook loading card over the fly-through,
   // then reveal the main menu GUI.
-  _runMapIntro() {
+  async _runMapIntro() {
     const el = document.getElementById('map-loading');
     if (el) {
       const region  = document.getElementById('ml-region');
@@ -285,12 +284,53 @@ export class Game {
       if (mode)    mode.textContent     = 'Loading map…';
       if (players) players.textContent  = 'Spectating';
       if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
-      clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
       el.classList.remove('hidden', 'ml-fade');
-      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2000);
-      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 2700);
+    }
+
+    try {
+      const map = await this.world.ready;
+      const mode = document.getElementById('ml-mode');
+      if (mode) mode.textContent = 'Map ready';
+      this.previewCharacter.position.copy(this.world.previewPedestalPos);
+      this._configureMapCamera(map);
+    } catch (error) {
+      console.error('[map] official Daytime Rook failed to load', error);
+      const mode = document.getElementById('ml-mode');
+      if (mode) mode.textContent = 'Map load failed';
+      return;
+    }
+
+    if (el) {
+      clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 650);
+      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 1200);
     }
     this._initAuth();
+  }
+
+  _configureMapCamera(map) {
+    if (map.spectatorWaypoints?.length >= 2) {
+      this._camWpts = map.spectatorWaypoints;
+      this._camSeg = 0;
+      this._camSegTime = 0;
+      return;
+    }
+    const { bounds } = map;
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+    const pad = Math.max(55, Math.min(size.x, size.z) * 0.23);
+    const height = Math.max(46, bounds.max.y + 12);
+    const target = new THREE.Vector3(center.x, 13, center.z);
+    this._camWpts = [
+      { p: new THREE.Vector3(center.x, height, bounds.max.z + pad), t: target.clone() },
+      { p: new THREE.Vector3(bounds.max.x + pad, height * 0.82, center.z), t: target.clone() },
+      { p: new THREE.Vector3(center.x, height, bounds.min.z - pad), t: target.clone() },
+      { p: new THREE.Vector3(bounds.min.x - pad, height * 0.86, center.z), t: target.clone() },
+    ];
+    this._camSeg = 0;
+    this._camSegTime = 0;
+    this.menuCamera.far = Math.max(600, Math.max(size.x, size.z) * 4);
+    this.menuCamera.updateProjectionMatrix();
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -560,7 +600,7 @@ export class Game {
     this.player.name = name;
     this.player.skin = this.selectedSkin;
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
-    this.player.respawn(SPAWN_POINT);
+    this.player.respawn(this.world.randomSpawnPoint());
     this.weaponSystem.resetState(this.player.baseFov);
     this.grenadeSystem.reset();
 
@@ -697,7 +737,7 @@ export class Game {
     sm.onRevive = () => {
       this._playerDowned = false;
       this.hud.hideDowned();
-      this.player.respawn(SPAWN_POINT);
+      this.player.respawn(this.world.randomSpawnPoint());
       this.player.health = 50;
       this.player.shield = Math.min(this.player.maxShield, this.player.maxShield * 0.3);
       this.hud.addKillFeed('REVIVED BY TEAMMATE — 50 HP');
@@ -1179,7 +1219,7 @@ export class Game {
     if (!menuOpen && !dead) {
       if (this._authNet && this._authNet.ready) {
         this._authNet.update(dt, this.input);
-      } else if (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled())) {
+      } else if (!this.world.usesMeshCollision && (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled()))) {
         if (!this.moveBridge) this.moveBridge = new MoveBridge(this.player, this.world);
         this.moveBridge.update(dt, this.input, this.world);
       } else {

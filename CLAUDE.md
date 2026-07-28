@@ -46,15 +46,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the active map is an official-image-led recreation of
-  **ev.io Daytime Rook** from [node 755](https://ev.io/node/755).
-  `_buildRookArena()` builds the complete visible composition: a huge suspended
-  left mass with an underpass, a diagonal-braced central monolith, stepped right
-  facade, distant circular gate, recessed rust-red stairs, pale panel floor,
-  gold route lamps and the page's documented Dust environment effect. The
-  proprietary `RookLit_0.evmap` was downloaded for identification but is not
-  parsed or shipped. Walkable bridges, stairs, ramps and roof surfaces are
-  registered in `platforms[]`; walls, supports and cover use `colliders[]`.
+- `src/world/World.js` — the active map is the downloaded official
+  **ev.io Daytime Rook** asset from [node 755](https://ev.io/node/755), not a
+  procedural recreation. `public/maps/RookLit_0.evmap` is decoded at runtime by
+  `src/world/EvMapLoader.js`, which implements ev.io's public version-3 binary
+  reader and builds its 43 geometry buffers, 23 materials, four embedded
+  textures, recursive scene graph, authored collision mesh and 15 player
+  spawns. `World` builds a Three.js `Octree` from that native collision mesh for
+  exact ground, capsule and weapon ray tests. `_buildRookArena()` is retained
+  only as inactive historical code and is never called.
   `_buildWinterGraveyard()` preserves the previous node-644 map for comparison.
   `_buildEvioArena()` preserves the previous Jinx-led pass for comparison.
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
