@@ -543,10 +543,9 @@ function makeBarbedWireTexture() {
 export class World {
   constructor() {
     this.scene = new THREE.Scene();
-    // Jinx and the daylight ev.io arenas use a clean blue horizon so the warm
-    // concrete silhouettes and luminous route accents stay readable at speed.
-    this.scene.background = new THREE.Color(0x78b9e7);
-    this.scene.fog = new THREE.Fog(0x8cb9d5, 150, 430);
+    // Winter-Graveyard's sunrise is warm at the horizon and mauve overhead.
+    this.scene.background = new THREE.Color(0xdba5b6);
+    this.scene.fog = new THREE.Fog(0xd8c4cd, 105, 260);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -651,14 +650,12 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // OBSERVED EV.IO ARENA: dark monumental bastions against a bright open sky,
-    // red route markings, cyan power panels, steep roof ramps, two bridge lanes,
-    // and a layered central fight space. Built from the gameplay capture rather
-    // than a literal asset rip, so the silhouette and routes are original.
+    // Official ev.io Winter-Graveyard (node 644): a snow basin framed by a
+    // monumental sealed gate, crescent ribs, graves, cliffs and a raised keep.
     this._buildLighting();
     this._buildGround();
     this._buildSky();
-    this._buildEvioArena();
+    this._buildWinterGraveyard();
     this._buildSpawnPoints();
 
     this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
@@ -678,23 +675,21 @@ export class World {
   }
 
   _buildLighting() {
-    // Bright neutral daylight is the most consistent ev.io presentation: pale
-    // sky fill, a warm key, and just enough cool rim for dark technical bases.
-    const hemi = new THREE.HemisphereLight(0xc6e6ff, 0x353039, 1.25);
+    const hemi = new THREE.HemisphereLight(0xffdfd1, 0x554956, 1.32);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff1dc, 1.15);
-    sun.position.set(-78, 118, 42);
+    const sun = new THREE.DirectionalLight(0xffd7aa, 1.45);
+    sun.position.set(72, 86, -95);
     sun.castShadow = false;
     this.scene.add(sun);
-    const skyRim = new THREE.DirectionalLight(0x72cfff, 0.34);
-    skyRim.position.set(65, 38, -62);
+    const skyRim = new THREE.DirectionalLight(0xc99ad5, 0.38);
+    skyRim.position.set(-75, 46, 54);
     skyRim.castShadow = false;
     this.scene.add(skyRim);
   }
 
   _buildGround() {
     const floor = new THREE.MeshStandardMaterial({
-      color: 0x171b22, roughness: 0.78, metalness: 0.28, envMapIntensity: 0.45,
+      color: 0xeee5ec, roughness: 1, metalness: 0, envMapIntensity: 0.22,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -703,14 +698,18 @@ export class World {
     ground.updateMatrix();
     this.scene.add(ground);
 
-    // Broad panel seams keep scale legible while sprinting across the courtyards.
-    const grid = new THREE.GridHelper(ARENA_HALF * 2, 32, 0x3b4654, 0x242b34);
-    grid.position.y = 0.025;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.34;
-    grid.matrixAutoUpdate = false;
-    grid.updateMatrix();
-    this.scene.add(grid);
+    // Sparse mauve wind streaks keep the otherwise white floor readable.
+    const drift = new THREE.MeshBasicMaterial({ color: 0xcbbcc8, transparent: true, opacity: 0.22 });
+    for (const [x, z, w, r] of [
+      [-28, 19, 22, -0.12], [9, 31, 30, 0.08], [-4, -10, 26, -0.04],
+      [27, -24, 18, 0.14], [-31, -35, 16, 0.05],
+    ]) {
+      const streak = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.32), drift);
+      streak.rotation.x = -Math.PI / 2;
+      streak.rotation.z = r;
+      streak.position.set(x, 0.025, z);
+      this.scene.add(streak);
+    }
   }
 
   _buildSky() {
@@ -718,10 +717,11 @@ export class World {
     canvas.width = 16; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0, '#3f96e9');
-    grad.addColorStop(0.48, '#69b4ef');
-    grad.addColorStop(0.8, '#add8f2');
-    grad.addColorStop(1, '#e8edf0');
+    grad.addColorStop(0, '#8b6f89');
+    grad.addColorStop(0.32, '#b981aa');
+    grad.addColorStop(0.66, '#efb7a8');
+    grad.addColorStop(0.86, '#ffd8ad');
+    grad.addColorStop(1, '#fff0cf');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 16, 512);
     const texture = new THREE.CanvasTexture(canvas);
@@ -4121,14 +4121,391 @@ export class World {
     ring.position.set(x, 2.3, z); ring.rotation.x = Math.PI / 2; this.scene.add(ring);
   }
 
+  // Winter-Graveyard, rebuilt from the complete official node 644 reference.
+  // The original .evmap is a proprietary binary, so this is a geometry-level
+  // recreation of the full visible composition rather than an asset import.
+  _buildWinterGraveyard() {
+    const mats = {
+      snow: new THREE.MeshStandardMaterial({ color: 0xf2e9ef, roughness: 1 }),
+      snowShade: new THREE.MeshStandardMaterial({ color: 0xd6c8d2, roughness: 1 }),
+      stone: new THREE.MeshStandardMaterial({ color: 0x9b8294, roughness: 0.94 }),
+      stoneLight: new THREE.MeshStandardMaterial({ color: 0xb6a0ae, roughness: 0.92 }),
+      stoneDark: new THREE.MeshStandardMaterial({ color: 0x665365, roughness: 0.96 }),
+      recess: new THREE.MeshStandardMaterial({ color: 0x342b3b, roughness: 1 }),
+      gold: new THREE.MeshStandardMaterial({ color: 0xc99c39, roughness: 0.7, metalness: 0.18 }),
+      green: new THREE.MeshStandardMaterial({ color: 0x2c7a32, roughness: 0.82 }),
+      bark: new THREE.MeshStandardMaterial({ color: 0x43352f, roughness: 1 }),
+      rock: new THREE.MeshStandardMaterial({ color: 0x887486, roughness: 1 }),
+      red: new THREE.MeshStandardMaterial({ color: 0xc8313b, roughness: 0.68 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xf8eef2, roughness: 0.8 }),
+      ginger: new THREE.MeshStandardMaterial({ color: 0xb7783e, roughness: 0.9 }),
+      wire: new THREE.MeshBasicMaterial({ color: 0x29212b }),
+    };
+
+    const add = (mesh, collider = false) => {
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      if (collider) this._addCollider(mesh);
+      else this.scene.add(mesh);
+      return mesh;
+    };
+    const box = (w, h, d, mat, x, y, z, collider = false, walkable = false) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      add(mesh, collider);
+      if (walkable) {
+        this.platforms.push({
+          minX: x - w / 2, maxX: x + w / 2,
+          minZ: z - d / 2, maxZ: z + d / 2,
+          y0: y + h / 2 + 0.04, y1: y + h / 2 + 0.04,
+        });
+      }
+      return mesh;
+    };
+    const cylinderBetween = (a, b, radius, mat, segments = 7) => {
+      const dir = new THREE.Vector3().subVectors(b, a);
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(radius * 0.86, radius, dir.length(), segments),
+        mat
+      );
+      mesh.position.copy(a).add(b).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      return add(mesh);
+    };
+    const ramp = (minX, maxX, minZ, maxZ, y0, y1, axis, mat) => {
+      const w = maxX - minX;
+      const d = maxZ - minZ;
+      const run = axis === 'x' ? w : d;
+      const rise = y1 - y0;
+      const len = Math.hypot(run, rise);
+      const mesh = new THREE.Mesh(
+        axis === 'x' ? new THREE.BoxGeometry(len, 0.55, d) : new THREE.BoxGeometry(w, 0.55, len),
+        mat
+      );
+      mesh.position.set((minX + maxX) / 2, (y0 + y1) / 2, (minZ + maxZ) / 2);
+      const angle = Math.atan2(rise, run);
+      if (axis === 'x') mesh.rotation.z = -angle;
+      else mesh.rotation.x = angle;
+      add(mesh);
+      this.platforms.push({ minX, maxX, minZ, maxZ, y0, y1, axis });
+      return mesh;
+    };
+
+    // ── Monumental sealed gate and rear curtain wall ───────────────────────
+    box(126, 20, 5, mats.stoneDark, 0, 10, -59.5, true);
+    box(42, 30, 5.8, mats.stone, 0, 15, -57.5, true);
+    box(34, 23, 0.7, mats.recess, 0, 11.5, -54.25);
+    box(25, 18, 0.5, mats.stoneDark, 0, 9, -53.8);
+
+    // Layered gate frame and the vertical gold-lit ribs visible in the source.
+    for (const [w, h, x] of [[2.2, 25, -16], [2.2, 25, 16], [1.2, 21, -12.5], [1.2, 21, 12.5]]) {
+      box(w, h, 1.15, mats.stoneLight, x, h / 2 + 1.2, -53.6);
+    }
+    for (const x of [-9.3, -6.2, 6.2, 9.3]) box(0.42, 15.5, 0.32, mats.gold, x, 8.3, -53.32);
+    box(18, 1.4, 0.9, mats.stoneLight, 0, 18.1, -53.45);
+    const gateCrown = new THREE.Mesh(new THREE.CylinderGeometry(12.5, 12.5, 0.75, 8, 1, false, 0, Math.PI), mats.stoneLight);
+    gateCrown.rotation.x = Math.PI / 2;
+    gateCrown.rotation.z = Math.PI / 2;
+    gateCrown.position.set(0, 18.1, -53.55);
+    gateCrown.scale.set(1, 0.62, 1);
+    add(gateCrown);
+
+    // Buttresses, arrow slits, panel relief and continuous battlements.
+    for (const x of [-52, -39, -26, 26, 39, 52]) {
+      box(5.5, 23, 7.2, mats.stone, x, 11.5, -57, true);
+      box(1.5, 15, 1, mats.stoneLight, x, 10.2, -53.15);
+      box(0.75, 3.6, 0.28, mats.gold, x, 9.8, -52.55);
+    }
+    for (let x = -59; x <= 59; x += 6) {
+      box(3.2, 3.2, 4.8, x % 12 === 1 ? mats.stoneLight : mats.stone, x, 21.6, -58.6);
+    }
+
+    // The map's signature nested crescent/rib monument in front of the gate.
+    for (let i = 0; i < 7; i++) {
+      const radius = 8.5 + i * 1.18;
+      const rib = new THREE.Mesh(
+        new THREE.TorusGeometry(radius, 0.23 + i * 0.025, 7, 48, Math.PI * 1.53),
+        i < 2 ? mats.snow : mats.stoneLight
+      );
+      rib.position.set(-1.8 + i * 0.25, 7.7, -48.2 + i * 0.42);
+      rib.rotation.z = -0.2 - i * 0.012;
+      add(rib);
+      const tipAngle = Math.PI * 1.53 - 0.02;
+      const tx = rib.position.x + Math.cos(tipAngle + rib.rotation.z) * radius;
+      const ty = rib.position.y + Math.sin(tipAngle + rib.rotation.z) * radius;
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.2, 6), mats.stoneLight);
+      tip.position.set(tx, ty, rib.position.z);
+      tip.rotation.z = 0.35;
+      add(tip);
+    }
+
+    // Central holiday wreath and bow.
+    const wreath = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.58, 8, 24), mats.green);
+    wreath.position.set(0, 11.6, -46.65);
+    add(wreath);
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2;
+      const colors = [0xff3b47, 0x49ef75, 0xffdc48, 0x57d8ff];
+      const bulbMat = new THREE.MeshBasicMaterial({ color: colors[i % colors.length] });
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), bulbMat);
+      bulb.position.set(Math.cos(a) * 2.56, Math.sin(a) * 2.56, 0.5);
+      wreath.add(bulb);
+    }
+    const bowL = box(1.65, 1.15, 0.35, mats.red, -0.8, 8.85, -46.35);
+    bowL.rotation.z = 0.45;
+    const bowR = box(1.65, 1.15, 0.35, mats.red, 0.8, 8.85, -46.35);
+    bowR.rotation.z = -0.45;
+
+    // ── Raised right-side keep, arches and playable parapet ────────────────
+    box(11, 20, 93, mats.stone, 52.5, 10, -4.5, true, true);
+    box(6.5, 5, 94, mats.stoneDark, 57.5, 22.5, -4.5, true);
+    for (let z = -45; z <= 40; z += 10) {
+      box(5.2, 3.2, 5.3, mats.stoneLight, 49.4, 21.65, z);
+    }
+    for (const z of [-39, -23, -7, 9, 25]) {
+      box(0.3, 7.3, 8.4, mats.recess, 46.82, 8.0, z);
+      box(1.35, 15.6, 1.5, mats.stoneLight, 46.45, 8.2, z - 5.0);
+      box(1.35, 15.6, 1.5, mats.stoneLight, 46.45, 8.2, z + 5.0);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.65, 6, 18, Math.PI), mats.stoneLight);
+      arch.position.set(46.55, 11.7, z);
+      arch.rotation.y = Math.PI / 2;
+      add(arch);
+    }
+    // Bridge from the keep toward the gate and a broad snow ramp onto it.
+    box(28, 2.1, 8, mats.stoneLight, 36, 16.2, -34, true, true);
+    box(28, 0.55, 0.5, mats.snow, 36, 17.55, -30.2);
+    ramp(40, 47, -4, 19, 0, 20.05, 'z', mats.stoneLight);
+    box(1.1, 6.4, 24, mats.stone, 39.45, 3.2, 7.5, true);
+
+    // Keep tower and angular crown above the right skyline.
+    box(16, 12, 17, mats.stoneDark, 50, 27, -32, true, true);
+    box(12, 6, 13, mats.stone, 50, 36, -32, true);
+    for (const x of [44, 50, 56]) {
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.1, 7, 4), mats.stoneDark);
+      spire.position.set(x, 42.5, -32);
+      spire.rotation.y = Math.PI / 4;
+      add(spire);
+    }
+
+    // ── Left canyon wall and the enclosing snow cliffs ─────────────────────
+    box(5, 20, 116, mats.rock, -60, 10, 0, true);
+    box(120, 12, 5, mats.rock, 0, 6, 60, true);
+    const cliffData = [
+      [-54, -46, 11, 15, 10], [-51, -31, 9, 12, 13], [-55, -15, 12, 18, 12],
+      [-52, 5, 10, 13, 15], [-55, 24, 11, 16, 12], [-51, 43, 8, 11, 14],
+      [-40, 54, 12, 8, 11], [-20, 57, 10, 7, 8], [20, 57, 11, 8, 9],
+    ];
+    for (let i = 0; i < cliffData.length; i++) {
+      const [x, z, sx, sy, sz] = cliffData[i];
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(3.5, 0), mats.rock);
+      rock.scale.set(sx / 7, sy / 7, sz / 7);
+      rock.position.set(x, sy * 0.44, z);
+      rock.rotation.set(i * 0.17, i * 0.41, i * 0.09);
+      add(rock);
+      this.colliders.push({
+        box: new THREE.Box3(
+          new THREE.Vector3(x - sx * 0.44, 0, z - sz * 0.44),
+          new THREE.Vector3(x + sx * 0.44, sy * 0.9, z + sz * 0.44)
+        ),
+        mesh: null,
+      });
+      const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(2.7, 1), mats.snow);
+      cap.scale.set(sx / 8, 0.48, sz / 8);
+      cap.position.set(x - 0.3, sy * 0.83, z);
+      add(cap);
+    }
+
+    // ── Snowbanks shape the three ground-level combat lanes ────────────────
+    const bankData = [
+      [-33, -38, 13, 2.6, 7, 0.12], [-18, -29, 11, 2.1, 5, -0.15],
+      [18, -25, 14, 2.4, 6, 0.18], [32, -15, 9, 2.0, 6, -0.08],
+      [-28, -2, 12, 2.2, 5, 0.1], [-7, 8, 15, 1.8, 5, -0.06],
+      [24, 18, 12, 2.1, 6, 0.18], [-29, 31, 14, 2.6, 8, -0.2],
+      [5, 42, 17, 2.0, 6, 0.08], [38, 40, 8, 2.4, 8, 0.2],
+    ];
+    for (let i = 0; i < bankData.length; i++) {
+      const [x, z, sx, sy, sz, ry] = bankData[i];
+      const bank = new THREE.Mesh(new THREE.IcosahedronGeometry(2.8, 1), i % 3 ? mats.snow : mats.snowShade);
+      bank.scale.set(sx / 5.6, sy / 5.6, sz / 5.6);
+      bank.position.set(x, sy * 0.34, z);
+      bank.rotation.set(0, ry, 0);
+      add(bank);
+      if (i === 0 || i === 2 || i === 7) {
+        this.colliders.push({
+          box: new THREE.Box3(
+            new THREE.Vector3(x - sx * 0.42, 0, z - sz * 0.42),
+            new THREE.Vector3(x + sx * 0.42, sy * 0.75, z + sz * 0.42)
+          ),
+          mesh: null,
+        });
+      }
+    }
+
+    // Angular boulder cover scattered through the basin.
+    for (const [x, z, s, r] of [
+      [-37, 14, 2.7, 0.2], [-16, 28, 2.2, 1.0], [12, 17, 2.1, 0.5],
+      [35, 30, 2.6, 0.8], [-6, -16, 1.8, 0.1], [28, -40, 2.4, 1.2],
+    ]) {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), mats.rock);
+      rock.scale.set(1.15, 0.75, 0.9);
+      rock.rotation.set(0.12, r, 0.2);
+      rock.position.set(x, s * 0.58, z);
+      add(rock);
+      this.colliders.push({
+        box: new THREE.Box3(
+          new THREE.Vector3(x - s, 0, z - s * 0.78),
+          new THREE.Vector3(x + s, s * 1.2, z + s * 0.78)
+        ),
+        mesh: null,
+      });
+      const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(s * 0.82, 1), mats.snow);
+      cap.scale.set(1.05, 0.35, 0.8);
+      cap.position.set(x, s * 1.03, z);
+      add(cap);
+    }
+
+    // ── Graveyard markers across the central approach ──────────────────────
+    const graveData = [
+      [-24, 40, 0.1], [-10, 35, -0.08], [15, 37, 0.08], [29, 34, -0.12],
+      [-34, 22, 0.1], [-17, 19, -0.06], [5, 24, 0.06], [21, 8, -0.08],
+      [-24, 1, 0.12], [2, -1, -0.08], [-12, -18, 0.06], [16, -15, -0.1],
+      [-26, -33, 0.08], [8, -33, -0.04], [27, -29, 0.1],
+    ];
+    for (let i = 0; i < graveData.length; i++) {
+      const [x, z, tilt] = graveData[i];
+      const group = new THREE.Group();
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.75, 0.38), i % 3 ? mats.stoneDark : mats.stone);
+      slab.position.y = 1.15;
+      group.add(slab);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.575, 0.575, 0.38, 8, 1, false, 0, Math.PI), slab.material);
+      crown.rotation.x = Math.PI / 2;
+      crown.rotation.z = Math.PI / 2;
+      crown.position.y = 2.02;
+      group.add(crown);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.28, 0.75), mats.snowShade);
+      foot.position.y = 0.14;
+      group.add(foot);
+      group.position.set(x, 0, z);
+      group.rotation.z = tilt;
+      group.rotation.y = (i % 5 - 2) * 0.12;
+      add(group);
+      if (i % 3 === 0) {
+        this.colliders.push({
+          box: new THREE.Box3(
+            new THREE.Vector3(x - 0.65, 0, z - 0.45),
+            new THREE.Vector3(x + 0.65, 2.2, z + 0.45)
+          ),
+          mesh: null,
+        });
+      }
+    }
+
+    // ── Candy cane and gingerbread holiday props on the right bank ─────────
+    const cane = new THREE.Group();
+    const caneStem = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 7, 10), mats.white);
+    caneStem.position.y = 3.5;
+    cane.add(caneStem);
+    const caneHook = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.43, 9, 24, Math.PI), mats.white);
+    caneHook.position.set(-1.7, 7, 0);
+    caneHook.rotation.z = Math.PI;
+    cane.add(caneHook);
+    for (let y = 0.8; y < 6.9; y += 1.2) {
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.12, 5, 10), mats.red);
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.y = y;
+      cane.add(stripe);
+    }
+    cane.position.set(34, 1, 14);
+    cane.rotation.set(0.08, -0.35, -0.12);
+    add(cane);
+
+    const ginger = new THREE.Group();
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(2.1, 3.1, 0.55), mats.ginger);
+    torso.position.y = 3.1;
+    ginger.add(torso);
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.65, 10), mats.ginger);
+    head.rotation.x = Math.PI / 2;
+    head.position.y = 5.3;
+    ginger.add(head);
+    cylinderBetween(new THREE.Vector3(37.4, 4, 13.7), new THREE.Vector3(40.2, 4.8, 13.7), 0.35, mats.ginger);
+    cylinderBetween(new THREE.Vector3(37.4, 4, 13.7), new THREE.Vector3(34.8, 5, 13.7), 0.35, mats.ginger);
+    ginger.position.set(37.4, 0.5, 13.7);
+    add(ginger);
+
+    // ── Bare trees and strings of colored holiday bulbs ────────────────────
+    const bulbColors = [0xff4054, 0x53ff7f, 0x42c7ff, 0xffdb45];
+    const lightString = (a, b, count = 12) => {
+      cylinderBetween(a, b, 0.035, mats.wire, 5);
+      for (let i = 0; i <= count; i++) {
+        const p = a.clone().lerp(b, i / count);
+        p.y -= Math.sin(i / count * Math.PI) * 0.45;
+        const bulb = new THREE.Mesh(
+          new THREE.ConeGeometry(0.11, 0.34, 5),
+          new THREE.MeshBasicMaterial({ color: bulbColors[i % bulbColors.length] })
+        );
+        bulb.position.copy(p);
+        bulb.rotation.z = Math.PI;
+        add(bulb);
+      }
+    };
+    const bareTree = (x, y, z, scale = 1) => {
+      const root = new THREE.Vector3(x, y, z);
+      const trunkTop = new THREE.Vector3(x + 0.4 * scale, y + 7.2 * scale, z);
+      cylinderBetween(root, trunkTop, 0.34 * scale, mats.bark);
+      const ends = [
+        new THREE.Vector3(x - 3.2 * scale, y + 10.4 * scale, z + 0.6),
+        new THREE.Vector3(x + 3.8 * scale, y + 11.2 * scale, z - 0.3),
+        new THREE.Vector3(x - 1.1 * scale, y + 13.2 * scale, z),
+      ];
+      for (let i = 0; i < ends.length; i++) {
+        const fork = new THREE.Vector3(x + (i - 1) * 0.6, y + 6.2 * scale, z);
+        cylinderBetween(fork, ends[i], 0.2 * scale, mats.bark);
+        const twig = ends[i].clone().add(new THREE.Vector3((i - 1) * 1.5, 2 * scale, (i % 2 ? 1 : -1) * scale));
+        cylinderBetween(ends[i], twig, 0.11 * scale, mats.bark, 5);
+      }
+      lightString(
+        new THREE.Vector3(x - 2.7 * scale, y + 9.7 * scale, z + 0.68),
+        new THREE.Vector3(x + 3.25 * scale, y + 10.5 * scale, z - 0.28),
+        9
+      );
+    };
+    bareTree(49, 38, -31, 0.72);
+    bareTree(50, 20.1, 22, 0.62);
+    bareTree(-39, 20, -53, 0.58);
+    bareTree(-47, 9, 38, 0.52);
+    lightString(new THREE.Vector3(-18, 19.5, -53), new THREE.Vector3(18, 19.5, -53), 25);
+    lightString(new THREE.Vector3(47, 17, -45), new THREE.Vector3(47, 17, 37), 34);
+
+    // Gentle snowfall across the full arena; low quality uses a smaller field.
+    const snowCount = Math.floor(620 * this._lod);
+    const positions = new Float32Array(snowCount * 3);
+    for (let i = 0; i < snowCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 122;
+      positions[i * 3 + 1] = 1 + Math.random() * 42;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 122;
+    }
+    const snowGeo = new THREE.BufferGeometry();
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const snow = new THREE.Points(
+      snowGeo,
+      new THREE.PointsMaterial({
+        color: 0xffffff, size: this._quality === 'high' ? 0.19 : 0.14,
+        transparent: true, opacity: 0.78, depthWrite: false,
+      })
+    );
+    snow.frustumCulled = false;
+    this.scene.add(snow);
+    this._snowfall = snow;
+  }
+
   _buildSpawnPoints() {
-    // Ground-level starts sit in the open quadrants and perimeter approach lanes;
-    // nobody spawns inside a bastion base or directly on a ramp trigger.
+    // Winter-Graveyard starts cover the central burial ground and the two
+    // asymmetric flanks without placing anyone inside the cliffs or keep.
     const coords = [
-      [0, -52], [0, 52], [-58, 0], [58, 0],
-      [-18, -18], [18, -18], [-18, 21], [18, 21],
-      [-14, -42], [14, -42], [-14, 42], [14, 42],
-      [-42, -14], [-42, 14], [42, -14], [42, 14],
+      [0, 50], [-25, 44], [24, 43], [-38, 30],
+      [-12, 29], [12, 26], [31, 25], [-34, 8],
+      [-12, 6], [15, 4], [33, -3], [-30, -14],
+      [-8, -19], [17, -22], [-24, -41], [22, -43],
     ];
     for (const [x, z] of coords) this.spawnPoints.push(new THREE.Vector3(x, 0, z));
   }
@@ -4137,6 +4514,22 @@ export class World {
   // Called every frame by Game.js (both gameplay and the menu fly-through).
   update(dt) {
     this._clock += dt;
+    if (this._snowfall) {
+      const attr = this._snowfall.geometry.attributes.position;
+      const p = attr.array;
+      for (let i = 0; i < p.length; i += 3) {
+        p[i] += dt * 0.34;
+        p[i + 1] -= dt * (2.15 + (i % 9) * 0.08);
+        if (p[i + 1] < 0.2) {
+          p[i] = (Math.random() - 0.5) * 122;
+          p[i + 1] = 38 + Math.random() * 7;
+          p[i + 2] = (Math.random() - 0.5) * 122;
+        } else if (p[i] > 61) {
+          p[i] = -61;
+        }
+      }
+      attr.needsUpdate = true;
+    }
     for (const v of this._airVehicles) {
       const g = v.group;
       if (v.kind === 'orbit') {

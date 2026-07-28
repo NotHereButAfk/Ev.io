@@ -46,20 +46,17 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the active map is a **Jinx-led ev.io arena
-  recreation**, identified from the gameplay capture and rebuilt from official
-  Jinx, Rook, Depot, Vestige and Momentum visual references. `_buildEvioArena()`
-  uses warm octagonal concrete/brick towers over black ribbed server bases,
-  gold/cyan circuit panels, muted-rose bridges with narrow red edge lighting,
-  a split-height central spine, four tower roofs, asymmetric ground cover, two
-  optional grav lifts and a clear blue arena-sky silhouette. A Jul 2026
-  video/gallery pass added a segmented northern halo gate, a matte-red route
-  channel, oversized NEXUS/TRANSIT/REACTOR wayfinding, a rotating objective
-  beacon, and narrow orange/cyan flank canyons. The east/west flank spawns now
-  sit safely in those canyons instead of overlapping the skyline bases. The
-  route topology stays native to this game: every playable roof/ramp is
-  registered in `platforms[]`; solid bases and the lowered perimeter use
-  `colliders[]`.
+- `src/world/World.js` — the active map is an official-image-led recreation of
+  **ev.io Winter-Graveyard** from [node 644](https://ev.io/node/644).
+  `_buildWinterGraveyard()` builds the complete visible composition: snow basin
+  and grave field, monumental sealed rear gate, nested crescent ribs and wreath,
+  raised right-side keep and parapet, left canyon cliffs, snowbank lanes,
+  holiday props, lit bare trees, warm mauve sunrise and live snowfall. The
+  proprietary `.evmap` file was downloaded for identification but is not parsed
+  or shipped. The route topology stays native to this game: walkable keep
+  surfaces and ramps are registered in `platforms[]`; solid walls, cliffs and
+  selected cover use `colliders[]`.
+  `_buildEvioArena()` preserves the previous Jinx-led pass for comparison.
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
