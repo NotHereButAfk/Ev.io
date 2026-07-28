@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from './PreviewCharacter.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
-import { applyWalkCycle } from './Locomotion.js';
+import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
+import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // One character body, driven entirely by a state struct.
@@ -24,6 +25,11 @@ import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 // the arms invert when someone looks at their feet.
 const PITCH_FOLLOW = 0.62;
 const PITCH_LIMIT  = 0.95;    // radians (~54°)
+
+// A position jump bigger than this in a single frame can't be running — the
+// fastest anyone moves is a 9.6 m/s sprint, which is 0.16m per frame at 60Hz
+// and under 0.5m even on a badly stuttering one.
+const TELEPORT_STEP = 3.0;    // metres
 
 export class Avatar {
   /**
@@ -54,6 +60,7 @@ export class Avatar {
     this._yawInit = false;
     this._prevPos = new THREE.Vector3();
     this._hasPrev = false;
+    this._lastDirPos = new THREE.Vector3();
     this._alive = true;
     this._dying = false;
     this._deathT = 0;
@@ -86,13 +93,21 @@ export class Avatar {
   /** Recoil pulse — call when this character fires. */
   fire() { this._kick = 1; this._aimHold = 1.1; }
 
+  /** Play the jump arc — call when this character blinks or takes a pad. */
+  hop() { triggerHop(this.rig); }
+
   /**
    * @param {number} dt
    * @param {object} s  {
    *   position: Vector3, yaw, pitch, speed?, sprint?, grounded?, crouch?,
-   *   firing?, alive?
+   *   firing?, alive?, vy?, sliding?, reload?, swing?, throwing?, hit?
    * }  speed is optional — omitted, it is measured from the position delta,
    *    which is how a remote player (who only sends positions) is animated.
+   *
+   *  The action fields come in two shapes. `reload` and `swing` are 0→1
+   *  progresses owned by the weapon, passed straight through. `throwing` and
+   *  `hit` are edge-triggered: a rising edge starts a one-shot here, so a
+   *  snapshot only has to carry a boolean rather than a synchronised clock.
    */
   update(dt, s) {
     const g = this.group;
@@ -151,11 +166,15 @@ export class Avatar {
       moveZ = (s.position.z - this._prevPos.z) / dt;
     }
     let speed = s.speed;
-    if (speed === undefined) {
-      speed = Math.hypot(moveX, moveZ);
-    }
+    if (speed === undefined) speed = Math.hypot(moveX, moveZ);
+    // The RAW per-frame step, not the per-second speed above. A jump of metres
+    // in a single frame is a blink or a teleport pad, not running: measuring
+    // speed off it reads as an absurd sprint for one frame and the body slides
+    // the whole way. Play the jump arc over it instead.
+    const stepped = this._hasPrev ? Math.hypot(moveX, moveZ) * dt : 0;
     this._prevPos.copy(s.position);
     this._hasPrev = true;
+    if (stepped > TELEPORT_STEP) { speed = 0; this.hop(); }
 
     if (this._spawnT > 0) {
       this._spawnT = Math.max(0, this._spawnT - dt);
@@ -207,13 +226,53 @@ export class Avatar {
 
     this._crouch += ((s.crouch ? 1 : 0) - this._crouch) * Math.min(1, dt * 10);
 
+    // Which way this body is travelling relative to the way it is FACING —
+    // without it the legs run a forward stride while the character strafes or
+    // backpedals, and the feet travel with the body instead of planting.
+    // The body faces local -Z, so after its yaw forward is (-sin, -cos) and
+    // right is (cos, -sin).
+    const sn = Math.sin(yaw), cs = Math.cos(yaw);
+    let dirF = 1, dirR = 0;
+    if (speed > 0.6) {
+      _v.copy(s.position).sub(this._lastDirPos); _v.y = 0;
+      const m = _v.length();
+      if (m > 1e-5) {
+        dirF = (_v.x * -sn + _v.z * -cs) / m;
+        dirR = (_v.x *  cs + _v.z * -sn) / m;
+      }
+    }
+    this._lastDirPos.copy(s.position);
+
+    // One-shot actions. `swap` has no clock of its own, so notice the weapon
+    // changing; `reload` and `melee` are progresses owned by the weapon and
+    // passed straight through.
+    if (this._lastWeaponId !== undefined && this._lastWeaponId !== this.weaponId) {
+      triggerAction(this.rig, 'swap');
+    }
+    this._lastWeaponId = this.weaponId;
+    if (s.throwing && !this._wasThrowing) triggerAction(this.rig, 'throw');
+    this._wasThrowing = !!s.throwing;
+    if (s.hit && !this._wasHit) triggerAction(this.rig, 'flinch');
+    this._wasHit = !!s.hit;
+    const act = tickActions(this.rig, dt);
+
     // The stride phase is owned by applyWalkCycle and derived from `speed`.
-    const gait = applyWalkCycle(this.rig, { speed, moving, run, crouch: this._crouch, dt });
+    const gait = applyWalkCycle(this.rig, {
+      speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
+      grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
+    });
     this._walkT = gait.phase;
     g.position.set(s.position.x, s.position.y + gait.bob, s.position.z);
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
 
-    if (this.isMelee || !this.weapon) return;
+    if (this.isMelee) {
+      applyMeleeCarry(this.rig, this.weapon, {
+        swing: s.swing, moving, phase: gait.phase, run, dt,
+        throwP: act.throw, flinch: act.flinch,
+      });
+      return;
+    }
+    if (!this.weapon) return;
 
     // Shoulder the rifle while firing, drift back to the patrol carry after.
     this._aimHold = Math.max(0, (this._aimHold || 0) - dt);
@@ -238,6 +297,7 @@ export class Avatar {
     applyRifleCarry(this.rig, this.weapon, this._aim, dt, {
       swing: gait.swing + this._pitch * this._aim,
       kick:  this._kick,
+      reload: s.reload || 0, swap: act.swap, flinch: act.flinch, throwP: act.throw,
     });
   }
 

@@ -46,6 +46,10 @@ function createTracerMesh() {
   return new THREE.Mesh(geo, mat);
 }
 
+// How far in front of the eye the viewmodel sits. Far enough that no part of
+// any gun in the arsenal reaches back inside the camera's near plane.
+const VIEWMODEL_Z = -0.58;
+
 export class WeaponSystem {
   constructor(camera, scene, audio) {
     this.camera = camera;
@@ -150,7 +154,10 @@ export class WeaponSystem {
     this.weaponMount = new THREE.Object3D();
     // Tucked lower-right and scaled down so the gun frames the corner of the
     // screen instead of blocking a third of the view (ev.io-style proportion).
-    this.weaponMount.position.set(0.30, -0.28, -0.52);
+    // Held 0.58m out rather than 0.52: the stock reaches back most of that
+    // distance, and any closer put it inside the camera's near plane, where it
+    // was silently sliced away. See Player.js's near-plane note.
+    this.weaponMount.position.set(0.30, -0.28, -0.58);
     this.weaponMount.scale.setScalar(0.74);
     this.camera.add(this.weaponMount);
 
@@ -1233,23 +1240,37 @@ export class WeaponSystem {
     const bobV = Math.sin(this._bobPhase * 2) * this._bobAmt;
     const bobH = Math.sin(this._bobPhase) * this._bobAmt * 0.55;
 
+    // Reload: the gun comes down and rolls over so the mag well faces you, with
+    // a jolt as the bolt goes home. Reading the reload's OWN timer rather than
+    // starting another one keeps this in step with the audio and with the
+    // third-person body, which animates the same reload from the same number.
+    // Without it the first-person view did nothing at all through a reload —
+    // just the HUD counter and a sound.
+    const rTime = def.reloadTime || 0;
+    const reloadP = (st.isReloading && rTime > 0)
+      ? THREE.MathUtils.clamp(1 - st.reloadTimer / rTime, 0, 1) : 0;
+    const rBell = reloadP > 0 ? Math.sin(Math.PI * reloadP) : 0;
+    const rack  = reloadP > 0 ? Math.exp(-Math.pow((reloadP - 0.62) / 0.055, 2)) : 0;
+
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
     const adsShiftX    = -this.scopeT * 0.32;
     const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
-    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH;
-    const tgtY = -0.26 + sprintRaiseY + bobV - landPulse * 0.055;
+    // Reload (mine) and the landing pulse (Codex's) are independent offsets on
+    // the same mount, so they simply sum.
+    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH + 0.05 * rBell;
+    const tgtY = -0.26 + sprintRaiseY + bobV
+      - 0.17 * rBell - 0.03 * rack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
-    this._mountRot.x = expDamp(
-      this._mountRot.x,
-      this._sprintT * 0.22 + landPulse * 0.12,
-      14,
-      dt
-    );
-    this._mountRot.z = expDamp(this._mountRot.z, this._sprintT * -1.0, 14, dt);
-    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, -0.5);
+    this._mountRot.x = expDamp(this._mountRot.x,
+      this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
+    this._mountRot.z = expDamp(this._mountRot.z,
+      this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
+    // VIEWMODEL_Z, not -0.5: the stock reaches back far enough that 0.5m put it
+    // inside the camera's near plane, where it was silently sliced away.
+    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;
 

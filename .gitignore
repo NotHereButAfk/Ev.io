@@ -6,3 +6,6 @@ dist
 .env.local
 .env.*.local
 __pycache__/
+
+# scratch artifact source (published, not part of the build)
+.jump-anim.html

@@ -26,7 +26,13 @@ const COYOTE_TIME     = 0.14;
 
 export class Player {
   constructor(aspect) {
-    this.camera = new THREE.PerspectiveCamera(78, aspect, 0.05, 300);
+    // Near plane at 0.02, not 0.05: the viewmodel is held ~0.5m from the eye
+    // and its stock reaches back most of that, so at 0.05 the rear of every gun
+    // was being sliced off by the near plane — worst during a reload, which
+    // rolls the receiver toward you. The viewmodel is also pushed out far
+    // enough to clear this; both are needed. 0.02/300 keeps the depth ratio
+    // inside what a 24-bit buffer handles without z-fighting the arena.
+    this.camera = new THREE.PerspectiveCamera(78, aspect, 0.02, 300);
     this.baseFov = 78;
 
     this.position = new THREE.Vector3(0, 0, 8);

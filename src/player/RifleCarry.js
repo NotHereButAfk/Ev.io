@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyThrowArm } from './Actions.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Rifle carry — how a soldier actually holds the gun.
@@ -26,6 +27,9 @@ import * as THREE from 'three';
 // contract the poses below were fitted to).
 export const GRIP_LOCAL      = new THREE.Vector3(0, -0.12,  0.10);
 export const HANDGUARD_LOCAL = new THREE.Vector3(0, -0.02, -0.28);
+// Where the support hand goes during a reload: under the receiver, on the
+// magazine well, a little behind the handguard it just left.
+const MAG_LOCAL = new THREE.Vector3(0, -0.26, -0.02);
 
 // Both were additionally swept against the body's own collision volumes so the
 // rifle rides clear of the chest instead of sinking into it — pose-lab.html
@@ -55,6 +59,8 @@ const _qAim    = new THREE.Quaternion().setFromEuler(AIM.wr);
 const _q       = new THREE.Quaternion();
 const _qSwing  = new THREE.Quaternion();
 const _qArm    = new THREE.Quaternion();
+const _qAct    = new THREE.Quaternion();
+const _eAct    = new THREE.Euler();
 const _pos     = new THREE.Vector3();
 const _T       = new THREE.Vector3();
 const _d       = new THREE.Vector3();
@@ -100,16 +106,32 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
  * @param {THREE.Object3D} weapon  the weapon model parented to the body (or null)
  * @param {number} aim     0 = patrol carry, 1 = shouldered and aiming
  * @param {number} dt      frame delta (seconds) — unused, kept for callers
- * @param {object} [o]     { swing, kick }
+ * @param {object} [o]     { swing, kick, reload, swap, flinch, throwP }
+ *   reload/swap/flinch/throwP are 0→1 action progresses. They move the WEAPON
+ *   (and, for a reload, the support hand's target on it) — never the arms
+ *   directly, because the arms are IK'd onto wherever the weapon ends up and
+ *   posing them here as well would just fight that solve.
  */
 export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   const a    = Math.max(0, Math.min(1, aim));
   const kick = o.kick || 0;
+  const reload = o.reload || 0, swap = o.swap || 0, flinch = o.flinch || 0;
+  // 0 → 1 → 0 shapes for the actions that go somewhere and come back.
+  const reloadB = reload > 0 ? Math.sin(Math.PI * reload) : 0;
+  const swapB   = swap   > 0 ? Math.sin(Math.PI * swap)   : 0;
+  // A hit is sharp on and slow off, not symmetric.
+  const flinchB = flinch > 0
+    ? (flinch < 0.15 ? flinch / 0.15 : Math.pow(1 - (flinch - 0.15) / 0.85, 2)) : 0;
+  // Working the bolt, a third of the way through the reload.
+  const rack = reload > 0 ? Math.exp(-Math.pow((reload - 0.62) / 0.06, 2)) : 0;
+
   // Everything that moves the rifle without changing the grip rides this one
   // common-mode shoulder pitch: idle breathing / stride, recoil, and a lift
   // through the middle of the patrol→aim blend (a straight interpolation drags
   // the buttstock through the right pec on the way across).
-  const swing = (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a);
+  const swing = (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
+    // Muzzle drops while the hands are busy, and again when hit.
+    - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 
   _pos.lerpVectors(PATROL.wp, AIM.wp, a);
   // Bow the path forward through the middle of the blend so the buttstock
@@ -120,6 +142,19 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // Slerp (not euler-lerp) between the two carries — the patrol pose is a
   // large compound rotation and euler blending swings it through junk.
   _q.slerpQuaternions(_qPatrol, _qAim, a);
+
+  // Reload rolls the receiver up toward the body so the mag well faces the
+  // support hand; a swap drops the whole weapon out of frame and brings it
+  // back. Both are rotations about the weapon's own axes, applied before the
+  // shoulder swing so they read as the wrists working rather than the torso.
+  if (reloadB || swapB) {
+    _qAct.setFromEuler(_eAct.set(0.30 * reloadB - 0.70 * swapB, 0,
+                                 0.85 * reloadB + 0.30 * swapB));
+    _q.multiply(_qAct);
+    _pos.y -= 0.13 * reloadB + 0.24 * swapB;
+    _pos.x -= 0.05 * reloadB;
+  }
+  if (rack) _pos.z += 0.045 * rack;                // the bolt going back
 
   if (swing) {
     // Rigid rotation about the X axis through the shoulder line (y=SHOULDER_Y,
@@ -137,8 +172,20 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   if (rig) {
     solveArm(rig.armR, rig.elbowR,  SHOULDER_X,
              _T.copy(GRIP_LOCAL).applyQuaternion(_q).add(_pos), SWIVEL_R);
+    // The support hand leaves the handguard for the magazine and comes back.
+    // Held at the mag through the middle of the reload rather than sliding
+    // continuously, so it reads as two moves — strip, seat — not one smear.
+    if (reload > 0) {
+      const hold = Math.min(1, Math.sin(Math.PI * Math.min(1, reload * 1.18)) * 1.9);
+      _T.copy(HANDGUARD_LOCAL).lerp(MAG_LOCAL, hold);
+    } else {
+      _T.copy(HANDGUARD_LOCAL);
+    }
     solveArm(rig.armL, rig.elbowL, -SHOULDER_X,
-             _T.copy(HANDGUARD_LOCAL).applyQuaternion(_q).add(_pos), SWIVEL_L);
+             _T.applyQuaternion(_q).add(_pos), SWIVEL_L);
+    // A grenade goes in the off hand, overriding the support grip entirely —
+    // it has to be applied last or the IK above would put the hand back.
+    if (o.throwP) applyThrowArm(rig, o.throwP);
   }
 }
 

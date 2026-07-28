@@ -25,6 +25,8 @@ instead.
 ```
 npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
+npm run test:gait             # walk cycle: foot planting in every direction, jump pose
+npm run test:actions          # every action moves the body
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -69,12 +71,56 @@ Assign it (`mesh.rotation.x = gait.lean`). Do not ease it again. The returned
 `bob` was solved for that exact lean; easing toward it separately drifts the
 feet up to 5cm through the floor.
 
-**3. `applyRifleCarry()` owns both arms *and* the weapon transform.**
+**2b. `applyWalkCycle()` needs to be told which way the body is TRAVELLING.**
+Pass `dirF`/`dirR` — the velocity's components along the body's own forward
+(−Z) and right (+X), normalised. Anything that always faces where it is going
+(the bots) can omit them. A **player cannot**: they strafe and backpedal while
+still facing their aim, and without this the legs run a forward stride while
+the body slides sideways, so the feet travel with the body instead of planting
+(measured slip 1.0 strafing, 1.5 backpedalling — the "animations are running
+backwards" bug). Pass `grounded`/`vy` too, or a jump has no pose and the legs
+just freeze in mid-air. `npm run test:gait` covers all of it.
+→ Do NOT hand-tune the stride rate. It is derived from `groundPerStep()`, which
+measures the ANKLE's travel across stance off the actual pose. Not the contact
+point — that migrates heel→toe as the foot rolls, and a rolling foot is not a
+sliding one.
+
+**2d. Zombies have their own rig and their own cycle, but the same rule.**
+`Zombie._animate` advances its phase by the DISTANCE the body actually moved
+(measured from the position delta — collision resolution runs after the move,
+and a wave of them spends most of its time shouldering into each other, so
+intent and displacement come apart). The metres-per-cycle that converts one to
+the other comes from `groundPerCycle()` in `Locomotion.js`, exported for this.
+Two things had to be true before that worked, and both are easy to get wrong
+again: a knee only folds BACKWARDS (negative), and it has to bend through its
+own leg's forward swing — for a hip on `sin(t)` that is `-max(0, cos(t))`, not
+`max(0, sin(t))`, which bends it through the stance and lifts the foot exactly
+when it should be planted. Shipped, the horde covered 4% of its travel with its
+feet and skated the other 96%.
+
+**2c. If it is an ACTION, it has to animate.** Reload, weapon swap, grenade
+throw, melee swing, slide and taking a hit all shipped at some point moving
+nothing at all. Adding a new one means adding its pose, not just its effect.
+→ Continuous state (crouching, sliding, airborne) is an option on
+`applyWalkCycle`. One-shots with no clock of their own (throw, swap, flinch) go
+through `triggerAction()` / `tickActions()` in `Actions.js`. One-shots that DO
+have a clock somewhere else — a reload runs off the weapon's `reloadTimer`, a
+melee strike off its `swingPhase` — pass that progress straight through; do not
+start a second timer, it will drift out of step with the thing it depicts.
+`npm run test:actions` fails on any action whose pose is identical to not doing
+it, which is the actual failure mode: silence, not a wrong number.
+
+**3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
+`applyMeleeCarry()` owns them for a blade.
 Don't pose `armL/armR/elbowL/elbowR` anywhere else for a gun-carrying body —
 the hands are IK'd onto the grip and handguard every frame and will slide off.
 Anything that should move the rifle *without* changing the grip (breathing,
 stride, recoil, look-pitch) goes through the `swing` option, which is a
 common-mode shoulder rotation the arms follow for free.
+A blade has no IK, so `applyMeleeCarry()` derives the weapon's position FROM
+the arm angles rather than keying it alongside them. Key both separately and
+you get exactly what the first attempt at the swing did: the sword tracking a
+perfectly good arc a forearm's length away from the arm swinging it.
 
 **4. Facing conventions.** Low-poly bodies are modelled facing **−Z**; game
 forward is **+Z** → add `π` to their yaw. A weapon's muzzle is its own local

@@ -5244,3 +5244,225 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   .lb-tabs { gap: 3px; }
   .lb-tab { padding-inline: 4px; font-size: 9px; letter-spacing: .7px; }
 }
+
+/* ============================================================================
+   ===========   IN-GAME HUD — TACTICAL PASS (supersedes the block above)  ====
+   Appended last so it wins.
+
+   The HUD read as a mobile game: emoji for every icon (heart, shield, bolt,
+   bomb, globe, stopwatch), 11-12px corner radii, saturated neon gradients each
+   with its own glow, 30-34px numerals, fat 8px pill bars, and a 52px conic
+   cooldown ring floating in the middle of the screen.
+
+   This is the same information as an instrument panel instead: hairline
+   rectangles, one restrained accent, typographic labels in place of emoji,
+   thin square-ended bars, and numerals sized to be read rather than admired.
+   Layout and markup are untouched — this is purely a restyle.
+   ============================================================================ */
+
+#hud {
+  /* Opaque enough to hold against the arena's blown-out white floor — the
+     first pass sat at 0.56 and the whole HUD washed out looking down. */
+  --t-panel:  rgba(8, 11, 16, 0.78);
+  --t-line:   rgba(170, 192, 212, 0.20);
+  --t-text:   #dde5ec;
+  --t-dim:    #8e9aa7;
+  --t-hp:     #7bb98a;
+  --t-sh:     #6d95bd;
+  --t-en:     #9a9384;
+  --t-accent: #4fb8cc;
+}
+
+/* ---- panels: hairline rectangles, no glow, no blur halo ---- */
+#hud .hud-panel {
+  background: var(--t-panel) !important;
+  border: 1px solid var(--t-line) !important;
+  border-radius: 2px !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  box-shadow: none !important;
+}
+
+/* ---- bars: thin, square, unlit ---- */
+#hud .bar-bg {
+  width: 132px !important; height: 4px !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+#hud .bar-fill { border-radius: 0 !important; box-shadow: none !important; }
+#hud #health-bar  { background: var(--t-hp) !important; }
+#hud #shield-bar, #hud .shield-fill  { background: var(--t-sh) !important; }
+#hud #stamina-bar, #hud .stamina-fill { background: var(--t-en) !important; }
+
+#hud #health-text, #hud #shield-text, #hud #stamina-text {
+  color: var(--t-text) !important;
+  font-size: 13px !important; font-weight: 600 !important;
+  letter-spacing: 0.5px !important;
+  font-variant-numeric: tabular-nums;
+  /* A hard 1px drop, not a glow: it buys legibility over the bright floor
+     without the neon halo that made this look like a toy. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65) !important;
+}
+
+/* ---- emoji out, typographic labels in. The glyph is collapsed rather than
+       removed so the markup and the JS that touches it are left alone. ---- */
+#hud .hud-icon {
+  font-size: 0 !important; filter: none !important;
+  width: auto !important; min-width: 0 !important;
+}
+#hud .hud-icon::after {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.1px;
+  color: var(--t-dim);
+}
+#hud .health-icon::after  { content: 'HP'; color: var(--t-hp); }
+#hud .shield-icon::after  { content: 'SH'; color: var(--t-sh); }
+#hud .stamina-icon::after { content: 'EN'; color: var(--t-en); }
+
+#hud .grenade-icon { font-size: 0 !important; filter: none !important; }
+#hud #frag-count, #hud #smoke-count {
+  color: var(--t-text) !important; font-size: 14px !important;
+  font-weight: 600 !important; font-variant-numeric: tabular-nums;
+}
+#hud .grenade-label {
+  color: var(--t-dim) !important;
+  font-size: 8px !important; letter-spacing: 1.2px !important;
+}
+#hud .grenade-divider { background: var(--t-line) !important; }
+
+/* ---- weapon name + ammo ---- */
+#hud #weapon-name {
+  font-size: 9px !important; letter-spacing: 1.6px !important;
+  color: var(--t-dim) !important; text-shadow: none !important;
+  font-weight: 600 !important;
+}
+#hud #ammo-text {
+  font-size: 21px !important; font-weight: 600 !important;
+  color: var(--t-text) !important; letter-spacing: 0.5px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65) !important;
+}
+#hud #reload-text {
+  font-size: 9px !important; letter-spacing: 1.4px !important;
+  color: var(--t-en) !important; text-shadow: none !important;
+}
+#hud #weapon-wrap { padding: 8px 12px !important; }
+
+/* ---- weapon slots ---- */
+#hud .weapon-slot {
+  width: 34px !important; height: 34px !important;
+  border-radius: 2px !important;
+  background: var(--t-panel) !important;
+  border: 1px solid var(--t-line) !important;
+  color: var(--t-dim) !important; font-weight: 600 !important;
+  box-shadow: none !important;
+}
+#hud .weapon-slot.active {
+  border-color: var(--t-accent) !important;
+  color: var(--t-text) !important;
+  background: rgba(79, 184, 204, 0.10) !important;
+  box-shadow: none !important;
+}
+
+/* ---- score / population ---- */
+#hud #score-wrap {
+  padding: 8px 12px !important; gap: 2px !important;
+  font-size: 10px !important; letter-spacing: 1px !important;
+  color: var(--t-dim) !important;
+}
+#hud #score-wrap span { color: var(--t-text) !important; }
+#hud #server-pop { color: var(--t-dim) !important; font-size: 9px !important; }
+#hud #server-pop span { color: var(--t-text) !important; }
+
+/* ---- match timer: plain numerals, no stopwatch glyph ---- */
+#hud #dm-timer {
+  font-size: 20px !important; letter-spacing: 2px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  font-weight: 600 !important;
+  color: var(--t-text) !important;
+  padding: 4px 14px !important;
+  background: var(--t-panel) !important;
+  border: 1px solid var(--t-line) !important;
+  border-radius: 2px !important;
+  text-shadow: none !important;
+  font-variant-numeric: tabular-nums;
+}
+#hud #dm-timer::before { content: none !important; }
+#hud #dm-timer.dm-low { color: #c96a63 !important; }
+
+/* ---- killfeed ---- */
+#hud .kill-entry {
+  background: var(--t-panel) !important;
+  border: 1px solid var(--t-line) !important;
+  border-left: 2px solid var(--t-accent) !important;
+  border-radius: 2px !important;
+  color: var(--t-text) !important;
+  font-size: 11px !important; font-weight: 500 !important;
+  box-shadow: none !important;
+}
+
+/* ---- ability chip: was a 52px conic ring floating dead centre-screen, which
+       is both the most cartoonish element and the one most in the way. Now a
+       small flat chip tucked down out of the sightline, its cooldown running
+       as a line under it rather than sweeping around a dial. ---- */
+#hud .ability-indicator {
+  bottom: 74px !important;
+  width: 46px !important; height: 31px !important;
+  padding-bottom: 3px;   /* clear of the cooldown line along the bottom edge */
+  border-radius: 2px !important;
+  background: var(--t-panel) !important;
+  border: 1px solid var(--t-line) !important;
+  gap: 0 !important;
+  overflow: hidden;
+}
+#hud .ability-indicator::before { content: none !important; }
+#hud .ability-indicator::after {
+  content: ''; position: absolute; left: 0; bottom: 0; height: 2px;
+  width: calc(var(--ratio, 1) * 100%);
+  background: var(--t-accent);
+}
+#hud .ability-indicator .ability-key {
+  font-size: 12px !important; font-weight: 700 !important;
+  color: var(--t-dim) !important; text-shadow: none !important;
+}
+#hud .ability-indicator .ability-name {
+  font-size: 6px !important; letter-spacing: 0.8px !important;
+  color: var(--t-dim) !important; opacity: 0.75;
+}
+#hud .ability-indicator.ready { border-color: rgba(79, 184, 204, 0.45) !important; }
+#hud .ability-indicator.ready .ability-key {
+  color: var(--t-text) !important; text-shadow: none !important;
+}
+#hud .ability-indicator:not(.ready) { opacity: 0.7 !important; }
+
+/* ---- crosshair: drop the neon halo, keep the hard shadow that makes it
+       readable over a bright floor. The COLOUR still comes from
+       --xhair-color, which the accessibility settings drive — these
+       selectors outrank the PHASE 8 rules, so hardcoding a colour here
+       would quietly break that setting. ---- */
+#hud #crosshair span {
+  background: var(--xhair-color, rgba(226, 236, 244, 0.85)) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.9) !important;
+}
+#hud #crosshair::after {
+  background: var(--xhair-color, var(--t-accent)) !important;
+  box-shadow: none !important;
+}
+
+/* ---- menu: the same pass, where the same problems show ---------------------
+   CLICK TO PLAY is set in near-white over a fly-through of a very bright
+   arena, so on the atrium shots it is all but invisible. A plate behind it
+   rather than a heavier glow, to match the HUD. ------------------------------ */
+#center-play .click-to-play {
+  background: rgba(8, 11, 16, 0.55) !important;
+  border: 1px solid rgba(170, 192, 212, 0.20) !important;
+  border-radius: 2px !important;
+  padding: 14px 40px !important;
+  color: #e8eef4 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+#center-play .spectate-hint {
+  color: #aab6c2 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+}

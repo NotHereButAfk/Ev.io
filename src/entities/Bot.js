@@ -4,6 +4,7 @@ import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
+import { applyMeleeCarry } from '../player/Actions.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
@@ -17,6 +18,7 @@ const DETECT_RADIUS = 15;      // how far a bot will chase once provoked
 const ATTACK_RADIUS = 1.9;
 const ATTACK_DAMAGE = 7;
 const ATTACK_COOLDOWN = 1.5;
+const LUNGE_TIME = 0.2;      // how long a sword bot's strike takes to play
 const RESPAWN_DELAY = 4;
 const RADIUS = 0.5;
 // Aggro persists this long after losing sight of you, so breaking line of
@@ -516,7 +518,7 @@ export class Bot {
         }
       } else if (this.attackCooldown <= 0) {
         this.attackCooldown = ATTACK_COOLDOWN;
-        this.lungeTimer = 0.2;
+        this.lungeTimer = LUNGE_TIME;
         onAttack(ATTACK_DAMAGE);
       }
     } else {
@@ -605,12 +607,13 @@ export class Bot {
     // Runs BEFORE the weapon block so the rifle can ride this frame's stride
     // phase rather than last frame's.
     let gait = _STILL;
+    // Bots move at 2.6-3.8 m/s — a walk to a jog, nowhere near the player's
+    // 9.6 m/s sprint. Mapping that narrow band onto the full walk→sprint blend
+    // had every bot leaning into a full sprint while ambling. Hoisted out of
+    // the rig block because the melee carry below needs it too.
+    const run = THREE.MathUtils.clamp((this.speed - 3.0) / 3.0, 0, 1);
     if (this._rig) {
       const isMoving = !!moveTarget;
-      // Bots move at 2.6-3.8 m/s — a walk to a jog, nowhere near the player's
-      // 9.6 m/s sprint. Mapping that narrow band onto the full walk→sprint
-      // blend had every bot leaning into a full sprint while ambling.
-      const run = THREE.MathUtils.clamp((this.speed - 3.0) / 3.0, 0, 1);
       // applyWalkCycle owns the stride phase and locks it to ground speed.
       gait = applyWalkCycle(this._rig, { speed: isMoving ? this.speed : 0, moving: isMoving, run, dt });
       this._walkT = gait.phase;
@@ -628,22 +631,10 @@ export class Bot {
       this.mesh.position.y = this.position.y + gait.bob;
       this.mesh.rotation.x = gait.lean;        // already eased, and bob assumes it
 
-      // Sword bots free-swing the off-hand; AR bots' arms belong to the rifle
-      // (applyRifleCarry, below, poses both onto the grip and handguard).
-      if (this._isSwordBot) {
-        const { armL, armR, elbowL, elbowR } = this._rig;
-        const t = this._walkT;
-        const L = (j, tgt, k) => { if (j) j.rotation.x += (tgt - j.rotation.x) * Math.min(1, dt * k); };
-        if (isMoving) {
-          const sw = Math.sin(t) * 0.55;
-          L(armL, -sw * 0.5, 12);  L(armR, sw * 0.5, 12);
-          L(elbowL, -0.30, 8);  L(elbowR, -0.30, 8);
-        } else {
-          const breathe = Math.sin(t * 0.28) * 0.04;
-          L(armL, breathe, 4);  L(armR, breathe, 4);
-          L(elbowL, -0.14, 4);  L(elbowR, -0.14, 4);
-        }
-      }
+      // AR bots' arms belong to the rifle (applyRifleCarry, below, poses both
+      // onto the grip and handguard). Sword bots go through the shared melee
+      // carry, which also owns the blade — so it runs down with the weapon
+      // block rather than here.
     }
 
     // ── Weapon animation (procedural model only) ───────────────────────────────
@@ -673,22 +664,20 @@ export class Bot {
           swing: gait.swing, kick: this._gunKick,
         });
       } else {
-        // Sword low guard. Base pos(−0.22, 1.06, −0.24) rot(−0.70, π, 0.22).
-        // Lunge THRUSTS the blade forward (−Z is the front) and dips the tip.
-        const alertY   = this._alertBlend * 0.06;
-        const alertPX  = this._alertBlend * -0.18;
-        const lungeZ   = isLunging ? -0.16 : 0;
-        const lungePX  = isLunging ?  0.35 : 0;
-        wm.position.set(
-          -0.22 + sway * 0.3,
-          1.06  + breathe * 1.3 + alertY - bob * 0.8,
-          -0.24 + lungeZ
-        );
-        wm.rotation.set(
-          -0.70 + alertPX + lungePX,
-          0,
-          0.22 + sway * 0.5
-        );
+        // A lunge used to thrust the blade forward on its own while the arms
+        // carried on swinging with the stride — the sword moved and the bot
+        // holding it did not. Route it through the shared melee carry, which
+        // owns both, so a bot's attack reads the same as a player's.
+        const swing = isLunging
+          ? 1 - this.lungeTimer / LUNGE_TIME       // 0 → 1 across the strike
+          : 1;                                     // 1 = at rest
+        applyMeleeCarry(this._rig, wm, {
+          swing, moving: isMoving, phase: this._walkT, run, dt,
+        });
+        // Guard rises a little once it has seen you.
+        wm.position.y += this._alertBlend * 0.06 + breathe * 1.3 - bob * 0.8;
+        wm.position.x += sway * 0.3;
+        wm.rotation.z += sway * 0.5;
       }
     }
 

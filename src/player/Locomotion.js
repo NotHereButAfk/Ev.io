@@ -24,10 +24,31 @@
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-// Fraction of the geometric step length the pose actually converts into ground
-// covered. Calibrated by measuring how far the PLANTED foot drifts in world
-// space per frame and driving that to zero — the direct test for skating.
-const STEP_EFFICIENCY = 0.88;
+// How long a triggered hop takes to play out, and the vertical speed it
+// pretends to have. Roughly a real jump: 9.5 m/s under 20 m/s² is airborne for
+// about 0.95s, and a blink should read as a shorter, sharper version of that.
+export const HOP_SECONDS = 0.46;
+const HOP_PEAK = 8.5;
+
+/**
+ * Play the whole jump arc without actually leaving the ground.
+ *
+ * A blink covers 22m between one frame and the next. The character arrives
+ * grounded with no vertical speed, so nothing in the gait has any reason to
+ * react and it just slides to the far end. Same for the teleport pads, which
+ * put you down grounded by design. Call this and the body pushes off, tucks and
+ * lands as if it had jumped there.
+ *
+ * @param {object} rig
+ * @param {number} [seconds]
+ */
+export function triggerHop(rig, seconds = HOP_SECONDS) {
+  if (!rig) return;
+  rig._hopT = seconds;
+  rig._hopFor = seconds;
+  rig._airT = 0;
+  rig._airLead = undefined;      // re-pick the leading leg from the live stride
+}
 
 // ── leg geometry, straight off the low-poly model ────────────────────────────
 const HIP_Y = 1.21, KNEE_Y = 0.62, ANKLE_Y = 0.27;
@@ -37,10 +58,14 @@ const SHIN_L  = KNEE_Y - ANKLE_Y;    // 0.35
 const HEEL_Y = -0.27, HEEL_Z =  0.10;
 const TOE_Y  = -0.27, TOE_Z  = -0.20;
 
-// A sole corner's position, walking the chain ankle → knee → hip → lean.
-// Only y and z matter (every joint here is a pitch about X).
+// A sole corner's position, walking the chain ankle → knee → hip → hip-yaw →
+// body lean. The leg swings in a plane, so within it only y and z matter (every
+// joint is a pitch about X); the hip yaw then turns that plane, and the body's
+// lean — a pitch about the body's OWN x axis — mixes y with whatever is left
+// pointing down z. Skipping the yaw there floats the feet by up to 8cm at a
+// sprinting strafe, where the leg plane is turned 90° out of the lean's.
 const _sole = { y: 0, z: 0 };
-function solePos(py, pz, thigh, knee, ankle, lean) {
+function solePos(py, pz, thigh, knee, ankle, lean, hipYaw = 0) {
   let y = py, z = pz, c, s;
   c = Math.cos(ankle); s = Math.sin(ankle);
   [y, z] = [y * c - z * s, y * s + z * c];
@@ -51,50 +76,159 @@ function solePos(py, pz, thigh, knee, ankle, lean) {
   c = Math.cos(thigh); s = Math.sin(thigh);
   [y, z] = [y * c - z * s, y * s + z * c];
   y += HIP_Y;
-  _sole.y = y * Math.cos(lean) - z * Math.sin(lean);
-  _sole.z = y * Math.sin(lean) + z * Math.cos(lean);
+  const zf = hipYaw ? z * Math.cos(hipYaw) : z;      // component still along body z
+  _sole.y = y * Math.cos(lean) - zf * Math.sin(lean);
+  _sole.z = y * Math.sin(lean) + zf * Math.cos(lean);
   return _sole;
 }
-function soleY(py, pz, thigh, knee, ankle, lean) {
-  return solePos(py, pz, thigh, knee, ankle, lean).y;
+function soleY(py, pz, thigh, knee, ankle, lean, hipYaw) {
+  return solePos(py, pz, thigh, knee, ankle, lean, hipYaw).y;
 }
 
-// How far the planted foot travels from the front of its stance to the back —
-// i.e. how much ground ONE step actually covers.
+// How much ground ONE step actually covers.
 //
-// Sampled rather than solved at the extremes, and tracking whichever sole
-// corner is LOWEST at each sample, because that's the corner touching the
-// ground: the contact point migrates heel→toe across stance as the ankle
-// rolls. Measuring only the toe overestimates the step by ~30%, which sets the
-// stride rate too slow and puts the feet right back to skating.
-function stepLength(amp, kAmp, kneeBase, cHip, run) {
-  let lo = Infinity, hi = -Infinity;
-  const N = 12;
-  for (let i = 0; i <= N; i++) {
-    const p = Math.PI / 2 + (i / N) * Math.PI;        // stance half-cycle
+// This is the number the whole cycle hangs off: the stride rate is set so the
+// body travels exactly this far per half cycle, which is what keeps the planted
+// foot still. Get it wrong and the feet skate.
+//
+// It has to be MEASURED from the pose rather than solved from the extremes, and
+// the thing to measure is the ANKLE — the foot as a rigid body — across the
+// interval that foot is bearing weight. A planted foot travels backwards under
+// the body by exactly the ground the body covers, so that displacement IS the
+// step.
+//
+// Not the contact point, which is the tempting choice and the wrong one: it
+// migrates heel→toe as the ankle rolls, jumping between sole corners. A rolling
+// foot is not a sliding one — a wheel's contact point advances along the ground
+// too — so tracking it both adds jumps that aren't slip and makes the answer
+// depend on how finely you sample. The ankle moves continuously and doesn't.
+//
+// The previous analytic version took the contact point's front-to-back RANGE
+// over stance, which ignored that the point doubles back as the ankle
+// dorsiflexes to clear. That overstated the step, set the stride too slow, and
+// left the feet skating at ~45% of body speed at a walk.
+const STEP_SAMPLES = 128;
+const _stepCache = new Map();
+function groundPerStep(amp, kAmp, kneeBase, cHip, run, lean) {
+  // Depends only on the pose parameters, which change slowly — quantize and
+  // cache so this doesn't run a full sweep on every frame of every body.
+  const key = `${amp.toFixed(3)}|${kAmp.toFixed(3)}|${kneeBase.toFixed(3)}|${cHip.toFixed(3)}|${run.toFixed(2)}|${lean.toFixed(2)}`;
+  const hit = _stepCache.get(key);
+  if (hit !== undefined) return hit;
+
+  // Pose of the left leg at a given phase.
+  const leg = (p) => {
     const thigh = amp * Math.sin(p) + cHip;
     const knee  = -kAmp * Math.max(0, Math.cos(p)) + kneeBase;
-    const ank   = ankleAngle(thigh, knee, p, run);
-    const h = solePos(HEEL_Y, HEEL_Z, thigh, knee, ank, 0);
-    const hy = h.y, hz = h.z;                          // copy: solePos reuses one object
-    const t = solePos(TOE_Y, TOE_Z, thigh, knee, ank, 0);
-    const z = t.y < hy ? t.z : hz;
-    if (z < lo) lo = z;
-    if (z > hi) hi = z;
+    return { thigh, knee, ank: ankleAngle(thigh, knee, p, run) };
+  };
+  const lowestSole = (p) => {
+    const { thigh, knee, ank } = leg(p);
+    return Math.min(solePos(HEEL_Y, HEEL_Z, thigh, knee, ank, lean).y,
+                    solePos(TOE_Y,  TOE_Z,  thigh, knee, ank, lean).y);
+  };
+  const ankleZ = (p) => {
+    const { thigh, knee, ank } = leg(p);
+    return solePos(0, 0, thigh, knee, ank, lean).z;
+  };
+
+  // Integrate the left ankle's backward travel, weighted by how much of the
+  // body's weight that foot is under, across one whole cycle. Each foot has
+  // exactly one stance per cycle, so that integral IS one step.
+  //
+  // Weighted rather than gated at the stance boundary: "which foot is lower" is
+  // a min over sole corners, so it is not smooth, it crosses zero more than
+  // twice, and picking a crossing to integrate between swung the answer by 2.5x
+  // on a lean change of 0.03 rad. A soft weight over the last centimetre of
+  // height difference has no boundary to pick and no flicker to be caught by.
+  const EPS = 0.01;
+  let step = 0;
+  for (let i = 0; i < STEP_SAMPLES; i++) {
+    const p  = (i / STEP_SAMPLES) * Math.PI * 2;
+    const dp = (Math.PI * 2) / STEP_SAMPLES;
+    const w  = 1 / (1 + Math.exp(-(lowestSole(p + Math.PI) - lowestSole(p)) / EPS));
+    step += w * (ankleZ(p + dp) - ankleZ(p));    // forward is -Z, backwards is +z
   }
-  return hi - lo;
+  step = Math.max(0.12, step);
+  if (_stepCache.size < 512) _stepCache.set(key, step);
+  return step;
 }
 
 // How far to drop the body so whichever sole corner is lowest sits ON the floor.
 // Solving this instead of hand-tuning a bob curve means the feet plant correctly
 // at ANY stride amplitude or lean — no constant to re-tune per speed.
-function groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean) {
+function groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw = 0) {
   let lo = Infinity;
   for (const [th, kn, an] of [[thighL, kneeL, ankleL], [thighR, kneeR, ankleR]]) {
-    lo = Math.min(lo, soleY(HEEL_Y, HEEL_Z, th, kn, an, lean),
-                      soleY(TOE_Y,  TOE_Z,  th, kn, an, lean));
+    lo = Math.min(lo, soleY(HEEL_Y, HEEL_Z, th, kn, an, lean, hipYaw),
+                      soleY(TOE_Y,  TOE_Z,  th, kn, an, lean, hipYaw));
   }
   return -lo;
+}
+
+// The three airborne key poses, per leg, as [thigh, knee, ankle] — positive
+// ankle is toes up. Leading leg and trailing leg are separate: a jump with both
+// legs doing the same thing is a cartoon.
+//                            thigh   knee  ankle
+const TUCK_LEAD   = [  0.80, -1.45,  0.02];
+const TUCK_TRAIL  = [ -0.36, -0.60,  0.12];
+const REACH_LEAD  = [  0.18, -0.20,  0.36];
+const REACH_TRAIL = [ -0.14, -0.32,  0.30];
+const EXT_LEAD    = [ -0.26, -0.12, -0.44];   // toes pointed, driving off the floor
+const EXT_TRAIL   = [ -0.50, -0.08, -0.36];
+const _poseLead = [0, 0, 0], _poseTrail = [0, 0, 0];
+
+// reach →(up)→ tuck, then →(push)→ extend, written into `out`.
+function blendPose(out, reach, tuck, up, ext, push) {
+  for (let i = 0; i < 3; i++) {
+    const arc = reach[i] + (tuck[i] - reach[i]) * up;
+    out[i] = arc + (ext[i] - arc) * push;
+  }
+}
+
+/**
+ * Ground covered per full cycle by ANY two-legged pose built from the same
+ * hip→knee→ankle chain, measured the way groundPerStep measures the player's:
+ * each ankle's travel while its own foot is bearing weight.
+ *
+ * Exported because the zombies need it and were skating badly without it —
+ * their phase advanced at a fixed rate per second with no reference to how fast
+ * they were actually moving, so the feet slid ~70% of the way. Their rig has
+ * different proportions and a completely different (deliberately asymmetric,
+ * limping) cycle, so what is shared is the measurement, not the pose.
+ *
+ * @param {object} g  { hipY, thigh, shin, soleY, heelZ, toeZ } leg geometry
+ * @param {(p:number)=>number[]} poseAt  phase → [thighL,kneeL,ankleL,thighR,kneeR,ankleR]
+ * @param {number} [samples]
+ * @returns {number} metres per full cycle (both steps)
+ */
+export function groundPerCycle(g, poseAt, samples = 128) {
+  const EPS = 0.01;                       // soft stance weight, metres
+  // Sole corner (or, at cy=cz=0, the ankle) for one leg.
+  const at = (cy, cz, thigh, knee, ankle) => {
+    let y = cy, z = cz, c, s;
+    c = Math.cos(ankle); s = Math.sin(ankle); [y, z] = [y * c - z * s, y * s + z * c];
+    y -= g.shin;
+    c = Math.cos(knee);  s = Math.sin(knee);  [y, z] = [y * c - z * s, y * s + z * c];
+    y -= g.thigh;
+    c = Math.cos(thigh); s = Math.sin(thigh); [y, z] = [y * c - z * s, y * s + z * c];
+    return { y: y + g.hipY, z };
+  };
+  const legOf = (q, i) => {
+    const th = q[i], kn = q[i + 1], an = q[i + 2];
+    const h = at(g.soleY, g.heelZ, th, kn, an), t = at(g.soleY, g.toeZ, th, kn, an);
+    return { low: Math.min(h.y, t.y), az: at(0, 0, th, kn, an).z };
+  };
+  const dp = (Math.PI * 2) / samples;
+  let total = 0;
+  for (let i = 0; i < samples; i++) {
+    const p = i * dp;
+    const a = poseAt(p), b = poseAt(p + dp);
+    const aL = legOf(a, 0), aR = legOf(a, 3), bL = legOf(b, 0), bR = legOf(b, 3);
+    const wL = 1 / (1 + Math.exp(-(aR.low - aL.low) / EPS));
+    total += wL * (bL.az - aL.az) + (1 - wL) * (bR.az - aR.az);
+  }
+  return Math.max(0.15, total);
 }
 
 // Frame-rate-independent ease toward a target on one channel.
@@ -118,10 +252,22 @@ function ankleAngle(thigh, knee, p, run) {
  *
  * @param {object} rig  { legL, legR, kneeL, kneeR, ankleL, ankleR }
  * @param {object} o    { speed (m/s), moving, run (0=walk … 1=sprint),
- *                        crouch (0..1), dt }
+ *                        crouch (0..1), dt, dirF, dirR, grounded, vy }
  *   The stride PHASE is owned here and derived from `speed` — callers must not
  *   advance their own clock, or the feet skate. Read it back as `.phase`.
- * @returns {{bob:number, lean:number, swing:number}}
+ *
+ *   dirF/dirR are the direction of travel in the BODY's own frame — the
+ *   components of the velocity along the body's forward (-Z) and right (+X)
+ *   axes, normalised. They default to straight ahead, which is right for
+ *   anything that always faces where it is going (the bots do). A player does
+ *   NOT: they strafe and backpedal while still facing their aim, and without
+ *   this the legs run a forward stride while the body slides sideways or
+ *   backwards — the feet then travel with the body instead of planting.
+ *
+ *   grounded/vy drive the airborne pose. With no jump pose at all the legs just
+ *   ease to a stand mid-flight, so a jump reads as the character freezing.
+ *
+ * @returns {{bob:number, lean:number, swing:number, phase:number}}
  *   bob   metres to drop the body by (≤ 0)
  *   lean  radians for the body's local pitch (already eased — ASSIGN it, do
  *         not ease it again, or it stops agreeing with `bob`)
@@ -134,6 +280,26 @@ export function applyWalkCycle(rig, o = {}) {
   const speed  = Math.max(0, o.speed || 0);
   const moving = !!o.moving;
   if (rig._walkT === undefined) rig._walkT = Math.random() * Math.PI * 2;
+
+  // ── which way is this body actually travelling, relative to its facing ─────
+  // Turn that into a yaw for the hips plus a direction for the stride. Past
+  // ±90° the legs would have to twist further than a hip goes, so the stride
+  // runs in reverse against a mirrored yaw instead — which is exactly what a
+  // backpedal is.
+  let dirF = o.dirF, dirR = o.dirR;
+  if (dirF === undefined && dirR === undefined) { dirF = 1; dirR = 0; }
+  else { dirF = dirF || 0; dirR = dirR || 0; }
+  let legYaw = 0, strideSign = 1;
+  if (moving && (dirF || dirR)) {
+    // The leg swings along its own -Z; after a hip yaw θ that points along
+    // (-sinθ, -cosθ). Matching it to the travel (dirR, -dirF) gives θ below —
+    // note the negated dirR, which is what makes a strafe plant rather than
+    // stride the wrong way along the same axis.
+    legYaw = Math.atan2(-dirR, dirF);
+    if (legYaw > Math.PI / 2)       { legYaw -= Math.PI; strideSign = -1; }
+    else if (legYaw < -Math.PI / 2) { legYaw += Math.PI; strideSign = -1; }
+  }
+  rig._legYaw = (rig._legYaw || 0) + (legYaw - (rig._legYaw || 0)) * Math.min(1, dt * 10);
 
   // Crouching just means deeper knees and a hip tuck. The body height falls out
   // of the ground solve below on its own — no separate crouch offset to keep in
@@ -151,12 +317,10 @@ export function applyWalkCycle(rig, o = {}) {
   // Picking a rate independently (which every caller used to do) makes the feet
   // skate — at 6.2 m/s the legs were cancelling only 22% of the body's motion,
   // which reads exactly like moonwalking.
-  // The analytic step is the ideal; the pose delivers a fraction of it (the
-  // ankle roll moves the contact point, and the swing foot overlaps stance at
-  // the ends). Calibrated against measured planted-foot drift — see the
-  // constant's definition.
-  const step = Math.max(0.25, stepLength(amp, kAmp, -0.10 + cKnee, cHip, run) * STEP_EFFICIENCY);
-  rig._walkT += moving ? (Math.PI * Math.max(speed, 0.4) / step) * dt : dt * 1.2;
+  // Measured against last frame's lean — it is eased and moves slowly, and
+  // using it here keeps the step solve ahead of the pose that consumes it.
+  const step = groundPerStep(amp, kAmp, -0.10 + cKnee, cHip, run, rig._lean || 0);
+  rig._walkT += moving ? strideSign * (Math.PI * Math.max(speed, 0.4) / step) * dt : dt * 1.2;
   const t = rig._walkT;
 
   // Blend between standing and striding, then ASSIGN. The stride must not be
@@ -174,10 +338,108 @@ export function applyWalkCycle(rig, o = {}) {
   const wKneeL  = -kAmp * Math.max(0,  Math.cos(t)) - 0.10 + cKnee;
   const wKneeR  = -kAmp * Math.max(0, -Math.cos(t)) - 0.10 + cKnee;
 
-  const thighL = mix(sThigh, wThighL), thighR = mix(sThigh, wThighR);
-  const kneeL  = mix(sKnee,  wKneeL),  kneeR  = mix(sKnee,  wKneeR);
-  const ankleL = mix(sAnk, ankleAngle(wThighL, wKneeL, t,            run));
-  const ankleR = mix(sAnk, ankleAngle(wThighR, wKneeR, t + Math.PI,  run));
+  let thighL = mix(sThigh, wThighL), thighR = mix(sThigh, wThighR);
+  let kneeL  = mix(sKnee,  wKneeL),  kneeR  = mix(sKnee,  wKneeR);
+  let ankleL = mix(sAnk, ankleAngle(wThighL, wKneeL, t,            run));
+  let ankleR = mix(sAnk, ankleAngle(wThighR, wKneeR, t + Math.PI,  run));
+
+  // ── airborne ───────────────────────────────────────────────────────────────
+  // A jump used to fall out of `moving`, so the legs simply eased to a stand in
+  // mid-flight and the character froze. It needs a pose — and specifically it
+  // needs THREE, in sequence, rather than one blend driven by vertical speed:
+  //
+  //   EXTEND  the drive off the floor. Legs straight, toes pointed. This one
+  //           has to run off its own clock, because vertical speed is at its
+  //           maximum here and cannot tell the push-off apart from the rise —
+  //           a pose that is purely a function of vy is already fully tucked
+  //           the instant it leaves the ground, which skips the push entirely
+  //           and reads like the character was yanked upward on a wire.
+  //   TUCK    knees come up as the body rises.
+  //   REACH   legs unfold and the toes turn up to meet the floor.
+  //
+  // A hop can also be played without leaving the ground at all — triggerHop().
+  rig._hopT = Math.max(0, (rig._hopT || 0) - dt);
+  const hopping = rig._hopT > 0;
+  const airTarget = (o.grounded === false || hopping) ? 1 : 0;
+  const prevAir = rig._air || 0;
+  // Fast in, slower out: a push-off is not a gradual thing, but the recovery on
+  // the far side of a landing is.
+  rig._air = prevAir + (airTarget - prevAir) * Math.min(1, dt * (airTarget ? 40 : 12));
+  // Landing: fires on the transition back to the ground, decays away.
+  if (airTarget === 0 && prevAir > 0.5) rig._land = 1;
+  rig._land = Math.max(0, (rig._land || 0) - dt * 4);
+  rig._airT = airTarget ? (rig._airT || 0) + dt : 0;
+  const air = rig._air;
+  const absorb = (rig._land || 0) * (rig._land || 0);   // sharp at touchdown
+
+  if (air > 0.001) {
+    // A triggered hop has no real vertical speed, so it plays the arc off the
+    // clock instead — full up at the start, full down at the end.
+    const vy = hopping
+      ? HOP_PEAK * (2 * (rig._hopT / (rig._hopFor || HOP_SECONDS)) - 1)
+      : (o.vy || 0);
+    // -1 falling … +1 rising, against a typical jump rather than the actual
+    // one, so a long fall doesn't wind the pose past its extreme.
+    // Saturating below the peak speed, so the tuck is at full depth for most of
+    // the rise instead of only at the one instant vy is at its maximum — which
+    // is the instant the push-off owns anyway.
+    const up   = clamp01((Math.max(-1, Math.min(1, vy / 6.5)) + 1) / 2);
+    // Held flat for the first 50ms, then let go quickly. Without the plateau the
+    // decay overlaps the airborne blend still fading in, the two dilute each
+    // other, and the extension only reaches about half strength — the push-off
+    // stops reading. Decaying slowly is just as bad the other way: it bleeds a
+    // straight leg into the tuck and costs it a quarter of its depth.
+    const push = Math.exp(-Math.max(0, rig._airT - 0.05) / 0.07);
+
+    // Whichever leg was forward at takeoff stays forward. You leave the ground
+    // off one foot, and a running jump that swaps legs in mid-air reads as a
+    // stumble.
+    if (rig._airLead === undefined || prevAir < 0.02) {
+      rig._airLead = Math.sin(t) >= 0 ? 1 : -1;
+    }
+
+    blendPose(_poseLead,  REACH_LEAD,  TUCK_LEAD,  up, EXT_LEAD,  push);
+    blendPose(_poseTrail, REACH_TRAIL, TUCK_TRAIL, up, EXT_TRAIL, push);
+    const pL = rig._airLead > 0 ? _poseLead : _poseTrail;
+    const pR = rig._airLead > 0 ? _poseTrail : _poseLead;
+
+    const a = (base, jump) => base + (jump - base) * air;
+    thighL = a(thighL, pL[0] + cHip);  thighR = a(thighR, pR[0] + cHip);
+    kneeL  = a(kneeL,  pL[1] + cKnee); kneeR  = a(kneeR,  pR[1] + cKnee);
+    ankleL = a(ankleL, pL[2]);         ankleR = a(ankleR, pR[2]);
+    rig._airPush = push;
+  } else {
+    rig._airPush = 0;
+  }
+  if (absorb > 0.001) {
+    kneeL  -= 0.55 * absorb; kneeR  -= 0.55 * absorb;
+    thighL += 0.22 * absorb; thighR += 0.22 * absorb;
+    ankleL += 0.18 * absorb; ankleR += 0.18 * absorb;
+  }
+
+  // ── slide ──────────────────────────────────────────────────────────────────
+  // A sprint-slide used to run the ordinary stride, so the character sprinted
+  // along at knee height with its legs still cycling. It is a held pose, not a
+  // cycle: lead leg thrown out straight in front, trailing leg folded under,
+  // body low and tipped back over it. The height falls out of the ground solve
+  // on its own — the folded leg is what puts the hips down there.
+  rig._slide = (rig._slide || 0) + (clamp01(o.slide || 0) - (rig._slide || 0)) * Math.min(1, dt * 11);
+  const slide = rig._slide;
+  if (slide > 0.001) {
+    if (rig._slideLead === undefined || slide < 0.02) {
+      rig._slideLead = Math.sin(t) >= 0 ? 1 : -1;
+    }
+    const s = (base, tgt) => base + (tgt - base) * slide;
+    const leadT = 1.02, leadK = -0.16, leadA = 0.30;   // out in front, heel down
+    const trailT = 0.10, trailK = -1.90, trailA = -0.10;  // folded under the hips
+    if (rig._slideLead > 0) {
+      thighL = s(thighL, leadT + cHip);  kneeL = s(kneeL, leadK);  ankleL = s(ankleL, leadA);
+      thighR = s(thighR, trailT + cHip); kneeR = s(kneeR, trailK); ankleR = s(ankleR, trailA);
+    } else {
+      thighR = s(thighR, leadT + cHip);  kneeR = s(kneeR, leadK);  ankleR = s(ankleR, leadA);
+      thighL = s(thighL, trailT + cHip); kneeL = s(kneeL, trailK); ankleL = s(ankleL, trailA);
+    }
+  }
 
   if (rig.legL)   rig.legL.rotation.x   = thighL;
   if (rig.legR)   rig.legR.rotation.x   = thighR;
@@ -186,17 +448,36 @@ export function applyWalkCycle(rig, o = {}) {
   if (rig.ankleL) rig.ankleL.rotation.x = ankleL;
   if (rig.ankleR) rig.ankleR.rotation.x = ankleR;
 
+  // Point the hips down the direction of travel. Order matters: the leg has to
+  // swing in its own plane and THEN be yawed into place, which is Y-before-X in
+  // three.js Euler terms ('YXZ' composes as Ry·Rx·Rz).
+  const hipYaw = rig._legYaw * (1 - air);
+  for (const leg of [rig.legL, rig.legR]) {
+    if (!leg) continue;
+    if (leg.rotation.order !== 'YXZ') leg.rotation.order = 'YXZ';
+    leg.rotation.y = hipYaw;
+  }
+
   // Negative = forward. Kept shallow: a walk barely leans, only a real sprint
-  // pitches in noticeably. Eased HERE rather than by the caller, because the
-  // ground solve below has to run against the lean that actually gets applied —
-  // solving for the target while the body eases toward it drifts the feet.
-  const leanTarget = (-(0.03 + 0.13 * run) * mb) - 0.10 * crouch;
+  // pitches in noticeably. Scaled by how much of the travel is actually forward,
+  // so a backpedal doesn't lean into the direction it is retreating from. Eased
+  // HERE rather than by the caller, because the ground solve below has to run
+  // against the lean that actually gets applied — solving for the target while
+  // the body eases toward it drifts the feet.
+  // The torso follows the legs, or the landing reads as a knee bend bolted onto
+  // a rigid mannequin: pitch into the compression on touchdown, and tip back a
+  // little over the drive off the floor. Not eased — both are already smooth
+  // curves of their own, and easing them would lag the legs they belong to.
+  const leanTarget = (-(0.03 + 0.13 * run) * mb * (moving ? dirF : 1)) - 0.10 * crouch;
   rig._lean = (rig._lean || 0) + (leanTarget - (rig._lean || 0)) * Math.min(1, dt * 6);
-  const lean = rig._lean;
-  const bob = groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean);
+  // Slide tips the torso BACK over the trailing leg (positive = back here).
+  const lean = rig._lean - 0.16 * absorb + 0.09 * air * rig._airPush + 0.30 * slide;
+  // Airborne the feet are tucked, so there is no ground contact to solve for —
+  // fade the drop out, or the body would sink to keep the raised soles at zero.
+  const bob = groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw) * (1 - air);
 
   return {
-    bob, lean, phase: t,
+    bob, lean, phase: t, air,
     // Rifle lifts as the pelvis drops (i.e. away from the chest, not into it),
     // fading to a breathing idle when standing.
     swing: mb * -(0.028 + 0.022 * run) * Math.cos(t * 2)
