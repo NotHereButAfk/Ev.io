@@ -89,8 +89,10 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   armour comes from `HumanSoldier.js`, and cosmetic armour overrides both.
 - `src/ui/` — `MainMenu.js` (nav + all panels: loadout/inventory, profile,
   shop, battlepass, settings, fireteam, private, achievements), `HUD.js`
-  (green/cyan/amber bars, coin popups, weapon wheel, top-center reload progress,
-  and central elimination/headshot confirmation), `Nameplates.js`,
+  (edge-aligned ev.io-like combat layout: slim green/cyan/amber bars and small
+  ability keys at lower-left, compact weapon chips, standalone lower-right
+  ammo, top-center timer/reload progress, coin popups, and central
+  elimination/headshot confirmation), `Nameplates.js`,
   `DamageNumbers.js`, `WeaponThumbnails.js` (renders skinned guns to dataURLs).
 - `public/*.glb` — soldier, player, spartan, weapons, zombie models.
 - `src/core/NetClient.js` — optional WebSocket client for the 24/7 match
@@ -101,10 +103,12 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - ev.io-inspired: dark translucent glass panels, **cyan** accent (`--kx-cyan`),
   consistent section labels w/ accent bars. Big appended sections at the end of
   the file: "PAGE UI OVERHAUL", "IN-GAME HUD OVERHAUL", inventory cards,
-  scoreboard, achievements, map loading screen, inventory v2 toolbar.
+  scoreboard, achievements, map loading screen, inventory v2 toolbar. The final
+  "CLEAN EV.IO-LIKE GAMEPLAY HUD" layer deliberately removes glass-card chrome
+  from the in-match readouts and is the authoritative gameplay-HUD cascade.
 
 ## Done this project (high level)
-- Full menu/page restyle; in-game HUD restyle; floating damage numbers;
+- Full menu/page restyle; clean edge-aligned in-game HUD; floating damage numbers;
   ev.io post-match leaderboard; PROFILE nav dropdown (Inventory/Career/Achievements);
   Achievements page; hold-TAB in-game scoreboard; survival wave HUD + wave bonus
   + best time; **1:1 inventory** (per-gun tabs, no main/map split);

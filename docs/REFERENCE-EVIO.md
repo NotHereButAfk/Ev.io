@@ -96,6 +96,10 @@ Visible motifs that repeat across those sources:
 
 Visible animation and combat-feedback cues:
 
+- **[verified]** Gameplay stills consistently keep status/ability controls at
+  the lower left, ammunition at the lower right, and the match timer at the top
+  centre. These elements are mostly edge-aligned text, bars, and small key
+  chips rather than a stack of large bordered panels.
 - **[verified]** The first-person weapon stays low-right with restrained
   movement sway and small, responsive recoil rather than large constant bob.
 - **[verified]** Reloading is a readable state: the weapon lowers out of its
@@ -119,6 +123,13 @@ a three-beat rigid-viewmodel reload, timed reload bar, viewmodel landing impulse
 central elimination/headshot score confirmation, shared remote fire recoil,
 short visual-only death fall, and teleport-style respawn reform. Mechanics and
 server timing remain unchanged.
+
+**[ours, implemented 2026-07-29]** The gameplay HUD now follows that visible
+edge hierarchy: slim HP/shield/energy bars and compact grenade/blink keys at
+lower-left, small weapon-switch chips at bottom-centre, standalone ammunition
+at lower-right, a quiet top-centre timer, and a single-line match summary. This
+is a visual adaptation to KYX.IO's existing information and controls, not a
+claim of pixel-identical ev.io UI.
 
 Implementation boundary: these cues justify this project's visual treatment.
 They do **not** verify exact ev.io layouts, scale, collision, spawn locations,
