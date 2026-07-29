@@ -27,6 +27,7 @@ npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
 npm run test:gait             # walk cycle: foot planting in every direction, jump pose
 npm run test:actions          # every action moves the body
+npm run test:bots             # combat spacing, pursuit, bursts, free-for-all targeting
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -128,11 +129,14 @@ forward is **+Z** → add `π` to their yaw. A weapon's muzzle is its own local
 `rotation.order = 'YXZ'` so lean and death-topple happen about the body's axes,
 not the world's.
 
-**5. Bots are passive by design.** `PASSIVE_UNTIL_PROVOKED = true` in
-`Bot.js` — they ignore the player until shot, and their aim is deliberately
-bad. This was changed once and reverted at the owner's request. `AIM_ERR_BASE`
-/ `AIM_ERR_PER_M` are the difficulty dial; hit probability goes as the inverse
-square of them.
+**5. Bots actively play the free-for-all.** The owner superseded the earlier
+passive-until-shot rule on 2026-07-29 after reviewing ev.io gameplay.
+`BotManager` must select from the human and other living bots—never turn the
+lobby into a 7v1. `Bot.js` may acquire on sight, orbit/retreat/rush, jump and
+pursue a last-seen point, but it must not fire without current line of sight.
+`AIM_ERR_BASE` / `AIM_ERR_PER_M` remain the difficulty dial; do not replace
+physical scatter with perfect aim or a damage dice roll. Run `npm run
+test:bots` after changing combat behavior.
 
 **6. What other players see comes from `src/player/Avatar.js`.**
 The local third-person body and every remote player must render through the

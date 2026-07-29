@@ -849,12 +849,8 @@ export class Game {
           kills = bot._netKills || 0;
           score = bot._netScore || 0;
         } else {
-          if (this._sbStats[key] == null) {
-            const k = Math.floor(Math.random() * 9);
-            this._sbStats[key] = { kills: k, score: k * 100 };
-          }
-          kills = this._sbStats[key].kills;
-          score = this._sbStats[key].score;
+          kills = bot._botKills || 0;
+          score = kills * 100;
         }
         rows.push({ name: key, kills, score, isYou: false });
       }
@@ -895,8 +891,8 @@ export class Game {
         a = 0;
         score = bot._netScore || 0;
       } else {
-        k = 3 + Math.floor(Math.random() * 14); // 3–16 kills
-        d = 1 + Math.floor(Math.random() * 9);  // 1–9 deaths
+        k = bot._botKills || 0;
+        d = bot._botDeaths || 0;
         a = Math.floor(Math.random() * 6);
         score = k * 100;
       }
@@ -1558,7 +1554,7 @@ export class Game {
     if (this.state === 'menu' && !this._menuBotsActive) this._spawnMenuBots();
     if (this._menuBotsActive) {
       const dummyPlayer = { position: new THREE.Vector3(9999, 9999, 9999), isDead: true };
-      this.botManager.update(dt, dummyPlayer, this.menuCamera, () => {}, this.world);
+      this.botManager.update(dt, dummyPlayer, this.menuCamera, () => {}, this.world, false);
     }
 
     // Cinematic spectator fly-through

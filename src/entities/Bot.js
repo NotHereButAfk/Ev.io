@@ -5,43 +5,41 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
+import { BOT_TACTICS, advanceBurst, chooseCombatSteering } from './BotCombat.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
 const _tmpB = new THREE.Vector3();
 
-// AR-type ranged stats — sword bots skip shooting entirely.
-// Slower fire + short range: bots are not meant to be a real threat.
-const AR_GUN = { damage: 14, fireRate: 0.30, range: 14 };
+// AR-type ranged stats — sword bots skip shooting entirely. The bot remains a
+// fair, imperfect shot; pressure comes from movement, pursuit and short bursts.
+const AR_GUN = { damage: 10, fireRate: 0.24, range: 26 };
 
-const DETECT_RADIUS = 15;      // how far a bot will chase once provoked
-const ATTACK_RADIUS = 1.9;
-const ATTACK_DAMAGE = 7;
-const ATTACK_COOLDOWN = 1.5;
+const DETECT_RADIUS = BOT_TACTICS.detectRadius;
+const ATTACK_RADIUS = BOT_TACTICS.meleeAttackDistance;
+const ATTACK_DAMAGE = 12;
+const ATTACK_COOLDOWN = 0.95;
 const LUNGE_TIME = 0.2;      // how long a sword bot's strike takes to play
 const RESPAWN_DELAY = 4;
 const RADIUS = 0.5;
+const BOT_GRAVITY = -20;
+const BOT_JUMP_SPEED = 9.6;
 // Aggro persists this long after losing sight of you, so breaking line of
 // sight buys you a few seconds rather than instantly erasing you.
-const PROVOKE_DURATION = 7;
+const PROVOKE_DURATION = BOT_TACTICS.memoryDuration;
 
 // ── Combat tuning ────────────────────────────────────────────────────────────
-// Bots are PASSIVE: they ignore you completely until you attack one, and even
-// then they shoot badly. They exist to populate the arena, not to kill you.
-const PASSIVE_UNTIL_PROVOKED = true;
-
 // Aim error in METRES AT THE TARGET rather than as an angle — a bot "misses by
 // about a metre, more the further out you are". Expressed this way it also
 // can't turn into a perfect marksman at point-blank, which a fixed angular cone
 // does (a 3° cone at 5m physically cannot miss a torso).
-// Tuned to reproduce the old dice-roll's hit curve (~14% at 3m, ~6% at 14m) —
-// the difference is that these are real bullets, so cover actually stops them.
-const AIM_ERR_BASE  = 0.80;    // metres of scatter at zero range
-const AIM_ERR_PER_M = 0.044;   // extra metres of scatter per metre of distance
+// Cover and player strafing still matter because these remain real ray shots.
+const AIM_ERR_BASE  = 0.62;    // metres of scatter at zero range
+const AIM_ERR_PER_M = 0.036;   // extra metres of scatter per metre of distance
 const AIM_SKILL_MIN = 0.85;    // per-bot multiplier — lower is a better shot
-const AIM_SKILL_MAX = 1.60;
-const REACTION_MIN  = 0.30;    // seconds between being provoked and firing back
-const REACTION_MAX  = 0.70;
+const AIM_SKILL_MAX = 1.45;
+const REACTION_MIN  = 0.18;    // seconds between acquiring a target and firing
+const REACTION_MAX  = 0.52;
 // Player hitboxes, relative to their feet: a torso sphere and a head.
 const PLAYER_BODY_Y = 1.05, PLAYER_BODY_R = 0.42;
 const PLAYER_HEAD_Y = 1.60, PLAYER_HEAD_R = 0.24;
@@ -101,12 +99,14 @@ export class Bot {
     this.flashTimer = 0;
     this.wanderTarget = spawnPoint.clone();
     this.wanderCooldown = 0;
-    this.speed = 2.6 + Math.random() * 1.2;
     this.lungeTimer = 0;
-    // 40% of bots carry swords (melee only); 60% carry ARs (ranged)
-    this._isSwordBot  = Math.random() < 0.40;
+    // The arena reads primarily as a firefight; a smaller sword cohort supplies
+    // close-range disruption instead of turning every encounter into a mob.
+    this._isSwordBot  = Math.random() < 0.20;
+    this.speed = (this._isSwordBot ? 5.15 : 4.55) + Math.random() * 1.15;
     this._botGun      = this._isSwordBot ? null : AR_GUN;
     this._gunTimer    = Math.random() * 0.8;
+    this._burstShots  = 2 + Math.floor(Math.random() * 3);
     // Per-bot marksmanship multiplier on the aim error. Rolling this per bot is
     // what makes some of them feel dangerous and others sloppy.
     this._aimSkill    = AIM_SKILL_MIN + Math.random() * (AIM_SKILL_MAX - AIM_SKILL_MIN);
@@ -123,13 +123,31 @@ export class Bot {
     this._muzzleT     = 0;      // muzzle-flash visible timer
     this._muzzleFlash = null;
     this._weaponBaseZ = 0;
-    // Passive AI: only fights back after being attacked.
     this._provoked     = false;
     this._provokeTimer = 0;
+    this._losT         = Math.random() * 0.12;
+    this._losCache     = false;
+    this._decisionT    = 0;
+    this._strafeSign   = Math.random() < 0.5 ? -1 : 1;
+    this._wantsJump    = false;
+    this._jumpCooldown = Math.random() * 0.8;
+    this._velY         = 0;
+    this._onGround     = true;
+    this._stuckT       = 0;
+    this._padTeleCD    = 0;
+    this._targetEntity = null;
+    this._targetScanT  = Math.random() * 0.35;
+    this._botKills     = 0;
+    this._botDeaths    = 0;
 
     // Pre-allocated scratch vectors — avoids per-frame GC pressure
     this._toPlayer    = new THREE.Vector3();
+    this._toTarget    = new THREE.Vector3();
     this._wanderDir   = new THREE.Vector3();
+    this._combatDir   = new THREE.Vector3();
+    this._strafeDir   = new THREE.Vector3();
+    this._lastSeenPos = spawnPoint.clone();
+    this._lastSeenValid = false;
     this._shootFrom   = new THREE.Vector3();
     this._shootTarget = new THREE.Vector3();
     this._shootDir    = new THREE.Vector3();
@@ -220,9 +238,12 @@ export class Bot {
     }
   }
 
+  get isDead() { return !this.alive; }
+
   takeDamage(amount) {
     if (!this.alive) return false;
-    // Being hit is the only thing that makes a bot fight back.
+    // Damage immediately refreshes combat memory even if the attacker fired
+    // from outside the normal vision cone/range.
     if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
     this._provoked = true;
     this._provokeTimer = PROVOKE_DURATION;
@@ -241,6 +262,7 @@ export class Bot {
 
   die() {
     if (this.audio) this.audio.playAt(this.position, () => { this.audio.playHurt(); this.audio.playLand(true); });
+    this._botDeaths = (this._botDeaths || 0) + 1;
     this.alive = false;
     this._dying      = true;
     this._deathT     = 0;
@@ -270,6 +292,19 @@ export class Bot {
     }
     this._gunKick   = 0;
     this._alertBlend = 0;
+    this._velY = 0;
+    this._onGround = true;
+    this._jumpCooldown = 0.4 + Math.random() * 0.8;
+    this._wantsJump = false;
+    this._stuckT = 0;
+    this._lastSeenValid = false;
+    this._provoked = false;
+    this._provokeTimer = 0;
+    this._losCache = false;
+    this._decisionT = 0;
+    this._burstShots = 2 + Math.floor(Math.random() * 3);
+    this._targetEntity = null;
+    this._targetScanT = 0;
     if (this._isSwordBot) {
       if (this._weaponMesh) { this._weaponMesh.position.z = this._weaponBaseZ; this._weaponMesh.rotation.x = -0.70; }
     } else {
@@ -466,80 +501,212 @@ export class Bot {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
     // ── Awareness ──────────────────────────────────────────────────────────────
-    // Passive: a bot ignores you entirely until you attack it (takeDamage sets
-    // _provoked), then retaliates for PROVOKE_DURATION before losing interest.
-    // Flip PASSIVE_UNTIL_PROVOKED to false to let them acquire you on sight.
-    if (this._provokeTimer > 0) {
-      this._provokeTimer -= dt;
-      if (this._provokeTimer <= 0) this._provoked = false;
-    }
+    // Bots acquire visible opponents on their own, remember the last place they
+    // saw them, and pursue that point for a short time after line-of-sight is
+    // broken. They never fire through cover: only a fresh LOS cache permits a
+    // shot.
     const inRange = !player.isDead && distToPlayer < DETECT_RADIUS;
-    if (inRange && !PASSIVE_UNTIL_PROVOKED) {
-      // Only pay for the LOS raycast a few times a second per bot.
-      this._losT = (this._losT || 0) - dt;
+    this._losT -= dt;
+    if (inRange) {
       if (this._losT <= 0) {
         this._losT = 0.12 + Math.random() * 0.1;
         this._losCache = this.hasLineOfSight(player, world);
       }
-      if (this._losCache) {
-        if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
-        this._provoked = true;
-        this._provokeTimer = PROVOKE_DURATION;
+    } else {
+      this._losCache = false;
+    }
+    const hasVisual = inRange && this._losCache;
+    if (hasVisual) {
+      if (!this._provoked) {
+        this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
       }
+      this._provoked = true;
+      this._provokeTimer = PROVOKE_DURATION;
+      this._lastSeenPos.copy(player.position);
+      this._lastSeenValid = true;
+    } else if (this._provokeTimer > 0) {
+      this._provokeTimer -= dt;
+      if (this._provokeTimer <= 0) {
+        this._provoked = false;
+        this._lastSeenValid = false;
+      }
+    } else if (player.isDead) {
+      this._provoked = false;
+      this._lastSeenValid = false;
     }
     if (this._reactT > 0) this._reactT -= dt;
-    const engaged = this._provoked && inRange;
+    const engaged = this._provoked && !player.isDead && (hasVisual || this._lastSeenValid);
 
     let moveTarget = null;
+    let gaitDirF = 0;
+    let gaitDirR = 0;
     if (engaged) {
-      // Face the player. The rig's forward is +Z — the aim and strafe layers
-      // both assume rotation.y == atan2(dx, dz). Object3D.lookAt aims the -Z
-      // axis instead, which faced the model backwards and played the walk
-      // cycle in reverse (moonwalk).
-      // Procedural / cyborg bodies are built with their FRONT on −Z, but the
-      // game's forward is +Z — so add π to face the model's front at the target
-      // (otherwise it walks + aims backward). Human soldier front is already +Z.
-      this._targetYaw = Math.atan2(player.position.x - this.position.x,
-                                   player.position.z - this.position.z)
+      const target = hasVisual ? player.position : this._lastSeenPos;
+      this._toTarget.set(target.x - this.position.x, 0, target.z - this.position.z);
+      const targetDistance = this._toTarget.length();
+      const targetDir = this._combatDir.copy(this._toTarget);
+      if (targetDir.lengthSq() > 1e-5) targetDir.normalize();
+
+      // Change direction in readable beats rather than vibrating every frame.
+      this._decisionT -= dt;
+      if (this._decisionT <= 0) {
+        this._decisionT = 0.55 + Math.random() * 0.75;
+        if (Math.random() < 0.62) this._strafeSign *= -1;
+        const targetIsHigher = player.position.y > this.position.y + 1.15;
+        this._wantsJump = this._onGround && this._jumpCooldown <= 0 &&
+          (targetIsHigher || (hasVisual && Math.random() < 0.27));
+      }
+
+      const steering = chooseCombatSteering({
+        distance: targetDistance,
+        hasLineOfSight: hasVisual,
+        strafeSign: this._strafeSign,
+        melee: this._isSwordBot,
+      });
+      this._strafeDir.set(targetDir.z, 0, -targetDir.x);
+      this._combatDir
+        .copy(targetDir)
+        .multiplyScalar(steering.forward)
+        .addScaledVector(this._strafeDir, steering.strafe);
+      const steerLen = Math.hypot(steering.forward, steering.strafe);
+      if (this._combatDir.lengthSq() > 1e-5) {
+        moveTarget = this._combatDir.normalize();
+        gaitDirF = steering.forward / Math.max(1, steerLen);
+        gaitDirR = steering.strafe / Math.max(1, steerLen);
+      }
+
+      // Face the live target while circling/retreating. With no visual, face
+      // the last-seen point until it is searched.
+      this._targetYaw = Math.atan2(target.x - this.position.x,
+                                   target.z - this.position.z)
                         + (this._isHuman ? 0 : Math.PI);
-      // Walk toward whoever provoked us. The body faces its direction of
-      // travel, which is what the forward-only walk cycle animates — sidestep
-      // movement while facing the player made the legs stride forward as the
-      // whole bot slid sideways.
-      if (distToPlayer > ATTACK_RADIUS * 0.85) {
-        moveTarget = toPlayer.normalize();
-        // AR bots shoot back while closing in; sword bots only melee.
-        if (this._botGun && this._reactT <= 0 && distToPlayer < this._botGun.range) {
-          this._gunTimer -= dt;
-          if (this._gunTimer <= 0) {
-            this._gunTimer = this._botGun.fireRate * (0.7 + Math.random() * 0.6);
-            this._shootAt(player, onAttack, world);
-          }
+
+      // Ranged bots use short bursts only with a verified firing lane.
+      if (this._botGun && hasVisual && this._reactT <= 0 && distToPlayer < this._botGun.range) {
+        this._gunTimer -= dt;
+        if (this._gunTimer <= 0) {
+          this._shootAt(player, onAttack, world);
+          const burst = advanceBurst(this._burstShots);
+          this._burstShots = burst.shotsRemaining;
+          this._gunTimer = this._botGun.fireRate * burst.delayScale;
         }
-      } else if (this.attackCooldown <= 0) {
+      }
+
+      if (this._isSwordBot && hasVisual && distToPlayer <= ATTACK_RADIUS &&
+          this.attackCooldown <= 0) {
         this.attackCooldown = ATTACK_COOLDOWN;
         this.lungeTimer = LUNGE_TIME;
-        onAttack(ATTACK_DAMAGE);
+        onAttack(ATTACK_DAMAGE, this.position);
+      }
+
+      // Reaching the remembered point without reacquiring the player starts a
+      // brief search, then releases the target instead of tracking through walls.
+      if (!hasVisual && targetDistance < 1.2) {
+        this._lastSeenValid = false;
+        this._provokeTimer = Math.min(this._provokeTimer, 0.65);
       }
     } else {
       this.wanderCooldown -= dt;
       if (this.wanderCooldown <= 0 || this.position.distanceTo(this.wanderTarget) < 1.5) {
-        const r = this.world.arenaHalf - 4;
-        this.wanderTarget.set((Math.random() * 2 - 1) * r, 0, (Math.random() * 2 - 1) * r);
-        this.wanderCooldown = 3 + Math.random() * 3;
+        // Authored spawns are known-clear locations and make much safer patrol
+        // anchors than arbitrary world coordinates inside Rook's solid geometry.
+        const points = this.world.spawnPoints || [];
+        let picked = null;
+        for (let i = 0; i < Math.min(8, points.length); i++) {
+          const p = points[Math.floor(Math.random() * points.length)];
+          if (!picked || Math.abs(p.y - this.position.y) < Math.abs(picked.y - this.position.y)) picked = p;
+          if (Math.abs(p.y - this.position.y) < 2.5) break;
+        }
+        if (picked) {
+          this.wanderTarget.set(picked.x, this.position.y, picked.z);
+        } else {
+          const roam = 18;
+          const half = Math.max(4, this.world.arenaHalf - 2);
+          this.wanderTarget.set(
+            THREE.MathUtils.clamp(this.position.x + (Math.random() * 2 - 1) * roam, -half, half),
+            this.position.y,
+            THREE.MathUtils.clamp(this.position.z + (Math.random() * 2 - 1) * roam, -half, half)
+          );
+        }
+        this.wanderCooldown = 2.4 + Math.random() * 2.8;
       }
       this._wanderDir.subVectors(this.wanderTarget, this.position);
+      this._wanderDir.y = 0;
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
+        gaitDirF = 1;
         this._targetYaw = Math.atan2(this.wanderTarget.x - this.position.x,
                                      this.wanderTarget.z - this.position.z)
                           + (this._isHuman ? 0 : Math.PI);
       }
     }
 
+    const beforeX = this.position.x;
+    const beforeZ = this.position.z;
     if (moveTarget) {
       this.position.addScaledVector(moveTarget, this.speed * dt);
-      this.world.resolveCollisions(this.position, RADIUS);
+    }
+
+    // Arena movement: bots can hop during a duel, recover from low cover, use
+    // grav lifts and fall between different authored elevations.
+    this._jumpCooldown = Math.max(0, this._jumpCooldown - dt);
+    if (this._wantsJump && this._onGround && this._jumpCooldown <= 0) {
+      this._velY = BOT_JUMP_SPEED;
+      this._onGround = false;
+      this._jumpCooldown = 1.35 + Math.random() * 1.15;
+      this.audio?.playAt(this.position, () => this.audio.playJump());
+    }
+    this._wantsJump = false;
+
+    const lift = world?.queryGravLift?.(this.position.x, this.position.z, this.position.y) || 0;
+    if (lift > 0) {
+      this._velY = Math.max(this._velY, lift);
+      this._onGround = false;
+    }
+
+    const prevY = this.position.y;
+    this._velY += BOT_GRAVITY * dt;
+    this.position.y += this._velY * dt;
+    const groundY = world?.groundHeightAt
+      ? world.groundHeightAt(this.position.x, this.position.z, prevY, this.position.y)
+      : 0;
+    if (this.position.y <= groundY + 0.05 && this._velY <= 0.001) {
+      this.position.y = groundY;
+      this._velY = 0;
+      this._onGround = true;
+    } else {
+      this._onGround = false;
+    }
+    this.world.resolveCollisions(this.position, RADIUS);
+
+    if (moveTarget) {
+      const moved = Math.hypot(this.position.x - beforeX, this.position.z - beforeZ);
+      if (moved < this.speed * dt * 0.18) this._stuckT += dt;
+      else this._stuckT = Math.max(0, this._stuckT - dt * 2);
+      if (this._stuckT > 0.38 && this._onGround) {
+        this._stuckT = 0;
+        this._strafeSign *= -1;
+        this._wantsJump = true;
+        this.wanderCooldown = 0;
+      }
+    } else {
+      this._stuckT = 0;
+    }
+
+    this._padTeleCD = Math.max(0, this._padTeleCD - dt);
+    if (this._padTeleCD <= 0 && world?.queryTeleport) {
+      const dest = world.queryTeleport(this.position.x, this.position.z);
+      if (dest) {
+        this.position.copy(dest);
+        this._velY = 0;
+        this._onGround = true;
+        this._padTeleCD = 1;
+      }
+    }
+
+    if (this.position.y < -35) {
+      this.respawnAt(this.world.safeSpawnPoint?.([player]) || this.world.randomSpawnPoint());
+      return;
     }
 
     this.mesh.position.set(this.position.x, this.position.y, this.position.z);
@@ -570,14 +737,9 @@ export class Bot {
       const ud = this.mesh.userData;
       const moving = !!moveTarget;
       const spd = moving ? (this.speed || 3) : 0;
-      // Strafe input: sign of lateral component of moveTarget in the bot's
-      // local frame — feeds the strafe-lean layer.
-      let strafe = 0;
-      if (moveTarget) {
-        const yaw = this.mesh.rotation.y;
-        const cs = Math.cos(yaw), sn = Math.sin(yaw);
-        strafe = -(moveTarget.x * cs - moveTarget.z * sn);   // local X
-      }
+      // The tactical steering already expresses travel in the aim-relative
+      // frame, so strafing remains correct while the torso tracks the player.
+      const strafe = moving ? gaitDirR : 0;
       if (ud.setLocomotion) ud.setLocomotion(spd, true, this.speed > 3.4, strafe);
       else ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
 
@@ -615,7 +777,18 @@ export class Bot {
     if (this._rig) {
       const isMoving = !!moveTarget;
       // applyWalkCycle owns the stride phase and locks it to ground speed.
-      gait = applyWalkCycle(this._rig, { speed: isMoving ? this.speed : 0, moving: isMoving, run, dt });
+      // Bots now orbit and retreat while aiming, so direction and air state are
+      // explicit—the forward-only default would moonwalk during those moves.
+      gait = applyWalkCycle(this._rig, {
+        speed: isMoving ? this.speed : 0,
+        moving: isMoving,
+        run,
+        dirF: gaitDirF,
+        dirR: gaitDirR,
+        grounded: this._onGround,
+        vy: this._velY,
+        dt,
+      });
       this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so
       // you can hear someone coming up behind you.

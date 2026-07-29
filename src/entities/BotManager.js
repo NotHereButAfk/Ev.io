@@ -78,9 +78,63 @@ export class BotManager {
     return this.bots.length > 0 && this.bots.every((b) => !b.alive);
   }
 
-  update(dt, player, camera, onPlayerDamaged, world) {
+  update(dt, player, camera, onPlayerDamaged, world, allowBotCombat = true) {
     for (const bot of this.bots) {
-      bot.update(dt, player, camera, onPlayerDamaged, world);
+      let target = player;
+
+      if (allowBotCombat && bot.alive) {
+        bot._targetScanT = Math.max(0, (bot._targetScanT || 0) - dt);
+        const current = bot._targetEntity;
+        const currentValid = current && current !== bot && !current.isDead &&
+          current.alive !== false && current.position &&
+          current.position.distanceTo(bot.position) < 46;
+
+        if (!currentValid || bot._targetScanT <= 0) {
+          const candidates = [player, ...this.bots].filter((candidate) =>
+            candidate && candidate !== bot && candidate.position &&
+            !candidate.isDead && candidate.alive !== false
+          );
+          let best = null;
+          let bestScore = Infinity;
+          for (const candidate of candidates) {
+            // A small stickiness bonus prevents target-flipping every scan when
+            // two opponents cross at nearly the same distance.
+            const sticky = candidate === current ? -5 : 0;
+            const score = candidate.position.distanceTo(bot.position) + sticky;
+            if (score < bestScore) {
+              best = candidate;
+              bestScore = score;
+            }
+          }
+          bot._targetEntity = best;
+          bot._targetScanT = 0.32 + Math.random() * 0.34;
+        }
+        target = bot._targetEntity || player;
+      }
+
+      const onTargetDamaged = target === player
+        ? (damage, from) => {
+            const wasDead = player.isDead;
+            onPlayerDamaged(damage, from);
+            if (!wasDead && player.isDead) {
+              bot._botKills = (bot._botKills || 0) + 1;
+              bot._targetEntity = null;
+              bot._targetScanT = 0;
+            }
+          }
+        : (damage) => {
+            if (!target?.alive) return;
+            const killed = target.takeDamage(damage);
+            target._targetEntity = bot;
+            target._targetScanT = 0.9;
+            if (killed) {
+              bot._botKills = (bot._botKills || 0) + 1;
+              bot._targetEntity = null;
+              bot._targetScanT = 0;
+            }
+          };
+
+      bot.update(dt, target, camera, onTargetDamaged, world);
     }
   }
 

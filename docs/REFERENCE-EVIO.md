@@ -113,6 +113,16 @@ Visible animation and combat-feedback cues:
   This is evidence for a gameplay feature, not enough evidence to invent its
   timing or add it without server-authoritative support.
 
+Owner-directed bot behavior:
+
+- **[owner-observed, clarified 2026-07-29]** Arena bots should actively acquire
+  opponents rather than wait to be shot, fight other bots as well as the human
+  player, change strafe direction during gunfights, reposition vertically, and
+  pursue briefly after losing sight.
+- **[ours]** Exact detection radii, spacing bands, jump timing, reaction time,
+  burst length, aim scatter and damage remain KYX.IO tuning choices. The visual
+  reference does not reveal ev.io's internal AI constants.
+
 These cues were checked frame-by-frame in
 [`65nU5yZxavw`](https://www.youtube.com/watch?v=65nU5yZxavw),
 [`HwdzCEbgxEQ`](https://www.youtube.com/watch?v=HwdzCEbgxEQ), and
@@ -130,6 +140,13 @@ lower-left, small weapon-switch chips at bottom-centre, standalone ammunition
 at lower-right, a quiet top-centre timer, and a single-line match summary. This
 is a visual adaptation to KYX.IO's existing information and controls, not a
 claim of pixel-identical ev.io UI.
+
+**[ours, implemented 2026-07-29]** Arena bots now play an active free-for-all:
+nearest-opponent targeting prevents a 7v1 against the user; ranged bots
+close/orbit/retreat and fire short imperfect bursts; melee bots rush; all bots
+can jump, use lifts/teleporters, recover from collision stalls, and search the
+last visible position without shooting through cover. Bot scoreboard kills are
+now earned by simulated combat rather than seeded display values.
 
 Implementation boundary: these cues justify this project's visual treatment.
 They do **not** verify exact ev.io layouts, scale, collision, spawn locations,

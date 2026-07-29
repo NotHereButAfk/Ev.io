@@ -68,6 +68,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   drives speed and strafe, automatic fire produces repeated recoil, death holds
   a short fall instead of popping out, and respawn triggers the same reform beat
   used by teleporting human bodies.
+- `src/entities/Bot.js` + `BotCombat.js` — active arena-opponent behavior:
+  sight acquisition with short last-seen memory, close/orbit/retreat/rush
+  steering, imperfect burst fire, jump/lift/teleporter traversal and
+  collision-stall recovery. `BotManager` targets the nearest living opponent
+  across the player and other bots, so deathmatch is a real free-for-all rather
+  than seven bots focusing the user. `npm run test:bots` locks the tactical
+  spacing, burst cadence and opponent-selection contract.
 - `src/weapons/` — WeaponSystem, weapon defs, skins, `WeaponModels.js` (GLB
   loader + procedural builders). The arsenal's models are **Blender-authored
   GLBs** scripted via `bpy` in `tools/` (`gunlib.py` helpers — box/cyl/row +
@@ -108,7 +115,8 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   from the in-match readouts and is the authoritative gameplay-HUD cascade.
 
 ## Done this project (high level)
-- Full menu/page restyle; clean edge-aligned in-game HUD; floating damage numbers;
+- Full menu/page restyle; clean edge-aligned in-game HUD; active free-for-all
+  arena bots; floating damage numbers;
   ev.io post-match leaderboard; PROFILE nav dropdown (Inventory/Career/Achievements);
   Achievements page; hold-TAB in-game scoreboard; survival wave HUD + wave bonus
   + best time; **1:1 inventory** (per-gun tabs, no main/map split);
