@@ -1,6 +1,18 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildPreviewCharacter } from '../player/PreviewCharacter.js';
+import { isSharedGeometry } from '../player/LowPolyModels.js';
+
+// The cyborg chassis share their geometry between every body in the game, so
+// tearing down the preview must not free it — swapping armour in the loadout
+// would otherwise empty the player's own model and every bot's.
+function _release(group) {
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    if (!isSharedGeometry(o.geometry)) o.geometry.dispose();
+    o.material.dispose();
+  });
+}
 
 // Dedicated Three.js renderer for the loadout panel's live armor preview.
 // Shows the full character (selected player skin + armor type + armor finish)
@@ -61,7 +73,7 @@ export class ArmorPreviewRenderer {
   loadArmor(playerSkin, armorTypeId, armorSkin) {
     if (this._group) {
       this._scene.remove(this._group);
-      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      _release(this._group);
       this._group = null;
     }
     const g = buildPreviewCharacter(playerSkin, armorTypeId, armorSkin, { preferSpartan: true });
@@ -121,7 +133,7 @@ export class ArmorPreviewRenderer {
   dispose() {
     this.stop();
     if (this._group) {
-      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      _release(this._group);
     }
     this._renderer.dispose();
   }

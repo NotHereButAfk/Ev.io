@@ -60,7 +60,14 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
-- `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
+- `src/player/` — `LowPolyModels.js` builds the PRIMARY player/bot chassis (the
+  three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
+  feet, arms, hands, skull — is one **lofted superelliptical surface** per part
+  (`|x/rx|^n + |z/rz|^n = 1`, n 2 = limb, 2.8 = ribcage, 3.2 = boot sole), and
+  the armour is `plate()`d as curved shells that wrap the form underneath rather
+  than boxes bolted over it. Buffers are cached by shape and SHARED between
+  bodies — see AGENTS.md 2e/2f, and `npm run test:mesh`.
+  `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
@@ -123,6 +130,9 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   kill-plane recovery to last safe support, deterministic teleport ray.
 - `src/sim/fixtures.js` — 10 sealed fixtures (flat-floor, wall, corner, ramp,
   step, ceiling, crouch tunnel, slide, teleport, recovery), shared by runner+lab.
+- `npm run test:mesh` (tools/mesh_check.mjs) — the body mesh still carries the
+  rig metrics the animation reads off it (pivot heights, sole plane, limb mean-x,
+  head zone), for all three chassis, plus the shared-buffer teardown rule.
 - `npm run test:move` (tools/movesim_fixtures.mjs) — invariants, double-run
   bit-identity, frame-schedule parity (two seeded irregular frame schedules →
   identical 20Hz hashes), golden hashes in tests/movesim.golden.json, movement

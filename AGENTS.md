@@ -27,6 +27,7 @@ npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
 npm run test:gait             # walk cycle: foot planting in every direction, jump pose
 npm run test:actions          # every action moves the body
+npm run test:mesh             # body mesh still carries the rig metrics
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -109,6 +110,30 @@ melee strike off its `swingPhase` — pass that progress straight through; do no
 start a second timer, it will drift out of step with the thing it depicts.
 `npm run test:actions` fails on any action whose pose is identical to not doing
 it, which is the actual failure mode: silence, not a wrong number.
+
+**2e. The body MESH is free to change; the numbers the animation reads off it
+are not.** `Locomotion.js` solves ground contact against a hard-coded leg chain
+(hip 1.21 / knee 0.62 / ankle 0.27, sole on y 0 spanning z +0.10 → −0.20) and
+`RifleCarry.js` IKs both arms against a hard-coded shoulder (|x| 0.27, y 1.76)
+and bone lengths (0.48 / 0.385). None of it is derived from the mesh, so
+reshaping the body silently breaks the ground solve or puts the hands off the
+gun. Two of these bite from an odd direction:
+→ `rigCharacterLimbs()` places each pivot at the MEAN x of the parts it
+  collected, so nudging one plate sideways moves the whole joint. Sideways shape
+  offsets belong in the geometry, not in `mesh.position`.
+→ Bots tag headshot zones with `mesh.position.y >= 1.90`, so a part whose
+  position sits at the origin with its height baked into the vertices drops out
+  of the head hitbox even though it renders in the right place.
+`npm run test:mesh` measures all of it off the built mesh, for all three
+chassis.
+
+**2f. The cyborg chassis SHARE their geometry between every body on the map.**
+`LowPolyModels.js` caches each buffer by shape, which is what keeps eight bots
+cheap to build (~8ms a body instead of ~34ms) and lets the outline hull cache
+hit. It also means `geometry.dispose()` on one body empties every other body
+that is still drawing — the player's own model included. Anything that tears
+down a character must check `isSharedGeometry()` first; `Avatar.dispose()` and
+`ArmorPreviewRenderer` both do, and `test:mesh` fails if either stops.
 
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
 `applyMeleeCarry()` owns them for a blade.
