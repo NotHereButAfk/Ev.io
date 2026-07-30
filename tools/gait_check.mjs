@@ -104,13 +104,13 @@ let failures = 0;
 const check = (ok, msg) => { if (!ok) { failures++; console.log('   FAIL  ' + msg); } };
 
 console.log('planted-foot slip  (0 = plants, 1 = feet do nothing, 2 = runs backwards)\n');
-console.log('   direction          walk 6.2   sprint 9.6');
+console.log('   direction          walk 6.2   sprint 10.85');
 const DIRS = [[0, 'forward'], [180, 'backpedal'], [-90, 'strafe-left'], [90, 'strafe-right'],
               [135, 'back-right diag'], [45, 'fwd-right diag']];
 const LIMIT = 0.25;
 for (const [deg, name] of DIRS) {
   const w = measureSlip(6.2, deg, { run: 0 }).slip;
-  const s = measureSlip(9.6, deg, { run: 1 }).slip;
+  const s = measureSlip(10.85, deg, { run: 1 }).slip;
   const bad = Math.max(Math.abs(w), Math.abs(s)) > LIMIT;
   console.log('   %s %s     %s%s', name.padEnd(16),
     w.toFixed(2).padStart(6), s.toFixed(2).padStart(6), bad ? '   <— SKATING' : '');

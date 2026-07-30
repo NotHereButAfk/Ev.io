@@ -1,20 +1,22 @@
 import * as THREE from 'three';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
+import { authoredWeaponSpecs } from './PickupLayout.js';
 
 const RESPAWN_DELAY = 18;  // seconds before a pickup reappears
 const COLLECT_RADIUS = 1.6;
 const WEAPON_RESPAWN = 35;  // power weapons come back slowly — worth fighting over
 const WEAPON_COLLECT_RADIUS = 2.0;
+const WEAPON_COLLECT_HEIGHT = 2.2;
 
-// The five "power" weapons that spawn on the map (ev.io style): a marked beam of
-// light with the floating weapon inside. Collecting one swaps it into your hands.
-const SPECIAL_WEAPONS = [
-  { id: 'rpg',        pos: [  0,   0], color: 0xff7a1a },  // Nova Launcher (centre holo-fountain — most contested)
-  { id: 'boltsniper', pos: [ 22,   0], color: 0x33d0ec },  // Rail Driver
-  { id: 'fuelrod',    pos: [-22,   0], color: 0x5cff7a },  // Fuel Rod
-  { id: 'needler',    pos: [  0,  22], color: 0xff4dd2 },  // Needler
-  { id: 'concussion', pos: [  0, -22], color: 0xb27bff },  // Concussion Rifle
+// Used only by maps with no authored weapon markers. Rook's deterministic
+// marker-to-gun mapping lives in PickupLayout.js.
+const FALLBACK_SPECIAL_WEAPONS = [
+  { id: 'rpg',        position: new THREE.Vector3(0, 0, 0),   color: 0xff7a1a },
+  { id: 'boltsniper', position: new THREE.Vector3(22, 0, 0),  color: 0x33d0ec },
+  { id: 'fuelrod',    position: new THREE.Vector3(-22, 0, 0), color: 0x5cff7a },
+  { id: 'needler',    position: new THREE.Vector3(0, 0, 22),  color: 0xff4dd2 },
+  { id: 'concussion', position: new THREE.Vector3(0, 0, -22), color: 0xb27bff },
 ];
 
 // Pickup definitions: type, color, geometry size
@@ -43,10 +45,16 @@ const SPAWN_LAYOUT = [
 ];
 
 export class PickupSystem {
-  constructor(scene) {
+  constructor(scene, authoredWeaponSpawns = []) {
     this.scene    = scene;
     this._pickups = [];
+    this._weaponSpawns = this._resolveWeaponSpawns(authoredWeaponSpawns);
     this._buildAll();
+  }
+
+  _resolveWeaponSpawns(points) {
+    const authored = authoredWeaponSpecs(points);
+    return authored.length ? authored : FALLBACK_SPECIAL_WEAPONS;
   }
 
   _buildMesh(def) {
@@ -93,11 +101,11 @@ export class PickupSystem {
       this._pickups.push({ type, def, mesh, active: true, respawnTimer: 0, baseY: 0.7, _animT: this._pickups.length * 1.37 });
     }
     // Special power-weapon spawns.
-    for (const spec of SPECIAL_WEAPONS) {
+    for (const spec of this._weaponSpawns) {
       const gun = getWeapon(spec.id);
       if (!gun) continue;
       const mesh = this._buildWeaponMesh(spec, gun);
-      mesh.position.set(spec.pos[0], 0, spec.pos[1]);
+      mesh.position.copy(spec.position);
       this.scene.add(mesh);
       this._pickups.push({
         type: 'weapon', gunId: spec.id, def: gun, name: gun.name, mesh,
@@ -230,9 +238,12 @@ export class PickupSystem {
 
       // Proximity collect
       const dx = pPos.x - p.mesh.position.x;
+      const dy = pPos.y - p.mesh.position.y;
       const dz = pPos.z - p.mesh.position.z;
       const radius = p.type === 'weapon' ? WEAPON_COLLECT_RADIUS : COLLECT_RADIUS;
-      if (Math.sqrt(dx * dx + dz * dz) < radius && !player.isDead) {
+      const closeEnough = Math.sqrt(dx * dx + dz * dz) < radius
+        && (p.type !== 'weapon' || Math.abs(dy) < WEAPON_COLLECT_HEIGHT);
+      if (closeEnough && !player.isDead) {
         // Only collect if it does something useful.
         let needed = false;
         if (p.type === 'weapon')  needed = weaponSystem?.currentDef?.id !== p.gunId;  // not already holding it

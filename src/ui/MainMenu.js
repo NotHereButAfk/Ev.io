@@ -573,14 +573,26 @@ export class MenuUI {
       const isYou = currentUser && p.name.toLowerCase() === currentUser.toLowerCase();
       if (isYou) tr.classList.add('rnk-you');
       const kd = p.deaths > 0 ? (p.kills / p.deaths).toFixed(2) : p.kills.toFixed(2);
-      tr.innerHTML =
-        `<td class="rnk-rank">${i + 1}</td>` +
-        `<td class="rnk-name">${p.name}${isYou ? ' <span class="rnk-you-tag">YOU</span>' : ''}</td>` +
-        `<td>${p.kills}</td>` +
-        `<td>${p.deaths}</td>` +
-        `<td>${kd}</td>` +
-        `<td>${p.score.toLocaleString()}</td>` +
-        `<td>${p.games}</td>`;
+      const cell = (value, className = '') => {
+        const td = document.createElement('td');
+        if (className) td.className = className;
+        td.textContent = value;
+        tr.appendChild(td);
+        return td;
+      };
+      cell(i + 1, 'rnk-rank');
+      const nameCell = cell(p.name, 'rnk-name');
+      if (isYou) {
+        const badge = document.createElement('span');
+        badge.className = 'rnk-you-tag';
+        badge.textContent = 'YOU';
+        nameCell.append(' ', badge);
+      }
+      cell(p.kills);
+      cell(p.deaths);
+      cell(kd);
+      cell(p.score.toLocaleString());
+      cell(p.games);
       tbody.appendChild(tr);
     });
     if (!players.length) {

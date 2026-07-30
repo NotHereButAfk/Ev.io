@@ -9,9 +9,9 @@ function clearErr(id) { document.getElementById(id)?.classList.add('hidden'); }
 const nameEl = document.getElementById('login-name');
 const passEl = document.getElementById('login-pass');
 
-const doLogin = () => {
+const doLogin = async () => {
   clearErr('login-err');
-  const res = UserAccount.login(nameEl.value.trim(), passEl.value);
+  const res = await UserAccount.login(nameEl.value.trim(), passEl.value);
   if (res.ok) window.location.href = '/';
   else err('login-err', res.err);
 };

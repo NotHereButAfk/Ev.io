@@ -553,6 +553,7 @@ export class World {
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
     this.spawnPoints = [];
+    this.weaponSpawnPoints = [];
     this.usesMeshCollision = true;
     this._mapOctree = null;
     this._mapBounds = null;
@@ -680,6 +681,7 @@ export class World {
     this._mapBounds = map.bounds;
 
     if (map.spawnPoints.length) this.spawnPoints = map.spawnPoints;
+    this.weaponSpawnPoints = map.weaponSpawnPoints;
     const maxXZ = Math.max(
       Math.abs(map.bounds.min.x),
       Math.abs(map.bounds.max.x),

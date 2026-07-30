@@ -1,8 +1,12 @@
 // Browser-local account system backed by localStorage.
-// No real security guarantee — this is a client-side game.
+// This is still a demo identity store, not server authentication. Passwords
+// are nevertheless salted and stretched so the browser never persists them
+// as plaintext. Existing plaintext records upgrade after one valid login.
 
 const _DB  = 'sio_accounts';
 const _SES = 'sio_session';
+const _PBKDF2_ITERS = 210_000;
+const _SALT_BYTES = 16;
 
 function _load() {
   try { return JSON.parse(localStorage.getItem(_DB) || '{"accounts":{}}'); }
@@ -10,31 +14,107 @@ function _load() {
 }
 function _save(db) { localStorage.setItem(_DB, JSON.stringify(db)); }
 
+function _base64(bytes) {
+  let raw = '';
+  for (const byte of bytes) raw += String.fromCharCode(byte);
+  return btoa(raw);
+}
+
+function _fromBase64(value) {
+  const raw = atob(value);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+async function _derive(password, salt, iterations = _PBKDF2_ITERS) {
+  if (!globalThis.crypto?.subtle) throw new Error('secure password storage unavailable');
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+    material,
+    256
+  );
+  return new Uint8Array(bits);
+}
+
+function _sameBytes(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+async function _passwordRecord(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(_SALT_BYTES));
+  const hash = await _derive(password, salt);
+  return {
+    passwordHash: _base64(hash),
+    passwordSalt: _base64(salt),
+    passwordIterations: _PBKDF2_ITERS,
+  };
+}
+
 export const UserAccount = {
   current()    { return sessionStorage.getItem(_SES) || null; },
   isGuest()    { return sessionStorage.getItem(_SES) === '__guest__'; },
   isLoggedIn() { return !!sessionStorage.getItem(_SES); },
 
-  login(username, password) {
+  async login(username, password) {
     if (!username) return { ok: false, err: 'Enter a username' };
-    const { accounts } = _load();
-    const acc = accounts[username.toLowerCase()];
-    if (!acc)                      return { ok: false, err: 'Account not found' };
-    if (acc.password !== password) return { ok: false, err: 'Incorrect password' };
-    sessionStorage.setItem(_SES, username.toLowerCase());
+    const key = username.toLowerCase();
+    const db = _load();
+    const acc = db.accounts[key];
+    if (!acc) return { ok: false, err: 'Account not found' };
+
+    try {
+      let valid = false;
+      if (acc.passwordHash && acc.passwordSalt) {
+        const actual = await _derive(
+          password,
+          _fromBase64(acc.passwordSalt),
+          acc.passwordIterations || _PBKDF2_ITERS
+        );
+        valid = _sameBytes(actual, _fromBase64(acc.passwordHash));
+      } else if (typeof acc.password === 'string') {
+        // One-time compatibility path for accounts created before hashes.
+        valid = acc.password === password;
+        if (valid) {
+          Object.assign(acc, await _passwordRecord(password));
+          delete acc.password;
+          _save(db);
+        }
+      }
+      if (!valid) return { ok: false, err: 'Incorrect password' };
+    } catch {
+      return { ok: false, err: 'Secure login is unavailable in this browser' };
+    }
+
+    sessionStorage.setItem(_SES, key);
     return { ok: true };
   },
 
-  register(username, password) {
+  async register(username, password) {
     const u = (username || '').trim();
     if (u.length < 2)               return { ok: false, err: 'Username must be 2+ characters' };
+    if (u.length > 24)              return { ok: false, err: 'Username must be 24 characters or fewer' };
     if (!/^[a-zA-Z0-9_]+$/.test(u)) return { ok: false, err: 'Letters, numbers and _ only' };
-    if (!password || password.length < 3) return { ok: false, err: 'Password must be 3+ characters' };
+    if (!password || password.length < 8) return { ok: false, err: 'Password must be 8+ characters' };
     const db = _load();
     if (db.accounts[u.toLowerCase()]) return { ok: false, err: 'Username already taken' };
+    let passwordFields;
+    try {
+      passwordFields = await _passwordRecord(password);
+    } catch {
+      return { ok: false, err: 'Secure registration is unavailable in this browser' };
+    }
     db.accounts[u.toLowerCase()] = {
       displayName: u,
-      password,
+      ...passwordFields,
       created: Date.now(),
       stats: { kills: 0, deaths: 0, score: 0, games: 0 },
     };

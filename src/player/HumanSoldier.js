@@ -2,6 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {
+  dampHumanTimeScale,
+  normalizeRootPositionValues,
+  selectHumanMotion,
+  targetHumanTimeScale,
+} from './HumanLocomotion.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Real rigged human soldier (Mixamo "Vanguard"), with Idle / Walk / Run clips.
@@ -52,8 +58,8 @@ const HEAD_SQUASH = new THREE.Vector3(0.82, 0.6, 0.86);
 // scale. This is what makes the loadout's armor cards each preview a different
 // "model" instead of the same green Chief four times.
 export const ARMOR_LOOKS = {
-  assault: { // white / silver plated spartan with orange energy glow (default)
-    body: 0xe9edf2, visor: 0xff8a1f,
+  assault: { // slate tactical plate with orange energy glow (default)
+    body: 0x596775, visor: 0xffa229,
     roughness: 0.42, metalness: 0.5, scale: 1.00,
   },
   recon: {   // sleek light-blue scout exo
@@ -93,7 +99,7 @@ function findBone(root, name) {
  * `armorTypeId` selects one of the ARMOR_LOOKS variants so each loadout armor
  * type previews as a distinct super-soldier.
  */
-export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
+export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSkin = null) {
   if (!_template) return null;
 
   const look = _lookFor(armorTypeId);
@@ -129,7 +135,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // Bolt on this loadout's distinct armour set (bone-parented so plates ride the
   // skeleton during the animation). Each armor type gets its own silhouette.
   group.updateMatrixWorld(true);
-  const armor = _buildArmorPieces(root, armorTypeId, look);
+  const armor = _buildArmorPieces(root, armorTypeId, look, armorSkin);
 
   // Measure the standing figure now, while its matrices resolve cleanly, and
   // stash the result. Re-measuring a posed SkinnedMesh elsewhere (e.g. the
@@ -143,7 +149,13 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // ── Animation: 3 clips (idle/walk/run) + rich procedural motion layers ──
   const mixer   = new THREE.AnimationMixer(root);
   const byName  = {};
-  for (const clip of _template.animations) byName[clip.name] = clip;
+  const bindHips = findBone(root, 'Hips')?.position;
+  for (const source of _template.animations) {
+    const clip = source.clone();
+    const hipsTrack = clip.tracks.find((track) => /Hips\.position$/i.test(track.name));
+    if (hipsTrack && bindHips) normalizeRootPositionValues(hipsTrack.values, bindHips);
+    byName[clip.name] = clip;
+  }
 
   const actions = {
     idle: byName.Idle ? mixer.clipAction(byName.Idle) : null,
@@ -155,10 +167,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   }
 
   let current = null;
-  // Crossfade time is chosen per transition: quick between neighboring clips,
-  // longer when returning to a rest state, so the blends never look snappy or
-  // overlong. `warp` keeps foot cadence in sync between locomotion clips.
-  const FADE = { idleToWalk: 0.14, walkToRun: 0.18, runToWalk: 0.20, walkToIdle: 0.24, idleToRun: 0.22, runToIdle: 0.26 };
+  // Phase-matched crossfades preserve which foot is planted. Resetting every
+  // new clip to frame zero made both feet pop whenever walk/run switched, while
+  // Three's warp option briefly sped one clip up and slowed the other down.
+  const FADE = { idleToWalk: 0.22, walkToRun: 0.28, runToWalk: 0.30, walkToIdle: 0.30, idleToRun: 0.30, runToIdle: 0.34 };
   const _fadeKey = (from, to) => {
     if (!from || !to) return 0.2;
     const f = from === actions.idle ? 'idle' : from === actions.walk ? 'walk' : 'run';
@@ -168,14 +180,17 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const setMotion = (name) => {
     const next = actions[name] || actions.idle;
     if (!next || next === current) return;
+    const phase = current && current !== actions.idle && next !== actions.idle
+      ? (current.time / Math.max(1e-5, current.getClip().duration)) % 1
+      : 0;
     next.enabled = true;
     next.setEffectiveTimeScale(1);
     next.setEffectiveWeight(1);
     next.reset().play();
+    if (phase > 0) next.time = phase * next.getClip().duration;
     if (current) {
       const fade = _fadeKey(current, next);
-      const warp = (next !== actions.idle && current !== actions.idle);   // warp between locomotion clips
-      current.crossFadeTo(next, fade, warp);
+      current.crossFadeTo(next, fade, false);
     }
     current = next;
   };
@@ -260,12 +275,16 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   // layer for lean, launch/land bounce, etc.
   const _clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   let _locName    = 'idle';
+  let _reportedSpeed = 0;
+  let _targetTimeScale = baseTS;
+  let _currentTimeScale = baseTS;
   let _lastSpeed  = 0;
   let _accel      = 0;                     // smoothed dSpeed/dt for lean
   let _grounded   = true;
   let _airT       = 0;                     // seconds off the ground
   let _landT      = 0;                     // seconds since landing (landing squish)
   let _strafeLean = 0;                     // –1 (right) .. +1 (left)
+  let _targetStrafeLean = 0;
   let _forwardLean = 0;                    // 0..1 momentum lean forward
   let _fireRecoil = 0;                     // recoil kick amplitude, decays
   let _flinch     = { x: 0, y: 0, t: 0 };  // damage flinch, decays
@@ -281,6 +300,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const TP_DUR    = 0.42;                   // teleport reform duration (s)
 
   const setLocomotion = (speed, grounded = true, sprinting = false, strafe = 0) => {
+    _reportedSpeed = Math.max(0, Number.isFinite(speed) ? speed : 0);
     // Air state overrides everything — bots normally pass grounded=true, but a
     // player-controlled or scripted character can hop by setting grounded=false.
     if (!grounded) {
@@ -291,22 +311,16 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
       // reads as a real jump — a push-off, an apex tuck, and a reach for the
       // landing — instead of a slow walk cycle treading the air.
       setMotion('idle');
-      mixer.timeScale = baseTS;
+      _targetTimeScale = baseTS;
     } else {
       if (!_grounded) { _landT = 0.24; _airT = 0; } // landing bounce
       _grounded = true;
-      let name = 'idle', ts = baseTS;
-      const runOn = _locName === 'run';
-      if (sprinting || speed > (runOn ? 4.4 : 5.4)) {
-        name = 'run';  ts = baseTS * _clamp(speed / 5.5, 0.7, 1.55);
-      } else if (speed > (_locName === 'idle' ? 0.55 : 0.32)) {
-        name = 'walk'; ts = baseTS * _clamp(speed / 1.6, 0.55, 1.9);
-      }
+      const name = selectHumanMotion(_reportedSpeed, sprinting, _locName);
       _locName = name;
       setMotion(name);
-      mixer.timeScale = ts;
+      _targetTimeScale = targetHumanTimeScale(name, _reportedSpeed, baseTS);
     }
-    _strafeLean = _clamp(strafe, -1, 1);
+    _targetStrafeLean = _clamp(strafe, -1, 1);
   };
 
   // Aim tracking: yaw twists the upper spine, pitch tilts the head.
@@ -354,6 +368,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
   const armorTick = (dt) => {
     armorT += dt;
     const t = armorT;
+    _currentTimeScale = dampHumanTimeScale(_currentTimeScale, _targetTimeScale, dt);
+    mixer.timeScale = _currentTimeScale;
+    _strafeLean += (_targetStrafeLean - _strafeLean) * (1 - Math.exp(-10 * dt));
+    const gaitPhase = current && current !== actions.idle
+      ? (current.time / Math.max(1e-5, current.getClip().duration)) * Math.PI * 2
+      : t * 1.5;
 
     // Keep the head squashed even if an animation clip touches head scale.
     if (B.head) B.head.scale.copy(HEAD_SQUASH);
@@ -376,7 +396,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     for (const p of poseOffsets) p.bone.quaternion.multiply(p.q);
 
     // ── Track state for lean/land/recoil layers ──
-    const speedNow = _locName === 'run' ? 5.5 : _locName === 'walk' ? 1.8 : 0;
+    const speedNow = _grounded ? _reportedSpeed : 0;
     _accel += ((speedNow - _lastSpeed) / Math.max(dt, 1e-3) - _accel) * Math.min(1, dt * 4);
     _lastSpeed = speedNow;
     if (!_grounded) { _airT += dt; _jumpT += dt; }
@@ -508,8 +528,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 
     // ── Layer 9: locomotion accent — a tiny head bob at foot cadence for weight ──
     if (_grounded && (_locName === 'walk' || _locName === 'run')) {
-      const cadence = _locName === 'run' ? 3.4 : 2.2;
-      const bobY = Math.sin(t * cadence * 2) * (_locName === 'run' ? 0.010 : 0.006);
+      const bobY = Math.sin(gaitPhase * 2) * (_locName === 'run' ? 0.010 : 0.006);
       if (B.head) B.head.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, bobY));
     }
 
@@ -527,9 +546,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
 
       // Cadence sway + breathing keep the carry alive instead of frozen; a
       // sprint tuck drops the weapon toward the hip when running flat out.
-      const cad     = _locName === 'run' ? 3.4 : 2.2;
       const alive   = _grounded && _locName !== 'idle'
-                    ? Math.sin(t * cad * 2) * 0.045
+                    ? Math.sin(gaitPhase * 2) * 0.045
                     : Math.sin(t * 1.5) * 0.015;
       const tuck    = _holdRunT * 0.22;                       // sprint: muzzle dips
       const landDip = _landT > 0 ? Math.sin((1 - _landT / 0.24) * Math.PI) * 0.12 : 0;
@@ -600,6 +618,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     armorTick,
     bodyMats,
     visorMats,
+    armorMats: armor.materials,
     armorTypeId,
     baseBodyColor: look.body, // the variant's plate colour, used as tint anchor
     // Cached framing metrics (see measurement above).
@@ -613,7 +632,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault') {
     secondaryMat: bodyMats[0] || null,
   };
 
-  if (skin) tintHumanSoldier(group, skin);
+  if (skin) tintHumanSoldier(group, skin, armorSkin);
   return group;
 }
 
@@ -794,9 +813,9 @@ function _attachAtWorld(bone, mesh, wx, wy, wz, worldScale, quat) {
 // type MOVES differently, not just looks different.
 const ARMOR_MOTION = {
   assault: { speed: 1.00, spineLean:  0.00, headPitch:  0.00 },
-  recon:   { speed: 1.16, spineLean: -0.04, headPitch: -0.06 }, // upright, alert
-  heavy:   { speed: 0.82, spineLean:  0.11, headPitch:  0.05 }, // lumbering hunch
-  stealth: { speed: 0.92, spineLean:  0.13, headPitch:  0.09 }, // low, prowling
+  recon:   { speed: 1.04, spineLean: -0.04, headPitch: -0.06 }, // upright, alert
+  heavy:   { speed: 0.92, spineLean:  0.11, headPitch:  0.05 }, // weighty, not slow-motion
+  stealth: { speed: 0.96, spineLean:  0.13, headPitch:  0.09 }, // low, prowling
 };
 const _AX_X = new THREE.Vector3(1, 0, 0);
 const _AX_Y = new THREE.Vector3(0, 1, 0);
@@ -806,7 +825,7 @@ const _bq2  = new THREE.Quaternion();
 
 // Returns { animated: [...] } — armour meshes that pulse / blink / sway every
 // frame via the group's armorTick(dt).
-function _buildArmorPieces(root, armorTypeId, look) {
+function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const bone = (n) => findBone(root, n);
   const s = look.scale || 1;
 
@@ -814,32 +833,52 @@ function _buildArmorPieces(root, armorTypeId, look) {
   // Layered plate finish: a matte-metal base plate, near-black recessed joints, a
   // bright polished trim for edges/rails, and the variant's glowing accent. The
   // trim is what makes the suit read as authored hard-surface rather than a slab.
+  const plateColor = armorSkin?.primary ?? look.body;
+  const underColor = armorSkin?.secondary ?? 0x0d1016;
+  const glowColor = armorSkin?.emissive ?? look.visor;
+  const finishRoughness = armorSkin?.roughness ?? look.roughness ?? 0.5;
+  const finishMetalness = armorSkin?.metalness ?? 0.66;
   const plate = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).multiplyScalar(0.80),
-    roughness: (look.roughness ?? 0.5) * 0.85, metalness: 0.66, envMapIntensity: 1.1,
+    color: new THREE.Color(plateColor).multiplyScalar(0.80),
+    roughness: finishRoughness * 0.85, metalness: finishMetalness, envMapIntensity: 1.1,
   });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x0d1016, roughness: 0.42, metalness: 0.82 });
-  const trim = new THREE.MeshStandardMaterial({ color: 0xd6dde4, roughness: 0.24, metalness: 0.95, envMapIntensity: 1.25 });
+  plate.userData.armorRole = 'plate';
+  const dark = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(underColor).multiplyScalar(0.55),
+    roughness: 0.42, metalness: 0.82,
+  });
+  dark.userData.armorRole = 'dark';
+  const trim = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(plateColor).lerp(new THREE.Color(0xe8edf2), 0.58),
+    roughness: 0.24, metalness: 0.95, envMapIntensity: 1.25,
+  });
+  trim.userData.armorRole = 'trim';
   const accent = new THREE.MeshStandardMaterial({
-    color: look.visor, emissive: look.visor, emissiveIntensity: 0.9, roughness: 0.26, metalness: 0.5,
+    color: glowColor, emissive: glowColor,
+    emissiveIntensity: armorSkin?.emissiveIntensity ?? 0.9,
+    roughness: 0.26, metalness: 0.5,
   });
+  accent.userData.armorRole = 'accent';
   const cape = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).multiplyScalar(0.4), roughness: 0.92, metalness: 0.05,
+    color: new THREE.Color(underColor).multiplyScalar(0.55), roughness: 0.92, metalness: 0.05,
     side: THREE.DoubleSide,
   });
+  cape.userData.armorRole = 'dark';
   // Dark tactical helmet shell — a near-black gunmetal that matches the dark
   // plating instead of a bright white dome. Carries only a whisper of the
   // variant hue so recon/heavy/stealth still read subtly different, but no
   // armour (least of all the white/silver assault) shows a big white egg.
   const helmetMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(look.body).multiplyScalar(0.26).lerp(new THREE.Color(0x14171e), 0.55),
+    color: new THREE.Color(underColor).multiplyScalar(0.55).lerp(new THREE.Color(0x14171e), 0.45),
     roughness: 0.4, metalness: 0.72, envMapIntensity: 1.0,
   });
+  helmetMat.userData.armorRole = 'dark';
   // Dark glossy visor glass — a near-black reflective faceplate (Halo/Titanfall
   // style) so the face reads as a real visor, not a bright oval.
   const visorMat = new THREE.MeshStandardMaterial({
     color: 0x0a0e14, roughness: 0.12, metalness: 0.92, envMapIntensity: 1.3,
   });
+  visorMat.userData.armorRole = 'visor';
 
   // ── Geometry helpers ────────────────────────────────────────────────────────
   // Every plate is a *rounded* box: chamfered edges catch the light so the armour
@@ -852,6 +891,7 @@ function _buildArmorPieces(root, armorTypeId, look) {
   const sph = (r) => new THREE.SphereGeometry(r, 20, 14);
   const oct = (r) => new THREE.OctahedronGeometry(r);
   const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 12);
+  const cone = (r, h) => new THREE.ConeGeometry(r, h, 10);
   // Bake a non-uniform scale into a geometry (spec attach only allows uniform
   // scale) — used to squash a sphere into a curved visor lens.
   const scaled = (geo, sx, sy, sz) => { geo.scale(sx, sy, sz); return geo; };
@@ -888,6 +928,40 @@ function _buildArmorPieces(root, armorTypeId, look) {
     // Neck gorget (dark) — seals the helmet to the collar (neck bone ~1.453).
     { bone: 'Neck', geo: box(0.225, 0.08, 0.205), mat: dark, x: 0, y: 1.42, z: 0.02 },
   ];
+
+  // Rarity finishes can carry an iconic helmet silhouette in addition to a
+  // palette. These small hard-surface add-ons echo the readable motifs in
+  // ev.io's character roster while staying on this rig and animation set.
+  const theme = armorSkin?.theme;
+  if (theme === 'ears') {
+    const left = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.22));
+    const right = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.22));
+    helmet.push(
+      { bone: 'Head', geo: cone(0.052, 0.19), mat: plate, x: -0.085, y: 1.77, z: 0.005, quat: left },
+      { bone: 'Head', geo: cone(0.052, 0.19), mat: plate, x: 0.085, y: 1.77, z: 0.005, quat: right },
+      { bone: 'Head', geo: cone(0.022, 0.12), mat: accent, x: -0.085, y: 1.775, z: -0.018, quat: left },
+      { bone: 'Head', geo: cone(0.022, 0.12), mat: accent, x: 0.085, y: 1.775, z: -0.018, quat: right },
+    );
+  } else if (theme === 'horns') {
+    const left = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, 0.42));
+    const right = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.18, 0, -0.42));
+    helmet.push(
+      { bone: 'Head', geo: cone(0.036, 0.18), mat: trim, x: -0.075, y: 1.74, z: -0.015, quat: left },
+      { bone: 'Head', geo: cone(0.036, 0.18), mat: trim, x: 0.075, y: 1.74, z: -0.015, quat: right },
+    );
+  } else if (theme === 'crown') {
+    helmet.push(
+      { bone: 'Head', geo: box(0.025, 0.13, 0.07), mat: trim, x: -0.07, y: 1.755, z: 0.015 },
+      { bone: 'Head', geo: box(0.025, 0.17, 0.07), mat: trim, x: 0, y: 1.775, z: 0.015 },
+      { bone: 'Head', geo: box(0.025, 0.13, 0.07), mat: trim, x: 0.07, y: 1.755, z: 0.015 },
+    );
+  } else if (theme === 'bone') {
+    helmet.push(
+      { bone: 'Head', geo: box(0.035, 0.10, 0.035), mat: trim, x: -0.055, y: 1.525, z: -0.135 },
+      { bone: 'Head', geo: box(0.035, 0.10, 0.035), mat: trim, x: 0.055, y: 1.525, z: -0.135 },
+      { bone: 'Head', geo: box(0.105, 0.032, 0.035), mat: trim, x: 0, y: 1.465, z: -0.125 },
+    );
+  }
 
   // spec: { bone, geo, mat, x, y, z, quat?, anim? }
   //   anim: { type:'pulse'|'thruster'|'blink'|'sway', freq, ... }
@@ -975,10 +1049,12 @@ function _buildArmorPieces(root, armorTypeId, look) {
   specs = [...helmet, ...specs]; // every soldier wears the helmet
 
   const animated = [];
+  const armorMaterials = new Set([plate, dark, trim, accent, cape, helmetMat, visorMat]);
   for (const sp of specs) {
     const b = bone(sp.bone);
     if (!b) continue;
     const mat = sp.anim ? sp.mat.clone() : sp.mat; // independent animation per piece
+    armorMaterials.add(mat);
     const mesh = new THREE.Mesh(sp.geo, mat);
     _attachAtWorld(b, mesh, sp.x * s, sp.y * s, sp.z * s, s, sp.quat);
     if (sp.anim) {
@@ -1019,7 +1095,7 @@ function _buildArmorPieces(root, armorTypeId, look) {
   _armPlate('LeftForeArm', 'LeftHand');
   _armPlate('RightForeArm', 'RightHand');
 
-  return { animated };
+  return { animated, materials: [...armorMaterials] };
 }
 
 // Cosmetic skin tint: recolours the armour plates toward the equipped skin
@@ -1040,5 +1116,26 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
       m.color.copy(tint).lerp(new THREE.Color(group.userData?.baseBodyColor ?? 0x5a7d35), 0.35);
     }
     m.needsUpdate = true;
+  }
+  if (armorSkin && group.userData?.armorMats) {
+    const plate = new THREE.Color(armorSkin.primary);
+    const under = new THREE.Color(armorSkin.secondary);
+    const glow = new THREE.Color(armorSkin.emissive ?? armorSkin.primary);
+    for (const m of group.userData.armorMats) {
+      const role = m.userData?.armorRole;
+      if (role === 'plate') m.color.copy(plate).multiplyScalar(0.80);
+      else if (role === 'dark') m.color.copy(under).multiplyScalar(0.55);
+      else if (role === 'trim') m.color.copy(plate).lerp(new THREE.Color(0xe8edf2), 0.58);
+      else if (role === 'accent') {
+        m.color.copy(glow);
+        m.emissive?.copy?.(glow);
+        m.emissiveIntensity = armorSkin.emissiveIntensity ?? 0.9;
+      }
+      if (role === 'plate' || role === 'trim') {
+        m.roughness = armorSkin.roughness ?? m.roughness;
+        m.metalness = armorSkin.metalness ?? m.metalness;
+      }
+      m.needsUpdate = true;
+    }
   }
 }

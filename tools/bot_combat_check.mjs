@@ -16,7 +16,8 @@ const cases = [
   {
     name: 'ranged circles while it has a useful firing lane',
     input: { distance: 9, hasLineOfSight: true, strafeSign: -1 },
-    check: (s) => s.mode === 'orbit' && Math.abs(s.forward) < 0.2 && s.strafe < -0.8,
+    check: (s) => s.mode === 'orbit' && Math.abs(s.forward) < 0.2
+      && s.strafe < -0.6 && s.strafe > -0.8,
   },
   {
     name: 'ranged creates room when crowded',

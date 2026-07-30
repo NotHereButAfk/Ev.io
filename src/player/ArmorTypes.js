@@ -50,6 +50,19 @@ export function getArmorType(id) {
 }
 
 const LS_KEY = 'sio_armor_type';
-// Default to the white cyborg terminator (the new primary player model).
-export function loadArmorType()       { return localStorage.getItem(LS_KEY) || 'vanguard'; }
+const MODEL_MIGRATION_KEY = 'sio_armor_human_model_v1';
+// Roll the current profile onto the rigged armored soldier once. The cyborg
+// roster remains selectable afterward, but new/default players now use the
+// silhouette and animation system that matches ev.io's character skins.
+export function loadArmorType() {
+  const saved = localStorage.getItem(LS_KEY);
+  if (!localStorage.getItem(MODEL_MIGRATION_KEY)) {
+    localStorage.setItem(MODEL_MIGRATION_KEY, '1');
+    if (!saved || ['vanguard', 'striker', 'phantom'].includes(saved)) {
+      localStorage.setItem(LS_KEY, 'assault');
+      return 'assault';
+    }
+  }
+  return saved || 'assault';
+}
 export function saveArmorType(id)     { localStorage.setItem(LS_KEY, id); }

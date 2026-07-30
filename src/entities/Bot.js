@@ -5,6 +5,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
+import { directionToBodyYaw } from '../player/Facing.js';
 import { BOT_TACTICS, advanceBurst, chooseCombatSteering } from './BotCombat.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
@@ -550,11 +551,12 @@ export class Bot {
       // Change direction in readable beats rather than vibrating every frame.
       this._decisionT -= dt;
       if (this._decisionT <= 0) {
-        this._decisionT = 0.55 + Math.random() * 0.75;
-        if (Math.random() < 0.62) this._strafeSign *= -1;
+        this._decisionT = 0.95 + Math.random() * 0.80;
+        if (Math.random() < 0.35) this._strafeSign *= -1;
         const targetIsHigher = player.position.y > this.position.y + 1.15;
         this._wantsJump = this._onGround && this._jumpCooldown <= 0 &&
-          (targetIsHigher || (hasVisual && Math.random() < 0.27));
+          (targetIsHigher || (hasVisual && targetDistance > 6 && targetDistance < 18
+            && Math.random() < 0.10));
       }
 
       const steering = chooseCombatSteering({
@@ -577,9 +579,10 @@ export class Bot {
 
       // Face the live target while circling/retreating. With no visual, face
       // the last-seen point until it is searched.
-      this._targetYaw = Math.atan2(target.x - this.position.x,
-                                   target.z - this.position.z)
-                        + (this._isHuman ? 0 : Math.PI);
+      this._targetYaw = directionToBodyYaw(
+        target.x - this.position.x,
+        target.z - this.position.z
+      );
 
       // Ranged bots use short bursts only with a verified firing lane.
       if (this._botGun && hasVisual && this._reactT <= 0 && distToPlayer < this._botGun.range) {
@@ -635,9 +638,10 @@ export class Bot {
       if (this._wanderDir.lengthSq() > 0.04) {
         moveTarget = this._wanderDir.normalize();
         gaitDirF = 1;
-        this._targetYaw = Math.atan2(this.wanderTarget.x - this.position.x,
-                                     this.wanderTarget.z - this.position.z)
-                          + (this._isHuman ? 0 : Math.PI);
+        this._targetYaw = directionToBodyYaw(
+          this.wanderTarget.x - this.position.x,
+          this.wanderTarget.z - this.position.z
+        );
       }
     }
 
@@ -653,7 +657,7 @@ export class Bot {
     if (this._wantsJump && this._onGround && this._jumpCooldown <= 0) {
       this._velY = BOT_JUMP_SPEED;
       this._onGround = false;
-      this._jumpCooldown = 1.35 + Math.random() * 1.15;
+      this._jumpCooldown = 2.2 + Math.random() * 1.4;
       this.audio?.playAt(this.position, () => this.audio.playJump());
     }
     this._wantsJump = false;
@@ -740,7 +744,7 @@ export class Bot {
       // The tactical steering already expresses travel in the aim-relative
       // frame, so strafing remains correct while the torso tracks the player.
       const strafe = moving ? gaitDirR : 0;
-      if (ud.setLocomotion) ud.setLocomotion(spd, true, this.speed > 3.4, strafe);
+      if (ud.setLocomotion) ud.setLocomotion(spd, this._onGround, this.speed > 3.4, strafe);
       else ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
 
       // Aim: when engaged with the player, spine + head track them; otherwise

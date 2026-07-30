@@ -30,8 +30,8 @@ export const DT = 1 / TICK_RATE;
 
 // Movement constants — kept identical to the legacy controller.
 const WALK_SPEED = 6.2;
-const SPRINT_MULT = 1.55;
-const JUMP_SPEED = 12.0;
+const SPRINT_MULT = 1.75;
+const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
 const RADIUS = 0.45;
 const STAND_H = 1.7;

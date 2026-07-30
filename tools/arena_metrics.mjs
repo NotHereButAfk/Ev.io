@@ -88,8 +88,17 @@ function runCohort(n) {
           if (d < bd) { bd = d; best = other; }
         }
         if (best && bd < 40) {
-          const yaw = Math.atan2(-(best.state.px - me.state.px), -(best.state.pz - me.state.pz));
-          room.onFire(bot.id, { seq: (me._fireSeq = (me._fireSeq || 0) + 1), wid: 'm4', yaw, pitch: 0 });
+          const tx = best.state.px - me.state.px;
+          const ty = best.state.py - me.state.py;
+          const tz = best.state.pz - me.state.pz;
+          const yaw = Math.atan2(-tx, -tz);
+          const pitch = Math.atan2(ty, Math.hypot(tx, tz));
+          room.onFire(bot.id, {
+            seq: (me._fireSeq = (me._fireSeq || 0) + 1),
+            wid: 'm4',
+            yaw,
+            pitch,
+          });
           bot.fireIn = 2 + Math.floor(bot.rnd() * 4);
         }
       }

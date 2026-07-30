@@ -567,6 +567,15 @@ export function buildEvMapScene(parsed, textures = []) {
       point.spawnYaw = THREE.MathUtils.degToRad(270 - spawn.position.w);
       return point;
     });
+  const weaponSpawnPoints = parsed.markers.map((marker) => {
+    const point = new THREE.Vector3(
+      -marker.position.x,
+      marker.position.y,
+      marker.position.z,
+    );
+    point.markerKind = marker.kind;
+    return point;
+  });
 
   const collisionBounds = new THREE.Box3().setFromObject(colliderRoot);
   const bounds = spawnPoints.length
@@ -602,6 +611,7 @@ export function buildEvMapScene(parsed, textures = []) {
     colliderRoot,
     raycastMeshes,
     spawnPoints,
+    weaponSpawnPoints,
     bounds,
     collisionBounds,
     spectatorWaypoints,

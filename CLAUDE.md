@@ -44,6 +44,69 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 ## Working branch
 - Develop on `claude/browser-game-weapons-wb22wp`; merge to `main` to deploy.
 
+## Latest Codex handoff — gameplay polish (2026-07-29)
+- Official Rook weapon pickups now come from the four marker records embedded in
+  `RookLit_0.evmap`, including their authored elevations. `PickupLayout.js`
+  maps them to the local power arsenal; collection checks vertical separation,
+  so a pickup on an upper floor cannot be taken from below. `npm run
+  test:evmap` locks the source hash, marker kinds, mirrored positions and guns.
+- Player mobility is intentionally our tuning, not a claim about ev.io's
+  internal constants: sprint is now 10.85 m/s (`6.2 * 1.75`) and jump impulse is
+  13.8 m/s. Legacy `Player.js` and deterministic `MoveSim.js` match. The new
+  `mobility` fixture locks a jump peak above 4m and sprint above 10.5 m/s.
+- Bots make tactical choices in longer, stickier beats, switch targets less,
+  strafe less violently and random-hop much less. Rigged human bots now receive
+  their actual grounded state, so a jump uses the air pose instead of running
+  in mid-air.
+- The first-person arm is shorter, darkened, tucked into the lower-right and
+  parented to the weapon kick/reload group. It follows the gun instead of
+  floating as a separate bright tube.
+- `ArmorSkins.js` now has eight original ev.io-inspired character finishes:
+  dark undersuits, segmented plate color blocking, restrained emissive accents,
+  and ear/horn/crown/bone helmet themes. Two starter finishes are guest-owned.
+  A one-time migration changes the default from the white cyborg to the rigged
+  human Assault model (cyborgs remain selectable). Guest Inventory access is
+  enabled, and `ArmorPreviewRenderer` now uses the same skinnable rigged model
+  as a match rather than the static white Spartan. Run `npm run test:skins`.
+- Forward-facing animation is centralized in `src/player/Facing.js`. The actual
+  `soldier.glb` planted-foot motion proves that its visual/travel forward is
+  local -Z, matching the procedural bodies. Local players, network avatars and
+  bots now use the same conversion instead of contradictory 180-degree special
+  cases. `npm run test:facing` locks both the yaw math and the real GLB axis.
+- Rigged-human locomotion now uses the measured `soldier.glb` planted-foot
+  speeds (walk 1.70 m/s, run 4.28 m/s) through `HumanLocomotion.js`. Walk/run
+  changes preserve normalized clip phase, avoid Three.js cadence warping,
+  damp playback speed, synchronize head/weapon accents to the actual foot
+  cycle, and normalize each clip's hips track to the same bind origin (the raw
+  clips differed by about 13 cm). Sprint cadence is capped at 1.72x so the
+  10.85 m/s sci-fi sprint does not become cartoon-fast. Run
+  `npm run test:human-motion`.
+- The first-person view now has two complete skinned gloves: a lifted trigger
+  hand seated on the pistol grip and a mirrored support hand on the fore-end.
+  Both are parented to the recoil/reload group; the support hand hides for
+  melee. This replaces the partly clipped single forearm that could disappear
+  below the bottom edge at common FOVs.
+- Full browser playtest (2026-07-29): the production menu, login, registration
+  and reset states render and respond; the game boots, respawns and accepts
+  combat/movement actions; both POV hands remain visible; and every movement
+  lab tape runs for flat floor, walls, corners, ramps, steps, ceilings, crouch
+  tunnels, slides, mobility, teleport and kill-plane recovery. The release
+  certificate is 9/9 green. During that pass, `arena_metrics.mjs` was corrected
+  to aim its deterministic test bots at the target's actual elevation instead
+  of always firing level; 2/4/8-player topology runs now all cover combat and
+  reach every callout.
+- Security check (2026-07-29): root production packages and the server have no
+  npm advisories. The one high-severity dev-only PostCSS advisory was patched
+  to 8.5.25; the browser-local rankings renderer now uses text nodes for stored
+  names, and no committed private keys/tokens were found. `UserAccount.js` now
+  persists 210k-iteration PBKDF2-SHA256 hashes with per-account salts, requires
+  eight-character passwords and upgrades legacy plaintext records after one
+  valid login. Important boundary: it is still browser-local demo identity, not
+  production authentication, and `server/index.js` is a client-trusting roster
+  relay. Do not use either for valuable identity, inventory or competitive
+  score; those require server-side accounts and the authoritative
+  `authserver.mjs` path with an exact `ALLOWED_ORIGINS` setting.
+
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
 - `src/world/World.js` — the active map is the downloaded official
@@ -133,8 +196,9 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   legacy gaps: flat-floor stability + support NORMALS (snap-down hysteresis),
   ceiling clamp, crouch-aware collision height + no-stand-under-blocked-headroom,
   kill-plane recovery to last safe support, deterministic teleport ray.
-- `src/sim/fixtures.js` — 10 sealed fixtures (flat-floor, wall, corner, ramp,
-  step, ceiling, crouch tunnel, slide, teleport, recovery), shared by runner+lab.
+- `src/sim/fixtures.js` — 11 sealed fixtures (flat-floor, wall, corner, ramp,
+  step, ceiling, crouch tunnel, slide, mobility, teleport, recovery), shared by
+  runner+lab.
 - `npm run test:move` (tools/movesim_fixtures.mjs) — invariants, double-run
   bit-identity, frame-schedule parity (two seeded irregular frame schedules →
   identical 20Hz hashes), golden hashes in tests/movesim.golden.json, movement

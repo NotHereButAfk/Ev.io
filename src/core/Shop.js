@@ -1,6 +1,7 @@
 const _KEY     = 'sio_shop';
 const _EQ_KEY  = 'sio_armor_skin';
 const STARTER  = 500; // coins new players start with
+const STARTER_ARMOR_SKINS = new Set(['cobalt_circuit', 'crimson_guard']);
 
 function _load() {
   try { return JSON.parse(localStorage.getItem(_KEY) || `{"coins":${STARTER},"owned":[]}`); }
@@ -11,7 +12,7 @@ function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 export const Shop = {
   getCoins()  { return _load().coins; },
   getOwned()  { return _load().owned; },
-  isOwned(id) { return _load().owned.includes(id); },
+  isOwned(id) { return STARTER_ARMOR_SKINS.has(id) || _load().owned.includes(id); },
 
   addCoins(n) {
     const d = _load();

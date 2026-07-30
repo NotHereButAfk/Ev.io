@@ -393,7 +393,7 @@ export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin =
   // allowHuman:false — they rely on the procedural model's limb-pivot rig,
   // per-part headshot zones, and weapon-hand attachment.
   if (opts.allowHuman !== false && isHumanSoldierReady()) {
-    const human = buildHumanSoldier(skin, armorTypeId);
+    const human = buildHumanSoldier(skin, armorTypeId, armorSkin);
     if (human) return human;
   }
 

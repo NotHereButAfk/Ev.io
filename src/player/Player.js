@@ -3,8 +3,8 @@ import * as THREE from 'three';
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
 const WALK_SPEED = 6.2;
-const SPRINT_MULT = 1.55;
-const JUMP_SPEED = 12.0;   // sci-fi boosted (was 7.5)
+const SPRINT_MULT = 1.75;
+const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
 
@@ -21,7 +21,7 @@ const SHIELD_REGEN_DELAY = 3.0; // seconds before regen kicks in
 
 const CROUCH_HEIGHT   = 0.85;
 const SLIDE_DURATION  = 0.72;
-const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~15.7 u/s burst
+const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~17.9 u/s burst
 const COYOTE_TIME     = 0.14;
 
 export class Player {

@@ -40,9 +40,9 @@ export function chooseCombatSteering({
     return { forward: 1, strafe: 0.28 * side, mode: 'close' };
   }
   if (distance < BOT_TACTICS.rangedRetreatDistance) {
-    return { forward: -0.82, strafe: 0.72 * side, mode: 'retreat' };
+    return { forward: -0.78, strafe: 0.50 * side, mode: 'retreat' };
   }
-  return { forward: 0.08, strafe: 0.92 * side, mode: 'orbit' };
+  return { forward: 0.14, strafe: 0.70 * side, mode: 'orbit' };
 }
 
 /**

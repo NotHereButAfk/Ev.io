@@ -99,7 +99,7 @@ export class BotManager {
           for (const candidate of candidates) {
             // A small stickiness bonus prevents target-flipping every scan when
             // two opponents cross at nearly the same distance.
-            const sticky = candidate === current ? -5 : 0;
+            const sticky = candidate === current ? -9 : 0;
             const score = candidate.position.distanceTo(bot.position) + sticky;
             if (score < bestScore) {
               best = candidate;
@@ -107,7 +107,7 @@ export class BotManager {
             }
           }
           bot._targetEntity = best;
-          bot._targetScanT = 0.32 + Math.random() * 0.34;
+          bot._targetScanT = 0.85 + Math.random() * 0.45;
         }
         target = bot._targetEntity || player;
       }

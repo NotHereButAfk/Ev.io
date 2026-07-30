@@ -113,6 +113,41 @@ Visible animation and combat-feedback cues:
   This is evidence for a gameplay feature, not enough evidence to invent its
   timing or add it without server-authoritative support.
 
+Official character-skin reference pass — 2026-07-29:
+
+- **[verified]** ev.io's public developer API documents
+  [`/all-skins`](https://ev.io/all-skins) as the non-comprehensive live item
+  catalog and points to individual character nodes such as
+  [Kijo](https://ev.io/node/308).
+- **[verified]** Official character pages inspected include
+  [Paladin](https://ev.io/node/285), [Mirage](https://ev.io/node/295),
+  [Anubis](https://ev.io/node/166), [Neon](https://ev.io/node/163),
+  [Ursus](https://ev.io/node/265), [Nexus](https://ev.io/node/317), and
+  [Oni](https://ev.io/node/162). The pages expose their large/profile
+  thumbnails, rarity, animation family, faction and proprietary `.evskin`
+  download.
+- **[verified]** Across the official thumbnails, recurring character language
+  is a dark flexible undersuit under segmented hard armor, two- or three-color
+  plate blocking, a narrow visor/eye glow, and one recognizable helmet motif
+  such as horns, ears, fins/crown rails or a skull-like face.
+- **[ours]** KYX.IO does not download or redistribute those proprietary
+  character models. Its eight new character finishes are original palettes and
+  small procedural helmet motifs applied to the existing rigged soldier, so
+  every locomotion/action animation remains compatible.
+
+Authored Rook pickup evidence:
+
+- **[verified]** The official `RookLit_0.evmap` contains exactly four generic
+  marker records (kinds `524288`, `8388608`, `1048576`, `2097152`) at authored
+  coordinates `(40,18.75,64)`, `(0.5,18,-0.75)`,
+  `(-100,17.5,24.02)`, `(28.5,10.75,-46)`. The loader mirrors X when
+  converting to the game's Three.js coordinates, just as it does for geometry
+  and player spawns.
+- **[ours]** The marker-to-local-gun assignment (Rail Driver, Nova Launcher,
+  Fuel Rod, Concussion Rifle) is a deterministic KYX.IO design choice. The
+  public asset verifies positions and elevations, not the intended ev.io weapon
+  identity for each marker kind.
+
 Owner-directed bot behavior:
 
 - **[owner-observed, clarified 2026-07-29]** Arena bots should actively acquire
@@ -149,8 +184,9 @@ last visible position without shooting through cover. Bot scoreboard kills are
 now earned by simulated combat rather than seeded display values.
 
 Implementation boundary: these cues justify this project's visual treatment.
-They do **not** verify exact ev.io layouts, scale, collision, spawn locations,
-or gameplay constants.
+They do **not** verify arbitrary ev.io layouts or gameplay constants. The
+downloaded official Rook binary is a direct source for that map's geometry,
+collision, player spawns and four generic marker positions.
 
 ## What we do NOT know
 

@@ -30,6 +30,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
+import { cameraYawToBodyYaw } from '../player/Facing.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
@@ -650,7 +651,7 @@ export class Game {
       this.hud.showServerPop(true);
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
-      this.pickupSystem = new PickupSystem(this.world.scene);
+      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
       const _mm = Math.floor(this._modeTimer / 60), _ss = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${_mm}:${String(_ss).padStart(2, '0')}`);
     } else if (this._isSurvival) {
@@ -678,7 +679,7 @@ export class Game {
       );
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
-      this.pickupSystem = new PickupSystem(this.world.scene);
+      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
       this._refreshModeHUD();
     }
 
@@ -1236,14 +1237,11 @@ export class Game {
         // Face the way the camera looks, so from behind you see the character's
         // BACK. Note the player's yaw is a CAMERA yaw: three.js cameras look
         // down their own −Z, so the view direction is −(sin yaw, cos yaw), and
-        // Player.update moves along it via `-moveZ`. A cyborg body is modelled
-        // front-on-−Z, which is the same axis, so it takes the yaw unchanged;
-        // the human soldier faces +Z and needs the π.
-        //
-        // Bots are the opposite way round and correctly keep their +π: their
-        // _targetYaw is atan2 of a MOVEMENT vector, not a camera yaw.
-        this._playerBody.rotation.y = this.player.yaw
-          + (this._playerBody.userData?.isHuman ? Math.PI : 0);
+        // Player.update moves along it via `-moveZ`. Every playable body,
+        // including the rigged soldier, is authored front-on-−Z and therefore
+        // takes camera yaw unchanged. Movement-vector yaw is converted
+        // separately for bots in Facing.js.
+        this._playerBody.rotation.y = cameraYawToBodyYaw(this.player.yaw);
         this._syncTpsWeapon();
         this._animatePlayerBody(dt);
       }

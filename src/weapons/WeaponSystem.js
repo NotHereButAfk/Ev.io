@@ -233,20 +233,26 @@ export class WeaponSystem {
     };
 
     const arm = new THREE.Group();
+    // Trigger hand: seat the palm on the pistol grip. The old transform pushed
+    // the entire arm below the camera, so players saw a floating gun—or no hand
+    // at all—depending on FOV.
+    arm.position.set(0.075, -0.045, 0.20);
+    arm.rotation.y = 0.18;
+    arm.scale.setScalar(0.94);
 
     // Forearm — tapered sleeve
     const forearm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.046, 0.062, 0.38, 12), this.sleeveMat);
+      new THREE.CylinderGeometry(0.042, 0.055, 0.26, 12), this.sleeveMat);
     forearm.rotation.x = 1.18;
-    forearm.position.set(0, -0.055, 0.19);
+    forearm.position.set(0, -0.050, 0.12);
     arm.add(forearm);
 
     // A compact armour plate carries the equipped character's authored colour.
     // The sleeve remains dark, so this reads as the player's gauntlet instead
     // of the old bright-white tube filling the bottom of the screen.
-    const forearmPlate = bx(0.068, 0.02, 0.14, this.armPlateMat);
+    const forearmPlate = bx(0.058, 0.016, 0.095, this.armPlateMat);
     forearmPlate.rotation.x = -0.34;
-    forearmPlate.position.set(0, -0.008, 0.17);
+    forearmPlate.position.set(0, -0.006, 0.10);
     arm.add(forearmPlate);
 
     // Sleeve cuff detail ring
@@ -299,8 +305,18 @@ export class WeaponSystem {
     arm.add(thumbTip);
 
     arm.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
-    this.swayGroup.add(arm);
+    this.kickGroup.add(arm);
     this.armGroup = arm;
+
+    // Support hand: mirror the complete glove (including thumb) and reach it
+    // onto the rifle fore-end. It shares the same palette and the weapon's
+    // recoil/reload parent, so both hands remain attached through every action.
+    const support = arm.clone(true);
+    support.position.set(-0.105, -0.035, -0.055);
+    support.rotation.set(-0.05, -0.42, -0.08);
+    support.scale.set(-0.88, 0.88, 0.88);
+    this.kickGroup.add(support);
+    this.supportArmGroup = support;
   }
 
   /**
@@ -321,12 +337,12 @@ export class WeaponSystem {
 
   /** Apply the exact equipped character palette to the first-person gauntlet. */
   setArmAppearance({ plate, sleeve, glove, accent }) {
-    this.armPlateMat.color.setHex(plate);
-    this.sleeveMat.color.setHex(sleeve);
-    this.gloveMat.color.setHex(glove);
+    this.armPlateMat.color.setHex(plate).multiplyScalar(0.52);
+    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.68);
+    this.gloveMat.color.setHex(glove).multiplyScalar(0.78);
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
-    this.cuffMat.emissiveIntensity = 0.35;
+    this.cuffMat.emissiveIntensity = 0.18;
   }
 
   /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
@@ -439,6 +455,7 @@ export class WeaponSystem {
     }
     const cur = this.loadout[index];
     if (cur) this.models.get(cur.id).group.visible = true;
+    if (this.supportArmGroup) this.supportArmGroup.visible = cur?.kind !== 'melee';
     // Kick off the raise animation — the new gun eases up from lowered.
     this._raiseT = 0;
   }

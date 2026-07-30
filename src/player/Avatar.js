@@ -5,6 +5,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
+import { cameraYawToBodyYaw } from './Facing.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // One character body, driven entirely by a state struct.
@@ -191,10 +192,9 @@ export class Avatar {
 
     // Facing. `yaw` is a CAMERA yaw (the server relays the client's look yaw),
     // and a three.js camera looks down −Z — so the direction being described is
-    // −(sin yaw, cos yaw). A cyborg body is modelled front-on-−Z and takes it
-    // unchanged; the human soldier faces +Z and needs the π.
+    // −(sin yaw, cos yaw). Every playable body uses that same local −Z axis.
     // Snap on the first frame so a fresh avatar doesn't spin into place.
-    const yaw = (s.yaw || 0) + (this.isHuman ? Math.PI : 0);
+    const yaw = cameraYawToBodyYaw(s.yaw || 0);
     if (!this._yawInit) { g.rotation.y = yaw; this._yawInit = true; }
     else {
       let d = yaw - g.rotation.y;

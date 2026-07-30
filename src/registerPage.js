@@ -9,10 +9,10 @@ const nameEl = document.getElementById('reg-name');
 const passEl = document.getElementById('reg-pass');
 const pass2El = document.getElementById('reg-pass2');
 
-const doReg = () => {
+const doReg = async () => {
   document.getElementById('reg-err')?.classList.add('hidden');
   if (passEl.value !== pass2El.value) { err("Passwords don't match"); return; }
-  const res = UserAccount.register(nameEl.value.trim(), passEl.value);
+  const res = await UserAccount.register(nameEl.value.trim(), passEl.value);
   if (res.ok) window.location.href = '/';
   else err(res.err);
 };
