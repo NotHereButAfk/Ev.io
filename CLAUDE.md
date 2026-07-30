@@ -22,6 +22,10 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `.github/workflows/deploy-vps.yml` builds and **rsyncs `dist/` over SSH** on
   every push to `main`. Repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
   (private key), `VPS_PATH` (web root), optional `VPS_PORT`.
+- The SSH-key heredoc was repaired on 2026-07-29; its unindented body had made
+  the workflow invalid YAML, so GitHub produced failed runs with zero jobs or
+  logs. If deployment still fails after that repair, inspect the actual job
+  log and verify the `VPS_*` secrets rather than reverting the YAML fix.
 - Being a VPS, it can ALSO run the 24/7 match relay (`server/`) under
   systemd/pm2 — set the `VITE_WS_URL` secret to its ws(s):// URL and clients
   share one live match. See "24/7 match server" below.
@@ -95,6 +99,14 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   to aim its deterministic test bots at the target's actual elevation instead
   of always firing level; 2/4/8-player topology runs now all cover combat and
   reach every callout.
+- Final live ev.io comparison used an actual Edge match, not only stills:
+  ev.io keeps its idle rifle low/right and lowers the entire viewmodel during
+  sprint. KYX follows the same restrained carry language but intentionally
+  keeps both skinned gloves clearer at idle because the owner explicitly wants
+  their hands visible. The comparison also exposed invalid placeholder
+  AdSense requests; the `ca-pub-XXXXXXXXXXXXXXXX` slots now remain inert until
+  a real publisher ID and loader are configured, eliminating those console
+  errors without removing the reserved layout.
 - Security check (2026-07-29): root production packages and the server have no
   npm advisories. The one high-severity dev-only PostCSS advisory was patched
   to 8.5.25; the browser-local rankings renderer now uses text nodes for stored

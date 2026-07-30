@@ -10,10 +10,10 @@
   <link rel="stylesheet" href="/src/style.css" />
   <!--
     Google AdSense — replace data-ad-client with your publisher ID (ca-pub-XXXXXXXXXXXXXXXX)
-    and each data-ad-slot with your per-unit slot IDs before going live.
+    and each data-ad-slot with your per-unit slot IDs before enabling the loader.
+    Placeholder slots deliberately stay inert so local and production pages do
+    not request an invalid publisher account.
   -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
-          crossorigin="anonymous"></script>
 </head>
 <body>
   <!-- Colour-blind correction matrices (Phase 8 accessibility). Applied to the
@@ -497,7 +497,6 @@
                data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
                data-ad-slot="2222222222"
                data-ad-format="rectangle"></ins>
-          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
         </div>
         <button id="restart-btn" class="play-btn">RESPAWN</button>
         <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
@@ -668,7 +667,6 @@
                data-ad-slot="3333333333"
                data-ad-format="horizontal"
                data-full-width-responsive="true"></ins>
-          <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
         </div>
         <div class="lb-footer">
           <div class="lb-new-match">NEW MATCH STARTING IN <span id="lb-countdown">10</span>s</div>

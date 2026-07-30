@@ -41,8 +41,8 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           cat > ~/.ssh/deploy_key << 'EOF'
-${{ secrets.VPS_SSH_KEY }}
-EOF
+          ${{ secrets.VPS_SSH_KEY }}
+          EOF
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
