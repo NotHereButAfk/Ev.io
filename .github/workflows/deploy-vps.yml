@@ -45,6 +45,9 @@ jobs:
           DEPLOY_KEY: ${{ secrets.VPS_SECRET }}
           DEPLOY_PATH: ${{ secrets.PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
+          # A repo secret is unfortunately named PATH. Pin the runner command
+          # path so referencing that secret cannot hide mkdir/ssh-keyscan.
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           test -n "$DEPLOY_HOST" || { echo "Missing VPS_HOST secret"; exit 1; }
           test -n "$DEPLOY_KEY" || { echo "Missing VPS_SECRET secret"; exit 1; }
@@ -60,6 +63,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
           DEPLOY_PATH: ${{ secrets.PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p 22" \
