@@ -70,14 +70,17 @@ jobs:
         run: |
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
-            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/dist' '$DEPLOY_PATH/server'"
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/dist' '$DEPLOY_PATH/server' '$DEPLOY_PATH/src/sim'"
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/dist/"
           /usr/bin/rsync -az --delete --exclude node_modules/ \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             server/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/"
+          /usr/bin/rsync -az --delete \
+            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
+            src/sim/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/sim/"
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "cd '$DEPLOY_PATH/server' && /usr/bin/env npm ci --omit=dev && sudo /usr/bin/systemctl restart kryx-game.service && /usr/bin/systemctl is-active --quiet kryx-game.service"
+            "cd '$DEPLOY_PATH/server' && /usr/bin/env npm ci --omit=dev && sudo /usr/bin/systemctl restart kryx-game.service && for i in 1 2 3 4 5 6 7 8 9 10; do /usr/bin/curl -fsS http://127.0.0.1:8788/ >/dev/null && exit 0; /usr/bin/sleep 1; done; /usr/bin/systemctl status --no-pager kryx-game.service; exit 1"
