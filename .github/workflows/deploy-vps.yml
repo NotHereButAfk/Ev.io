@@ -53,10 +53,10 @@ jobs:
           test -n "$DEPLOY_KEY" || { echo "Missing VPS_SECRET secret"; exit 1; }
           test -n "$DEPLOY_PATH" || { echo "Missing PATH secret"; exit 1; }
           test -n "$DEPLOY_USER" || { echo "Missing VPS_USER secret"; exit 1; }
-          mkdir -p ~/.ssh
+          /usr/bin/mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          /usr/bin/chmod 600 ~/.ssh/deploy_key
+          /usr/bin/ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Rsync dist/ to VPS
         env:
@@ -65,6 +65,6 @@ jobs:
           DEPLOY_USER: ${{ secrets.VPS_USER }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
-          rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key -p 22" \
+          /usr/bin/rsync -az --delete \
+            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
