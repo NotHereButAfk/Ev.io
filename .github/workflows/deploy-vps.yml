@@ -5,11 +5,11 @@ name: Deploy to VPS
 # Actions):
 #   VPS_HOST     the VPS IP or hostname (e.g. kyrx.live or 203.0.113.7)
 #   VPS_USER     SSH user (e.g. root or deploy)
-#   VPS_SSH_KEY  PRIVATE key whose public half is in that user's
+#   VPS_SECRET   PRIVATE key whose public half is in that user's
 #                ~/.ssh/authorized_keys on the VPS
 #                (generate with: ssh-keygen -t ed25519 -f deploy_key -N "")
-#   VPS_PATH     web root the site is served from (e.g. /var/www/kyrx.live/html)
-#   VPS_PORT     optional — SSH port if not 22
+#   PATH         web root the site is served from (e.g. /var/www/kyrx.live/html)
+# SSH uses port 22 for this Hostinger account.
 #
 # Optional: VITE_WS_URL — URL of the 24/7 match relay (see server/README.md).
 # The VPS can host it too (it keeps a Node process alive, unlike shared
@@ -38,16 +38,27 @@ jobs:
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
 
       - name: Set up SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.VPS_HOST }}
+          DEPLOY_KEY: ${{ secrets.VPS_SECRET }}
+          DEPLOY_PATH: ${{ secrets.PATH }}
+          DEPLOY_USER: ${{ secrets.VPS_USER }}
         run: |
+          test -n "$DEPLOY_HOST" || { echo "Missing VPS_HOST secret"; exit 1; }
+          test -n "$DEPLOY_KEY" || { echo "Missing VPS_SECRET secret"; exit 1; }
+          test -n "$DEPLOY_PATH" || { echo "Missing PATH secret"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "Missing VPS_USER secret"; exit 1; }
           mkdir -p ~/.ssh
-          cat > ~/.ssh/deploy_key << 'EOF'
-          ${{ secrets.VPS_SSH_KEY }}
-          EOF
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Rsync dist/ to VPS
+        env:
+          DEPLOY_HOST: ${{ secrets.VPS_HOST }}
+          DEPLOY_PATH: ${{ secrets.PATH }}
+          DEPLOY_USER: ${{ secrets.VPS_USER }}
         run: |
           rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }}" \
-            dist/ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.VPS_PATH }}/"
+            -e "ssh -i ~/.ssh/deploy_key -p 22" \
+            dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
