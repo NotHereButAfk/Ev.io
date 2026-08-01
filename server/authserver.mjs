@@ -12,6 +12,9 @@
 // Embedded test:   import { makeAuthServer } from './authserver.mjs'
 
 import { createServer } from 'http';
+import { createReadStream, statSync } from 'fs';
+import { extname, join, normalize, resolve, sep } from 'path';
+import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
 
@@ -20,6 +23,54 @@ const RATE_TOKENS = 60, RATE_REFILL_MS = 1000;   // ~60 msgs/sec sustained
 const HEARTBEAT_MS = 5000, DEAD_MS = 12000;
 const SEND_BUFFER_CAP = 256 * 1024;         // skip snapshot if socket is backed up
 const MAX_NAME = 24;
+
+const MIME = {
+  '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon',
+  '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
+  '.woff': 'font/woff', '.woff2': 'font/woff2',
+};
+
+function staticHandler(root) {
+  const base = resolve(root);
+  return (req, res) => {
+    if (!['GET', 'HEAD'].includes(req.method || 'GET')) {
+      res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return;
+    }
+
+    let pathname;
+    try { pathname = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname); }
+    catch { res.writeHead(400); res.end('Bad request'); return; }
+    if (pathname.includes('\0')) { res.writeHead(400); res.end('Bad request'); return; }
+    if (pathname === '/') pathname = '/index.html';
+
+    const relative = normalize(pathname.replace(/^[/\\]+/, ''));
+    const file = resolve(join(base, relative));
+    if (file !== base && !file.startsWith(base + sep)) {
+      res.writeHead(403); res.end('Forbidden'); return;
+    }
+
+    let stat;
+    try { stat = statSync(file); } catch { res.writeHead(404); res.end('Not found'); return; }
+    if (!stat.isFile()) { res.writeHead(404); res.end('Not found'); return; }
+
+    const ext = extname(file).toLowerCase();
+    const immutable = pathname.startsWith('/assets/');
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Content-Length': stat.size,
+      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+    });
+    if (req.method === 'HEAD') { res.end(); return; }
+    createReadStream(file).on('error', () => res.destroy()).pipe(res);
+  };
+}
 
 const ALLOWED = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
@@ -48,8 +99,11 @@ function sanitizeName(n) {
   return c || 'Recruit';
 }
 
-export function makeAuthServer({ server, port } = {}) {
-  const http = server || createServer((_req, res) => { res.writeHead(200); res.end('kyx auth server'); });
+export function makeAuthServer({ server, port, staticRoot } = {}) {
+  const handler = staticRoot
+    ? staticHandler(staticRoot)
+    : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
+  const http = server || createServer(handler);
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MSG_BYTES });
   const room = new AuthRoom();
 
@@ -125,7 +179,11 @@ export function makeAuthServer({ server, port } = {}) {
     }
   }, HEARTBEAT_MS);
 
-  const close = () => { clearInterval(loop); clearInterval(hb); wss.close(); http.close(); };
+  const close = () => new Promise((resolveClose) => {
+    clearInterval(loop); clearInterval(hb);
+    for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
+    wss.close(() => http.close(() => resolveClose()));
+  });
 
   if (port) http.listen(port, () => console.log(`[auth] listening on :${port} (tick ${TICK_MS.toFixed(1)}ms)`));
   return { wss, room, http, close };
@@ -133,5 +191,7 @@ export function makeAuthServer({ server, port } = {}) {
 
 // standalone entry
 if (import.meta.url === `file://${process.argv[1]}`) {
-  makeAuthServer({ port: process.env.PORT || 8788 });
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const staticRoot = process.env.STATIC_ROOT || resolve(here, '../dist');
+  makeAuthServer({ port: process.env.PORT || 8788, staticRoot });
 }

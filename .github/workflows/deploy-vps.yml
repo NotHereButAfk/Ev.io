@@ -11,10 +11,8 @@ name: Deploy to VPS
 #   VPS_PATH     web root the site is served from (e.g. /var/www/kryx.live/html)
 # SSH uses port 22 for this Hostinger account.
 #
-# Optional: VITE_WS_URL — URL of the 24/7 match relay (see server/README.md).
-# The VPS can host it too (it keeps a Node process alive, unlike shared
-# hosting): run server/ under systemd or pm2 and set this to wss://kryx.live/ws
-# (or ws://HOST:PORT) so clients share one live match.
+# VITE_AUTH_WS_URL is the public authoritative WebSocket URL. For the combined
+# Nginx/Node deployment use wss://kryx.live.
 
 on:
   push:
@@ -38,6 +36,7 @@ jobs:
       - run: node node_modules/vite/bin/vite.js build
         env:
           VITE_WS_URL: ${{ secrets.VITE_WS_URL }}
+          VITE_AUTH_WS_URL: ${{ secrets.VITE_AUTH_WS_URL }}
 
       - name: Set up SSH
         env:
@@ -62,13 +61,23 @@ jobs:
             || { echo "VPS_SECRET is not a valid SSH private key"; exit 1; }
           /usr/bin/ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Rsync dist/ to VPS
+      - name: Deploy game and authoritative server
         env:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
           DEPLOY_PATH: ${{ secrets.VPS_PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
+          /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/dist' '$DEPLOY_PATH/server'"
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
-            dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+            dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/dist/"
+          /usr/bin/rsync -az --delete --exclude node_modules/ \
+            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
+            server/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/"
+          /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH/server' && /usr/bin/env npm ci --omit=dev && sudo /usr/bin/systemctl restart kryx-game.service && /usr/bin/systemctl is-active --quiet kryx-game.service"

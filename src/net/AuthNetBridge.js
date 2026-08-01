@@ -5,7 +5,8 @@
 //   ?authnet=1                  (connect to ws://<host>:8788)
 //   ?authnet=ws://host:port     (explicit URL)
 //   localStorage.kx_authnet = "1"
-// The single-player / ServerSim path is completely untouched when off.
+// Production can enable it with VITE_AUTH_WS_URL. The single-player /
+// ServerSim path is completely untouched when no target is configured.
 
 import * as THREE from 'three';
 import { AuthClient } from './AuthClient.js';
@@ -35,7 +36,7 @@ export function authNetTarget() {
     if (q) return q === '1' ? `ws://${location.hostname}:8788` : q;
     if (localStorage.getItem('kx_authnet') === '1') return `ws://${location.hostname}:8788`;
   } catch {}
-  return null;
+  return import.meta.env.VITE_AUTH_WS_URL || null;
 }
 
 export class AuthNetBridge {

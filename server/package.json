@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Shared match-state relay for kyx.io — NOT the static game site. Deploy separately to a host that keeps a Node process running (see README.md).",
+  "description": "Authoritative multiplayer server and static host for kryx.live.",
   "scripts": {
-    "start": "node index.js",
+    "start": "node authserver.mjs",
+    "relay": "node index.js",
     "auth": "node authserver.mjs",
-    "test:auth": "node authnet_test.mjs"
+    "test:auth": "node authnet_test.mjs",
+    "test:static": "node static_test.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

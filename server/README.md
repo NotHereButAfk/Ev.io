@@ -1,21 +1,17 @@
-# kyx-server
+# kryx.live server
 
-A small always-on WebSocket relay that shares the deathmatch countdown timer
-and the roster of real connected players across everyone's browser — so
-joining the arena mid-match shows the real elapsed time and real other
-players instead of everyone getting a private simulated match.
+The production entry point is the authoritative WebSocket server. It also
+serves the compiled Vite frontend from `../dist`, allowing Nginx to proxy the
+entire `kryx.live` origin to one Node process.
 
-It does **not** simulate positions, movement, or hit detection — that all
-stays client-side exactly as it is today. If this server is unreachable or
-never deployed, the game falls back to the existing local-only simulation
-automatically; nothing breaks.
+Movement, combat, ammo, damage, respawns, and abilities are server-owned.
+Clients retain prediction and interpolation for responsive presentation.
 
-## Why this is separate from the main site
+## Deployment model
 
-The main site (`dist/`) is deployed to Hostinger as static files over FTP —
-that hosting can only serve files, it can't keep a Node process running.
-This server needs to run continuously somewhere else. Any host that can run
-`npm start` and keep the process alive works:
+The compiled site and server remain separate directories, but one Node process
+serves both. This requires an always-on host such as a VPS; shared static
+hosting cannot run the authoritative simulation.
 
 - A VPS (including a Hostinger VPS, if you have one — plain shared hosting
   does not support this)
@@ -28,17 +24,18 @@ This server needs to run continuously somewhere else. Any host that can run
 ## Deploy
 
 1. `cd server && npm install`
-2. `npm start` (reads `PORT` from the environment, defaults to 8787)
-3. Point your host's process at `server/` as the working directory with
+2. Build the frontend in the repository root with `npm run build`.
+3. `npm start` (reads `PORT` from the environment, defaults to 8788)
+4. Point your host's process at `server/` as the working directory with
    `npm start` as the run command.
-4. Once deployed, you'll have a URL like `wss://your-app.example.com`.
+5. Set `ALLOWED_ORIGINS` to the exact public HTTPS origin.
+6. Once deployed, the same origin serves HTTP and WebSocket traffic.
 
-For the authoritative movement/combat server, run `npm run auth` instead and
-set `ALLOWED_ORIGINS` to the exact comma-separated browser origins allowed to
+Set `ALLOWED_ORIGINS` to the exact comma-separated browser origins allowed to
 connect, for example:
 
 ```
-ALLOWED_ORIGINS=https://your-game.example npm run auth
+ALLOWED_ORIGINS=https://kryx.live PORT=8788 npm start
 ```
 
 When `ALLOWED_ORIGINS` is absent, `authserver.mjs` accepts loopback browser
@@ -47,11 +44,9 @@ not be used on a public server.
 
 ## Wire the client to it
 
-In the repo root, set the build-time env var `VITE_WS_URL` to your server's
-`wss://` URL (see `.env.example`). If you deploy via the existing GitHub
-Action (`.github/workflows/deploy-hostinger.yml`), add a repo secret named
-`VITE_WS_URL` — the workflow already passes it through to the build. Leaving
-it unset keeps today's local-only behavior.
+In the repo root, set `VITE_AUTH_WS_URL` to the server's `wss://` URL (see
+`.env.example`). The VPS GitHub Action passes the matching repository secret
+through to Vite. Leaving it unset keeps the local/offline behavior.
 
 ## Local testing
 
@@ -64,7 +59,7 @@ npm start
 Then in the repo root, create `.env.local` with:
 
 ```
-VITE_WS_URL=ws://localhost:8787
+VITE_AUTH_WS_URL=ws://localhost:8788
 ```
 
 and run the usual dev server (`npx vite --port 5999 --host`). Open two
