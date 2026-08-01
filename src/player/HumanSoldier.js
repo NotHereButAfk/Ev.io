@@ -1050,6 +1050,26 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
     const r = Math.max(0.004, Math.min(0.03, Math.min(w, h, d) * 0.28));
     return new RoundedBoxGeometry(w, h, d, 3, r);
   };
+  // Eight-corner faceted plate. Different top/bottom widths and depths create
+  // the diagonal armor cuts that a rounded box cannot express.
+  const taper = (topW, bottomW, h, topD, bottomD, topShiftX = 0) => {
+    const ty = h * 0.5, by = -h * 0.5;
+    const tw = topW * 0.5, bw = bottomW * 0.5;
+    const td = topD * 0.5, bd = bottomD * 0.5;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([
+      -tw + topShiftX, ty, -td,  tw + topShiftX, ty, -td,
+       tw + topShiftX, ty,  td, -tw + topShiftX, ty,  td,
+      -bw, by, -bd,  bw, by, -bd,  bw, by, bd, -bw, by, bd,
+    ], 3));
+    geo.setIndex([
+      0, 3, 2, 0, 2, 1, 4, 5, 6, 4, 6, 7,
+      0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5,
+      2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+    ]);
+    geo.computeVertexNormals();
+    return geo;
+  };
   const sph = (r) => new THREE.SphereGeometry(r, 20, 14);
   const oct = (r) => new THREE.OctahedronGeometry(r);
   const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 12);
@@ -1065,9 +1085,9 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const helmet = [
     // Compact faceted shell: broad enough to cover the source head without the
     // oversized round dome that previously made the model look toy-like.
-    { bone: 'Head', geo: box(0.205, 0.215, 0.18), mat: helmetMat, x: 0, y: 1.59, z: 0.005 },
+    { bone: 'Head', geo: taper(0.165, 0.205, 0.215, 0.16, 0.19), mat: helmetMat, x: 0, y: 1.59, z: 0.005 },
     // Recessed dark faceplate across the front.
-    { bone: 'Head', geo: box(0.155, 0.135, 0.045), mat: visorMat, x: 0, y: 1.565, z: -0.095 },
+    { bone: 'Head', geo: taper(0.145, 0.12, 0.135, 0.035, 0.045), mat: visorMat, x: 0, y: 1.565, z: -0.095 },
     // Vertical identity stripe across the faceplate.
     { bone: 'Head', geo: box(0.032, 0.125, 0.018), mat: accent, x: 0, y: 1.585, z: -0.123,
       anim: { type: 'pulse', freq: 1.0, min: 0.7, max: 1.2 } },
@@ -1186,11 +1206,11 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       // collar deck, and a polished sternum ridge with the glowing emitter set in.
       // Broad dark carrier plus separate angular plates: this gives the torso
       // the layered EV-style exosuit read without copying a proprietary mesh.
-      { bone: 'Spine2', geo: box(0.37, 0.34, 0.13), mat: dark, x: 0, y: 1.28, z: -0.012 },
-      { bone: 'Spine2', geo: box(0.145, 0.16, 0.09), mat: plate, x: -0.085, y: 1.365, z: -0.082, quat: chestLeft },
-      { bone: 'Spine2', geo: box(0.145, 0.16, 0.09), mat: plate, x:  0.085, y: 1.365, z: -0.082, quat: chestRight },
-      { bone: 'Spine2', geo: box(0.105, 0.235, 0.075), mat: plate, x: 0, y: 1.245, z: -0.105 },
-      { bone: 'Spine1', geo: box(0.22, 0.085, 0.085), mat: plate, x: 0, y: 1.105, z: -0.075 },
+      { bone: 'Spine2', geo: taper(0.37, 0.29, 0.34, 0.13, 0.105), mat: dark, x: 0, y: 1.28, z: -0.012 },
+      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095, -0.01), mat: plate, x: -0.085, y: 1.365, z: -0.082, quat: chestLeft },
+      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095,  0.01), mat: plate, x:  0.085, y: 1.365, z: -0.082, quat: chestRight },
+      { bone: 'Spine2', geo: taper(0.11, 0.075, 0.235, 0.07, 0.08), mat: plate, x: 0, y: 1.245, z: -0.105 },
+      { bone: 'Spine1', geo: taper(0.18, 0.22, 0.085, 0.075, 0.09), mat: plate, x: 0, y: 1.105, z: -0.075 },
       { bone: 'Spine2', geo: box(0.032, 0.155, 0.022), mat: accent, x: 0, y: 1.285, z: -0.15,
         anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },
       { bone: 'Spine2', geo: cyl(0.034, 0.026), mat: trim, x: -0.10, y: 1.34, z: -0.14, quat: faceDisc },
@@ -1217,14 +1237,14 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightArm', geo: box(0.18, 0.115, 0.12), mat: plate, x:  0.30, y: 1.47, z: 0.00 },
       { bone: 'LeftArm',  geo: box(0.075, 0.03, 0.025), mat: accent, x: -0.30, y: 1.47, z: -0.073 },
       { bone: 'RightArm', geo: box(0.075, 0.03, 0.025), mat: accent, x:  0.30, y: 1.47, z: -0.073 },
-      { bone: 'LeftUpLeg',  geo: box(0.135, 0.285, 0.105), mat: plate, x: -0.105, y: 0.82, z: -0.045 },
-      { bone: 'RightUpLeg', geo: box(0.135, 0.285, 0.105), mat: plate, x:  0.105, y: 0.82, z: -0.045 },
+      { bone: 'LeftUpLeg',  geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x: -0.105, y: 0.82, z: -0.045 },
+      { bone: 'RightUpLeg', geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x:  0.105, y: 0.82, z: -0.045 },
       { bone: 'LeftUpLeg',  geo: box(0.035, 0.20, 0.022), mat: accent, x: -0.105, y: 0.83, z: -0.108 },
       { bone: 'RightUpLeg', geo: box(0.035, 0.20, 0.022), mat: accent, x:  0.105, y: 0.83, z: -0.108 },
       { bone: 'LeftLeg',  geo: box(0.14, 0.105, 0.115), mat: trim, x: -0.10, y: 0.56, z: -0.055 },
       { bone: 'RightLeg', geo: box(0.14, 0.105, 0.115), mat: trim, x:  0.10, y: 0.56, z: -0.055 },
-      { bone: 'LeftLeg',  geo: box(0.125, 0.31, 0.105), mat: plate, x: -0.10, y: 0.35, z: -0.045 },
-      { bone: 'RightLeg', geo: box(0.125, 0.31, 0.105), mat: plate, x:  0.10, y: 0.35, z: -0.045 },
+      { bone: 'LeftLeg',  geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x: -0.10, y: 0.35, z: -0.045 },
+      { bone: 'RightLeg', geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x:  0.10, y: 0.35, z: -0.045 },
       { bone: 'LeftLeg',  geo: box(0.032, 0.245, 0.022), mat: accent, x: -0.10, y: 0.35, z: -0.108 },
       { bone: 'RightLeg', geo: box(0.032, 0.245, 0.022), mat: accent, x:  0.10, y: 0.35, z: -0.108 },
       { bone: 'LeftFoot',  geo: box(0.15, 0.105, 0.23), mat: dark, x: -0.10, y: 0.09, z: -0.03 },
