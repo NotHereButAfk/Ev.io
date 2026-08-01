@@ -23,7 +23,7 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
-import { INKFALL } from '../src/sim/arenas.js';
+import { ROOK } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
 export const TICK_MS = 1000 / TICK_HZ;
@@ -69,6 +69,7 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 // AABB slab raycast (nearest hit t in [0.1, maxT], else maxT) — used to find
 // an ability's detonation point against the arena geometry.
 function rayVsBoxes(world, ox, oy, oz, dx, dy, dz, maxT) {
+  if (world.raycast) return world.raycast(ox, oy, oz, dx, dy, dz, maxT);
   let best = maxT;
   for (const b of world.boxes) {
     let t0 = 0, t1 = best, hit = true;
@@ -91,12 +92,14 @@ function rayVsBoxes(world, ox, oy, oz, dx, dy, dz, maxT) {
 let _pid = 1;
 
 export class AuthRoom {
-  constructor(arena = INKFALL) {
+  constructor(arena = ROOK) {
     this.arena = arena;
     this.simWorld = {
       half: arena.half, killY: arena.killY,
+      noBaseFloor: !!arena.noBaseFloor,
       platforms: arena.platforms, boxes: arena.boxes,
       gravLifts: arena.gravLifts, teleporters: arena.teleporters,
+      raycast: arena.raycast,
     };
     this.tick = 0;
     this.players = new Map();   // id -> player
@@ -137,6 +140,7 @@ export class AuthRoom {
     p.send({
       t: 'welcome', you: id, tick: this.tick,
       arena: { name: this.arena.name, half: this.arena.half,
+               noBaseFloor: !!this.arena.noBaseFloor,
                platforms: this.arena.platforms, boxes: this.arena.boxes,
                spawns: this.arena.spawns },
       players: this._roster(),
@@ -227,6 +231,7 @@ export class AuthRoom {
       // smoke occlusion: if the ray to the hit passes through an active smoke
       // volume, the shot is blocked (server-authoritative vision denial).
       if (best && this._raySmoked(ox, oy, oz, rx, ry, rz, best.t2)) continue;
+      if (best && rayVsBoxes(this.simWorld, ox, oy, oz, rx, ry, rz, best.t2) < best.t2 - 0.05) continue;
       if (best) this._damage(best.t, shooter, w.dmg * (best.head ? w.hs : 1), best.head);
     }
   }
@@ -345,6 +350,7 @@ export class AuthRoom {
       const previousState = p.state;
       const sprinting = isSprinting(previousState, cmd.inp);
       p.state = step(previousState, cmd.inp, this.simWorld);
+      if (this.arena.resolveState) p.state = this.arena.resolveState(previousState, p.state);
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
       p.wid = cmd.wid || p.wid;
@@ -405,6 +411,7 @@ export class AuthRoom {
         aiming: !!p._lastAim,
         firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
         health: p.health, shield: p.shield,
+        kills: p.kills, deaths: p.deaths, score: p.score,
       });
     }
     const smokeList = this.smokes.map((s) => ({ x: s.x, y: s.y, z: s.z, r: s.r }));

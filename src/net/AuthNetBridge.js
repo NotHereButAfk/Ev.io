@@ -48,9 +48,22 @@ export class AuthNetBridge {
     this.remotes = new Map();          // id -> { group, mat, nameEl }
     this._acc = 0;
     this._fireCd = 0;
+    this._tpsDesired = new THREE.Vector3();
+    this._tpsOffset = new THREE.Vector3();
+    this._tpsRaycaster = new THREE.Raycaster();
     this._edges = { jump: false, crouch: false, tele: false };
     this._nameLayer = this._makeNameLayer();
-    this.client.onWelcome = () => { this.ready = true; };
+    this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
+    this.client.onWelcome = () => {
+      this.ready = true;
+      // Authoritative matches must have one ownership model. Local AI used to
+      // keep fighting underneath the real server snapshots, causing phantom
+      // damage, fake population counts, and two incompatible scoreboards.
+      game.botManager?.clear?.();
+      game.serverSim?.stop?.();
+      game._netDriven = true;
+      game.hud?.setServerPop?.(1, 8);
+    };
     this.client.connect();
   }
 
@@ -93,6 +106,12 @@ export class AuthNetBridge {
     p.pitch += sign * input.mouseDY * MOUSE_SENS * p.sensitivityMult;
     p.pitch = THREE.MathUtils.clamp(p.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
 
+    // Match the legacy controller: the wheel enters/leaves third-person and
+    // WeaponSystem sees _camDist immediately, so it cannot also swap weapons.
+    if (input.wheelDelta !== 0) {
+      p._camDist = THREE.MathUtils.clamp(p._camDist + input.wheelDelta * 0.9, 0, 6.0);
+    }
+
     // edges collected per frame, consumed on the next tick
     if (input.consumeJustPressed('Space')) this._edges.jump = true;
     if (input.consumeJustPressed('ControlLeft') || input.consumeJustPressed('KeyC')) this._edges.crouch = true;
@@ -125,10 +144,43 @@ export class AuthNetBridge {
     p.isSprinting = !!c.sprinting;
     p._eyeHeight = c.sim.eye;
     p.health = c.self.health;
-    p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
-    p.camera.rotation.order = 'YXZ';
-    p.camera.rotation.y = p.yaw;
-    p.camera.rotation.x = p.pitch;
+    if (p._camDist > 0) {
+      const d = p._camDist;
+      const pitchBlend = Math.sin(Math.max(0, p.pitch) * 0.5);
+      this._tpsDesired.set(
+        p.position.x + Math.sin(p.yaw) * d * (1 - pitchBlend * 0.4),
+        p.position.y + 1.4 + 0.5 * d * 0.18 + pitchBlend * d * 0.6,
+        p.position.z + Math.cos(p.yaw) * d * (1 - pitchBlend * 0.4),
+      );
+      p._tpsTarget.set(p.position.x, p.position.y + 1.2, p.position.z);
+      const cameraOffset = this._tpsOffset.copy(this._tpsDesired).sub(p._tpsTarget);
+      const desiredDistance = cameraOffset.length();
+      this._tpsRaycaster.set(p._tpsTarget, cameraOffset.normalize());
+      this._tpsRaycaster.near = 0.05;
+      this._tpsRaycaster.far = desiredDistance;
+      const obstruction = this._tpsRaycaster.intersectObjects(this.game.world.raycastMeshes, true)[0];
+      p._tpsObstructed = !!obstruction && obstruction.distance < 0.8;
+      if (p._tpsObstructed) {
+        p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
+        p.camera.rotation.order = 'YXZ';
+        p.camera.rotation.y = p.yaw;
+        p.camera.rotation.x = p.pitch;
+        p.camera.rotation.z = 0;
+      } else if (obstruction) {
+        p.camera.position.copy(p._tpsTarget)
+          .addScaledVector(cameraOffset, Math.max(0.35, obstruction.distance - 0.18));
+      } else {
+        p.camera.position.copy(this._tpsDesired);
+      }
+      if (!p._tpsObstructed) p.camera.lookAt(p._tpsTarget);
+    } else {
+      p._tpsObstructed = false;
+      p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
+      p.camera.rotation.order = 'YXZ';
+      p.camera.rotation.y = p.yaw;
+      p.camera.rotation.x = p.pitch;
+      p.camera.rotation.z = 0;
+    }
 
     // ── fire (server-authoritative hit; client just requests) ──
     this._fireCd = Math.max(0, this._fireCd - dt);
@@ -139,7 +191,24 @@ export class AuthNetBridge {
 
     // ── render remote players ──
     this._syncRemotes(dt);
+    this.game.hud?.setServerPop?.(this.client.remotes.size + 1, 8);
     this._drainEvents();
+  }
+
+  _resolveRookCollision(next, previous) {
+    const world = this.game.world;
+    if (!world?._mapOctree) return next;
+    const ground = world.groundHeightAt(next.px, next.pz, previous.py, next.py);
+    if (next.py <= ground + 0.05 && next.vy <= 0.001) {
+      next.py = ground; next.vy = 0; next.onGround = 1;
+      next.nX = 0; next.nY = 1; next.nZ = 0;
+    }
+    const position = new THREE.Vector3(next.px, next.py, next.pz);
+    world.resolveCollisions(position, 0.45);
+    next.px = Math.round(position.x * 1e6) / 1e6;
+    next.py = Math.round(position.y * 1e6) / 1e6;
+    next.pz = Math.round(position.z * 1e6) / 1e6;
+    return next;
   }
 
   _syncRemotes(dt) {

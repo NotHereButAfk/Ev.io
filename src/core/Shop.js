@@ -39,7 +39,15 @@ export const Shop = {
     }
   },
 
-  getEquipped()   { try { return localStorage.getItem(_EQ_KEY) || null; } catch { return null; } },
+  // New profiles start with a readable blue/graphite finish instead of the
+  // nearly-black untinted material. An explicit empty string still means the
+  // player chose the unpainted default in Inventory.
+  getEquipped()   {
+    try {
+      const stored = localStorage.getItem(_EQ_KEY);
+      return stored === null ? 'cobalt_circuit' : (stored || null);
+    } catch { return 'cobalt_circuit'; }
+  },
   equip(skinId)   { localStorage.setItem(_EQ_KEY, skinId || ''); },
-  unequip()       { localStorage.removeItem(_EQ_KEY); },
+  unequip()       { localStorage.setItem(_EQ_KEY, ''); },
 };

@@ -65,6 +65,9 @@ export class Player {
     // Third-person camera
     this._camDist = 0;           // 0 = FPS, >0 = TPS metres
     this._tpsTarget = new THREE.Vector3();
+    this._tpsDesired = new THREE.Vector3();
+    this._tpsOffset = new THREE.Vector3();
+    this._tpsRaycaster = new THREE.Raycaster();
 
     // Sprint blend (0..1) for camera roll
     this._sprintT = 0;
@@ -393,14 +396,34 @@ export class Player {
       const sinY = Math.sin(this.yaw);
       const cosY = Math.cos(this.yaw);
       const pitchBlend = Math.sin(Math.max(0, this.pitch) * 0.5);
-      this.camera.position.set(
+      this._tpsDesired.set(
         this.position.x + sinY * d * (1 - pitchBlend * 0.4),
         this.position.y + 1.4 + 0.5 * d * 0.18 + pitchBlend * d * 0.6,
         this.position.z + cosY * d * (1 - pitchBlend * 0.4)
       );
       this._tpsTarget.set(this.position.x, this.position.y + 1.2, this.position.z);
-      this.camera.lookAt(this._tpsTarget);
+      const cameraOffset = this._tpsOffset.copy(this._tpsDesired).sub(this._tpsTarget);
+      const desiredDistance = cameraOffset.length();
+      this._tpsRaycaster.set(this._tpsTarget, cameraOffset.normalize());
+      this._tpsRaycaster.near = 0.05;
+      this._tpsRaycaster.far = desiredDistance;
+      const obstruction = this._tpsRaycaster.intersectObjects(world.raycastMeshes, true)[0];
+      this._tpsObstructed = !!obstruction && obstruction.distance < 0.8;
+      if (this._tpsObstructed) {
+        this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
+        this.camera.rotation.order = 'YXZ';
+        this.camera.rotation.y = this.yaw + recoilViewYaw;
+        this.camera.rotation.x = this.pitch + recoilView;
+        this.camera.rotation.z = this._sprintT * -0.025;
+      } else if (obstruction) {
+        this.camera.position.copy(this._tpsTarget)
+          .addScaledVector(cameraOffset, Math.max(0.35, obstruction.distance - 0.18));
+      } else {
+        this.camera.position.copy(this._tpsDesired);
+      }
+      if (!this._tpsObstructed) this.camera.lookAt(this._tpsTarget);
     } else {
+      this._tpsObstructed = false;
       // First-person: camera sits at eye height with head-bob.
       this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
       this.camera.rotation.order = 'YXZ';

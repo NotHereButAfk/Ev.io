@@ -142,11 +142,14 @@ ok('input: server integrated movement (Alice moved -z)', a.last().you.z < startZ
 
 // forged transform: client cannot teleport by sending a position — there's no
 // position field the server trusts; prove a bogus huge input can't warp.
-const beforeZ = a.last().you.z;
+const beforeForge = { x: a.last().you.x, y: a.last().you.y, z: a.last().you.z };
 a.inputRaw({ seq: 9999, tick: 0, mx: 0, mz: 1, yaw: 0, x: -999, y: 500, z: -999 });
 await sleep(150);
+const afterForge = a.last().you;
 ok('forged transform: injected x/y/z ignored (no teleport)',
-   Math.abs(a.last().you.y) < 5 && a.last().you.z > -50);
+   Math.hypot(afterForge.x - beforeForge.x, afterForge.y - beforeForge.y,
+              afterForge.z - beforeForge.z) < 4 &&
+   Math.hypot(afterForge.x + 999, afterForge.y - 500, afterForge.z + 999) > 100);
 
 // duplicate / stale seq: replayed old seq must be dropped
 const z1 = a.last().you.z;

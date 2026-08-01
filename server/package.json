@@ -12,6 +12,7 @@
     "test:static": "node static_test.mjs"
   },
   "dependencies": {
+    "three": "^0.184.0",
     "ws": "^8.18.0"
   }
 }

@@ -844,6 +844,18 @@ export class Game {
   // players) use their real kills/score from the shared server instead.
   // Survival shows just you (vs. zombies).
   _buildScoreboardRows() {
+    if (this._authNet?.ready) {
+      const client = this._authNet.client;
+      const rows = (client.roster || []).map((entry) => ({
+        name: entry.name,
+        kills: entry.id === client.you ? client.self.kills : entry.kills,
+        score: entry.id === client.you ? client.self.score : entry.score,
+        isYou: entry.id === client.you,
+        isBot: entry.isBot,
+      }));
+      rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
+      return rows;
+    }
     const rows = [{ name: this.player.name || 'You', kills: this.kills, score: this.score, isYou: true }];
     if (!this._isSurvival) {
       for (const bot of (this.botManager?.bots || [])) {
@@ -1237,7 +1249,7 @@ export class Game {
     this.world.update(dt);
 
     // Sync third-person body mesh and hide/show viewmodel
-    const inTPS = this.player._camDist > 0;
+    const inTPS = this.player._camDist > 0 && !this.player._tpsObstructed;
     if (this._playerBody) {
       this._playerBody.visible = inTPS;
       this._playerBody.position.copy(this.player.position);

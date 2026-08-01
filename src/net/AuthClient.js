@@ -34,8 +34,10 @@ export class AuthClient {
     this.smokes = [];                       // active smoke volumes from the server
     this.abilitySeq = 0;
     this.events = [];                       // drained by the game each frame
+    this.roster = [];
     this.arena = null;
     this.onWelcome = null;
+    this.postStep = null;
     this._acc = 0;
   }
 
@@ -58,6 +60,7 @@ export class AuthClient {
         this.arena = m.arena;
         this.simWorld = {
           half: m.arena.half, killY: -25,
+          noBaseFloor: !!m.arena.noBaseFloor,
           platforms: m.arena.platforms, boxes: m.arena.boxes,
           gravLifts: [], teleporters: [],
         };
@@ -82,6 +85,10 @@ export class AuthClient {
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
                   abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
+    this.roster = snap.players.map((pl) => ({
+      id: pl.id, name: pl.name, isBot: !!pl.isBot,
+      kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
+    }));
     // snap predicted state to server truth
     this.sim = { ...this.sim,
       px: y.x, py: y.y, pz: y.z, vx: y.vx, vy: y.vy, vz: y.vz,
@@ -120,7 +127,8 @@ export class AuthClient {
                    grounded: pl.onGround !== false, crouch: pl.crouch, slide: !!pl.slide,
                    sprint: !!pl.sprint, wid: pl.wid || 'm4', aiming: !!pl.aiming,
                    firing: !!pl.firing,
-                   alive: pl.alive, health: pl.health });
+                   alive: pl.alive, health: pl.health,
+                   kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0 });
       if (r.buf.length > 20) r.buf.shift();
     }
     // reap gone players
@@ -136,7 +144,7 @@ export class AuthClient {
     const next = step(before, inp, this.simWorld);
     const distance = Math.hypot(next.px - before.px, next.pz - before.pz);
     this.sprinting = active && !inp.teleJust && distance / DT > 6.5 && distance < 2;
-    this.sim = next;
+    this.sim = this.postStep ? this.postStep(next, before) : next;
   }
 
   // Feed one client input; predicts locally + ships to the server.
