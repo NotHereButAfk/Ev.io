@@ -8,6 +8,7 @@ import {
   HUMAN_PHASE_ORIGIN,
   HUMAN_STRIDE_WARP,
   humanStrideWarpAngle,
+  humanTravelPose,
   mapHumanMotionPhase,
   selectHumanMotion,
   targetHumanStrideScale,
@@ -43,6 +44,30 @@ assert(Math.abs(targetHumanStrideScale('run', HUMAN_CLIP_SPEED.run, 1) - 1) < 1e
 let smooth = 1;
 for (let i = 0; i < 6; i++) smooth = dampHumanTimeScale(smooth, sprintRate, 1 / 60);
 assert(smooth > 1 && smooth < sprintRate, 'time-scale damping snapped or stalled');
+
+// Sweep through a live strafe-to-backpedal change in both directions. The
+// reverse-clip hysteresis may change the hidden target, but the damped pelvis
+// players actually see must never snap across frames.
+for (const side of [-1, 1]) {
+  for (const sweep of [[1, -1], [-1, 1]]) {
+    let reverse = sweep[0] < 0;
+    let renderedYaw = humanTravelPose(sweep[0], 0, reverse).yaw;
+    let worstYawStep = 0;
+    for (let i = 1; i <= 240; i++) {
+      const forward = sweep[0] + (sweep[1] - sweep[0]) * i / 240;
+      const right = side * Math.sqrt(Math.max(0, 1 - forward * forward));
+      const pose = humanTravelPose(forward, right, reverse);
+      reverse = pose.reverse;
+      let delta = pose.yaw - renderedYaw;
+      delta = ((delta + Math.PI) % (Math.PI * 2)) - Math.PI;
+      const step = delta * (1 - Math.exp(-12 / 60));
+      renderedYaw += step;
+      worstYawStep = Math.max(worstYawStep, Math.abs(step));
+    }
+    assert(worstYawStep < 0.06,
+      `travel-direction crossover snaps pelvis by ${worstYawStep.toFixed(3)}rad`);
+  }
+}
 
 globalThis.ProgressEvent ??= class ProgressEvent {
   constructor(type, init = {}) {

@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import {
   dampHumanTimeScale,
   humanStrideWarpAngle,
+  humanTravelPose,
   mapHumanMotionPhase,
   selectHumanMotion,
   targetHumanStrideScale,
@@ -326,11 +327,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     if (_reportedSpeed > 0.2) {
       // Backpedalling reverses the clip instead of twisting the pelvis 180°.
       // Hysteresis prevents the choice flickering while moving almost sideways.
-      if (_reverseGait ? df > 0.20 : df < -0.20) _reverseGait = !_reverseGait;
-      _targetLowerYaw = _reverseGait
-        ? Math.atan2(-dr, Math.max(1e-5, -df))
-        : Math.atan2(-dr, Math.max(1e-5, df));
-      _targetLowerYaw = _clamp(_targetLowerYaw, -Math.PI * 0.52, Math.PI * 0.52);
+      const travel = humanTravelPose(df, dr, _reverseGait);
+      _reverseGait = travel.reverse;
+      _targetLowerYaw = travel.yaw;
     } else {
       _targetLowerYaw = 0;
       _reverseGait = false;

@@ -85,3 +85,18 @@ export function humanStrideWarpAngle(motion, strideScale, gaitPhase) {
 export function dampHumanTimeScale(current, target, dt, response = 9) {
   return target + (current - target) * Math.exp(-response * Math.max(0, dt));
 }
+
+// Convert resolved travel in body space into the lower-body yaw and playback
+// direction used by the Soldier rig. Keeping this pure makes the lateral
+// forward/back crossover measurable instead of relying on an eyeballed pose.
+export function humanTravelPose(dirF = 1, dirR = 0, wasReverse = false) {
+  const forward = Number.isFinite(dirF) ? dirF : 1;
+  const right = Number.isFinite(dirR) ? dirR : 0;
+  const reverse = wasReverse ? forward <= 0.20 : forward < -0.20;
+  const denominator = Math.max(1e-5, reverse ? -forward : forward);
+  const yaw = Math.atan2(-right, denominator);
+  return {
+    reverse,
+    yaw: Math.max(-Math.PI * 0.52, Math.min(Math.PI * 0.52, yaw)),
+  };
+}
