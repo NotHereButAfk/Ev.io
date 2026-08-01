@@ -3,7 +3,7 @@
 A browser arena FPS built with [Three.js](https://threejs.org/) and Vite. No
 plugin, no download — it runs in a tab.
 
-Live at **[kyrx.live](https://kyrx.live)**, deployed automatically on every push
+Live at **[kryx.live](https://kryx.live)**, deployed automatically on every push
 to `main`.
 
 | | |

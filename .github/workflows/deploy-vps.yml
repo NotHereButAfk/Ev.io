@@ -1,19 +1,19 @@
 name: Deploy to VPS
 
-# Build the Vite site and rsync dist/ to the kyrx.live VPS over SSH on every
+# Build the Vite site and rsync dist/ to the kryx.live VPS over SSH on every
 # push to main. Set these repo secrets (Settings → Secrets and variables →
 # Actions):
-#   VPS_HOST     the VPS IP or hostname (e.g. kyrx.live or 203.0.113.7)
+#   VPS_HOST     the VPS IP or hostname (e.g. kryx.live or 203.0.113.7)
 #   VPS_USER     SSH user (e.g. root or deploy)
 #   VPS_SECRET   PRIVATE key whose public half is in that user's
 #                ~/.ssh/authorized_keys on the VPS
 #                (generate with: ssh-keygen -t ed25519 -f deploy_key -N "")
-#   PATH         web root the site is served from (e.g. /var/www/kyrx.live/html)
+#   VPS_PATH     web root the site is served from (e.g. /var/www/kryx.live/html)
 # SSH uses port 22 for this Hostinger account.
 #
 # Optional: VITE_WS_URL — URL of the 24/7 match relay (see server/README.md).
 # The VPS can host it too (it keeps a Node process alive, unlike shared
-# hosting): run server/ under systemd or pm2 and set this to wss://kyrx.live/ws
+# hosting): run server/ under systemd or pm2 and set this to wss://kryx.live/ws
 # (or ws://HOST:PORT) so clients share one live match.
 
 on:
@@ -43,15 +43,13 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
           DEPLOY_KEY: ${{ secrets.VPS_SECRET }}
-          DEPLOY_PATH: ${{ secrets.PATH }}
+          DEPLOY_PATH: ${{ secrets.VPS_PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
-          # A repo secret is unfortunately named PATH. Pin the runner command
-          # path so referencing that secret cannot hide mkdir/ssh-keyscan.
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           test -n "$DEPLOY_HOST" || { echo "Missing VPS_HOST secret"; exit 1; }
           test -n "$DEPLOY_KEY" || { echo "Missing VPS_SECRET secret"; exit 1; }
-          test -n "$DEPLOY_PATH" || { echo "Missing PATH secret"; exit 1; }
+          test -n "$DEPLOY_PATH" || { echo "Missing VPS_PATH secret"; exit 1; }
           test -n "$DEPLOY_USER" || { echo "Missing VPS_USER secret"; exit 1; }
           /usr/bin/mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
@@ -67,10 +65,10 @@ jobs:
       - name: Rsync dist/ to VPS
         env:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
-          DEPLOY_PATH: ${{ secrets.PATH }}
+          DEPLOY_PATH: ${{ secrets.VPS_PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           /usr/bin/rsync -az --delete \
-            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22" \
+            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"

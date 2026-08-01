@@ -15,13 +15,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - Headless screenshots for verification: Playwright + swiftshader; GLBs take
   ~30s to load. Log in via `#auth-guest-btn`, start a match via `#play-btn`.
 
-## Deploy (VPS — kyrx.live)
-- Live site: **kyrx.live**, hosted on a **VPS** (as of Jul 2026; supersedes the
+## Deploy (VPS — kryx.live)
+- Live site: **kryx.live**, hosted on a **VPS** (as of Jul 2026; supersedes the
   old kyx.io Hostinger shared hosting, which superseded Netlify — Netlify PR
   previews still post bot comments; ignore them).
 - `.github/workflows/deploy-vps.yml` builds and **rsyncs `dist/` over SSH** on
-  every push to `main`. Repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
-  (private key), `VPS_PATH` (web root), optional `VPS_PORT`.
+  every push to `main`. Repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SECRET`
+  (private key), and `VPS_PATH` (web root). SSH uses port 22.
 - The SSH-key heredoc was repaired on 2026-07-29; its unindented body had made
   the workflow invalid YAML, so GitHub produced failed runs with zero jobs or
   logs. If deployment still fails after that repair, inspect the actual job
