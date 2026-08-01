@@ -56,6 +56,11 @@ jobs:
           /usr/bin/mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
           /usr/bin/chmod 600 ~/.ssh/deploy_key
+          ACTUAL_FINGERPRINT="$(/usr/bin/ssh-keygen -y -f ~/.ssh/deploy_key \
+            | /usr/bin/ssh-keygen -lf - -E sha256 \
+            | /usr/bin/awk '{print $2}')"
+          test "$ACTUAL_FINGERPRINT" = "SHA256:BkZHce6cAZ4c6amr86JOVeE6w2GBRZlJV6avGJj+BLM" \
+            || { echo "VPS_SECRET does not match the approved deploy key fingerprint"; exit 1; }
           /usr/bin/ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Rsync dist/ to VPS
