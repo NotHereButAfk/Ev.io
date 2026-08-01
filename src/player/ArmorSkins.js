@@ -10,7 +10,7 @@ export const RARITY_SHIELD = { common: 20, epic: 60, legendary: 80, mythic: 100 
 export const ARMOR_SKINS = [
   {
     id: 'cobalt_circuit', name: 'Cobalt Circuit', rarity: 'common', starter: true,
-    primary: 0x2f66a4, secondary: 0x111923, emissive: 0x45e6ff,
+    primary: 0x3b82d0, secondary: 0x0c1420, emissive: 0x45e6ff,
     emissiveIntensity: 0.75, roughness: 0.44, metalness: 0.58, price: 0, shield: 0,
   },
   {

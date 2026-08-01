@@ -1001,7 +1001,7 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const finishRoughness = armorSkin?.roughness ?? look.roughness ?? 0.5;
   const finishMetalness = armorSkin?.metalness ?? 0.66;
   const plate = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(plateColor).multiplyScalar(0.80),
+    color: new THREE.Color(plateColor).multiplyScalar(0.92),
     roughness: finishRoughness * 0.85, metalness: finishMetalness, envMapIntensity: 1.1,
   });
   plate.userData.armorRole = 'plate';
@@ -1054,32 +1054,32 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const oct = (r) => new THREE.OctahedronGeometry(r);
   const cyl = (r, h) => new THREE.CylinderGeometry(r, r, h, 12);
   const cone = (r, h) => new THREE.ConeGeometry(r, h, 10);
-  // Bake a non-uniform scale into a geometry (spec attach only allows uniform
-  // scale) — used to squash a sphere into a curved visor lens.
-  const scaled = (geo, sx, sy, sz) => { geo.scale(sx, sy, sz); return geo; };
   const tiltBack = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, 0));
+  const faceDisc = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+  const chestLeft = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.09));
+  const chestRight = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.09));
 
-  // Helmet worn by EVERY variant — a full sci-fi helmet that covers the bald head
-  // and gives the soldier a real face: a rounded cranium, an angled faceplate with
-  // a brow, a curved glowing visor lens, a breather mandible, side comms housings,
-  // a top crest, and a neck gorget that ties the head to the chest.
+  // Helmet worn by EVERY variant — a full angular shell with an opaque faceplate,
+  // vertical energy stripe, split mandible, side comms housings, crown rail, and
+  // a neck gorget that visually seals it to the torso.
   const helmet = [
-    // Compact ROUND shell (width ≈ height) — sits on the squashed head, so it's a
-    // helmet skull, not a tall egg.
-    { bone: 'Head', geo: scaled(sph(0.129), 1.0, 1.02, 1.08), mat: helmetMat, x: 0, y: 1.592, z: 0.0 },
-    // Big curved dark glossy visor across the whole front (motorcycle-/Spartan-
-    // style) — the single feature that makes it read unmistakably as a helmet.
-    { bone: 'Head', geo: scaled(sph(0.118), 0.95, 0.98, 0.62), mat: visorMat, x: 0, y: 1.55, z: -0.05 },
-    // Glowing eye-line across the visor.
-    { bone: 'Head', geo: scaled(sph(0.09), 0.98, 0.08, 0.18), mat: accent, x: 0, y: 1.572, z: -0.128,
+    // Compact faceted shell: broad enough to cover the source head without the
+    // oversized round dome that previously made the model look toy-like.
+    { bone: 'Head', geo: box(0.205, 0.215, 0.18), mat: helmetMat, x: 0, y: 1.59, z: 0.005 },
+    // Recessed dark faceplate across the front.
+    { bone: 'Head', geo: box(0.155, 0.135, 0.045), mat: visorMat, x: 0, y: 1.565, z: -0.095 },
+    // Vertical identity stripe across the faceplate.
+    { bone: 'Head', geo: box(0.032, 0.125, 0.018), mat: accent, x: 0, y: 1.585, z: -0.123,
       anim: { type: 'pulse', freq: 1.0, min: 0.7, max: 1.2 } },
     // Shell brow lip + chin guard capping the visor top and bottom.
-    { bone: 'Head', geo: box(0.175, 0.04, 0.09), mat: helmetMat, x: 0, y: 1.638, z: -0.055 },
-    { bone: 'Head', geo: box(0.14, 0.05, 0.09), mat: helmetMat, x: 0, y: 1.452, z: -0.055 },
+    { bone: 'Head', geo: box(0.18, 0.04, 0.09), mat: helmetMat, x: 0, y: 1.642, z: -0.06 },
+    { bone: 'Head', geo: box(0.16, 0.06, 0.105), mat: helmetMat, x: 0, y: 1.47, z: -0.052 },
+    { bone: 'Head', geo: box(0.062, 0.022, 0.022), mat: accent, x: -0.047, y: 1.485, z: -0.115 },
+    { bone: 'Head', geo: box(0.062, 0.022, 0.022), mat: accent, x:  0.047, y: 1.485, z: -0.115 },
     // Chin breather vent slit (bright detail).
     { bone: 'Head', geo: box(0.055, 0.024, 0.03), mat: trim, x: 0, y: 1.45, z: -0.108 },
     // Top crest ridge (shell colour, integrated).
-    { bone: 'Head', geo: box(0.028, 0.04, 0.16), mat: helmetMat, x: 0, y: 1.70, z: 0.0 },
+    { bone: 'Head', geo: box(0.055, 0.045, 0.16), mat: plate, x: 0, y: 1.708, z: 0.0 },
     // Side comms housings + status lights.
     { bone: 'Head', geo: box(0.045, 0.10, 0.10), mat: dark, x: -0.116, y: 1.558, z: 0.005 },
     { bone: 'Head', geo: box(0.045, 0.10, 0.10), mat: dark, x:  0.116, y: 1.558, z: 0.005 },
@@ -1184,12 +1184,18 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
     specs = [
       // Layered chest cuirass (Spine2 ~1.314): a main breastplate, an upper-chest
       // collar deck, and a polished sternum ridge with the glowing emitter set in.
-      { bone: 'Spine2', geo: box(0.32, 0.34, 0.12), mat: plate, x: 0, y: 1.27, z: -0.055 },
-      { bone: 'Spine2', geo: box(0.25, 0.12, 0.11), mat: plate, x: 0, y: 1.405, z: -0.070 }, // upper chest deck
-      { bone: 'Spine2', geo: box(0.06, 0.30, 0.05), mat: trim,  x: 0, y: 1.28, z: -0.108 },  // sternum ridge
-      { bone: 'Spine2', geo: box(0.045, 0.20, 0.03), mat: accent, x: 0, y: 1.27, z: -0.126,
-        anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },         // chest emitter heartbeat
-      { bone: 'Spine2', geo: box(0.17, 0.02, 0.03), mat: trim, x: 0, y: 1.39, z: -0.118 },   // clavicle rail
+      // Broad dark carrier plus separate angular plates: this gives the torso
+      // the layered EV-style exosuit read without copying a proprietary mesh.
+      { bone: 'Spine2', geo: box(0.37, 0.34, 0.13), mat: dark, x: 0, y: 1.28, z: -0.012 },
+      { bone: 'Spine2', geo: box(0.145, 0.16, 0.09), mat: plate, x: -0.085, y: 1.365, z: -0.082, quat: chestLeft },
+      { bone: 'Spine2', geo: box(0.145, 0.16, 0.09), mat: plate, x:  0.085, y: 1.365, z: -0.082, quat: chestRight },
+      { bone: 'Spine2', geo: box(0.105, 0.235, 0.075), mat: plate, x: 0, y: 1.245, z: -0.105 },
+      { bone: 'Spine1', geo: box(0.22, 0.085, 0.085), mat: plate, x: 0, y: 1.105, z: -0.075 },
+      { bone: 'Spine2', geo: box(0.032, 0.155, 0.022), mat: accent, x: 0, y: 1.285, z: -0.15,
+        anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },
+      { bone: 'Spine2', geo: cyl(0.034, 0.026), mat: trim, x: -0.10, y: 1.34, z: -0.14, quat: faceDisc },
+      { bone: 'Spine2', geo: cyl(0.034, 0.026), mat: trim, x:  0.10, y: 1.34, z: -0.14, quat: faceDisc },
+      { bone: 'Spine2', geo: box(0.17, 0.022, 0.026), mat: trim, x: 0, y: 1.425, z: -0.125 },
       // Layered pauldrons (shoulder bone ~1.429): a rounded cap, a polished trim
       // lip, and a status beacon on the outer face.
       { bone: 'LeftShoulder',  geo: box(0.135, 0.105, 0.15), mat: plate, x: -0.17, y: 1.44, z: 0.01 },
@@ -1202,6 +1208,29 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2, phase: Math.PI } },
       { bone: 'Spine', geo: box(0.33, 0.09, 0.23), mat: dark, x: 0, y: 1.04, z: -0.01 },     // belt (Spine ~1.075)
       { bone: 'Spine', geo: box(0.35, 0.03, 0.25), mat: trim, x: 0, y: 1.085, z: -0.01 },    // belt trim lip
+      { bone: 'Spine', geo: box(0.085, 0.10, 0.10), mat: plate, x: -0.135, y: 1.00, z: -0.025 },
+      { bone: 'Spine', geo: box(0.085, 0.10, 0.10), mat: plate, x:  0.135, y: 1.00, z: -0.025 },
+
+      // Segmented limb armour keeps the black flex joints visible while giving
+      // the forearms, thighs, knees, shins, and boots the same authored rhythm.
+      { bone: 'LeftArm',  geo: box(0.18, 0.115, 0.12), mat: plate, x: -0.30, y: 1.47, z: 0.00 },
+      { bone: 'RightArm', geo: box(0.18, 0.115, 0.12), mat: plate, x:  0.30, y: 1.47, z: 0.00 },
+      { bone: 'LeftArm',  geo: box(0.075, 0.03, 0.025), mat: accent, x: -0.30, y: 1.47, z: -0.073 },
+      { bone: 'RightArm', geo: box(0.075, 0.03, 0.025), mat: accent, x:  0.30, y: 1.47, z: -0.073 },
+      { bone: 'LeftUpLeg',  geo: box(0.135, 0.285, 0.105), mat: plate, x: -0.105, y: 0.82, z: -0.045 },
+      { bone: 'RightUpLeg', geo: box(0.135, 0.285, 0.105), mat: plate, x:  0.105, y: 0.82, z: -0.045 },
+      { bone: 'LeftUpLeg',  geo: box(0.035, 0.20, 0.022), mat: accent, x: -0.105, y: 0.83, z: -0.108 },
+      { bone: 'RightUpLeg', geo: box(0.035, 0.20, 0.022), mat: accent, x:  0.105, y: 0.83, z: -0.108 },
+      { bone: 'LeftLeg',  geo: box(0.14, 0.105, 0.115), mat: trim, x: -0.10, y: 0.56, z: -0.055 },
+      { bone: 'RightLeg', geo: box(0.14, 0.105, 0.115), mat: trim, x:  0.10, y: 0.56, z: -0.055 },
+      { bone: 'LeftLeg',  geo: box(0.125, 0.31, 0.105), mat: plate, x: -0.10, y: 0.35, z: -0.045 },
+      { bone: 'RightLeg', geo: box(0.125, 0.31, 0.105), mat: plate, x:  0.10, y: 0.35, z: -0.045 },
+      { bone: 'LeftLeg',  geo: box(0.032, 0.245, 0.022), mat: accent, x: -0.10, y: 0.35, z: -0.108 },
+      { bone: 'RightLeg', geo: box(0.032, 0.245, 0.022), mat: accent, x:  0.10, y: 0.35, z: -0.108 },
+      { bone: 'LeftFoot',  geo: box(0.15, 0.105, 0.23), mat: dark, x: -0.10, y: 0.09, z: -0.03 },
+      { bone: 'RightFoot', geo: box(0.15, 0.105, 0.23), mat: dark, x:  0.10, y: 0.09, z: -0.03 },
+      { bone: 'LeftFoot',  geo: box(0.115, 0.035, 0.17), mat: plate, x: -0.10, y: 0.145, z: -0.055 },
+      { bone: 'RightFoot', geo: box(0.115, 0.035, 0.17), mat: plate, x:  0.10, y: 0.145, z: -0.055 },
       // Compact, layered power pack: the waist and arms remain readable from
       // behind, and the selected plate colour now carries into the rear view.
       { bone: 'Spine2', geo: box(0.18, 0.20, 0.085), mat: dark, x: 0, y: 1.27, z: 0.105 },
@@ -1292,7 +1321,7 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
     const glow = new THREE.Color(armorSkin.emissive ?? armorSkin.primary);
     for (const m of group.userData.armorMats) {
       const role = m.userData?.armorRole;
-      if (role === 'plate') m.color.copy(plate).multiplyScalar(0.80);
+      if (role === 'plate') m.color.copy(plate).multiplyScalar(0.92);
       else if (role === 'dark') m.color.copy(under).multiplyScalar(0.55);
       else if (role === 'trim') m.color.copy(plate).lerp(new THREE.Color(0xe8edf2), 0.58);
       else if (role === 'accent') {
