@@ -39,6 +39,19 @@ let _nextId = 5000;
 // Frame-rate-independent smoothing factor for lerp/slerp toward a target.
 const damp = (lambda, dt) => 1 - Math.exp(-lambda * dt);
 
+export const ZOMBIE_DEATH_SECONDS = 0.65;
+
+/**
+ * Apply the skeletal death pose from the pose captured at the instant of
+ * death. This must assign an absolute offset: adding the eased target every
+ * frame makes the corpse fold farther at higher refresh rates.
+ */
+export function applyZombieDeathCrumple(rig, baseSpineX, baseHeadX, eased) {
+  if (!rig) return;
+  rig.spineGroup.rotation.x = baseSpineX + eased * 0.4;
+  rig.headGroup.rotation.x  = baseHeadX  + eased * 0.3;
+}
+
 // ── DIVERSITY palettes — each zombie draws a distinct look from these, so a
 // horde reads as many different corpses, not one recolored template. ──────────
 const SKIN_TONES = [
@@ -1030,6 +1043,8 @@ export class Zombie {
     this._deathT    = 0;
     this._deathSide = Math.random() < 0.5 ? 1 : -1;
     this._deathBaseY= this.mesh.position.y;
+    this._deathSpineX = this._rig?.spineGroup.rotation.x ?? 0;
+    this._deathHeadX  = this._rig?.headGroup.rotation.x ?? 0;
     this.healthBarGroup.visible = false;
     if (this._muzzleFlash) this._muzzleFlash.intensity = 0;
     if (this.audio) this.audio.playZombieDeath();
@@ -1067,17 +1082,19 @@ export class Zombie {
     // Death animation
     if (this._dying) {
       this._deathT += dt;
-      const p = Math.min(1, this._deathT / 0.65);
+      const p = Math.min(1, this._deathT / ZOMBIE_DEATH_SECONDS);
       const e = p * p;
       this.mesh.rotation.z = e * (Math.PI / 2) * this._deathSide;
       this.mesh.rotation.x = e * 0.25;
       this.mesh.position.y = this._deathBaseY - e * 0.55;
 
       // Enhanced crumple
-      if (this._rig) {
-        this._rig.spineGroup.rotation.x += e * 0.4;
-        this._rig.headGroup.rotation.x  += e * 0.3;
-      }
+      applyZombieDeathCrumple(
+        this._rig,
+        this._deathSpineX ?? 0,
+        this._deathHeadX ?? 0,
+        e
+      );
 
       if (p > 0.55) {
         const fade = 1 - (p - 0.55) / 0.45;

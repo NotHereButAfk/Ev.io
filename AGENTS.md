@@ -28,12 +28,16 @@ npm run test:move             # 11 movement fixtures, exact hashes
 npm run test:gait             # walk cycle: foot planting in every direction, jump pose
 npm run test:facing           # local/network/bot yaw plus soldier.glb forward-axis proof
 npm run test:human-motion     # measured clip speeds, cadence caps, smoothed transitions
+npm run test:human-carry      # real Soldier GLB: both wrists stay on rifle
+npm run test:viewmodel        # all weapons/FOVs/aspects: near-plane + glove framing
+npm run test:zombie-death     # absolute death pose matches at 30/60/144Hz
+npm run test:player-respawn   # transient movement/animation state resets
 npm run test:account          # salted local password storage + plaintext migration
 npm run test:actions          # every action moves the body
 npm run test:bots             # combat spacing, pursuit, bursts, free-for-all targeting
 npm run test:evmap            # official Rook hash, geometry/spawns, authored weapon markers
 npm run test:skins            # character catalog, starter finishes, themed silhouettes
-cd server && npm run test:auth   # 25 authority/abuse proofs
+cd server && npm run test:auth   # 33 authority/abuse proofs
 npm run certify               # build, movement, actions, net authority, topology, soak, assets, a11y
 ```
 

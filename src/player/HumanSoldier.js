@@ -4,10 +4,15 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   dampHumanTimeScale,
-  normalizeRootPositionValues,
+  humanStrideWarpAngle,
+  mapHumanMotionPhase,
   selectHumanMotion,
+  targetHumanStrideScale,
   targetHumanTimeScale,
 } from './HumanLocomotion.js';
+import { ACTION_TIME } from './Actions.js';
+import { createHumanActionPose, sampleHumanActionPose } from './HumanActionMotion.js';
+import { applyHumanRifleCarry } from './HumanRifleCarry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Real rigged human soldier (Mixamo "Vanguard"), with Idle / Walk / Run clips.
@@ -149,11 +154,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   // ── Animation: 3 clips (idle/walk/run) + rich procedural motion layers ──
   const mixer   = new THREE.AnimationMixer(root);
   const byName  = {};
-  const bindHips = findBone(root, 'Hips')?.position;
   for (const source of _template.animations) {
     const clip = source.clone();
-    const hipsTrack = clip.tracks.find((track) => /Hips\.position$/i.test(track.name));
-    if (hipsTrack && bindHips) normalizeRootPositionValues(hipsTrack.values, bindHips);
     byName[clip.name] = clip;
   }
 
@@ -180,9 +182,13 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   const setMotion = (name) => {
     const next = actions[name] || actions.idle;
     if (!next || next === current) return;
-    const phase = current && current !== actions.idle && next !== actions.idle
-      ? (current.time / Math.max(1e-5, current.getClip().duration)) % 1
-      : 0;
+    const fromName = current === actions.walk ? 'walk'
+      : current === actions.run ? 'run' : 'idle';
+    const toName = next === actions.walk ? 'walk'
+      : next === actions.run ? 'run' : 'idle';
+    const rawPhase = current
+      ? (current.time / Math.max(1e-5, current.getClip().duration)) % 1 : 0;
+    const phase = mapHumanMotionPhase(rawPhase, fromName, toName);
     next.enabled = true;
     next.setEffectiveTimeScale(1);
     next.setEffectiveWeight(1);
@@ -278,6 +284,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _reportedSpeed = 0;
   let _targetTimeScale = baseTS;
   let _currentTimeScale = baseTS;
+  let _targetStrideScale = 1;
+  let _strideScale = 1;
   let _lastSpeed  = 0;
   let _accel      = 0;                     // smoothed dSpeed/dt for lean
   let _grounded   = true;
@@ -285,6 +293,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _landT      = 0;                     // seconds since landing (landing squish)
   let _strafeLean = 0;                     // –1 (right) .. +1 (left)
   let _targetStrafeLean = 0;
+  let _targetLowerYaw = 0;                 // legs follow travel while torso keeps aim
+  let _lowerYaw = 0;
+  let _reverseGait = false;
   let _forwardLean = 0;                    // 0..1 momentum lean forward
   let _fireRecoil = 0;                     // recoil kick amplitude, decays
   let _flinch     = { x: 0, y: 0, t: 0 };  // damage flinch, decays
@@ -298,9 +309,32 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _jumpT      = 0;                      // seconds since the current jump launched
   let _teleportT  = 0;                      // teleport reform timer, decays
   const TP_DUR    = 0.42;                   // teleport reform duration (s)
+  let _verticalVelocity = 0;
+  let _targetCrouch = 0, _crouchT = 0;
+  let _targetSlide = 0, _slideT = 0;
+  let _reloadP = 0, _meleeSwing = 1;
+  let _targetWeaponAim = 0, _weaponAim = 0;
+  const _actionLeft = { swap: 0, throw: 0 };
+  const _actionPose = createHumanActionPose();
 
-  const setLocomotion = (speed, grounded = true, sprinting = false, strafe = 0) => {
+  const setLocomotion = (
+    speed, grounded = true, sprinting = false, strafe = 0, dirF = 1, dirR = 0
+  ) => {
     _reportedSpeed = Math.max(0, Number.isFinite(speed) ? speed : 0);
+    const df = Number.isFinite(dirF) ? dirF : 1;
+    const dr = Number.isFinite(dirR) ? dirR : 0;
+    if (_reportedSpeed > 0.2) {
+      // Backpedalling reverses the clip instead of twisting the pelvis 180°.
+      // Hysteresis prevents the choice flickering while moving almost sideways.
+      if (_reverseGait ? df > 0.20 : df < -0.20) _reverseGait = !_reverseGait;
+      _targetLowerYaw = _reverseGait
+        ? Math.atan2(-dr, Math.max(1e-5, -df))
+        : Math.atan2(-dr, Math.max(1e-5, df));
+      _targetLowerYaw = _clamp(_targetLowerYaw, -Math.PI * 0.52, Math.PI * 0.52);
+    } else {
+      _targetLowerYaw = 0;
+      _reverseGait = false;
+    }
     // Air state overrides everything — bots normally pass grounded=true, but a
     // player-controlled or scripted character can hop by setting grounded=false.
     if (!grounded) {
@@ -312,13 +346,18 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       // landing — instead of a slow walk cycle treading the air.
       setMotion('idle');
       _targetTimeScale = baseTS;
+      _targetStrideScale = 1;
     } else {
       if (!_grounded) { _landT = 0.24; _airT = 0; } // landing bounce
       _grounded = true;
       const name = selectHumanMotion(_reportedSpeed, sprinting, _locName);
       _locName = name;
       setMotion(name);
-      _targetTimeScale = targetHumanTimeScale(name, _reportedSpeed, baseTS);
+      _targetTimeScale = targetHumanTimeScale(name, _reportedSpeed, baseTS)
+        * (_reverseGait && name !== 'idle' ? -1 : 1);
+      _targetStrideScale = targetHumanStrideScale(
+        name, _reportedSpeed, _targetTimeScale, look.scale
+      );
     }
     _targetStrafeLean = _clamp(strafe, -1, 1);
   };
@@ -332,6 +371,21 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   // Teleport/blink reform: the body arrives compressed and braced, then springs
   // back to a full stance over TP_DUR — a quick recover that sells the blink.
   const triggerTeleport = () => { _teleportT = TP_DUR; };
+  const setActionState = (state = {}) => {
+    if (Number.isFinite(state.reload)) _reloadP = _clamp(state.reload, 0, 1);
+    if (Number.isFinite(state.swing)) _meleeSwing = _clamp(state.swing, 0, 1);
+    if (Number.isFinite(state.crouch)) _targetCrouch = _clamp(state.crouch, 0, 1);
+    if (Number.isFinite(state.slide)) _targetSlide = _clamp(state.slide, 0, 1);
+    if (Number.isFinite(state.vy)) _verticalVelocity = state.vy;
+    if (Number.isFinite(state.aim)) _targetWeaponAim = _clamp(state.aim, 0, 1);
+  };
+  const triggerAction = (kind) => {
+    if (kind === 'swap' || kind === 'throw') {
+      _actionLeft[kind] = ACTION_TIME[kind];
+    } else if (kind === 'flinch') {
+      triggerHit(0.7, 0.8);
+    }
+  };
 
   // Stance offsets applied after mixer.update overwrites bones (per armor type).
   const poseOffsets = [];
@@ -363,13 +417,19 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
     new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(),
   ];
+  const _actionQuat = new THREE.Quaternion();
+  const _actionEuler = new THREE.Euler();
 
   let armorT = 0;
+  const _rootBaseY = root.position.y;
   const armorTick = (dt) => {
     armorT += dt;
     const t = armorT;
+    let bodyDrop = 0;
+    root.position.y = _rootBaseY;
     _currentTimeScale = dampHumanTimeScale(_currentTimeScale, _targetTimeScale, dt);
     mixer.timeScale = _currentTimeScale;
+    _strideScale += (_targetStrideScale - _strideScale) * (1 - Math.exp(-8 * dt));
     _strafeLean += (_targetStrafeLean - _strafeLean) * (1 - Math.exp(-10 * dt));
     const gaitPhase = current && current !== actions.idle
       ? (current.time / Math.max(1e-5, current.getClip().duration)) * Math.PI * 2
@@ -404,20 +464,50 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     if (_fireRecoil > 0) _fireRecoil = Math.max(0, _fireRecoil - dt * 1.4);
     if (_flinch.t > 0) _flinch.t = Math.max(0, _flinch.t - dt);
     if (_teleportT > 0) _teleportT = Math.max(0, _teleportT - dt);
+    for (const kind of ['swap', 'throw']) {
+      if (_actionLeft[kind] > 0) _actionLeft[kind] = Math.max(0, _actionLeft[kind] - dt);
+    }
+    _crouchT += (_targetCrouch - _crouchT) * (1 - Math.exp(-12 * dt));
+    _slideT += (_targetSlide - _slideT) * (1 - Math.exp(-16 * dt));
+    _weaponAim += (_targetWeaponAim - _weaponAim) * (1 - Math.exp(-10 * dt));
 
     // Smooth the aim tracking so quick camera whips don't snap the spine.
-    _sAimYaw   += (_aimYaw   - _sAimYaw)   * Math.min(1, dt * 8);
-    _sAimPitch += (_aimPitch - _sAimPitch) * Math.min(1, dt * 8);
+    const aimEase = 1 - Math.exp(-8 * dt);
+    _sAimYaw   += (_aimYaw   - _sAimYaw)   * aimEase;
+    _sAimPitch += (_aimPitch - _sAimPitch) * aimEase;
+    let lowerYawDelta = _targetLowerYaw - _lowerYaw;
+    lowerYawDelta = ((lowerYawDelta + Math.PI) % (Math.PI * 2)) - Math.PI;
+    _lowerYaw += lowerYawDelta * (1 - Math.exp(-12 * dt));
 
     // Momentum lean: tilt forward when accelerating into a run, back when stopping.
     const targetFwd = _grounded ? _clamp(_accel * 0.02, -0.06, 0.09) : 0;
-    _forwardLean += (targetFwd - _forwardLean) * Math.min(1, dt * 5);
+    _forwardLean += (targetFwd - _forwardLean) * (1 - Math.exp(-5 * dt));
 
     // ── Layer 1: aim tracking (spine1 yaw + head pitch) ──
     if (B.s1)   B.s1.quaternion.multiply(_q[0].setFromAxisAngle(_AX_Y, _sAimYaw * 0.55));
     if (B.s2)   B.s2.quaternion.multiply(_q[1].setFromAxisAngle(_AX_Y, _sAimYaw * 0.25));
     if (B.head) B.head.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, _sAimPitch * 0.7));
     if (B.head) B.head.quaternion.multiply(_q[3].setFromAxisAngle(_AX_Y, _sAimYaw   * 0.35));
+
+    // Lower-body travel direction. The pelvis turns the running clips into the
+    // resolved movement vector while the spine counter-turns to keep the chest,
+    // rifle, and gaze on the aim line.
+    if (Math.abs(_lowerYaw) > 0.001) {
+      if (B.hips)  B.hips.quaternion.multiply(_q[4].setFromAxisAngle(_AX_Y, _lowerYaw));
+      if (B.spine) B.spine.quaternion.multiply(_q[5].setFromAxisAngle(_AX_Y, -_lowerYaw * 0.28));
+      if (B.s1)    B.s1.quaternion.multiply(_q[6].setFromAxisAngle(_AX_Y, -_lowerYaw * 0.42));
+      if (B.s2)    B.s2.quaternion.multiply(_q[7].setFromAxisAngle(_AX_Y, -_lowerYaw * 0.30));
+    }
+
+    // Past the believable cadence cap, extend the authored stride at the
+    // thighs. The sign is calibrated against the real Run clip so the planted
+    // foot travels farther backwards; bending the calves here causes toe drag.
+    if (_grounded && (_locName === 'walk' || _locName === 'run') && _strideScale > 1.001) {
+      const stride = humanStrideWarpAngle(_locName, _strideScale, gaitPhase)
+        * (1 - _slideT) * (1 - _crouchT * 0.45);
+      if (B.lLeg)  B.lLeg.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X,  stride));
+      if (B.rLeg)  B.rLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, -stride));
+    }
 
     // ── Layer 2: strafe lean (bank Z into direction of movement) ──
     if (B.spine && _grounded) {
@@ -449,8 +539,14 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     //   reach     (~0.4s+)   : legs extend back down, prepping for the landing
     if (!_grounded) {
       const push  = _clamp(_jumpT / 0.13, 0, 1) * (1 - _clamp((_jumpT - 0.13) / 0.12, 0, 1));
-      const tuck  = _clamp((_jumpT - 0.09) * 5.5, 0, 1) * (1 - _clamp((_jumpT - 0.5) * 2, 0, 0.75));
-      const reach = _clamp((_jumpT - 0.4) * 3, 0, 0.9);
+      const timedTuck = _clamp((_jumpT - 0.09) * 5.5, 0, 1)
+        * (1 - _clamp((_jumpT - 0.5) * 2, 0, 0.75));
+      const apexTuck = _clamp(1 - Math.abs(_verticalVelocity) / 5.5, 0, 1);
+      const tuck = Math.max(timedTuck * 0.65, apexTuck);
+      const reach = Math.max(
+        _clamp((_jumpT - 0.4) * 3, 0, 0.9),
+        _clamp(-_verticalVelocity / 8, 0, 0.9)
+      );
 
       // Spine: brief stretch up on launch, small forward curl at the tuck.
       if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, 0.10 * tuck - 0.05 * push));
@@ -476,7 +572,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       const w = _landT / 0.24;
       const drop = Math.sin((1 - w) * Math.PI) * 0.09;
       if (B.hips) {
-        B.hips.position.y -= drop * 3;
+        bodyDrop += drop;
         if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X,  drop * 1.6));
         if (B.lLeg)  B.lLeg.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X,  -drop * 2.2));
         if (B.rLeg)  B.rLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X,  -drop * 2.2));
@@ -489,7 +585,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     if (_teleportT > 0) {
       const p = 1 - _teleportT / TP_DUR;        // 0 (arrival) → 1 (recovered)
       const c = Math.max(0, 1 - p * 1.12);      // compression, strongest at arrival
-      if (B.hips)  B.hips.position.y -= c * 0.22;
+      bodyDrop += c * 0.22;
       if (B.spine) B.spine.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, c * 0.30));
       if (B.s1)    B.s1.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, c * 0.15));
       if (B.lLeg)  B.lLeg.quaternion.multiply(_q[2].setFromAxisAngle(_AX_X, -c * 0.34));
@@ -503,6 +599,24 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     }
 
     // ── Layer 8: rich idle life — breathing, weight shift, occasional glance ──
+    // Crouch and slide are real silhouettes rather than a standing run clip
+    // translated downward. The slide extends a lead leg and tucks the trail leg.
+    const crouch = _crouchT * (1 - _slideT);
+    if (crouch > 0.001 || _slideT > 0.001) {
+      bodyDrop += crouch * 0.19 + _slideT * 0.30;
+      if (B.spine) B.spine.quaternion.multiply(
+        _q[0].setFromAxisAngle(_AX_X, crouch * 0.12 - _slideT * 0.20));
+      if (B.lLeg) B.lLeg.quaternion.multiply(
+        _q[1].setFromAxisAngle(_AX_X, -crouch * 0.32 + _slideT * 0.40));
+      if (B.rLeg) B.rLeg.quaternion.multiply(
+        _q[2].setFromAxisAngle(_AX_X, -crouch * 0.32 - _slideT * 0.78));
+      if (B.lCalf) B.lCalf.quaternion.multiply(
+        _q[3].setFromAxisAngle(_AX_X, crouch * 0.62 - _slideT * 0.28));
+      if (B.rCalf) B.rCalf.quaternion.multiply(
+        _q[4].setFromAxisAngle(_AX_X, crouch * 0.62 + _slideT * 1.05));
+    }
+    root.position.y = _rootBaseY - bodyDrop;
+
     if (_locName === 'idle') {
       // Two breathing frequencies layered for a natural cycle.
       const breathe = Math.sin(t * 1.5) * 0.014 + Math.sin(t * 2.7) * 0.005;
@@ -537,8 +651,11 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     // limbs that own the weapon, while everything below the waist keeps the
     // full locomotion animation. ──
     if (_weaponKind) {
-      const pose = HOLD_POSES[_weaponKind];
-      _holdRunT += (((_grounded && _locName === 'run') ? 1 : 0) - _holdRunT) * Math.min(1, dt * 6);
+      _holdRunT += (((_grounded && _locName === 'run') ? 1 : 0) - _holdRunT)
+        * (1 - Math.exp(-6 * dt));
+    }
+    if (_weaponKind === 'melee') {
+      const pose = HOLD_POSES.melee;
       const w = !_grounded ? pose.w.air
               : _locName === 'run'  ? pose.w.run
               : _locName === 'walk' ? pose.w.walk
@@ -557,30 +674,74 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       _holdBone(B.lArm,  _armRef.lArm,  pose.lArm,  w * 0.9);
       _holdBone(B.lFore, _armRef.lFore, pose.lFore, w * 0.9);
       if (B.rFore) B.rFore.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, alive + tuck + landDip));
-      if (B.lFore && _weaponKind === 'gun')
-        B.lFore.quaternion.multiply(_q[1].setFromAxisAngle(_AX_X, alive * 0.7 + tuck + landDip));
+    }
+    if (_weaponKind === 'gun') {
+      if (B.s1)    B.s1.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Y, 0.10));
+      if (B.spine) B.spine.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, 0.03));
+    }
 
-      // Shooter stance: a rifle squares the torso slightly toward the aim line
-      // and hunches it a touch; a sword stays upright and loose.
-      if (_weaponKind === 'gun') {
-        if (B.s1)    B.s1.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Y, 0.10));
-        if (B.spine) B.spine.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, 0.03));
+    const actionProgress = (kind) => _actionLeft[kind] > 0
+      ? 1 - _actionLeft[kind] / ACTION_TIME[kind] : 0;
+    const swapP = actionProgress('swap');
+    const throwP = actionProgress('throw');
+    sampleHumanActionPose({
+      reload: _weaponKind === 'gun' ? _reloadP : 0,
+      swing: _weaponKind === 'melee' ? _meleeSwing : 1,
+      swap: swapP,
+      throwP,
+    }, _actionPose);
+    const applyActionEuler = (bone, x, y, z) => {
+      if (!bone || (!x && !y && !z)) return;
+      bone.quaternion.multiply(_actionQuat.setFromEuler(_actionEuler.set(x, y, z)));
+    };
+    applyActionEuler(B.spine, _actionPose.torsoX, 0, _actionPose.torsoZ);
+    if (_weaponKind === 'melee') {
+      applyActionEuler(B.rArm, _actionPose.rArmX, _actionPose.rArmY, _actionPose.rArmZ);
+      applyActionEuler(B.rFore, _actionPose.rForeX, 0, _actionPose.rForeZ);
+      applyActionEuler(B.lArm, _actionPose.lArmX, _actionPose.lArmY, _actionPose.lArmZ);
+      applyActionEuler(B.lFore, _actionPose.lForeX, 0, _actionPose.lForeZ);
+    } else if (_weaponKind === 'gun' && _heldWeapon) {
+      // A grenade temporarily releases the support hand. Otherwise both palms
+      // are solved onto the moving rifle every frame.
+      if (throwP > 0) {
+        applyActionEuler(B.lArm, _actionPose.lArmX, _actionPose.lArmY, _actionPose.lArmZ);
+        applyActionEuler(B.lFore, _actionPose.lForeX, 0, _actionPose.lForeZ);
       }
+      const carrySway = _grounded && _locName !== 'idle'
+        ? Math.sin(gaitPhase * 2) * 0.035
+        : Math.sin(t * 1.5) * 0.012;
+      const landDip = _landT > 0
+        ? Math.sin((1 - _landT / 0.24) * Math.PI) * 0.10 : 0;
+      applyHumanRifleCarry(group, B, _heldWeapon, {
+        aim: _weaponAim,
+        reload: _reloadP,
+        swap: swapP,
+        throwP,
+        sprint: _holdRunT,
+        sway: carrySway - landDip,
+        recoil: _fireRecoil,
+        pitch: _sAimPitch,
+      });
     }
   };
 
-  // ── Third-person weapon: parent a held weapon to the right-hand bone so it
-  // rides the skeleton (grip in palm, barrel forward). The offsets are in the
-  // hand bone's LOCAL frame, so they hold regardless of animation pose.
+  // ── Third-person weapon: firearms live in body space and drive a two-arm IK
+  // solve; melee weapons stay parented to the right hand.
   let _heldWeapon = null;
   const attachWeapon = (weaponGroup, isMelee = false) => {
     if (_heldWeapon) { _heldWeapon.parent?.remove(_heldWeapon); _heldWeapon = null; }
     _weaponKind = null;
     if (!weaponGroup) return;
-    const hand = B.rHand;
-    if (!hand) return; // no hand bone — skip rather than float a gun at the origin
     _weaponKind = isMelee ? 'melee' : 'gun';
     weaponGroup.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+    if (!isMelee) {
+      weaponGroup.scale.setScalar(1);
+      group.add(weaponGroup);
+      _heldWeapon = weaponGroup;
+      return;
+    }
+    const hand = B.rHand;
+    if (!hand) return; // no hand bone — skip rather than float a gun at the origin
     // Mixamo armatures carry a tiny (~0.01) scale on the bones; a child of the
     // hand inherits it and a rifle collapses to millimetres. Counter-scale so
     // the weapon renders at world size, and express the grip offsets in world
@@ -590,15 +751,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     hand.getWorldScale(_ws);
     const inv = 1 / Math.max(1e-6, _ws.x);
     // Grip pose relative to the palm (world-unit offsets, tuned on the Vanguard rig).
-    if (isMelee) {
-      weaponGroup.position.set(0.02, 0.06, 0.02).multiplyScalar(inv);
-      weaponGroup.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
-      weaponGroup.scale.setScalar(1.15 * inv);
-    } else {
-      weaponGroup.position.set(-0.02, 0.04, 0.02).multiplyScalar(inv);
-      weaponGroup.rotation.set(1.15, Math.PI, 0.15);
-      weaponGroup.scale.setScalar(1.0 * inv);
-    }
+    weaponGroup.position.set(0.02, 0.06, 0.02).multiplyScalar(inv);
+    weaponGroup.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
+    weaponGroup.scale.setScalar(1.15 * inv);
     hand.add(weaponGroup);
     _heldWeapon = weaponGroup;
   };
@@ -609,6 +764,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     actions,
     setMotion,
     setLocomotion,
+    setActionState,
+    triggerAction,
     setAim,          // (pitch, yaw) — spine twist + head tilt track camera aim
     triggerFire,     // (kick=1)     — brief recoil pulse when the character fires
     triggerHit,      // (dx, dy)     — damage flinch from a hit direction

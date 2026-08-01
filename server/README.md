@@ -33,6 +33,18 @@ This server needs to run continuously somewhere else. Any host that can run
    `npm start` as the run command.
 4. Once deployed, you'll have a URL like `wss://your-app.example.com`.
 
+For the authoritative movement/combat server, run `npm run auth` instead and
+set `ALLOWED_ORIGINS` to the exact comma-separated browser origins allowed to
+connect, for example:
+
+```
+ALLOWED_ORIGINS=https://your-game.example npm run auth
+```
+
+When `ALLOWED_ORIGINS` is absent, `authserver.mjs` accepts loopback browser
+origins only. An explicit `*` is available for isolated development but must
+not be used on a public server.
+
 ## Wire the client to it
 
 In the repo root, set the build-time env var `VITE_WS_URL` to your server's

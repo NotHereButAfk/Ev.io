@@ -5,8 +5,45 @@ export const HUMAN_CLIP_SPEED = Object.freeze({
   run: 4.28,
 });
 
+// The Walk and Run clips do not put the same planted foot at the same
+// normalized time. These origins are measured from both ToeBase contact minima
+// in public/soldier.glb (right contact averaged with left contact minus 0.5).
+// Convert through this shared contact phase when changing clips so a planted
+// foot stays planted through the crossfade.
+export const HUMAN_PHASE_ORIGIN = Object.freeze({
+  walk: 0.29792,
+  run: 0.11111,
+});
+
+// Additive upper-leg rotation needed once cadence reaches its believable cap.
+// These gains are measured against public/soldier.glb: the negative sine sign
+// extends each planted foot's rearward travel. Calf warping is intentionally
+// omitted because it shortens that travel and pushes the toes through the floor.
+export const HUMAN_STRIDE_WARP = Object.freeze({
+  walk: 0.50,
+  run: 0.64,
+});
+
+const wrapPhase = (phase) => {
+  const wrapped = phase % 1;
+  return wrapped < 0 ? wrapped + 1 : wrapped;
+};
+
+export function mapHumanMotionPhase(phase, fromMotion, toMotion) {
+  const value = Number.isFinite(phase) ? wrapPhase(phase) : 0;
+  if (fromMotion === toMotion) return value;
+  const fromOrigin = HUMAN_PHASE_ORIGIN[fromMotion];
+  const toOrigin = HUMAN_PHASE_ORIGIN[toMotion];
+  // Idle is not a cyclic gait. Entering or leaving it deliberately starts the
+  // destination at frame zero rather than carrying an unrelated idle phase.
+  if (fromOrigin === undefined || toOrigin === undefined) return 0;
+  return wrapPhase(value - fromOrigin + toOrigin);
+}
+
 export function selectHumanMotion(speed, sprinting = false, current = 'idle') {
-  if (sprinting) return 'run';
+  // Sprint intent cannot force a running clip when collision resolution says
+  // the body did not move (for example, holding Shift+W into a wall).
+  if (sprinting && speed > 0.55) return 'run';
   if (current === 'run') {
     if (speed > 3.55) return 'run';
   } else if (speed > 4.05) {
@@ -29,19 +66,22 @@ export function targetHumanTimeScale(motion, speed, characterScale = 1) {
   return characterScale;
 }
 
-export function dampHumanTimeScale(current, target, dt, response = 9) {
-  return target + (current - target) * Math.exp(-response * Math.max(0, dt));
+// Once cadence reaches its believable cap, lengthen the stride instead of
+// spinning the legs faster. This is a target for the additive thigh layer
+// in HumanSoldier; 1 means the authored clip needs no warping.
+export function targetHumanStrideScale(motion, speed, timeScale, modelScale = 1) {
+  const clipSpeed = HUMAN_CLIP_SPEED[motion];
+  if (!clipSpeed || speed <= 0) return 1;
+  const delivered = clipSpeed * Math.abs(timeScale) * Math.max(0.01, modelScale);
+  return Math.max(1, Math.min(1.6, speed / Math.max(0.01, delivered)));
 }
 
-export function normalizeRootPositionValues(values, bindPosition) {
-  if (!values || values.length < 3 || !bindPosition) return values;
-  const dx = bindPosition.x - values[0];
-  const dy = bindPosition.y - values[1];
-  const dz = bindPosition.z - values[2];
-  for (let i = 0; i < values.length; i += 3) {
-    values[i] += dx;
-    values[i + 1] += dy;
-    values[i + 2] += dz;
-  }
-  return values;
+export function humanStrideWarpAngle(motion, strideScale, gaitPhase) {
+  const gain = HUMAN_STRIDE_WARP[motion] || 0;
+  if (!gain || strideScale <= 1) return 0;
+  return -Math.sin(gaitPhase) * (strideScale - 1) * gain;
+}
+
+export function dampHumanTimeScale(current, target, dt, response = 9) {
+  return target + (current - target) * Math.exp(-response * Math.max(0, dt));
 }

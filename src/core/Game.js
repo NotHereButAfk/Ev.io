@@ -703,6 +703,8 @@ export class Game {
     this._playerBody.visible = false;
     this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
     this._tpsWeaponMesh = null; // old weapon went with the removed body
+    this._tpsAnimPrev = null;
+    this._tpsAnimSpeed = this._tpsAnimVX = this._tpsAnimVZ = 0;
     this.world.scene.add(this._playerBody);
 
     this.state = 'playing';
@@ -739,6 +741,7 @@ export class Game {
       this._playerDowned = false;
       this.hud.hideDowned();
       this.player.respawn(this.world.randomSpawnPoint());
+      this.weaponSystem.resetMotionState();
       this.player.health = 50;
       this.player.shield = Math.min(this.player.maxShield, this.player.maxShield * 0.3);
       this.hud.addKillFeed('REVIVED BY TEAMMATE — 50 HP');
@@ -1071,6 +1074,7 @@ export class Game {
 
   /** Wind the off arm up and lob — see Actions.js. */
   _throwAnim() {
+    this._playerBody?.userData?.triggerAction?.('throw');
     triggerAction(this._playerBody?.userData?.rig, 'throw');
   }
 
@@ -1104,6 +1108,7 @@ export class Game {
         clearTimeout(this._respawnTimer);
         this._respawnTimer = setTimeout(() => {
           this.player.respawn(this.world.safeSpawnPoint(this._activeManager?.bots || []));
+          this.weaponSystem.resetMotionState();
           this._resetLoadoutHud();   // drop any picked-up power weapon
           this._refreshModeHUD();
         }, RESPAWN_DELAY * 1000);
@@ -1119,6 +1124,7 @@ export class Game {
     if (this.state !== 'playing') return;
     const point = this.world.safeSpawnPoint(this._activeManager?.bots || []);
     this.player.respawn(point);
+    this.weaponSystem.resetMotionState();
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
     this.hud.addKillFeed('RESPAWNED');
@@ -1213,10 +1219,12 @@ export class Game {
     // Dead players are frozen where they fell until the respawn timer fires —
     // clicking back in early shouldn't let a corpse run around and shoot.
     const dead = this.player.isDead && !this._playerDowned;
-    if (!menuOpen && !dead) {
-      if (this._authNet && this._authNet.ready) {
-        this._authNet.update(dt, this.input);
-      } else if (!this.world.usesMeshCollision && (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled()))) {
+    if (!menuOpen && this._authNet && this._authNet.ready) {
+      // Keep receiving authoritative snapshots while locally dead; otherwise
+      // the server's respawn can never clear the client's dead state.
+      this._authNet.update(dt, this.input);
+    } else if (!menuOpen && !dead) {
+      if (!this.world.usesMeshCollision && (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled()))) {
         if (!this.moveBridge) this.moveBridge = new MoveBridge(this.player, this.world);
         this.moveBridge.update(dt, this.input, this.world);
       } else {
@@ -1232,19 +1240,19 @@ export class Game {
     const inTPS = this.player._camDist > 0;
     if (this._playerBody) {
       this._playerBody.visible = inTPS;
-      if (inTPS) {
-        this._playerBody.position.copy(this.player.position);
-        // Face the way the camera looks, so from behind you see the character's
-        // BACK. Note the player's yaw is a CAMERA yaw: three.js cameras look
-        // down their own −Z, so the view direction is −(sin yaw, cos yaw), and
-        // Player.update moves along it via `-moveZ`. Every playable body,
-        // including the rigged soldier, is authored front-on-−Z and therefore
-        // takes camera yaw unchanged. Movement-vector yaw is converted
-        // separately for bots in Facing.js.
-        this._playerBody.rotation.y = cameraYawToBodyYaw(this.player.yaw);
-        this._syncTpsWeapon();
-        this._animatePlayerBody(dt);
-      }
+      this._playerBody.position.copy(this.player.position);
+      // Face the way the camera looks, so from behind you see the character's
+      // BACK. Note the player's yaw is a CAMERA yaw: three.js cameras look
+      // down their own −Z, so the view direction is −(sin yaw, cos yaw), and
+      // Player.update moves along it via `-moveZ`. Every playable body,
+      // including the rigged soldier, is authored front-on-−Z and therefore
+      // takes camera yaw unchanged. Movement-vector yaw is converted
+      // separately for bots in Facing.js.
+      this._playerBody.rotation.y = cameraYawToBodyYaw(this.player.yaw);
+      // Tick the hidden body too: action, recoil, teleport, and gait clocks
+      // must not freeze in FPS and replay stale motion on POV re-entry.
+      this._syncTpsWeapon();
+      this._animatePlayerBody(dt);
     }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
@@ -1319,11 +1327,13 @@ export class Game {
     if (!ud) return;
     const def = this.weaponSystem.currentDef;
     if (!def || this._tpsWeaponId === def.id) return;
+    const isSwap = this._tpsWeaponId !== null;
     this._tpsWeaponId = def.id;
     // Human soldier: attach to the rigged hand via its own hold system.
     if (ud.isHuman && ud.attachWeapon) {
       const built = buildWeaponModel(def, { procedural: true });
       ud.attachWeapon(built?.group || null, def.kind === 'melee');
+      if (isSwap) ud.triggerAction?.('swap');
       return;
     }
     // Procedural / low-poly (cyborg) body: seat the weapon in front of the chest
@@ -1345,7 +1355,31 @@ export class Game {
   // when moving, gentle breathing sway when standing still.
   _animatePlayerBody(dt) {
     const p = this.player;
-    const speed = Math.hypot(p.velocity.x, p.velocity.z);
+    // Drive gait from post-collision displacement. Requested velocity can stay
+    // non-zero while collision resolution pins the body against a wall.
+    if (!this._tpsAnimPrev) {
+      this._tpsAnimPrev = p.position.clone();
+      this._tpsAnimSpeed = this._tpsAnimVX = this._tpsAnimVZ = 0;
+    }
+    const dx = p.position.x - this._tpsAnimPrev.x;
+    const dz = p.position.z - this._tpsAnimPrev.z;
+    const step = Math.hypot(dx, dz);
+    const validStep = dt > 1e-4 && step < 2.0;
+    if (!validStep) {
+      this._tpsAnimSpeed = this._tpsAnimVX = this._tpsAnimVZ = 0;
+    } else {
+      const resolvedVX = dx / dt;
+      const resolvedVZ = dz / dt;
+      const resolvedSpeed = Math.hypot(resolvedVX, resolvedVZ);
+      const speedEase = 1 - Math.exp(
+        -(resolvedSpeed < this._tpsAnimSpeed ? 18 : 12) * dt
+      );
+      this._tpsAnimSpeed += (resolvedSpeed - this._tpsAnimSpeed) * speedEase;
+      this._tpsAnimVX += (resolvedVX - this._tpsAnimVX) * speedEase;
+      this._tpsAnimVZ += (resolvedVZ - this._tpsAnimVZ) * speedEase;
+    }
+    this._tpsAnimPrev.copy(p.position);
+    const speed = this._tpsAnimSpeed;
 
     // Real human soldier: drive its skeletal Idle/Walk/Run clips.
     const ud = this._playerBody?.userData;
@@ -1353,12 +1387,31 @@ export class Game {
       // Strafe input in the body's local frame — feeds the lean layer.
       const yaw = p.yaw;
       const cs = Math.cos(yaw), sn = Math.sin(yaw);
-      const strafe = -(p.velocity.x * cs - p.velocity.z * sn) / Math.max(1, speed);
-      if (ud.setLocomotion) ud.setLocomotion(speed, p.onGround, p.isSprinting, strafe);
+      const dirF = speed > 0.15
+        ? (this._tpsAnimVX * -sn + this._tpsAnimVZ * -cs) / Math.max(0.01, speed) : 1;
+      const dirR = speed > 0.15
+        ? (this._tpsAnimVX * cs + this._tpsAnimVZ * -sn) / Math.max(0.01, speed) : 0;
+      const strafe = -dirR;
+      if (ud.setLocomotion) {
+        ud.setLocomotion(speed, p.onGround, p.isSprinting, strafe, dirF, dirR);
+      }
       else ud.setMotion(speed > 0.6 && p.onGround ? (speed > 6.5 ? 'run' : 'walk') : 'idle');
       // Head/spine track the player's aim pitch (the whole body already yaws to
       // face the aim direction, so we only need pitch here).
       if (ud.setAim) ud.setAim(p.pitch, 0);
+      const wst = this.weaponSystem.currentState;
+      const rTime = this.weaponSystem.currentDef?.reloadTime || 0;
+      const reload = (wst?.isReloading && rTime > 0)
+        ? THREE.MathUtils.clamp(1 - wst.reloadTimer / rTime, 0, 1) : 0;
+      this._tpsAimHold = Math.max(0, (this._tpsAimHold || 0) - dt);
+      ud.setActionState?.({
+        reload,
+        swing: this.weaponSystem.swingPhase,
+        crouch: p.isCrouching ? 1 : 0,
+        slide: p.isSliding ? 1 : 0,
+        vy: p.velocity.y,
+        aim: (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0,
+      });
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
       return;

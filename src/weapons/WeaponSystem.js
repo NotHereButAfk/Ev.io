@@ -18,18 +18,18 @@ const _BOX_OBJ = { userData: {} };
 function expDamp(current, target, lambda, dt) {
   return target + (current - target) * Math.exp(-lambda * dt);
 }
-// Advance a damped-spring scalar (x, v) toward 0 by one step. Critically-ish
-// damped for a punchy snap that settles with no jitter. Returns [x, v].
-function springTo(x, v, target, stiffness, damping, dt) {
-  // semi-implicit Euler, substepped so a big dt can't blow the spring up
-  const steps = dt > 1 / 60 ? Math.ceil(dt * 60) : 1;
-  const h = dt / steps;
-  for (let i = 0; i < steps; i++) {
-    const a = -stiffness * (x - target) - damping * v;
-    v += a * h;
-    x += v * h;
-  }
-  return [x, v];
+// Exact critically damped spring. Unlike an Euler step, this produces the same
+// pose after a given elapsed time at 30, 60, 144Hz, or a briefly uneven frame.
+function springTo(x, v, target, stiffness, _damping, dt) {
+  const h = Math.max(0, dt);
+  const omega = Math.sqrt(stiffness);
+  const offset = x - target;
+  const impulse = v + omega * offset;
+  const decay = Math.exp(-omega * h);
+  return [
+    target + (offset + impulse * h) * decay,
+    (v - omega * impulse * h) * decay,
+  ];
 }
 
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
@@ -46,9 +46,22 @@ function createTracerMesh() {
   return new THREE.Mesh(geo, mat);
 }
 
-// How far in front of the eye the viewmodel sits. Far enough that no part of
-// any gun in the arsenal reaches back inside the camera's near plane.
-const VIEWMODEL_Z = -0.58;
+// How far in front of the eye the viewmodel sits. The asynchronously loaded
+// authored guns have much longer stocks than the procedural fallbacks (DMR is
+// the worst case), and recoil moves the whole gun back toward the eye. Keeping
+// the shared mount farther out preserves the hand-to-grip relationship while
+// leaving every shipped model clear of the camera's near plane.
+const VIEWMODEL_Z = -0.78;
+const VIEWMODEL_X = 0.32;
+const VIEWMODEL_Y = -0.22;
+const REFERENCE_ASPECT = 16 / 9;
+
+// Preserve the lower-right composition on landscape screens without pushing
+// both gloves out of portrait/mobile view. Capped on ultrawide so the weapon
+// does not drift all the way into the corner.
+function viewmodelAspectScale(aspect) {
+  return THREE.MathUtils.clamp((aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT, 0.32, 1.15);
+}
 
 export class WeaponSystem {
   constructor(camera, scene, audio) {
@@ -94,11 +107,14 @@ export class WeaponSystem {
     this._swayX = 0; this._swayY = 0;         // smoothed look-sway
     this._swayVelX = 0; this._swayVelY = 0;   // smoothed mouse velocity
     this._bobPhase = 0;                       // continuous bob phase (own clock)
-    this._mountPos = new THREE.Vector3(0.32, -0.26, -0.5);
+    this._mountPos = new THREE.Vector3(
+      VIEWMODEL_X * viewmodelAspectScale(camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
     this._mountRot = new THREE.Vector3(0, 0, 0);
     this._raiseT = 1;                         // 0=just switched (lowered) → 1=up
     this._wasGrounded = true;                 // viewmodel landing impulse edge
     this._landT = 0;                          // 0.22s settle after touching down
+    this._landStrength = 0;                   // impact-scaled landing response
+    this._fallSpeed = 0;                      // fastest downward speed this airtime
 
     this.tracers = [];
     this.rockets = [];
@@ -154,10 +170,10 @@ export class WeaponSystem {
     this.weaponMount = new THREE.Object3D();
     // Tucked lower-right and scaled down so the gun frames the corner of the
     // screen instead of blocking a third of the view (ev.io-style proportion).
-    // Held 0.58m out rather than 0.52: the stock reaches back most of that
-    // distance, and any closer put it inside the camera's near plane, where it
-    // was silently sliced away. See Player.js's near-plane note.
-    this.weaponMount.position.set(0.30, -0.28, -0.58);
+    // The complete weapon + two-hand rig shares this deeper mount. Moving the
+    // model alone would clear the stock but detach both palms from their grips.
+    this.weaponMount.position.set(
+      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
     this.weaponMount.scale.setScalar(0.74);
     this.camera.add(this.weaponMount);
 
@@ -242,17 +258,19 @@ export class WeaponSystem {
 
     // Forearm — tapered sleeve
     const forearm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.042, 0.055, 0.26, 12), this.sleeveMat);
+      new THREE.CylinderGeometry(0.032, 0.043, 0.17, 12), this.sleeveMat);
     forearm.rotation.x = 1.18;
-    forearm.position.set(0, -0.050, 0.12);
+    // Keep the sleeve behind the wrist. Extending it toward the eye makes its
+    // end cap balloon across half the screen even though the glove is small.
+    forearm.position.set(0, -0.040, 0.025);
     arm.add(forearm);
 
     // A compact armour plate carries the equipped character's authored colour.
     // The sleeve remains dark, so this reads as the player's gauntlet instead
     // of the old bright-white tube filling the bottom of the screen.
-    const forearmPlate = bx(0.058, 0.016, 0.095, this.armPlateMat);
+    const forearmPlate = bx(0.050, 0.014, 0.070, this.armPlateMat);
     forearmPlate.rotation.x = -0.34;
-    forearmPlate.position.set(0, -0.006, 0.10);
+    forearmPlate.position.set(0, -0.006, 0.035);
     arm.add(forearmPlate);
 
     // Sleeve cuff detail ring
@@ -476,8 +494,43 @@ export class WeaponSystem {
     }
     this.currentIndex = index;
     this.fireTimer = Math.max(this.fireTimer, 0.12);
+    // Never carry an unfinished blade arc into the next equipped weapon.
+    this.swingPhase = 1;
     this._setActiveModel(index);
     this.audio.playWeaponSwitch();
+  }
+
+  resetMotionState() {
+    this.kickPos.set(0, 0, 0);
+    this.kickVel.set(0, 0, 0);
+    this.kickRotX = 0;
+    this.kickRotXVel = 0;
+    this.swingPhase = 1;
+    this.scopeT = 0;
+    this._sprintT = 0;
+    this._swayX = 0;
+    this._swayY = 0;
+    this._swayVelX = 0;
+    this._swayVelY = 0;
+    this._bobPhase = 0;
+    this._bobAmt = 0;
+    this._idleT = 0;
+    this._raiseT = 1;
+    this._wasGrounded = true;
+    this._landT = 0;
+    this._landStrength = 0;
+    this._fallSpeed = 0;
+    this.prevMouseDown = false;
+    this._mountPos.set(
+      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z,
+    );
+    this._mountRot.set(0, 0, 0);
+    this.weaponMount?.position.copy(this._mountPos);
+    this.weaponMount?.rotation.set(0, 0, 0);
+    this.swayGroup?.position.set(0, 0, 0);
+    this.swayGroup?.rotation.set(0, 0, 0);
+    this.kickGroup?.position.set(0, 0, 0);
+    this.kickGroup?.rotation.set(0, 0, 0);
   }
 
   resetState(baseFov) {
@@ -491,12 +544,7 @@ export class WeaponSystem {
       st.reloadTimer = 0;
     }
     this.fireTimer = 0;
-    this.kickPos.set(0, 0, 0);
-    this.kickRotX = 0;
-    this.swingPhase = 1;
-    this.scopeT = 0;
-    this._wasGrounded = true;
-    this._landT = 0;
+    this.resetMotionState();
     this._knifeCooldown = 0;
     this._prevRightMouse = false;
     this.camera.fov = baseFov;
@@ -1022,6 +1070,15 @@ export class WeaponSystem {
     }
   }
 
+  _applyViewmodelRecoil(amount) {
+    this.kickPos.z += amount * 2.2;
+    this.kickPos.y += amount * 0.4;
+    this.kickRotX  -= amount * 3.2;
+    this.kickVel.z += amount * 26;
+    this.kickVel.y += amount * 6;
+    this.kickRotXVel -= amount * 34;
+  }
+
   _fire(world, botMeshes, player, botManager) {
     const def = this.currentDef;
     const st = this.currentState;
@@ -1070,12 +1127,7 @@ export class WeaponSystem {
 
     // Recoil impulse: a displacement kick PLUS a velocity punch, so the spring
     // launches fast and settles smoothly (juicier than a pure position offset).
-    this.kickPos.z += def.recoil * 2.2;
-    this.kickPos.y += def.recoil * 0.4;
-    this.kickRotX  -= def.recoil * 3.2;
-    this.kickVel.z += def.recoil * 26;
-    this.kickVel.y += def.recoil * 6;
-    this.kickRotXVel -= def.recoil * 34;
+    this._applyViewmodelRecoil(def.recoil);
     if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
 
     if (this.onShoot) this.onShoot(def);
@@ -1110,11 +1162,22 @@ export class WeaponSystem {
     // first person. It is intentionally small—the camera already has its own
     // head motion—and only the viewmodel receives this impulse.
     const grounded = player?.onGround !== false;
-    if (grounded && !this._wasGrounded) this._landT = 0.22;
+    const fallingSpeed = Math.max(0, -(player?.velocity?.y || 0));
+    if (!grounded) this._fallSpeed = Math.max(this._fallSpeed, fallingSpeed);
+    if (grounded && !this._wasGrounded) {
+      // Player.update has already zeroed velocity.y by the time the viewmodel
+      // sees a landing, so retain the fastest downward speed from the airtime.
+      // Tiny curb drops get a restrained settle; a hard fall gets the full dip.
+      this._landStrength = THREE.MathUtils.clamp(this._fallSpeed / 14, 0.18, 1.2);
+      this._landT = this._fallSpeed > 0.35 ? 0.22 : 0;
+      this._fallSpeed = 0;
+    } else if (grounded) {
+      this._fallSpeed = 0;
+    }
     this._wasGrounded = grounded;
     if (this._landT > 0) this._landT = Math.max(0, this._landT - dt);
     const landP = this._landT > 0 ? 1 - this._landT / 0.22 : 1;
-    const landPulse = this._landT > 0 ? Math.sin(landP * Math.PI) : 0;
+    const landPulse = (this._landT > 0 ? Math.sin(landP * Math.PI) : 0) * this._landStrength;
 
     const mouseJustPressed = input.mouseDown && !this.prevMouseDown;
     const triggerPulled = def.automatic ? input.mouseDown : mouseJustPressed;
@@ -1140,11 +1203,14 @@ export class WeaponSystem {
     this._prevRightMouse = input.rightMouseDown;
 
     // Sprint blend for COD carry animation (blocks ADS)
-    this._sprintT += ((player.isSprinting ? 1 : 0) - this._sprintT) * Math.min(1, dt * 9);
+    this._sprintT = expDamp(this._sprintT, player.isSprinting ? 1 : 0, 9, dt);
 
     // scope zoom — disabled while sprinting
     const wantScope = !!def.scoped && input.rightMouseDown && !player.isSprinting;
-    this.scopeT += ((wantScope ? 1 : 0) - this.scopeT) * Math.min(1, dt * 10);
+    this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, 10, dt);
+    // Aiming keeps a trace of organic motion, but removes enough viewmodel
+    // travel that the physical sight and fixed scope overlay do not disagree.
+    const adsMotionScale = THREE.MathUtils.lerp(1, 0.08, this.scopeT);
     const sprintFovBoost = this._sprintT * 6;
     const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, 28, this.scopeT);
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
@@ -1165,8 +1231,9 @@ export class WeaponSystem {
     const raiseDrop = (1 - this._raiseT) * 0.28;
     const raiseTilt = (1 - this._raiseT) * 0.9;
     this.kickGroup.position.set(this.kickPos.x, this.kickPos.y - raiseDrop, this.kickPos.z);
-    this.kickGroup.rotation.x = this.kickRotX - raiseTilt;
-    if (def.kind !== 'melee') this.kickGroup.rotation.y = 0;
+    // Establish the complete base pose every frame. A reload or blade arc can
+    // add roll/yaw below, but those axes must never leak into the next weapon.
+    this.kickGroup.rotation.set(this.kickRotX - raiseTilt, 0, 0);
 
     // sword swing animation — windup → fast diagonal slash → recover
     if (def.kind === 'melee' && this.swingPhase < 1) {
@@ -1204,7 +1271,7 @@ export class WeaponSystem {
     // clock (not tied to any snappy state).
     this._idleT += dt;
     if (def.kind !== 'melee') {
-      const breatheAmt = 1.0 - this._sprintT;
+      const breatheAmt = (1.0 - this._sprintT) * adsMotionScale;
       const breathe = Math.sin(this._idleT * 1.6) * 0.004 * breatheAmt;
       const swayB   = Math.cos(this._idleT * 1.1) * 0.003 * breatheAmt;
       this.kickGroup.position.y += breathe;
@@ -1225,7 +1292,9 @@ export class WeaponSystem {
           THREE.MathUtils.clamp((p - 0.36) / 0.30, 0, 1) * Math.PI
         );
         this.kickGroup.position.x += hold * 0.075;
-        this.kickGroup.position.y -= hold * 0.20 + seat * 0.025;
+        // The mount below already lowers for reload. Keep this local hand beat
+        // compact so the magazine hand remains visible at 60-degree FOV.
+        this.kickGroup.position.y -= hold * 0.08 + seat * 0.015;
         this.kickGroup.position.z += hold * 0.055;
         this.kickGroup.rotation.x += hold * 0.30 + seat * 0.07;
         this.kickGroup.rotation.y += hold * 0.16;
@@ -1243,8 +1312,8 @@ export class WeaponSystem {
     this._swayVelY = expDamp(this._swayVelY, mvY, 16, dt);
     this._swayX = expDamp(this._swayX, this._swayVelX, 9, dt);
     this._swayY = expDamp(this._swayY, this._swayVelY, 9, dt);
-    this.swayGroup.rotation.y = this._swayX;
-    this.swayGroup.rotation.x = this._swayY;
+    this.swayGroup.rotation.y = this._swayX * adsMotionScale;
+    this.swayGroup.rotation.x = this._swayY * adsMotionScale;
 
     // COD-style weapon bob driven by a CONTINUOUS phase that accelerates with
     // move speed — no pops when starting/stopping, and framerate-independent.
@@ -1252,7 +1321,7 @@ export class WeaponSystem {
     const bobHz = player.onGround ? (2.0 + moveSpeed * 0.9) : 0;
     this._bobPhase += bobHz * dt;
     const bobAmtTarget = (player.onGround && moveSpeed > 0.5)
-      ? (player.isSprinting ? 0.026 : 0.016) : 0.0;
+      ? (player.isSprinting ? 0.026 : 0.016) * adsMotionScale : 0.0;
     this._bobAmt = expDamp(this._bobAmt ?? 0, bobAmtTarget, 8, dt);   // fade bob in/out
     const bobV = Math.sin(this._bobPhase * 2) * this._bobAmt;
     const bobH = Math.sin(this._bobPhase) * this._bobAmt * 0.55;
@@ -1271,22 +1340,25 @@ export class WeaponSystem {
 
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
-    const adsShiftX    = -this.scopeT * 0.32;
+    const aspectScale  = viewmodelAspectScale(this.camera.aspect);
+    const baseX        = VIEWMODEL_X * aspectScale;
+    const adsShiftX    = -this.scopeT * baseX;
     const sprintRaiseY =  this._sprintT * 0.12;
-    const sprintShiftX = -this._sprintT * 0.12;
+    const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
-    const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH + 0.05 * rBell;
-    const tgtY = -0.26 + sprintRaiseY + bobV
-      - 0.17 * rBell - 0.03 * rack - landPulse * 0.055;
+    const tgtX = baseX + sprintShiftX + adsShiftX
+      + (bobH + 0.05 * rBell) * aspectScale;
+    const tgtY = VIEWMODEL_Y + sprintRaiseY + bobV
+      - 0.07 * rBell - 0.015 * rack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
       this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
-    // VIEWMODEL_Z, not -0.5: the stock reaches back far enough that 0.5m put it
-    // inside the camera's near plane, where it was silently sliced away.
+    // The tested shared depth keeps the longest authored stock and its recoil
+    // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;

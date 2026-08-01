@@ -40,8 +40,91 @@ function client() {
 }
 const open = (c) => new Promise((r) => c.ws.on('open', r));
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+const ownPublic = (c, snap) => snap?.players.find((p) => p.id === c.welcome.you);
+async function drive(c, frames, input) {
+  const firstSeq = c.seq + 1;
+  for (let i = 0; i < frames; i++) {
+    c.input({ tick: i, ...input });
+    await sleep(TICK());
+  }
+  await sleep(80);
+  return c.snaps.filter((s) => s.ack >= firstSeq);
+}
 
 // ═══ Phase 4 ═══
+const hostile = new WebSocket(`ws://127.0.0.1:${PORT}`, { origin: 'https://attacker.example' });
+hostile.on('error', () => {});
+const hostileClose = await Promise.race([
+  new Promise((resolve) => hostile.on('close', (code) => resolve(code))),
+  sleep(1000).then(() => null),
+]);
+if (hostileClose == null) hostile.terminate();
+ok('origin allow-list: non-local browser origin rejected', hostileClose === 1008);
+
+const sprintProbe = client(); await open(sprintProbe); sprintProbe.hello('SprintProbe');
+await sleep(120);
+let sprintSnaps = await drive(sprintProbe, 4, { mx: 0, mz: 1, yaw: 0, sprint: true });
+ok('snapshot: real authoritative sprint is published',
+   sprintSnaps.some((s) => ownPublic(sprintProbe, s)?.sprint === true));
+
+sprintSnaps = await drive(sprintProbe, 4, { mx: 1, mz: 0, yaw: 0, sprint: true });
+ok('snapshot: strafe cannot spoof sprint animation',
+   sprintSnaps.length > 0
+   && sprintSnaps.every((s) => ownPublic(sprintProbe, s)?.sprint === false));
+
+const sprintPlayer = room.players.get(sprintProbe.welcome.you);
+sprintPlayer.state.stamina = 0;
+sprintSnaps = await drive(sprintProbe, 4, { mx: 0, mz: 1, yaw: 0, sprint: true });
+ok('snapshot: depleted stamina cannot spoof sprint animation',
+   sprintSnaps.length > 0
+   && sprintSnaps.every((s) => ownPublic(sprintProbe, s)?.sprint === false));
+
+Object.assign(sprintPlayer.state, {
+  px: room.arena.half - 1.2, py: 0, pz: 0,
+  vx: 0, vy: 0, vz: 0, onGround: 1,
+  crouch: 0, slide: 0, stamina: 100, stamDelay: 0,
+  safeX: room.arena.half - 1.2, safeY: 0, safeZ: 0,
+});
+sprintPlayer.queue.length = 0;
+sprintSnaps = await drive(sprintProbe, 4, {
+  mx: 0, mz: 1, yaw: -Math.PI / 2, sprint: true,
+});
+ok('snapshot: wall-blocked sprint publishes zero animation motion',
+   sprintSnaps.length > 0 && sprintSnaps.every((s) => {
+     const self = ownPublic(sprintProbe, s);
+     return self?.sprint === false && Math.hypot(self.vx, self.vz) < 0.01;
+   }));
+
+let presentationSnaps = await drive(sprintProbe, 2, {
+  mx: 0, mz: 0, yaw: 0, wid: 'sword', aiming: true,
+});
+ok('snapshot: allow-listed equip and aim presentation reach remotes',
+   presentationSnaps.some((s) => {
+     const self = ownPublic(sprintProbe, s);
+     return self?.wid === 'sword' && self?.aiming === true;
+   }));
+presentationSnaps = await drive(sprintProbe, 2, {
+  mx: 0, mz: 0, yaw: 0, wid: '../../untrusted.glb',
+});
+ok('snapshot: unknown presentation weapon is rejected',
+   presentationSnaps.length > 0
+   && presentationSnaps.every((s) => ownPublic(sprintProbe, s)?.wid === 'sword'));
+sprintProbe.ws.close();
+await sleep(100);
+
+const resetId = room.add(() => {}, 'RespawnResetProbe');
+const resetPlayer = room.players.get(resetId);
+resetPlayer._firingTicks = 8;
+resetPlayer._lastSprint = true;
+resetPlayer._lastAim = true;
+resetPlayer.alive = false;
+resetPlayer.deadUntil = room.tick + 1;
+room.update();
+ok('respawn: transient firing/sprint/aim presentation is cleared',
+   resetPlayer.alive && resetPlayer._firingTicks === 0
+   && !resetPlayer._lastSprint && !resetPlayer._lastAim);
+room.remove(resetId);
+
 const a = client(); await open(a); a.hello('Alice');
 const b = client(); await open(b); b.hello('Bob');
 await sleep(200);

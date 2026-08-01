@@ -19,7 +19,7 @@ const REMOTE_SKINS = [
   { primary: 0x9050d1, secondary: 0x241433 }, { primary: 0x2fae5a, secondary: 0x0c2a16 },
   { primary: 0xc9d2d8, secondary: 0x2a3238 }, { primary: 0xe0902c, secondary: 0x33240c },
 ];
-const REMOTE_CHASSIS = ['vanguard', 'striker', 'phantom'];
+const REMOTE_CHASSIS = ['assault', 'recon', 'heavy', 'stealth'];
 function hashId(id) {
   const s = String(id);
   let h = 0;
@@ -72,6 +72,7 @@ export class AuthNetBridge {
       skin: REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
       armorTypeId: REMOTE_CHASSIS[hashId(id) % REMOTE_CHASSIS.length],
       weaponId: 'm4',
+      allowHuman: true,
     });
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'position:absolute;transform:translate(-50%,-100%);font:700 12px monospace;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap';
@@ -98,6 +99,7 @@ export class AuthNetBridge {
 
     // ── fixed-tick input send + prediction ──
     this._acc += Math.min(dt, 0.1);
+    const def = this.game.weaponSystem?.currentDef;
     while (this._acc >= DT) {
       this._acc -= DT;
       const mz = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
@@ -107,6 +109,7 @@ export class AuthNetBridge {
         sprint: input.isDown('ShiftLeft') || (input.isMobile && mz > 0),
         crouch: input.isDown('ControlLeft') || input.isDown('KeyC'),
         jumpJust: this._edges.jump, crouchJust: this._edges.crouch, teleJust: this._edges.tele,
+        wid: def?.id || 'm4', aiming: !!input.rightMouseDown,
       });
       this._edges.jump = this._edges.crouch = this._edges.tele = false;
     }
@@ -114,8 +117,11 @@ export class AuthNetBridge {
     // ── drive the local player from the predicted sim ──
     const lp = c.localPos();
     if (lp) { p.position.set(lp.x, lp.y, lp.z); }
+    p.velocity.set(c.sim.vx || 0, c.sim.vy || 0, c.sim.vz || 0);
     p.onGround = !!c.sim.onGround;
     p.isCrouching = !!c.sim.crouch;
+    p.isSliding = !!c.sim.slide;
+    p.isSprinting = !!c.sprinting;
     p._eyeHeight = c.sim.eye;
     p.health = c.self.health;
     p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
@@ -125,7 +131,6 @@ export class AuthNetBridge {
 
     // ── fire (server-authoritative hit; client just requests) ──
     this._fireCd = Math.max(0, this._fireCd - dt);
-    const def = this.game.weaponSystem?.currentDef;
     if (input.mouseDown && this._fireCd <= 0 && def && def.kind !== 'melee') {
       this._fireCd = def.fireRate || 0.12;
       c.sendFire(def.id, p.yaw, p.pitch);
@@ -145,11 +150,14 @@ export class AuthNetBridge {
       seen.add(r.id);
       const a = this._remoteAvatar(r.id);
       a.pos.set(r.x, r.y, r.z);
-      // Speed is left out on purpose: Avatar measures it from the position
-      // delta, so a remote animates off nothing but the snapshot stream.
+      a.avatar.setWeapon(r.wid || 'm4');
+      // Derive cadence from rendered interpolation displacement, so a stalled
+      // snapshot stream settles to idle rather than running in place.
       a.avatar.update(dt, {
         position: a.pos, yaw: r.yaw, pitch: r.pitch || 0,
-        crouch: r.crouch, firing: r.firing, alive: r.alive,
+        sprint: r.sprint, grounded: r.grounded, vy: r.vy || 0,
+        crouch: r.crouch, sliding: r.sliding,
+        aiming: r.aiming, firing: r.firing, alive: r.alive,
       });
       // nameplate
       v.set(r.x, r.y + 2.0, r.z).project(cam);
@@ -168,7 +176,11 @@ export class AuthNetBridge {
   _drainEvents() {
     const me = this.client.you;
     for (const e of this.client.drainEvents()) {
-      if (e.e === 'hit' && e.by === me) this.game.hud?.flashHitmarker?.(e.head);
+      if (e.e === 'hit') {
+        if (e.by === me) this.game.hud?.flashHitmarker?.(e.head);
+        if (e.id === me) this.game._playerBody?.userData?.triggerHit?.(0.7, 0.8);
+        else this.remotes.get(e.id)?.avatar?.group?.userData?.triggerHit?.(0.7, 0.8);
+      }
       else if (e.e === 'kill') {
         if (e.by === me) {
           this.game.hud?.flashHitmarker?.(e.head);

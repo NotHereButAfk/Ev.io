@@ -14,6 +14,7 @@
 import { applyWalkCycle, groundPerCycle } from '../src/player/Locomotion.js';
 import { applyRifleCarry } from '../src/player/RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry, ACTION_TIME } from '../src/player/Actions.js';
+import { createHumanActionPose, sampleHumanActionPose } from '../src/player/HumanActionMotion.js';
 
 const JOINTS = ['legL', 'legR', 'kneeL', 'kneeR', 'ankleL', 'ankleR',
                 'armL', 'armR', 'elbowL', 'elbowR'];
@@ -63,6 +64,51 @@ function record(name, moved, limit, what) {
 }
 
 const dt = 1 / 60;
+
+// The preferred rigged soldier has its own additive action layer. Each curve
+// must visibly move, return to neutral, and remain continuous.
+for (const [name, input, what] of [
+  ['human reload', (p) => ({ reload: p }), 'support arm visits magazine and rack'],
+  ['human swap', (p) => ({ swap: p }), 'both arms lower and recover'],
+  ['human throw', (p) => ({ throwP: p }), 'off arm winds, releases, and recovers'],
+  ['human melee', (p) => ({ swing: p }), 'weapon arm winds, cuts, and recovers'],
+]) {
+  const pose = createHumanActionPose();
+  let peak = 0, worstStep = 0;
+  let previous = null;
+  for (let i = 0; i <= 120; i++) {
+    sampleHumanActionPose(input(i / 120), pose);
+    const values = Object.values(pose);
+    peak = Math.max(peak, ...values.map(Math.abs));
+    if (previous) {
+      worstStep = Math.max(
+        worstStep,
+        ...values.map((v, j) => Math.abs(v - previous[j]))
+      );
+    }
+    previous = values.slice();
+  }
+  record(name, peak, 0.3, what);
+  const continuous = worstStep < 0.16;
+  if (!continuous) failures++;
+  results.push({
+    name: `${name} — continuous`,
+    moved: continuous ? 1 : 0,
+    limit: 1,
+    ok: continuous,
+    what: `largest 1/120-step delta ${worstStep.toFixed(3)}rad`,
+  });
+  sampleHumanActionPose(input(1), pose);
+  const neutral = Object.values(pose).every((v) => Math.abs(v) < 1e-9);
+  if (!neutral) failures++;
+  results.push({
+    name: `${name} — neutral finish`,
+    moved: neutral ? 1 : 0,
+    limit: 1,
+    ok: neutral,
+    what: 'no end-of-action pose pop',
+  });
+}
 
 // ── gun actions: reload / swap / flinch / throw ─────────────────────────────
 // Each drives applyRifleCarry against a control with the action left out, so

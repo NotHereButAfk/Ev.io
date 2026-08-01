@@ -1,6 +1,6 @@
 // Authoritative game server host (Phase 4) — wraps AuthRoom with the
 // connection-level protections the room itself doesn't handle:
-//   • origin allow-list          (VITE-style ALLOWED_ORIGINS env, * in dev)
+//   • origin allow-list          (ALLOWED_ORIGINS env; loopback-only by default)
 //   • message schema + size cap   (reject non-JSON / oversized / unknown types)
 //   • per-connection rate limit    (token bucket on inbound messages)
 //   • replay guard                 (monotonic input/fire seq — in AuthRoom)
@@ -21,12 +21,25 @@ const HEARTBEAT_MS = 5000, DEAD_MS = 12000;
 const SEND_BUFFER_CAP = 256 * 1024;         // skip snapshot if socket is backed up
 const MAX_NAME = 24;
 
-const ALLOWED = (process.env.ALLOWED_ORIGINS || '*')
+const ALLOWED = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map((s) => s.trim()).filter(Boolean);
+
+function isLoopbackOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function originOk(origin) {
   if (ALLOWED.includes('*')) return true;
   if (!origin) return false;
+  // An unset allow-list is safe for local development but cannot accidentally
+  // expose a production server to arbitrary browser origins.
+  if (!ALLOWED.length) return isLoopbackOrigin(origin);
   return ALLOWED.includes(origin);
 }
 

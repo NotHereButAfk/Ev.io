@@ -22,7 +22,7 @@
 // Anti-abuse lives in authserver.mjs (origin/schema/rate/size/replay/
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
-import { createState, step, makeInput } from '../src/sim/MoveSim.js';
+import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
 import { INKFALL } from '../src/sim/arenas.js';
 
 export const TICK_HZ = 20;
@@ -42,6 +42,15 @@ const WEAPONS = {
   energyshotgun:{dmg: 12, rate: 0.65, spread: 0.095, pellets: 10,range: 28,  hs: 1,   reload: 1.8, mag: 8  },
   plasmarifle: { dmg: 13, rate: 0.08, spread: 0.015, pellets: 1, range: 90,  hs: 1,   reload: 1.6, mag: 40 },
 };
+// The authoritative combat subset above is intentionally small, but remote
+// presentation still needs to show every shipped held model (including melee).
+// Input may choose only one of these known IDs; arbitrary asset names never
+// reach snapshots or model lookup.
+const PRESENTATION_WEAPONS = new Set([
+  'sidearm', 'uzi', 'levershotgun', 'm4', 'm16', 'rifle', 'lmg', 'rpg',
+  'boltsniper', 'knife', 'sword', 'magnum', 'battlerifle', 'needler',
+  'plasmarifle', 'dmr', 'fuelrod', 'concussion', 'energyshotgun', 'ghammer',
+]);
 const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 
 // Server-authoritative throwable abilities (Phase 10). The server owns charges,
@@ -116,6 +125,7 @@ export class AuthRoom {
       health: START_HEALTH, shield: START_SHIELD, maxShield: START_SHIELD,
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
       wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0,
+      _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       history: [],               // [{tick, x,y,z}]
       lastFireSeq: 0,
       abilities: { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
@@ -157,7 +167,8 @@ export class AuthRoom {
       sprint: !!msg.sprint, crouch: !!msg.crouch,
       jumpJust: !!msg.jump, crouchJust: !!msg.crouchDown, teleJust: !!msg.tele,
     });
-    p.queue.push({ seq: msg.seq, inp });
+    const wid = PRESENTATION_WEAPONS.has(msg.wid) ? msg.wid : p.wid;
+    p.queue.push({ seq: msg.seq, inp, wid, aiming: !!msg.aiming });
     p.lastInputSeq = msg.seq;
     if (p.queue.length > MAX_INPUT_QUEUE) p.queue.splice(0, p.queue.length - MAX_INPUT_QUEUE);
   }
@@ -238,6 +249,10 @@ export class AuthRoom {
     if (target.health <= 0) {
       target.alive = false;
       target.health = 0;
+      target._lastSprint = false;
+      target._lastAim = false;
+      target._animVX = target._animVZ = 0;
+      target._firingTicks = 0;
       target.deadUntil = this.tick + RESPAWN_TICKS;
       target.deaths++;
       shooter.kills++;
@@ -308,6 +323,10 @@ export class AuthRoom {
           p.health = START_HEALTH; p.shield = p.maxShield;
           p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;
           p.alive = true; p.queue.length = 0;
+          p._lastSprint = false;
+          p._animVX = p._animVZ = 0;
+          p._lastAim = false;
+          p._firingTicks = 0;
           p.blindUntil = 0;
           p.abilities = { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
@@ -323,9 +342,24 @@ export class AuthRoom {
         cmd = { seq: p.lastInputSeq, inp: makeInput({ yaw: p._lastYaw ?? 0 }) };
       }
       // reject inputs that claim to be too far in the future (schema guard)
-      p.state = step(p.state, cmd.inp, this.simWorld);
+      const previousState = p.state;
+      const sprinting = isSprinting(previousState, cmd.inp);
+      p.state = step(previousState, cmd.inp, this.simWorld);
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
+      p.wid = cmd.wid || p.wid;
+      p._lastAim = !!cmd.aiming;
+      // Public animation velocity is resolved displacement, not requested
+      // velocity, so a player pinned against a wall does not run in place.
+      const dx = p.state.px - previousState.px;
+      const dz = p.state.pz - previousState.pz;
+      const distance = Math.hypot(dx, dz);
+      const padJump = p.state.padCD > previousState.padCD + 0.5;
+      const regularStep = distance < 2 && !cmd.inp.teleJust && !padJump;
+      const resolvedSpeed = distance * TICK_HZ;
+      p._animVX = regularStep ? dx * TICK_HZ : 0;
+      p._animVZ = regularStep ? dz * TICK_HZ : 0;
+      p._lastSprint = sprinting && regularStep && resolvedSpeed > 6.5;
       // Pitch is client-owned look state — the sim doesn't use it, but remote
       // avatars need it or everyone renders as aiming flat at the horizon.
       if (Number.isFinite(cmd.inp.pitch)) p._lastPitch = cmd.inp.pitch;
@@ -365,7 +399,11 @@ export class AuthRoom {
         id: p.id, name: p.name, isBot: p.isBot,
         x: p.state.px, y: p.state.py, z: p.state.pz,
         yaw: p._lastYaw ?? 0, pitch: p._lastPitch ?? 0,
-        crouch: p.state.crouch, firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
+        vx: p._animVX, vy: p.state.vy, vz: p._animVZ,
+        onGround: p.state.onGround, crouch: p.state.crouch,
+        slide: p.state.slide, sprint: !!p._lastSprint, wid: p.wid,
+        aiming: !!p._lastAim,
+        firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
         health: p.health, shield: p.shield,
       });
     }
@@ -375,7 +413,15 @@ export class AuthRoom {
         t: 'snapshot', tick: now, ack: p.ackTick,
         you: { x: p.state.px, y: p.state.py, z: p.state.pz,
                vx: p.state.vx, vy: p.state.vy, vz: p.state.vz,
+               eye: p.state.eye,
                onGround: p.state.onGround, crouch: p.state.crouch,
+               slide: p.state.slide, slideT: p.state.slideT,
+               slideDx: p.state.slideDx, slideDz: p.state.slideDz,
+               stamina: p.state.stamina, stamDelay: p.state.stamDelay,
+               coyote: p.state.coyote, teleCD: p.state.teleCD, padCD: p.state.padCD,
+               nX: p.state.nX, nY: p.state.nY, nZ: p.state.nZ,
+               safeX: p.state.safeX, safeY: p.state.safeY, safeZ: p.state.safeZ,
+               sprint: !!p._lastSprint,
                health: p.health, shield: p.shield, alive: p.alive,
                mag: p.mag, kills: p.kills, deaths: p.deaths, score: p.score,
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),

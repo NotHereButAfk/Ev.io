@@ -78,6 +78,13 @@ export function makeInput(o = {}) {
   };
 }
 
+/** Exact authoritative sprint predicate shared by the sim and snapshots. */
+export function isSprinting(s, input) {
+  const moving = Math.hypot(input.mx, input.mz) > 0;
+  return moving && input.sprint === 1 && input.mz > 0
+    && s.stamina > 2 && !s.slide && !s.crouch;
+}
+
 // Highest walkable support under (x,z) — platform semantics identical to
 // World.groundHeightAt, plus the base floor at y=0 inside the arena. Returns
 // { y, nx, ny, nz } so flat floors report an EXACT up normal and ramps a real
@@ -202,9 +209,7 @@ export function step(s, input, world) {
     wx = sinY * -mz + Math.sin(input.yaw + Math.PI / 2) * mx;
     wz = cosY * -mz + Math.cos(input.yaw + Math.PI / 2) * mx;
   }
-  const moving = len > 0;
-  const sprinting = moving && input.sprint === 1 && input.mz > 0 &&
-    s.stamina > 2 && !s.slide && !s.crouch;
+  const sprinting = isSprinting(s, input);
 
   // stamina
   if (sprinting) {

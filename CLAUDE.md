@@ -238,7 +238,7 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   predicts locally each tick, on every snapshot snaps to server truth at
   ackTick and replays unacked inputs; renders remotes 2 ticks in the past
   lerped between snapshots.
-- `server/authnet_test.mjs` (`npm run test:auth` in server/) — 15 authority/
+- `server/authnet_test.mjs` (`npm run test:auth` in server/) — 33 authority/
   abuse proofs: forged transforms ignored, replay/reorder guarded, spam-fire
   rate-limited, impossible ammo blocked, forged kill/damage ignored, duplicate
   fire/session dropped, reconnect, 50%-loss+jitter survival. All pass.
@@ -287,6 +287,54 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `server/authnet_test.mjs` now 21 proofs (was 15): +unknown-kind ignored,
   spam capped by charges/cooldown, smoke volume created, duplicate seq ignored,
   impulse velocity clamped (no infinite launch).
+
+## Phase 11 — measured animation quality pass
+- `src/player/HumanLocomotion.js` + `HumanSoldier.js` now use the shipped
+  `soldier.glb` as the measurement source of truth. Walk/run crossfades map
+  between measured bilateral foot-contact origins, resolved displacement drives
+  cadence (so holding sprint into a wall stops the legs), backpedal reverses the
+  gait, and travel direction turns the lower body while the chest keeps the aim
+  line. A measured thigh-only stride warp replaces cartoon-fast sprint playback:
+  11.06 m/s of foot travel for the 10.85 m/s sprint target (1.9% high), with no
+  added toe penetration. Do not restore the old Hips-track normalization; the
+  source clips are already floor-aligned (0.77 cm total floor spread).
+- Human actions now have visible, smoothed silhouettes for crouch, slide, jump
+  push/apex/landing, reload, swap, grenade throw, melee, recoil, damage,
+  teleport, and death/respawn recovery. One-shot timing uses the owning gameplay
+  clock, and smoothing is exponential so 30/60/144 Hz converge.
+- `src/player/HumanRifleCarry.js` owns the firearm in body space and solves both
+  real Mixamo arms onto the grip/receiver every frame. Patrol, aim, locomotion,
+  sprint, reload, and vertical aim were swept across all four production armor
+  scales against the actual rig: both wrist errors are 0.00 cm across 48 states,
+  with every target kept inside the measured arm reach. The reload rolls the
+  magazine toward the support shoulder.
+- `src/weapons/WeaponSystem.js` keeps both first-person gloves visible, uses
+  aspect-aware framing and a farther near-plane-safe mount, suppresses duplicate
+  reload motion, sharply reduces ADS bob/sway, and scales landing response from
+  retained fall speed. The gate covers 20 weapons × 12 FOV/aspect combinations
+  plus 30/60/144 Hz blend and recoil parity, and guards gun-to-melee pose reset.
+- Local TPS, remote avatars, bots, and authoritative snapshots now carry the
+  same resolved speed/direction, ground/vertical, sprint/slide, aim/action, and
+  weapon state. Zombie death crumple is absolute rather than frame-accumulated,
+  and player respawn clears every transient pose/controller state.
+- Browser comparison against live ev.io confirmed the same readability targets:
+  a compact low-ready carry, tucked sprint silhouette, quick shouldered aim, and
+  restrained first-person weapon motion. KYX intentionally keeps both owner
+  gloves visible because that is an explicit owner requirement.
+- New evidence gates: `test:human-carry`, `test:viewmodel`,
+  `test:zombie-death`, and `test:player-respawn`; `test:human-motion` now parses
+  the real GLB at 720 phases and proves floor contact, phase continuity, stride
+  delivery, and no penetration regression. `test:actions` covers the human
+  action curves. All are included in `npm run certify`.
+- Security check for this pass: full root and server `npm audit` both report
+  zero known vulnerabilities; the diff adds no dynamic HTML/eval, credentials,
+  or storage. New presentation inputs are boolean-sanitized or weapon-
+  allowlisted, while sprint presentation is derived from authoritative resolved
+  velocity rather than client intent. An unset
+  `ALLOWED_ORIGINS` accepts loopback browsers only instead of silently allowing
+  every site. All 33 authority/abuse proofs pass. This is engineering evidence
+  only; the release certificate still correctly leaves G-legal for a human
+  security/privacy/legal review.
 
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player

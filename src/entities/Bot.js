@@ -49,7 +49,7 @@ let nextId = 1;
 
 // Bots spawn as the cyborg-terminator models — the same low-poly cel-shaded
 // endoskeletons the player uses. Cycling the three chassis keeps the mob varied.
-const ARMOR_TYPES = ['vanguard', 'striker', 'phantom'];
+const ARMOR_TYPES = ['assault', 'recon', 'heavy', 'stealth'];
 let _armorIdx = 0;
 
 // Each bot picks the next skin in sequence so the lobby always looks varied.
@@ -134,6 +134,7 @@ export class Bot {
     this._jumpCooldown = Math.random() * 0.8;
     this._velY         = 0;
     this._onGround     = true;
+    this._animSpeed    = 0;
     this._stuckT       = 0;
     this._padTeleCD    = 0;
     this._targetEntity = null;
@@ -295,6 +296,7 @@ export class Bot {
     this._alertBlend = 0;
     this._velY = 0;
     this._onGround = true;
+    this._animSpeed = 0;
     this._jumpCooldown = 0.4 + Math.random() * 0.8;
     this._wantsJump = false;
     this._stuckT = 0;
@@ -683,9 +685,15 @@ export class Bot {
     }
     this.world.resolveCollisions(this.position, RADIUS);
 
+    const actualDX = this.position.x - beforeX;
+    const actualDZ = this.position.z - beforeZ;
+    const actualMoved = Math.hypot(actualDX, actualDZ);
+    const actualSpeed = dt > 1e-4 ? actualMoved / dt : 0;
+    this._animSpeed += (actualSpeed - this._animSpeed)
+      * (1 - Math.exp(-(actualSpeed < this._animSpeed ? 18 : 10) * dt));
+
     if (moveTarget) {
-      const moved = Math.hypot(this.position.x - beforeX, this.position.z - beforeZ);
-      if (moved < this.speed * dt * 0.18) this._stuckT += dt;
+      if (actualMoved < this.speed * dt * 0.18) this._stuckT += dt;
       else this._stuckT = Math.max(0, this._stuckT - dt * 2);
       if (this._stuckT > 0.38 && this._onGround) {
         this._stuckT = 0;
@@ -705,6 +713,8 @@ export class Bot {
         this._velY = 0;
         this._onGround = true;
         this._padTeleCD = 1;
+        this._animSpeed = 0;
+        this.mesh?.userData?.triggerTeleport?.();
       }
     }
 
@@ -736,15 +746,25 @@ export class Bot {
       this.healthBarGroup.quaternion.copy(localQuat);
     }
 
+    const resolvedMoving = this._animSpeed > 0.25 && actualMoved > 1e-5;
+    const bodySn = Math.sin(this.mesh.rotation.y);
+    const bodyCs = Math.cos(this.mesh.rotation.y);
+    const resolvedDirF = resolvedMoving
+      ? (actualDX * -bodySn + actualDZ * -bodyCs) / actualMoved : 1;
+    const resolvedDirR = resolvedMoving
+      ? (actualDX * bodyCs + actualDZ * -bodySn) / actualMoved : 0;
+
     // ── Human soldier: drive its skeletal idle/walk/run animation ──────────────
     if (this._isHuman) {
       const ud = this.mesh.userData;
-      const moving = !!moveTarget;
-      const spd = moving ? (this.speed || 3) : 0;
+      const spd = this._animSpeed;
+      const moving = resolvedMoving;
       // The tactical steering already expresses travel in the aim-relative
       // frame, so strafing remains correct while the torso tracks the player.
-      const strafe = moving ? gaitDirR : 0;
-      if (ud.setLocomotion) ud.setLocomotion(spd, this._onGround, this.speed > 3.4, strafe);
+      const strafe = -resolvedDirR;
+      if (ud.setLocomotion) {
+        ud.setLocomotion(spd, this._onGround, spd > 3.4, strafe, resolvedDirF, resolvedDirR);
+      }
       else ud.setMotion(moving ? (this.speed > 3.4 ? 'run' : 'walk') : 'idle');
 
       // Aim: when engaged with the player, spine + head track them; otherwise
@@ -754,17 +774,27 @@ export class Bot {
           const dx = player.position.x - this.position.x;
           const dz = player.position.z - this.position.z;
           const dy = (player.position.y + 1.0) - (this.position.y + 1.5);
-          const worldAim = Math.atan2(dx, dz);
+          const worldAim = directionToBodyYaw(dx, dz);
           const dyaw = worldAim - this.mesh.rotation.y;
           // Wrap to [-π, π] so the twist takes the short way round.
           const wrapped = ((dyaw + Math.PI) % (Math.PI * 2)) - Math.PI;
           const flat = Math.hypot(dx, dz);
-          const pitch = -Math.atan2(dy, flat);
+          const pitch = Math.atan2(dy, flat);
           ud.setAim(pitch, wrapped);
         } else {
           ud.setAim(0, 0);
         }
       }
+      const swing = this._isSwordBot && this.lungeTimer > 0
+        ? 1 - this.lungeTimer / LUNGE_TIME : 1;
+      ud.setActionState?.({
+        swing,
+        vy: this._velY,
+        crouch: 0,
+        slide: 0,
+        reload: 0,
+        aim: !this._isSwordBot && (this._provoked || engaged) ? 1 : 0,
+      });
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
     }
@@ -777,18 +807,18 @@ export class Bot {
     // 9.6 m/s sprint. Mapping that narrow band onto the full walk→sprint blend
     // had every bot leaning into a full sprint while ambling. Hoisted out of
     // the rig block because the melee carry below needs it too.
-    const run = THREE.MathUtils.clamp((this.speed - 3.0) / 3.0, 0, 1);
+    const run = THREE.MathUtils.clamp((this._animSpeed - 3.0) / 3.0, 0, 1);
     if (this._rig) {
-      const isMoving = !!moveTarget;
+      const isMoving = resolvedMoving;
       // applyWalkCycle owns the stride phase and locks it to ground speed.
       // Bots now orbit and retreat while aiming, so direction and air state are
       // explicit—the forward-only default would moonwalk during those moves.
       gait = applyWalkCycle(this._rig, {
-        speed: isMoving ? this.speed : 0,
+        speed: isMoving ? this._animSpeed : 0,
         moving: isMoving,
         run,
-        dirF: gaitDirF,
-        dirR: gaitDirR,
+        dirF: resolvedDirF,
+        dirR: resolvedDirR,
         grounded: this._onGround,
         vy: this._velY,
         dt,
@@ -817,7 +847,7 @@ export class Bot {
     // ── Weapon animation (procedural model only) ───────────────────────────────
     if (this._weaponMesh) {
       const isAlert   = engaged;
-      const isMoving  = !!moveTarget;
+      const isMoving  = resolvedMoving;
       const isLunging = this.lungeTimer > 0;
 
       // Blend alert level: raise weapon when bot spots player

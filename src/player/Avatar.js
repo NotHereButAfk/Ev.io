@@ -68,10 +68,12 @@ export class Avatar {
     this._deathSide = this.group.id % 2 ? 1 : -1;
     this._spawnT = 0;
     this._firePulseT = 0;
+    this._animSpeed = 0;
   }
 
   setWeapon(id) {
     if (id === this.weaponId) return;
+    const isSwap = this.weaponId !== null;
     this.weaponId = id;
     if (this.weapon) { this.group.remove(this.weapon); this.weapon = null; }
     const def = getWeapon(id);
@@ -79,6 +81,7 @@ export class Avatar {
     if (this.isHuman && this.group.userData.attachWeapon) {
       const built = buildWeaponModel(def, { procedural: true });
       this.group.userData.attachWeapon(built?.group || null, def.kind === 'melee');
+      if (isSwap) this.group.userData.triggerAction?.('swap');
       return;
     }
     const wm = buildWeaponModel(def, { procedural: true })?.group;
@@ -95,7 +98,10 @@ export class Avatar {
   fire() { this._kick = 1; this._aimHold = 1.1; }
 
   /** Play the jump arc — call when this character blinks or takes a pad. */
-  hop() { triggerHop(this.rig); }
+  hop() {
+    if (this.isHuman) this.group.userData?.triggerJump?.();
+    else triggerHop(this.rig);
+  }
 
   /**
    * @param {number} dt
@@ -128,6 +134,7 @@ export class Avatar {
       }
       this._alive = false;
       this._hasPrev = false;
+      this._animSpeed = 0;
       if (!this._dying) { g.visible = false; return; }
 
       this._deathT += dt;
@@ -153,6 +160,7 @@ export class Avatar {
       this._alive = true;
       this._spawnT = 0.42;
       this._hasPrev = false;
+      this._animSpeed = 0;
       g.rotation.x = 0;
       g.rotation.z = 0;
       g.userData?.triggerTeleport?.();
@@ -175,7 +183,14 @@ export class Avatar {
     const stepped = this._hasPrev ? Math.hypot(moveX, moveZ) * dt : 0;
     this._prevPos.copy(s.position);
     this._hasPrev = true;
-    if (stepped > TELEPORT_STEP) { speed = 0; this.hop(); }
+    if (stepped > TELEPORT_STEP) {
+      speed = 0;
+      this._animSpeed = 0;
+      this.hop();
+    }
+    const speedEase = 1 - Math.exp(-(speed < this._animSpeed ? 18 : 10) * dt);
+    this._animSpeed += (Math.min(14, speed) - this._animSpeed) * speedEase;
+    speed = this._animSpeed;
 
     if (this._spawnT > 0) {
       this._spawnT = Math.max(0, this._spawnT - dt);
@@ -206,13 +221,26 @@ export class Avatar {
     if (this.isHuman) {
       const ud = g.userData;
       g.position.copy(s.position);
-      const viewYaw = s.yaw || 0;
+      const viewYaw = g.rotation.y;
       const cs = Math.cos(viewYaw), sn = Math.sin(viewYaw);
-      const strafe = speed > 0.2
-        ? -(moveX * cs - moveZ * sn) / Math.max(1, speed)
-        : 0;
-      ud.setLocomotion?.(speed, grounded, !!s.sprint, strafe);
+      const dirF = speed > 0.2
+        ? (moveX * -sn + moveZ * -cs) / Math.max(0.01, speed) : 1;
+      const dirR = speed > 0.2
+        ? (moveX * cs + moveZ * -sn) / Math.max(0.01, speed) : 0;
+      ud.setLocomotion?.(speed, grounded, !!s.sprint, -dirR, dirF, dirR);
       ud.setAim?.(s.pitch || 0, 0);
+      if (s.throwing && !this._wasThrowing) ud.triggerAction?.('throw');
+      this._wasThrowing = !!s.throwing;
+      if (s.hit && !this._wasHit) ud.triggerHit?.(0.7, 0.8);
+      this._wasHit = !!s.hit;
+      ud.setActionState?.({
+        reload: s.reload || 0,
+        swing: s.swing == null ? 1 : s.swing,
+        crouch: s.crouch ? 1 : 0,
+        slide: s.sliding ? 1 : 0,
+        vy: s.vy || 0,
+        aim: (s.firing || s.aiming) ? 1 : 0,
+      });
       this._firePulseT = Math.max(0, this._firePulseT - dt);
       if (s.firing && this._firePulseT <= 0) {
         ud.triggerFire?.(1);

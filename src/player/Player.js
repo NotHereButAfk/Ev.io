@@ -112,6 +112,27 @@ export class Player {
     this.position.copy(position);
     if (Number.isFinite(position.spawnYaw)) this.yaw = position.spawnYaw;
     this.velocity.set(0, 0, 0);
+
+    // A new life must start from a neutral movement pose. Without clearing
+    // these, dying during a crouch/slide/sprint can briefly respawn the camera
+    // at crouch height, keep the body in its airborne pose, or carry the old
+    // bob/slide phase into the first frame.
+    this.onGround      = true;
+    this._wasOnGround  = true;
+    this.isSprinting   = false;
+    this._sprintT      = 0;
+    this.isCrouching   = false;
+    this.isSliding     = false;
+    this._slideTimer   = 0;
+    this._slideVel.set(0, 0, 0);
+    this._slideFwd.set(0, 0, 0);
+    this._coyoteTimer  = 0;
+    this._eyeHeight    = EYE_HEIGHT;
+    this.bobTime       = 0;
+    this._stepPhase    = 0;
+    this._lastBobSign  = 1;
+    this.camera.rotation.z = 0;
+
     this.recoilPitch = 0; this.recoilPitchVel = 0;
     this.recoilYaw = 0;   this.recoilYawVel = 0;
   }

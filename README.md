@@ -41,7 +41,7 @@ npm run build        # → dist/  (base: './', works from any web root)
 | `npm run certify` | aggregate check |
 
 The standalone match server lives in `server/` and has its own README and test
-suite (`npm run test:auth` — 25 authority/abuse proofs).
+suite (`npm run test:auth` — 33 authority/abuse proofs).
 
 ---
 
@@ -114,7 +114,7 @@ Two pieces are worth knowing about because they're shared:
 
 **Multiplayer is built but off by default.** The authoritative server
 (`server/authroom.mjs`) does validated movement, lag-compensated hitscan and
-server-owned abilities, and it passes 25 abuse proofs — but the shipped game
+server-owned abilities, and it passes 33 abuse proofs — but the shipped game
 runs local bots unless you opt in with `?authnet=1`. See `server/README.md`.
 
 ---

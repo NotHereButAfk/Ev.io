@@ -12,7 +12,7 @@
 // Transport-agnostic: pass any object with send(str) + onmessage; a WebSocket
 // works directly. Purely optional — the game runs offline without it.
 
-import { createState, step, makeInput, DT } from '../sim/MoveSim.js';
+import { createState, step, makeInput, isSprinting, DT } from '../sim/MoveSim.js';
 
 const INTERP_DELAY = 2 * DT * 1000;         // render remotes 2 ticks behind (ms)
 
@@ -26,6 +26,7 @@ export class AuthClient {
     this.fireSeq = 0;
     this.pending = [];                      // unacked {seq, inp}
     this.sim = null;                        // predicted local state
+    this.sprinting = false;                 // exact predicted MoveSim presentation
     this.simWorld = null;
     this.remotes = new Map();               // id -> {name, buf:[{t,x,y,z,yaw,crouch}]}
     this.self = { health: 100, shield: 0, alive: true, mag: 30, kills: 0, deaths: 0, score: 0,
@@ -84,10 +85,28 @@ export class AuthClient {
     // snap predicted state to server truth
     this.sim = { ...this.sim,
       px: y.x, py: y.y, pz: y.z, vx: y.vx, vy: y.vy, vz: y.vz,
-      onGround: y.onGround, crouch: y.crouch };
+      eye: y.eye ?? this.sim.eye,
+      onGround: y.onGround ?? this.sim.onGround,
+      crouch: y.crouch ?? this.sim.crouch,
+      slide: y.slide ?? this.sim.slide,
+      slideT: y.slideT ?? this.sim.slideT,
+      slideDx: y.slideDx ?? this.sim.slideDx,
+      slideDz: y.slideDz ?? this.sim.slideDz,
+      stamina: y.stamina ?? this.sim.stamina,
+      stamDelay: y.stamDelay ?? this.sim.stamDelay,
+      coyote: y.coyote ?? this.sim.coyote,
+      teleCD: y.teleCD ?? this.sim.teleCD,
+      padCD: y.padCD ?? this.sim.padCD,
+      nX: y.nX ?? this.sim.nX,
+      nY: y.nY ?? this.sim.nY,
+      nZ: y.nZ ?? this.sim.nZ,
+      safeX: y.safeX ?? this.sim.safeX,
+      safeY: y.safeY ?? this.sim.safeY,
+      safeZ: y.safeZ ?? this.sim.safeZ };
+    this.sprinting = !!y.sprint;
     // drop acked inputs, replay the rest
     this.pending = this.pending.filter((c) => c.seq > snap.ack);
-    for (const c of this.pending) this.sim = step(this.sim, c.inp, this.simWorld);
+    for (const c of this.pending) this._predict(c.inp);
 
     // remote interpolation buffers
     const t = performance.now();
@@ -97,7 +116,10 @@ export class AuthClient {
       if (!r) { r = { name: pl.name, buf: [] }; this.remotes.set(pl.id, r); }
       r.name = pl.name;
       r.buf.push({ t, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch || 0,
-                   crouch: pl.crouch, firing: !!pl.firing,
+                   vx: pl.vx || 0, vy: pl.vy || 0, vz: pl.vz || 0,
+                   grounded: pl.onGround !== false, crouch: pl.crouch, slide: !!pl.slide,
+                   sprint: !!pl.sprint, wid: pl.wid || 'm4', aiming: !!pl.aiming,
+                   firing: !!pl.firing,
                    alive: pl.alive, health: pl.health });
       if (r.buf.length > 20) r.buf.shift();
     }
@@ -108,19 +130,29 @@ export class AuthClient {
     if (snap.events?.length) this.events.push(...snap.events);
   }
 
+  _predict(inp) {
+    const before = this.sim;
+    const active = isSprinting(before, inp);
+    const next = step(before, inp, this.simWorld);
+    const distance = Math.hypot(next.px - before.px, next.pz - before.pz);
+    this.sprinting = active && !inp.teleJust && distance / DT > 6.5 && distance < 2;
+    this.sim = next;
+  }
+
   // Feed one client input; predicts locally + ships to the server.
   sendInput(raw) {
     if (!this.connected || !this.sim) return;
     const inp = makeInput(raw);
     this.seq++;
     this.pending.push({ seq: this.seq, inp });
-    this.sim = step(this.sim, inp, this.simWorld);      // immediate prediction
+    this._predict(inp);                                 // immediate prediction
     this.ws.send(JSON.stringify({
       t: 'input', seq: this.seq, tick: this.sim.tick,
       mx: raw.mx | 0, mz: raw.mz | 0,
       yaw: raw.yaw ?? 0, pitch: raw.pitch ?? 0,
       sprint: raw.sprint ? 1 : 0, crouch: raw.crouch ? 1 : 0,
       jump: raw.jumpJust ? 1 : 0, crouchDown: raw.crouchJust ? 1 : 0, tele: raw.teleJust ? 1 : 0,
+      wid: raw.wid, aiming: raw.aiming ? 1 : 0,
     }));
   }
 
@@ -161,7 +193,11 @@ export class AuthClient {
         // the whole circle every time someone crosses ±π.
         yaw: a.yaw + (((b.yaw - a.yaw + Math.PI) % (Math.PI * 2)) - Math.PI) * f,
         pitch: (a.pitch || 0) + ((b.pitch || 0) - (a.pitch || 0)) * f,
-        crouch: b.crouch, firing: !!b.firing,
+        vx: a.vx + (b.vx - a.vx) * f,
+        vy: a.vy + (b.vy - a.vy) * f,
+        vz: a.vz + (b.vz - a.vz) * f,
+        grounded: b.grounded, crouch: b.crouch, sliding: b.slide,
+        sprint: b.sprint, wid: b.wid, aiming: b.aiming, firing: !!b.firing,
       });
     }
     return out;
