@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import {
+  nextThirdPersonDistance,
+  safeThirdPersonObstructionDistance,
+} from './ThirdPersonCamera.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
@@ -161,7 +165,7 @@ export class Player {
   update(dt, input, world) {
     // --- third-person camera zoom (scroll wheel) ---
     if (input.wheelDelta !== 0) {
-      this._camDist = THREE.MathUtils.clamp(this._camDist + input.wheelDelta * 0.9, 0, 6.0);
+      this._camDist = nextThirdPersonDistance(this._camDist, input.wheelDelta);
     }
 
     // --- look ---
@@ -417,7 +421,7 @@ export class Player {
         this.camera.rotation.z = this._sprintT * -0.025;
       } else if (obstruction) {
         this.camera.position.copy(this._tpsTarget)
-          .addScaledVector(cameraOffset, Math.max(0.35, obstruction.distance - 0.18));
+          .addScaledVector(cameraOffset, safeThirdPersonObstructionDistance(obstruction.distance));
       } else {
         this.camera.position.copy(this._tpsDesired);
       }

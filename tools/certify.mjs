@@ -41,6 +41,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:zombie-death'); return { ok: r.ok && /zombie death crumple passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-VIEW', phase: '—', name: 'Viewmodels clear the near plane and keep both gloves framed',
     fn: () => { const r = run('npm run test:viewmodel'); return { ok: r.ok && /viewmodel passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-TPS', phase: 'camera', name: 'Third-person camera frames the complete player model',
+    fn: () => { const r = run('npm run test:tps-camera'); return { ok: r.ok && /third-person camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',
     fn: () => { const r = run('node authnet_test.mjs', join(root, 'server')); const m = r.out.match(/(\d+) passed, (\d+) failed/);
                 return { ok: !!m && m[2] === '0', detail: m ? `${m[1]} authority/abuse proofs pass` : tail(r.out) }; } },

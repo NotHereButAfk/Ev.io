@@ -515,7 +515,13 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     }
 
     // ── Layer 3: momentum forward lean ──
-    if (B.spine) B.spine.quaternion.multiply(_q[5].setFromAxisAngle(_AX_X, _forwardLean));
+    // Curve through the torso instead of hinging the whole upper body at the
+    // waist. The head counter-rotation keeps the gaze stable through starts
+    // and stops while the chest still visibly absorbs momentum.
+    if (B.spine) B.spine.quaternion.multiply(_q[5].setFromAxisAngle(_AX_X, _forwardLean * 0.45));
+    if (B.s1)    B.s1.quaternion.multiply(_q[6].setFromAxisAngle(_AX_X, _forwardLean * 0.35));
+    if (B.s2)    B.s2.quaternion.multiply(_q[7].setFromAxisAngle(_AX_X, _forwardLean * 0.20));
+    if (B.head)  B.head.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, -_forwardLean * 0.12));
 
     // ── Layer 4: fire recoil (spine kicks back, decays out) ──
     if (_fireRecoil > 0) {
@@ -1186,19 +1192,26 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'Spine2', geo: box(0.17, 0.02, 0.03), mat: trim, x: 0, y: 1.39, z: -0.118 },   // clavicle rail
       // Layered pauldrons (shoulder bone ~1.429): a rounded cap, a polished trim
       // lip, and a status beacon on the outer face.
-      { bone: 'LeftShoulder',  geo: box(0.16, 0.13, 0.18), mat: plate, x: -0.185, y: 1.45, z: 0.02 },
-      { bone: 'RightShoulder', geo: box(0.16, 0.13, 0.18), mat: plate, x:  0.185, y: 1.45, z: 0.02 },
-      { bone: 'LeftShoulder',  geo: box(0.15, 0.035, 0.165), mat: trim,  x: -0.185, y: 1.505, z: 0.02 },
-      { bone: 'RightShoulder', geo: box(0.15, 0.035, 0.165), mat: trim,  x:  0.185, y: 1.505, z: 0.02 },
-      { bone: 'LeftShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: -0.20, y: 1.49, z: -0.02,
+      { bone: 'LeftShoulder',  geo: box(0.135, 0.105, 0.15), mat: plate, x: -0.17, y: 1.44, z: 0.01 },
+      { bone: 'RightShoulder', geo: box(0.135, 0.105, 0.15), mat: plate, x:  0.17, y: 1.44, z: 0.01 },
+      { bone: 'LeftShoulder',  geo: box(0.125, 0.025, 0.135), mat: trim,  x: -0.17, y: 1.485, z: 0.01 },
+      { bone: 'RightShoulder', geo: box(0.125, 0.025, 0.135), mat: trim,  x:  0.17, y: 1.485, z: 0.01 },
+      { bone: 'LeftShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: -0.185, y: 1.475, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
-      { bone: 'RightShoulder', geo: box(0.045, 0.045, 0.045), mat: accent, x: 0.20, y: 1.49, z: -0.02,
+      { bone: 'RightShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: 0.185, y: 1.475, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2, phase: Math.PI } },
       { bone: 'Spine', geo: box(0.33, 0.09, 0.23), mat: dark, x: 0, y: 1.04, z: -0.01 },     // belt (Spine ~1.075)
       { bone: 'Spine', geo: box(0.35, 0.03, 0.25), mat: trim, x: 0, y: 1.085, z: -0.01 },    // belt trim lip
-      { bone: 'Spine2', geo: box(0.22, 0.26, 0.13), mat: dark, x: 0, y: 1.25, z: 0.135 },    // pack
-      { bone: 'Spine2', geo: box(0.16, 0.035, 0.03), mat: accent, x: 0, y: 1.35, z: 0.195,
-        anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2 } },         // back power bar
+      // Compact, layered power pack: the waist and arms remain readable from
+      // behind, and the selected plate colour now carries into the rear view.
+      { bone: 'Spine2', geo: box(0.18, 0.20, 0.085), mat: dark, x: 0, y: 1.27, z: 0.105 },
+      { bone: 'Spine2', geo: box(0.025, 0.17, 0.025), mat: plate, x: -0.068, y: 1.27, z: 0.158 },
+      { bone: 'Spine2', geo: box(0.025, 0.17, 0.025), mat: plate, x:  0.068, y: 1.27, z: 0.158 },
+      { bone: 'Spine2', geo: box(0.12, 0.025, 0.025), mat: trim, x: 0, y: 1.325, z: 0.160 },
+      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x: -0.04, y: 1.36, z: 0.168,
+        anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2 } },
+      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x:  0.04, y: 1.36, z: 0.168,
+        anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2, phase: Math.PI * 0.15 } },
     ];
   }
 

@@ -12,6 +12,10 @@ import * as THREE from 'three';
 import { AuthClient } from './AuthClient.js';
 import { DT } from '../sim/MoveSim.js';
 import { Avatar } from '../player/Avatar.js';
+import {
+  nextThirdPersonDistance,
+  safeThirdPersonObstructionDistance,
+} from '../player/ThirdPersonCamera.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -109,7 +113,7 @@ export class AuthNetBridge {
     // Match the legacy controller: the wheel enters/leaves third-person and
     // WeaponSystem sees _camDist immediately, so it cannot also swap weapons.
     if (input.wheelDelta !== 0) {
-      p._camDist = THREE.MathUtils.clamp(p._camDist + input.wheelDelta * 0.9, 0, 6.0);
+      p._camDist = nextThirdPersonDistance(p._camDist, input.wheelDelta);
     }
 
     // edges collected per frame, consumed on the next tick
@@ -168,7 +172,7 @@ export class AuthNetBridge {
         p.camera.rotation.z = 0;
       } else if (obstruction) {
         p.camera.position.copy(p._tpsTarget)
-          .addScaledVector(cameraOffset, Math.max(0.35, obstruction.distance - 0.18));
+          .addScaledVector(cameraOffset, safeThirdPersonObstructionDistance(obstruction.distance));
       } else {
         p.camera.position.copy(this._tpsDesired);
       }
