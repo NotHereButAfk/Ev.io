@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import {
   applyRifleCarry, GRIP_LOCAL, HANDGUARD_LOCAL, AIM_PITCH_LIMIT,
 } from '../src/player/RifleCarry.js';
-import { adsMountY } from '../src/weapons/WeaponSystem.js';
+import { adsMountY, viewmodelZ } from '../src/weapons/WeaponSystem.js';
 
 const R2D = 180 / Math.PI, D2R = Math.PI / 180;
 let fails = 0;
@@ -163,45 +163,66 @@ for (const [file, what] of [
 // ADS used to slide the gun to the middle of the screen and leave it at hip
 // height, so at 28° of scoped FOV the muzzle sat 57% of the way to the bottom
 // edge (85% on the magnum) — you aimed over the top of the weapon while the
-// crosshair floated on its own. The weapon models can't be built in Node (they
-// bake canvas textures), so the geometry is checked here and the wiring that
-// feeds it is checked by source.
-console.log('\naiming down the sights puts the weapon on the crosshair');
+// crosshair floated on its own.
+//
+// The models cannot be built in Node (they bake their textures through a 2D
+// canvas), so `npm run sights` measures them in a real browser and records
+// tests/sights.json. This checks the whole arsenal against that record, and
+// re-derives the mount from the recorded inputs so the maths here cannot drift
+// away from what was actually surveyed.
+console.log('\naiming down the sights puts every gun on the crosshair');
 {
-  // Measured off the real models: [bore height, sight top], in mount metres.
-  const RIGS = [
-    ['m4 (carry handle)',   0.078, 0.198],
-    ['magnum (blade)',      0.072, 0.1125],
-    ['battlerifle (optic)', 0.078, 0.210],
-  ];
-  // adsMountY returns `dip - sightTop`, so (mountY + sightTop) is the dip: how
-  // far the top of the sighting furniture ends up ABOVE the camera axis, i.e.
-  // how far INTO the sight the crosshair sits.
-  let worstOff = 0, leastDip = Infinity;
-  for (const [, boreY, top] of RIGS) {
-    const dip = adsMountY({ x: 0, y: boreY }, top) + top;
-    worstOff = Math.max(worstOff, Math.abs(dip));
-    leastDip = Math.min(leastDip, dip);
+  const sights = JSON.parse(
+    readFileSync(new URL('../tests/sights.json', import.meta.url), 'utf8'));
+  const defs = readFileSync(new URL('../src/weapons/weaponDefs.js', import.meta.url), 'utf8');
+
+  // Every gun in the game has to be in the record. A new weapon that nobody
+  // surveyed is exactly the one whose sights will be wrong.
+  const ids = [...defs.matchAll(/id:\s*'([a-z0-9_]+)'/g)].map(m => m[1]);
+  const melee = new Set(['knife', 'sword', 'ghammer']);
+  const guns = ids.filter(id => !melee.has(id));
+  const missing = guns.filter(id => !(id in sights));
+  ok(missing.length === 0,
+     `every gun in the arsenal has been surveyed (${guns.length})`,
+     missing.length ? `missing: ${missing.join(', ')}` : `${Object.keys(sights).length} recorded`);
+
+  let worstOff = 0, worstOffId = '', minGap = Infinity, minGapId = '', drift = 0, driftId = '';
+  for (const [id, v] of Object.entries(sights)) {
+    // The sight must end up ON the axis: at it for a declared aim point, just
+    // inside the top edge for an inferred one. Shipped, these sat 6-15cm below.
+    worstOff = Math.max(worstOff, Math.abs(v.dip));
+    if (Math.abs(v.dip) === worstOff) worstOffId = id;
+    if (v.rearGap < minGap) { minGap = v.rearGap; minGapId = id; }
+    // Re-derive from the recorded geometry — catches the maths changing under
+    // a fixture that was not re-measured.
+    const y = adsMountY({ x: v.boreX, y: v.bore }, v.sightTop, v.scale, v.declared);
+    const z = viewmodelZ(v.ext.backZ, v.scale);
+    const d = Math.max(Math.abs(y - v.mountY), Math.abs(z - v.mountZ));
+    if (d > drift) { drift = d; driftId = id; }
   }
-  // Shipped, the mount stayed at hip height (-0.26), leaving these sights 6-15cm
-  // below the eye and the muzzle off the bottom of a scoped frame.
-  ok(worstOff <= 0.035,
-     'the sight comes up to the camera axis for every weapon',
-     `worst ${(worstOff * 100).toFixed(1)} cm (was 6.2-14.8 cm below it)`);
-  ok(leastDip > 0,
-     'the crosshair sits inside the sight, not over the top of it',
-     `at least ${(leastDip * 100).toFixed(1)} cm down from the sight top`);
+  ok(worstOff <= 0.031,
+     'the sight comes up to the camera axis on every gun',
+     `worst ${(worstOff * 100).toFixed(1)} cm (${worstOffId}) — was 6-15 cm below`);
+  ok(Object.values(sights).every(v => v.dip >= 0),
+     'the crosshair never sits above the sight');
+  ok(Object.values(sights).every(v => !v.declared || v.dip === 0),
+     'a declared aim point lands exactly on the axis, with no fudge');
+  ok(minGap > 0.02,
+     'no stock reaches back inside the camera near plane',
+     `tightest ${minGap.toFixed(3)} m (${minGapId})`);
+  // The fixture stores 4-decimal values, so agreement is to within rounding —
+  // a tighter bound than that would just be testing toFixed().
+  ok(drift < 5e-4,
+     'the shipping maths still reproduces the surveyed mount',
+     `worst ${(drift * 1000).toFixed(3)} mm${driftId ? ` (${driftId})` : ''}`);
 
-  // A tall optic has to be looked THROUGH; a pistol blade must not get the same
-  // drop or the crosshair ends up buried in the slide.
-  const optic = adsMountY({ x: 0, y: 0.078 }, 0.210) + 0.210;
-  const blade = adsMountY({ x: 0, y: 0.072 }, 0.1125) + 0.1125;
-  ok(optic > blade,
-     'a tall optic is looked through, a low blade is looked along',
-     `optic ${(optic * 100).toFixed(1)} cm into the glass vs blade ${(blade * 100).toFixed(1)} cm`);
+  // The scale trap: the bore and sight are measured INSIDE the scaled mount, so
+  // they have to be taken through that scale. Skipping it moves the gun the
+  // right way by the wrong amount, which looks plausible in a screenshot.
+  ok(adsMountY({ x: 0, y: 0.078 }, 0.198, 0.74) !== adsMountY({ x: 0, y: 0.078 }, 0.198, 1),
+     'the mount scale is applied, not assumed to be 1');
 
-  // Un-measurable weapon (melee, or a model with no meshes): must not throw and
-  // must not move the mount somewhere strange.
+  // Un-measurable weapon (melee, or a model with no meshes): must not throw.
   ok(adsMountY(null, null) === -0.26 && adsMountY({ x: 0, y: 0 }, null) === -0.26,
      'a weapon with no measurable sight leaves the mount where it was');
 }
@@ -210,7 +231,7 @@ console.log('\nboth viewmodel build paths measure the weapon');
 {
   const src = readFileSync(new URL('../src/weapons/WeaponSystem.js', import.meta.url), 'utf8');
   const builds = src.split('buildWeaponModel(w)').length - 1;
-  const measured = src.split('sightTop: _sightTopIn').length - 1;
+  const measured = src.split('extent: _extentIn').length - 1;
   // The GLB finishing its load rebuilds every model. Carrying the old offsets
   // over there would un-align ADS the moment the real meshes arrived.
   ok(builds > 0 && measured === builds,

@@ -1,0 +1,274 @@
+{
+  "sidearm": {
+    "bore": 0.06,
+    "sightTop": 0.129,
+    "aboveBore": 0.069,
+    "mountY": -0.0827,
+    "dip": 0.0128,
+    "boreX": 0,
+    "ext": {
+      "y": 0.364,
+      "backZ": 0.191
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.439
+  },
+  "uzi": {
+    "bore": 0.05,
+    "sightTop": 0.129,
+    "aboveBore": 0.079,
+    "mountY": -0.0808,
+    "dip": 0.0146,
+    "boreX": 0,
+    "ext": {
+      "y": 0.469,
+      "backZ": 0.417
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.272
+  },
+  "levershotgun": {
+    "bore": 0.082,
+    "sightTop": 0.1195,
+    "aboveBore": 0.0375,
+    "mountY": -0.0815,
+    "dip": 0.0069,
+    "boreX": 0,
+    "ext": {
+      "y": 0.284,
+      "backZ": 0.53
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.188
+  },
+  "m4": {
+    "bore": 0.078,
+    "sightTop": 0.198,
+    "aboveBore": 0.12,
+    "mountY": -0.1243,
+    "dip": 0.0222,
+    "boreX": 0,
+    "ext": {
+      "y": 0.435,
+      "backZ": 0.445
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.251
+  },
+  "m16": {
+    "bore": 0.06,
+    "sightTop": 0.2005,
+    "aboveBore": 0.1405,
+    "mountY": -0.1224,
+    "dip": 0.026,
+    "boreX": 0,
+    "ext": {
+      "y": 0.434,
+      "backZ": 0.576
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.154
+  },
+  "rifle": {
+    "bore": 0.068,
+    "sightTop": 0.155,
+    "aboveBore": 0.087,
+    "mountY": -0.0986,
+    "dip": 0.0161,
+    "boreX": 0,
+    "ext": {
+      "y": 0.424,
+      "backZ": 0.491
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.217
+  },
+  "lmg": {
+    "bore": 0.082,
+    "sightTop": 0.236,
+    "aboveBore": 0.154,
+    "mountY": -0.1462,
+    "dip": 0.0285,
+    "boreX": 0,
+    "ext": {
+      "y": 0.45,
+      "backZ": 0.504
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.207
+  },
+  "rpg": {
+    "bore": 0.062,
+    "sightTop": 0.1785,
+    "aboveBore": 0.1165,
+    "mountY": -0.1105,
+    "dip": 0.0216,
+    "boreX": 0,
+    "ext": {
+      "y": 0.351,
+      "backZ": 0.57
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.158
+  },
+  "boltsniper": {
+    "bore": 0.075,
+    "sightTop": 0.392,
+    "aboveBore": 0.317,
+    "mountY": -0.2601,
+    "dip": 0.03,
+    "boreX": 0,
+    "ext": {
+      "y": 0.624,
+      "backZ": 0.618
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.123
+  },
+  "magnum": {
+    "bore": 0.072,
+    "sightTop": 0.1125,
+    "aboveBore": 0.0405,
+    "mountY": -0.0758,
+    "dip": 0.0075,
+    "boreX": 0,
+    "ext": {
+      "y": 0.243,
+      "backZ": 0.117
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.493
+  },
+  "battlerifle": {
+    "bore": 0.078,
+    "sightTop": 0.21,
+    "aboveBore": 0.132,
+    "mountY": -0.131,
+    "dip": 0.0244,
+    "boreX": 0,
+    "ext": {
+      "y": 0.414,
+      "backZ": 0.39
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.291
+  },
+  "needler": {
+    "bore": 0.058,
+    "sightTop": 0.199,
+    "aboveBore": 0.141,
+    "mountY": -0.1212,
+    "dip": 0.0261,
+    "boreX": 0,
+    "ext": {
+      "y": 0.338,
+      "backZ": 0.32
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.343
+  },
+  "plasmarifle": {
+    "bore": 0.07,
+    "sightTop": 0.14,
+    "aboveBore": 0.07,
+    "mountY": -0.0906,
+    "dip": 0.0129,
+    "boreX": 0,
+    "ext": {
+      "y": 0.263,
+      "backZ": 0.26
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.388
+  },
+  "dmr": {
+    "bore": 0.078,
+    "sightTop": 0.216,
+    "aboveBore": 0.138,
+    "mountY": -0.1598,
+    "dip": 0,
+    "boreX": 0,
+    "ext": {
+      "y": 0.577,
+      "backZ": 0.488
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": true,
+    "rearGap": 0.219
+  },
+  "fuelrod": {
+    "bore": 0.075,
+    "sightTop": 0.162,
+    "aboveBore": 0.087,
+    "mountY": -0.1038,
+    "dip": 0.0161,
+    "boreX": 0,
+    "ext": {
+      "y": 0.251,
+      "backZ": 0.255
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.391
+  },
+  "concussion": {
+    "bore": 0.075,
+    "sightTop": 0.168,
+    "aboveBore": 0.093,
+    "mountY": -0.1071,
+    "dip": 0.0172,
+    "boreX": 0,
+    "ext": {
+      "y": 0.279,
+      "backZ": 0.203
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.43
+  },
+  "energyshotgun": {
+    "bore": 0.085,
+    "sightTop": 0.143,
+    "aboveBore": 0.058,
+    "mountY": -0.0951,
+    "dip": 0.0107,
+    "boreX": 0,
+    "ext": {
+      "y": 0.242,
+      "backZ": 0.41
+    },
+    "mountZ": -0.58,
+    "scale": 0.74,
+    "declared": false,
+    "rearGap": 0.277
+  }
+}

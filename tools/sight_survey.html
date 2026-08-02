@@ -1,0 +1,127 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#0b0d12}canvas{display:block}#gl{display:none}
+</style></head><body>
+<canvas id="out"></canvas><canvas id="gl"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { buildWeaponModel } from '/src/weapons/WeaponModels.js';
+import { WEAPONS } from '/src/weapons/weaponDefs.js';
+import { adsMountY, viewmodelZ } from '/src/weapons/WeaponSystem.js';
+
+const W = 340, H = 300, FOV_ADS = 28;
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true });
+renderer.setSize(W, H); renderer.setPixelRatio(2);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x232a35);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x40485a, 2.2));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(1,2,1); scene.add(key);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 60),
+  new THREE.MeshStandardMaterial({ color: 0x39424f }));
+wall.position.z = -14; scene.add(wall);
+for (let i = -6; i <= 6; i++) {
+  const s = new THREE.Mesh(new THREE.BoxGeometry(0.03, 10, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x2b323c }));
+  s.position.set(i * 1.1, 0, -13.9); scene.add(s);
+}
+const cam = new THREE.PerspectiveCamera(FOV_ADS, W / H, 0.02, 300); scene.add(cam);
+const mount = new THREE.Object3D(); cam.add(mount);
+// The shipping mount is scaled — without this the survey renders every gun
+// 35% too large and measures its alignment in the wrong space.
+const VM_SCALE = 0.74;
+mount.scale.setScalar(VM_SCALE);
+const sway  = new THREE.Object3D(); mount.add(sway);
+const kick  = new THREE.Object3D(); sway.add(kick);
+const vmKey = new THREE.PointLight(0xffffff, 2.4, 3.2, 2);
+vmKey.position.set(0.25, 0.15, 0.15); cam.add(vmKey);
+
+// The two measurements WeaponSystem takes, mirrored exactly.
+function localPositionIn(anc, node) {
+  const p = new THREE.Vector3();
+  for (let o = node; o && o !== anc; o = o.parent) { o.updateMatrix(); p.applyMatrix4(o.matrix); }
+  return p;
+}
+function extentIn(anc, group) {
+  let declared = null;
+  const bb = new THREE.Box3(), t = new THREE.Box3(), m = new THREE.Matrix4();
+  bb.makeEmpty();
+  group.traverse(o => {
+    if (o.name === 'sight_point') declared = localPositionIn(anc, o).y;
+    if (!o.isMesh || !o.geometry || o.name === 'outline') return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    t.copy(o.geometry.boundingBox); m.identity();
+    for (let n = o; n && n !== anc; n = n.parent) { n.updateMatrix(); m.premultiply(n.matrix); }
+    bb.union(t.applyMatrix4(m));
+  });
+  if (bb.isEmpty()) return null;
+  return { top: declared ?? bb.max.y, back: bb.max.z, declared: declared !== null };
+}
+
+const guns = WEAPONS.filter(w => w.kind !== 'melee');
+const COLS = 5, ROWS = Math.ceil(guns.length / COLS);
+const out = document.getElementById('out');
+out.width = W * COLS; out.height = H * ROWS + 30;
+const ctx = out.getContext('2d');
+ctx.fillStyle = '#0b0d12'; ctx.fillRect(0, 0, out.width, out.height);
+
+const survey = {};
+guns.forEach((def, i) => {
+  kick.clear();
+  const built = buildWeaponModel(def);
+  kick.add(built.group); built.group.visible = true;
+  const bore = localPositionIn(kick, built.muzzle);
+  const ext = extentIn(kick, built.group);
+  const sightTop = ext.top;
+  const my = adsMountY(bore, sightTop, VM_SCALE, ext.declared);
+  const mz = viewmodelZ(ext.back, VM_SCALE);
+  mount.position.set(-bore.x * VM_SCALE, my, mz);
+  mount.rotation.set(0, 0, 0);
+  cam.updateMatrixWorld(true);
+
+  // Where the sight top ends up relative to the eye. Positive = the crosshair
+  // sits that far down inside the sight; negative = the sight is BELOW the
+  // crosshair and the gun is not on target.
+  const dip = my + sightTop * VM_SCALE;
+  // Full extent in mount space, and how much of the ADS frame the weapon eats.
+  // Coverage is sampled from the depth of the render rather than guessed from
+  // the box, so a gun that is merely long does not count as a gun that blocks.
+  const bbm = new THREE.Box3(), t2 = new THREE.Box3(), m2 = new THREE.Matrix4();
+  bbm.makeEmpty();
+  built.group.traverse(o => {
+    if (!o.isMesh || !o.geometry || o.name === 'outline') return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    t2.copy(o.geometry.boundingBox); m2.identity();
+    for (let n = o; n && n !== kick; n = n.parent) { n.updateMatrix(); m2.premultiply(n.matrix); }
+    bbm.union(t2.applyMatrix4(m2));
+  });
+  survey[def.id] = {
+    bore: +bore.y.toFixed(4), sightTop: +sightTop.toFixed(4),
+    aboveBore: +(sightTop - bore.y).toFixed(4),
+    mountY: +my.toFixed(4), dip: +dip.toFixed(4), boreX: +bore.x.toFixed(4),
+    ext: { y: +(bbm.max.y - bbm.min.y).toFixed(3), backZ: +bbm.max.z.toFixed(3) },
+    mountZ: +mz.toFixed(3), scale: VM_SCALE, declared: !!ext.declared,
+    // Distance from the eye to the rearmost point. Must stay clear of the
+    // camera's 0.02 near plane or the receiver is sliced open on screen.
+    rearGap: +(-mz - bbm.max.z * VM_SCALE).toFixed(3),
+  };
+
+  const col = i % COLS, row = (i / COLS) | 0;
+  renderer.render(scene, cam);
+  const x = col * W, y = 30 + row * H;
+  ctx.drawImage(renderer.domElement, x, y, W, H);
+  const cx = x + W / 2, cy = y + H / 2;
+  ctx.strokeStyle = '#00ff9c'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx-10,cy); ctx.lineTo(cx-4,cy); ctx.moveTo(cx+4,cy); ctx.lineTo(cx+10,cy);
+  ctx.moveTo(cx,cy-10); ctx.lineTo(cx,cy-4); ctx.moveTo(cx,cy+4); ctx.lineTo(cx,cy+10);
+  ctx.stroke();
+  ctx.fillStyle = '#7fd4ff'; ctx.font = '600 13px ui-monospace,monospace';
+  ctx.fillText(def.id, x + 9, y + 18);
+  ctx.fillStyle = Math.abs(dip) <= 0.035 ? '#4fd88a' : '#ff5a4a';
+  ctx.font = '600 11px ui-monospace,monospace';
+  ctx.fillText(`sight ${(dip*100).toFixed(1)}cm from eye`, x + 9, y + H - 10);
+});
+ctx.fillStyle = '#e6ecf4'; ctx.font = '600 15px ui-monospace,monospace';
+ctx.fillText(`ADS, every gun in the arsenal (${guns.length}) — green crosshair should sit on each sight`, 14, 20);
+window.__survey = survey;
+window.__done = true;
+</script></body></html>

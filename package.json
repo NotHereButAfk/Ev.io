@@ -10,6 +10,7 @@
     "test:move": "node tools/movesim_fixtures.mjs",
     "test:gait": "node tools/gait_check.mjs",
     "test:aim": "node tools/aim_check.mjs",
+    "sights": "node tools/sight_survey.mjs",
     "test:actions": "node tools/action_check.mjs",
     "test:mesh": "node tools/mesh_check.mjs",
     "arena:metrics": "node tools/arena_metrics.mjs",

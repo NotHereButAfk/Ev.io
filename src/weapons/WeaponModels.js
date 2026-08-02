@@ -1065,6 +1065,13 @@ function buildAR10(color, def = {}) {
   // glowing holo reticle visible in the rear lens
   const reticle = cyl(0.012, 0.012, 0.006, energy, 10);
   reticle.position.set(0, 0.216, 0.082);
+  // Declared aim point: the optical axis of the scope. Without it the viewmodel
+  // infers the sight from the highest point on the weapon, which here is the
+  // elevation turret 5cm above the reticle.
+  const sightPoint = new THREE.Object3D();
+  sightPoint.name = 'sight_point';
+  sightPoint.position.set(0, 0.216, 0.082);
+  g.add(sightPoint);
   g.add(reticle);
 
   // Barrel (heavier .308 profile)

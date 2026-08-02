@@ -47,8 +47,16 @@ function createTracerMesh() {
 }
 
 // How far in front of the eye the viewmodel sits. Far enough that no part of
-// any gun in the arsenal reaches back inside the camera's near plane.
+// any gun in the arsenal reaches back inside the camera's near plane — measured
+// across all 17, the tightest is the boltsniper at 0.123m of clearance, so the
+// claim holds with room to spare.
 const VIEWMODEL_Z = -0.58;
+// ...and a guard so it keeps holding. Nothing in the arsenal triggers this
+// today; it exists because the margin above is only true as long as no one adds
+// a longer weapon, and the failure mode if they do is the near plane slicing
+// the receiver open across the middle of the screen rather than anything that
+// looks like a bug in the new weapon.
+const VIEWMODEL_NEAR_MARGIN = 0.08;
 
 // ── Aiming down the sights ───────────────────────────────────────────────────
 // ADS used to slide the gun to the middle of the screen and leave it there, at
@@ -95,9 +103,15 @@ function _localPositionIn(ancestor, node) {
 // above rather than Box3.setFromObject(), which reports WORLD coordinates —
 // i.e. wherever the mount happened to be left on the previous frame.
 const _bb = new THREE.Box3(), _bbTmp = new THREE.Box3(), _bbM = new THREE.Matrix4();
-function _sightTopIn(ancestor, group) {
+function _extentIn(ancestor, group) {
+  // A model may declare its own aim point. The heuristic below is right for
+  // 16 of the 17 guns, but it cannot tell a scope's elevation turret from the
+  // reticle underneath it — on the dmr that put the crosshair 5cm above the
+  // optical axis, on the top of the knob rather than in the glass.
+  let declared = null;
   _bb.makeEmpty();
   group.traverse((o) => {
+    if (o.name === 'sight_point') declared = _localPositionIn(ancestor, o).y;
     if (!o.isMesh || !o.geometry || o.name === 'outline') return;
     if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
     _bbTmp.copy(o.geometry.boundingBox);
@@ -105,14 +119,44 @@ function _sightTopIn(ancestor, group) {
     for (let n = o; n && n !== ancestor; n = n.parent) { n.updateMatrix(); _bbM.premultiply(n.matrix); }
     _bb.union(_bbTmp.applyMatrix4(_bbM));
   });
-  return _bb.isEmpty() ? null : _bb.max.y;
+  if (_bb.isEmpty()) return null;
+  // `back` always comes from the geometry — a declared point says where to aim,
+  // not how far the stock reaches.
+  return { top: declared ?? _bb.max.y, back: _bb.max.z, declared: declared !== null };
 }
 
-/** Mount height that puts this weapon's sight on the camera axis. */
-export function adsMountY(bore, sightTop) {
+/**
+ * Mount distance that keeps this weapon's stock clear of the camera.
+ *
+ * `back` is measured INSIDE the mount, which is scaled — so it has to be taken
+ * through that scale before it can be compared against distances in camera
+ * space. Getting this wrong is silent: the gun still moves the right way, just
+ * not by the right amount.
+ */
+export function viewmodelZ(back, scale = 1) {
+  if (back == null) return VIEWMODEL_Z;
+  return Math.min(VIEWMODEL_Z, -(back * scale + VIEWMODEL_NEAR_MARGIN));
+}
+
+/**
+ * Mount height that puts this weapon's sight on the camera axis.
+ *
+ * `bore` and `sightTop` are measured inside the mount and so are subject to its
+ * scale; the dip is a camera-space distance and is not. Mixing the two spaces
+ * puts the sight a fraction of the way to where it belongs — on this arsenal it
+ * left the crosshair ABOVE the sight on every weapon, in the same direction and
+ * by a plausible-looking amount, which is exactly the kind of wrong that
+ * survives a glance at a screenshot.
+ */
+export function adsMountY(bore, sightTop, scale = 1, declared = false) {
   if (bore == null || sightTop == null) return -0.26;      // unmeasurable — leave it
-  const dip = Math.min(SIGHT_DIP_MAX, SIGHT_DIP_FRAC * Math.max(0, sightTop - bore.y));
-  return dip - sightTop;
+  const top = sightTop * scale;
+  // A declared sight point IS the aim point, so it goes straight on the axis.
+  // The dip only exists to guess how far under an inferred top edge to look.
+  const dip = declared
+    ? 0
+    : Math.min(SIGHT_DIP_MAX, SIGHT_DIP_FRAC * Math.max(0, top - bore.y * scale));
+  return dip - top;
 }
 
 export class WeaponSystem {
@@ -251,7 +295,7 @@ export class WeaponSystem {
       // cancel to put the barrel on the camera axis.
       this.models.set(w.id, { group, muzzle,
         bore: _localPositionIn(this.kickGroup, muzzle),
-        sightTop: _sightTopIn(this.kickGroup, group) });
+        extent: _extentIn(this.kickGroup, group) });
     }
     this._setActiveModel(0);
     this._buildArm();
@@ -275,7 +319,7 @@ export class WeaponSystem {
       // moment the models finished loading.
       this.models.set(w.id, { group, muzzle,
         bore: _localPositionIn(this.kickGroup, muzzle),
-        sightTop: _sightTopIn(this.kickGroup, group) });
+        extent: _extentIn(this.kickGroup, group) });
     }
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
     if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
@@ -1335,8 +1379,10 @@ export class WeaponSystem {
     // used, because every bore in the arsenal is centred, but the y term is the
     // one that was missing entirely.
     const vm = this.models.get(def.id);
-    const adsShiftX = this.scopeT * ((vm?.bore ? -vm.bore.x : 0) - 0.32);
-    const adsRaiseY = this.scopeT * (adsMountY(vm?.bore, vm?.sightTop) + 0.26);
+    const vmScale = this.weaponMount.scale.x;
+    const adsShiftX = this.scopeT * ((vm?.bore ? -vm.bore.x * vmScale : 0) - 0.32);
+    const adsRaiseY = this.scopeT *
+      (adsMountY(vm?.bore, vm?.extent?.top, vmScale, vm?.extent?.declared) + 0.26);
     const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
@@ -1350,9 +1396,10 @@ export class WeaponSystem {
       this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
-    // VIEWMODEL_Z, not -0.5: the stock reaches back far enough that 0.5m put it
-    // inside the camera's near plane, where it was silently sliced away.
-    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
+    // Per weapon, not a shared constant: the long guns reach further back than
+    // any single distance can absorb (see VIEWMODEL_Z).
+    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y,
+                                 viewmodelZ(vm?.extent?.back, vmScale));
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.z = this._mountRot.z;
 
