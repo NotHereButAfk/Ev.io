@@ -173,6 +173,25 @@ export class MenuUI {
       e.currentTarget.querySelector('.pm-name').textContent = 'WALLET LINKED ✓';
     });
 
+    document.getElementById('feedback-save-btn')?.addEventListener('click', () => {
+      const field = document.getElementById('feedback-text');
+      const status = document.getElementById('feedback-status');
+      const message = field?.value.trim() || '';
+      if (!message) {
+        if (status) status.textContent = 'Write a message first.';
+        return;
+      }
+      try {
+        const items = JSON.parse(localStorage.getItem('kyx_feedback') || '[]');
+        items.push({ message, createdAt: new Date().toISOString() });
+        localStorage.setItem('kyx_feedback', JSON.stringify(items.slice(-20)));
+        field.value = '';
+        if (status) status.textContent = 'Saved on this device. Thank you.';
+      } catch {
+        if (status) status.textContent = 'Could not save feedback on this device.';
+      }
+    });
+
     // Auth control (right-side menu). "login" is a plain link to /login; the
     // logout button clears the session and drops back to spectating.
     document.getElementById('nav-logout-btn')?.addEventListener('click', (e) => {

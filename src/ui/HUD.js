@@ -24,6 +24,7 @@ export class HUD {
     this.serverPopMax   = document.getElementById('server-pop-max');
     this.weaponSlots = document.getElementById('weapon-slots');
     this.hitmarker   = document.getElementById('hitmarker');
+    this.crosshair   = document.getElementById('crosshair');
     this.killConfirm      = document.getElementById('kill-confirm');
     this.killConfirmTitle = document.getElementById('kill-confirm-title');
     this.killConfirmScore = document.getElementById('kill-confirm-score');
@@ -192,6 +193,16 @@ export class HUD {
       ? '∞'
       : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
     this.reloadText.classList.toggle('hidden', !weaponInfo.isReloading);
+    if (this.crosshair) {
+      const bloom = Math.max(0, Math.min(1, weaponInfo.spreadRatio || 0));
+      const aiming = Math.max(0, Math.min(1, weaponInfo.aiming || 0));
+      // EV.IO-style readable cone: sustained hip fire opens the four bars;
+      // ADS closes them into the optic without moving the centre dot.
+      const gap = (3 + bloom * 9) * (1 - aiming * 0.78);
+      this.crosshair.style.setProperty('--xhair-size', `${10 + gap * 2}px`);
+      this.crosshair.style.setProperty('--xhair-opacity', `${1 - aiming * 0.42}`);
+      this.crosshair.classList.toggle('ads', aiming > 0.72);
+    }
     if (this.reloadProgress) {
       const reloadPct = Math.max(0, Math.min(1, weaponInfo.reloadProgress || 0));
       this.reloadProgress.style.width = `${reloadPct * 100}%`;

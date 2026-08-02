@@ -67,6 +67,8 @@
           </div>
         </div>
 
+        <button class="nav-item" data-panel="private">PRIVATE</button>
+
         <!-- PROFILE dropdown — Inventory / Career / Achievements (gated) -->
         <div class="nav-dd-wrap">
           <button class="nav-item nav-dd-btn" data-dd="profile">PROFILE &#9660;</button>
@@ -88,7 +90,7 @@
 
         <!-- NIGHT MARKET dropdown — Night Market + Battle Pass (gated) -->
         <div class="nav-dd-wrap">
-          <button class="nav-item nav-dd-btn" data-dd="store">NIGHT MARKET &#9660;</button>
+          <button class="nav-item nav-dd-btn" data-dd="store">STORE &#9660;</button>
           <div class="nav-dd profile-dropdown hidden" id="dd-store">
             <button class="profile-menu-item" data-panel="shop" data-gated="1">
               <span class="pm-icon">&#127769;</span>
@@ -120,6 +122,22 @@
           </div>
         </div>
 
+        <!-- CRYPTO — mirrors EV.IO's top-level information architecture while
+             keeping the wallet action cosmetic until a real provider exists. -->
+        <div class="nav-dd-wrap">
+          <button class="nav-item nav-dd-btn" data-dd="crypto">CRYPTO &#9660;</button>
+          <div class="nav-dd profile-dropdown hidden" id="dd-crypto">
+            <button class="profile-menu-item" id="crypto-wallet-btn">
+              <span class="pm-icon">&#9670;</span>
+              <div class="pm-body"><div class="pm-name">LINK WALLET</div><div class="pm-sub">Connect a player wallet</div></div>
+            </button>
+            <button class="profile-menu-item" data-panel="battlepass" data-gated="1">
+              <span class="pm-icon">&#9733;</span>
+              <div class="pm-body"><div class="pm-name">REWARDS</div><div class="pm-sub">Season progression</div></div>
+            </button>
+          </div>
+        </div>
+
         <!-- SETTINGS — open to everyone (local config) -->
         <button class="nav-item" data-panel="settings">SETTINGS</button>
       </nav>
@@ -134,6 +152,8 @@
         <button id="nav-logout-btn" class="side-link side-logout">logout</button>
       </div>
       <button class="side-link" data-panel="rankings">rankings</button>
+      <button class="side-link" data-panel="feedback">feedback</button>
+      <button class="side-link" data-panel="more">more</button>
     </div>
 
     <!-- Bottom-left: share game -->
@@ -412,6 +432,25 @@
         </tr></thead>
         <tbody id="rnk-rows"></tbody>
       </table>
+    </div>
+
+    <!-- ===================== PANEL: FEEDBACK / MORE ===================== -->
+    <div id="panel-feedback" class="nav-panel nav-panel-wide hidden">
+      <div class="panel-label">FEEDBACK</div>
+      <p class="private-desc">Tell us what felt wrong, where it happened, and what you expected.</p>
+      <label class="field-label" for="feedback-text">Message</label>
+      <textarea id="feedback-text" class="text-input feedback-text" maxlength="1200" placeholder="Your feedback..."></textarea>
+      <button id="feedback-save-btn" class="play-btn feedback-save">SAVE FEEDBACK</button>
+      <div id="feedback-status" class="party-hint" aria-live="polite"></div>
+    </div>
+
+    <div id="panel-more" class="nav-panel nav-panel-wide hidden">
+      <div class="panel-label">MORE</div>
+      <div class="more-grid">
+        <button class="profile-menu-item" data-panel="settings"><span class="pm-icon">&#9881;</span><div class="pm-body"><div class="pm-name">SETTINGS</div><div class="pm-sub">Controls, video and accessibility</div></div></button>
+        <button class="profile-menu-item" data-panel="achievements" data-gated="1"><span class="pm-icon">&#127942;</span><div class="pm-body"><div class="pm-name">ACHIEVEMENTS</div><div class="pm-sub">Challenges and rewards</div></div></button>
+        <a class="profile-menu-item" href="https://discord.com" target="_blank" rel="noopener"><span class="pm-icon">&#128172;</span><div class="pm-body"><div class="pm-name">COMMUNITY</div><div class="pm-sub">Join the Discord</div></div></a>
+      </div>
     </div>
 
     <!-- ===================== PANEL: NIGHT MARKET ===================== -->

@@ -22,6 +22,20 @@ const _authoredTemplates = [];
 let _readyCallbacks = [];
 let _allReady = false;
 
+// Procedural viewmodels and the camera both use -Z as "forward". Some Blender
+// exports were authored down +Z; normalize that convention once at the asset
+// boundary so the barrel, muzzle marker, sights, tracers, and both hands all
+// agree everywhere else in the game.
+export function orientWeaponModelForward(root, muzzle) {
+  root.updateWorldMatrix(true, true);
+  const muzzleInParent = muzzle.getWorldPosition(new THREE.Vector3());
+  if (root.parent) root.parent.worldToLocal(muzzleInParent);
+  const flipped = muzzleInParent.z > 0;
+  if (flipped) root.rotation.y += Math.PI;
+  root.updateWorldMatrix(true, true);
+  return flipped;
+}
+
 function _fireReady() {
   _allReady = true;
   const cbs = _readyCallbacks; _readyCallbacks = [];
@@ -175,6 +189,8 @@ function _buildFromGLB(weaponDef) {
     muzzle.position.set(0, 0.062, -0.32);
     cloned.add(muzzle);
   }
+
+  orientWeaponModelForward(cloned, muzzle);
 
   const group = new THREE.Group();
   group.add(cloned);

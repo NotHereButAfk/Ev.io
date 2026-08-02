@@ -180,7 +180,7 @@ await sleep(400);
 const bHpAfter = b.last().you.health;
 const aMag = a.last().you.mag;
 ok('fire authority: mag never below 0 (impossible ammo blocked)', aMag >= 0, `mag=${aMag}`);
-ok('fire authority: spam did NOT empty a 30-mag instantly (rate-limited)', aMag > 0 || bHpAfter < bHpBefore);
+ok('fire authority: spam did NOT empty a 50-mag instantly (rate-limited)', aMag > 0 || bHpAfter < bHpBefore);
 
 // forged kill/damage: Bob claims a kill on Alice via a bogus message type
 const aKillsBefore = a.last().you.deaths;

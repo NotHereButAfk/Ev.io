@@ -36,7 +36,9 @@ const START_HEALTH = 100, START_SHIELD = 0;
 
 // Minimal server-side weapon table (authority only needs combat numbers).
 const WEAPONS = {
-  m4:          { dmg: 22, rate: 0.1,  spread: 0.009, pellets: 1, range: 150, hs: 1,   reload: 1.8, mag: 30 },
+  m4:          { dmg: 10, rate: 0.12, spreadMin: 0, spreadMax: 0.02,
+                 bloomShot: 0.0025, bloomRecovery: 0.008, zoomSpreadMod: 0,
+                 pellets: 1, range: 150, hs: 1, reload: 1.8, mag: 50 },
   magnum:      { dmg: 38, rate: 0.28, spread: 0.003, pellets: 1, range: 120, hs: 2.2, reload: 1.2, mag: 8  },
   battlerifle: { dmg: 22, rate: 0.45, spread: 0.008, pellets: 3, range: 170, hs: 1.8, reload: 2.0, mag: 36 },
   energyshotgun:{dmg: 12, rate: 0.65, spread: 0.095, pellets: 10,range: 28,  hs: 1,   reload: 1.8, mag: 8  },
@@ -127,10 +129,10 @@ export class AuthRoom {
       queue: [],
       health: START_HEALTH, shield: START_SHIELD, maxShield: START_SHIELD,
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
-      wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0,
+      wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       history: [],               // [{tick, x,y,z}]
-      lastFireSeq: 0,
+      lastFireSeq: 0, lastFireRequestTick: -Infinity,
       abilities: { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                    impulse: ABILITIES.impulse.charges },
       abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
@@ -186,10 +188,18 @@ export class AuthRoom {
     if (!p || !p.alive) return;
     if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;   // replay/dup
     p.lastFireSeq = msg.seq;
+    const requestedWid = WEAPONS[msg.wid] ? msg.wid : 'm4';
+    const requestedWeapon = WEAPONS[requestedWid];
+    // Carry fractional tick debt only inside one continuous burst. Otherwise a
+    // long idle period could bank negative cooldown and double-tap the first
+    // two rounds faster than the weapon's real cadence.
+    const burstGap = Math.ceil(requestedWeapon.rate * TICK_HZ) + 1;
+    if (this.tick - p.lastFireRequestTick > burstGap) p.fireCooldown = 0;
+    p.lastFireRequestTick = this.tick;
     // Hold a "firing" flag for ~0.4s so other clients can shoulder this
     // player's rifle and show the recoil, not just hear about the hit.
     p._firingTicks = 8;
-    p.fireReq = { wid: WEAPONS[msg.wid] ? msg.wid : 'm4',
+    p.fireReq = { wid: requestedWid,
                   yaw: Number.isFinite(msg.yaw) ? msg.yaw : 0,
                   pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
   }
@@ -207,7 +217,7 @@ export class AuthRoom {
                      pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
   }
 
-  _hitscan(shooter, w, yaw, pitch) {
+  _hitscan(shooter, w, yaw, pitch, aiming = false) {
     // Rewind targets to the shooter's acked tick (lag compensation).
     const rewind = shooter.ackTick;
     const ox = shooter.state.px, oy = shooter.state.py + HEAD_Y, oz = shooter.state.pz;
@@ -216,8 +226,10 @@ export class AuthRoom {
 
     for (let pellet = 0; pellet < w.pellets; pellet++) {
       // deterministic-ish spread from tick+pellet (server-authoritative)
-      const a = (this._rand(shooter.id * 131 + this.tick * 7 + pellet) - 0.5) * w.spread;
-      const b = (this._rand(shooter.id * 977 + this.tick * 13 + pellet) - 0.5) * w.spread;
+      const baseSpread = w.spread ?? Math.max(w.spreadMin || 0, shooter.gunBloom || 0);
+      const spread = baseSpread * (aiming ? (w.zoomSpreadMod ?? 0.45) : 1);
+      const a = (this._rand(shooter.id * 131 + this.tick * 7 + pellet) - 0.5) * spread;
+      const b = (this._rand(shooter.id * 977 + this.tick * 13 + pellet) - 0.5) * spread;
       const rx = dx + a, ry = dy + b, rz = dz;
       let best = null, bestT = w.range;
       for (const t of this.players.values()) {
@@ -318,7 +330,15 @@ export class AuthRoom {
     if (this.smokes.length) this.smokes = this.smokes.filter((s) => this.tick < s.until);
 
     for (const p of this.players.values()) {
-      p.fireCooldown = Math.max(0, p.fireCooldown - 1 / TICK_HZ);
+      const equipped = WEAPONS[p.wid] || WEAPONS.m4;
+      p.fireCooldown = Math.max(
+        -(equipped.rate || 0.12),
+        p.fireCooldown - 1 / TICK_HZ,
+      );
+      p.gunBloom = Math.max(
+        equipped.spreadMin || 0,
+        (p.gunBloom || 0) - (equipped.bloomRecovery || 0) / TICK_HZ,
+      );
       p.abilityCD = Math.max(0, p.abilityCD - 1 / TICK_HZ);
 
       if (!p.alive) {
@@ -332,6 +352,7 @@ export class AuthRoom {
           p._animVX = p._animVZ = 0;
           p._lastAim = false;
           p._firingTicks = 0;
+          p.gunBloom = 0;
           p.blindUntil = 0;
           p.abilities = { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
@@ -381,9 +402,12 @@ export class AuthRoom {
       if (p.fireCooldown > 0 || p.mag <= 0) continue;   // authority: rate + ammo
       const w = WEAPONS[req.wid] || WEAPONS.m4;
       p.wid = req.wid;
-      p.fireCooldown = w.rate;
+      p.fireCooldown = Math.max(-w.rate, p.fireCooldown) + w.rate;
       p.mag--;
-      this._hitscan(p, w, req.yaw, req.pitch);
+      this._hitscan(p, w, req.yaw, req.pitch, p._lastAim);
+      if (w.spreadMax != null) {
+        p.gunBloom = Math.min(w.spreadMax, (p.gunBloom || 0) + (w.bloomShot || 0));
+      }
     }
 
     // resolve ability requests (charges + cooldown + effect all server-owned)

@@ -16,6 +16,11 @@ import {
   nextThirdPersonDistance,
   safeThirdPersonObstructionDistance,
 } from '../player/ThirdPersonCamera.js';
+import {
+  advanceFireCooldown,
+  scheduleNextShot,
+  wantsTriggerShot,
+} from '../weapons/FireControl.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -52,6 +57,7 @@ export class AuthNetBridge {
     this.remotes = new Map();          // id -> { group, mat, nameEl }
     this._acc = 0;
     this._fireCd = 0;
+    this._prevFireDown = false;
     this._tpsDesired = new THREE.Vector3();
     this._tpsOffset = new THREE.Vector3();
     this._tpsRaycaster = new THREE.Raycaster();
@@ -187,11 +193,15 @@ export class AuthNetBridge {
     }
 
     // ── fire (server-authoritative hit; client just requests) ──
-    this._fireCd = Math.max(0, this._fireCd - dt);
-    if (input.mouseDown && this._fireCd <= 0 && def && def.kind !== 'melee') {
-      this._fireCd = def.fireRate || 0.12;
+    this._fireCd = advanceFireCooldown(this._fireCd, dt);
+    const wantsShot = def && def.kind !== 'melee'
+      && wantsTriggerShot(def.automatic, input.mouseDown, this._prevFireDown);
+    if (wantsShot && this._fireCd <= 0) {
       c.sendFire(def.id, p.yaw, p.pitch);
+      this._fireCd = scheduleNextShot(this._fireCd, def.fireRate);
     }
+    if (!input.mouseDown && this._fireCd < 0) this._fireCd = 0;
+    this._prevFireDown = !!input.mouseDown;
 
     // ── render remote players ──
     this._syncRemotes(dt);

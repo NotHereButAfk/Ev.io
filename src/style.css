@@ -4798,6 +4798,72 @@ html, body { margin: 0; }
 .login-sep { color: #3a4756; margin: 0 8px; }
 .login-alt { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: #8a97a2; font-size: 14px; }
 
+/* Match EV.IO's desktop auth-page geometry: broad left-aligned content rail,
+   full-width tab divider, and compact action button. KYX keeps its own mark. */
+.auth-page .login-topbar {
+  padding: 20px 70px 16px;
+  border-bottom: 0;
+}
+.auth-page .login-brand {
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+.auth-page .login-main {
+  max-width: none;
+  margin: 0;
+  padding: 22px 70px 60px;
+}
+.auth-page .login-title {
+  margin: 4px 0 8px;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-size: 38px;
+  font-weight: 500;
+}
+.auth-page .login-tabs {
+  width: 100%;
+  margin-bottom: 20px;
+}
+.auth-page .login-tabs .auth-tab {
+  padding: 12px 16px;
+  border-radius: 2px 2px 0 0;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-size: 18px;
+}
+.auth-page .login-forms { width: 570px; max-width: 100%; }
+.auth-page .login-label { margin: 15px 0 5px; }
+.auth-page .login-input { border-radius: 0; padding: 9px 11px; }
+.auth-page .login-submit { align-self: flex-start; margin-top: 15px; padding: 9px 12px; border-radius: 0; }
+.auth-page .login-alt { display: none; }
+
+.feedback-text {
+  width: 100%; min-height: 160px; resize: vertical; padding: 12px;
+  color: #fff; background: rgba(10,16,24,0.9); border: 1px solid var(--kx-line);
+  font: 600 15px/1.45 'Rajdhani', system-ui, sans-serif;
+}
+.feedback-save { width: auto; margin-top: 14px; padding: 10px 20px; }
+.more-grid { display: grid; gap: 8px; margin-top: 18px; }
+
+@media (max-width: 1100px) {
+  #top-nav { padding: 0 12px !important; }
+  #top-nav .nav-brand { font-size: 20px !important; flex: 0 0 auto; }
+  #top-nav .nav-items { gap: 0 !important; min-width: 0; }
+  #top-nav .nav-item,
+  #top-nav .nav-dd-btn {
+    padding: 8px 7px !important;
+    font-size: 10px !important;
+    letter-spacing: 0.35px !important;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .auth-page .login-topbar { padding: 18px 20px; }
+  .auth-page .login-brand { font-size: 28px; }
+  .auth-page .login-main { padding: 22px 20px 50px; }
+  .auth-page .login-tabs .auth-tab { font-size: 15px; padding: 10px 9px; }
+}
+
 /* ============================================================================
    ================  KYX.IO  INVENTORY (ev.io-EXACT)  =========================
    Simple ev.io-style loadout: big avatar + username, Balance/Networth, an
@@ -5836,8 +5902,10 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 /* Compact, neutral crosshair. User-configured crosshair colours still flow
    through --xhair-color. */
 #hud #crosshair {
-  width: 18px;
-  height: 18px;
+  width: var(--xhair-size, 16px);
+  height: var(--xhair-size, 16px);
+  opacity: var(--xhair-opacity, 1);
+  transition: width 45ms linear, height 45ms linear, opacity 90ms ease;
 }
 #hud #crosshair span {
   background: var(--xhair-color, rgba(245, 250, 251, 0.92)) !important;
@@ -5860,6 +5928,9 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   height: 2px !important;
   background: var(--xhair-color, var(--ev-hud-white)) !important;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.9) !important;
+}
+#hud #crosshair.ads span {
+  opacity: 0.72;
 }
 
 @media (max-width: 700px) {

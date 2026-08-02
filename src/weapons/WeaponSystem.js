@@ -3,9 +3,13 @@ import { WEAPONS } from './weaponDefs.js';
 import { buildWeaponModel, onWeaponModelsReady } from './WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
+import {
+  advanceFireCooldown,
+  scheduleNextShot,
+  wantsTriggerShot,
+} from './FireControl.js';
 
-const TRACER_LIFE = 0.07;
-const FLASH_LIFE = 0.05;
+const FLASH_LIFE = 0.038;
 
 // Stand-in "object" for a hit on one of the map's bare box colliders — it has
 // no mesh, but the hit-handling code only ever reads userData off it.
@@ -39,10 +43,10 @@ const CUTE_SOUNDS = new Set(['anime', 'waifu', 'meow', 'uwu', 'bark', 'sparkle']
 const FIRE_SOUNDS = new Set(['fire']);
 
 function createTracerMesh() {
-  const geo = new THREE.CylinderGeometry(0.006, 0.006, 1, 5, 1, true);
+  const geo = new THREE.CylinderGeometry(0.0035, 0.0035, 1, 5, 1, true);
   geo.translate(0, 0.5, 0);
   geo.rotateX(Math.PI / 2);
-  const mat = new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.9 });
+  const mat = new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.84 });
   return new THREE.Mesh(geo, mat);
 }
 
@@ -115,8 +119,10 @@ export class WeaponSystem {
     this._landT = 0;                          // 0.22s settle after touching down
     this._landStrength = 0;                   // impact-scaled landing response
     this._fallSpeed = 0;                      // fastest downward speed this airtime
+    this._shotBloom = 0;                      // sustained-fire accuracy cone
 
     this.tracers = [];
+    this.muzzleSmoke = [];
     this.rockets = [];
     this.explosions = [];
     this.shells = [];
@@ -252,30 +258,30 @@ export class WeaponSystem {
     // Trigger hand: seat the palm on the pistol grip. The old transform pushed
     // the entire arm below the camera, so players saw a floating gun—or no hand
     // at all—depending on FOV.
-    arm.position.set(0.075, -0.045, 0.20);
+    arm.position.set(0.035, -0.020, 0.200);
     arm.rotation.y = 0.18;
     arm.scale.setScalar(0.94);
 
     // Forearm — tapered sleeve
     const forearm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.032, 0.043, 0.17, 12), this.sleeveMat);
+      new THREE.CylinderGeometry(0.026, 0.035, 0.13, 12), this.sleeveMat);
     forearm.rotation.x = 1.18;
     // Keep the sleeve behind the wrist. Extending it toward the eye makes its
     // end cap balloon across half the screen even though the glove is small.
-    forearm.position.set(0, -0.040, 0.025);
+    forearm.position.set(0, -0.034, 0.040);
     arm.add(forearm);
 
     // A compact armour plate carries the equipped character's authored colour.
     // The sleeve remains dark, so this reads as the player's gauntlet instead
     // of the old bright-white tube filling the bottom of the screen.
-    const forearmPlate = bx(0.050, 0.014, 0.070, this.armPlateMat);
+    const forearmPlate = bx(0.040, 0.012, 0.050, this.armPlateMat);
     forearmPlate.rotation.x = -0.34;
     forearmPlate.position.set(0, -0.006, 0.035);
     arm.add(forearmPlate);
 
     // Sleeve cuff detail ring
     const cuff = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 0.018, 12), gloveSeam);
+      new THREE.CylinderGeometry(0.04, 0.04, 0.016, 12), gloveSeam);
     cuff.rotation.x = 1.18;
     cuff.position.set(0, -0.032, 0.01);
     arm.add(cuff);
@@ -330,9 +336,9 @@ export class WeaponSystem {
     // onto the rifle fore-end. It shares the same palette and the weapon's
     // recoil/reload parent, so both hands remain attached through every action.
     const support = arm.clone(true);
-    support.position.set(-0.105, -0.035, -0.055);
+    support.position.set(-0.015, -0.015, -0.18);
     support.rotation.set(-0.05, -0.42, -0.08);
-    support.scale.set(-0.88, 0.88, 0.88);
+    support.scale.set(-0.90, 0.90, 0.90);
     this.kickGroup.add(support);
     this.supportArmGroup = support;
   }
@@ -494,6 +500,7 @@ export class WeaponSystem {
     }
     this.currentIndex = index;
     this.fireTimer = Math.max(this.fireTimer, 0.12);
+    this._shotBloom = 0;
     // Never carry an unfinished blade arc into the next equipped weapon.
     this.swingPhase = 1;
     this._setActiveModel(index);
@@ -520,6 +527,7 @@ export class WeaponSystem {
     this._landT = 0;
     this._landStrength = 0;
     this._fallSpeed = 0;
+    this._shotBloom = 0;
     this.prevMouseDown = false;
     this._mountPos.set(
       VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z,
@@ -570,10 +578,20 @@ export class WeaponSystem {
     this.explosions.length = 0;
     for (const s of this.shells) {
       this.scene.remove(s.mesh);
-      s.mesh.geometry.dispose();
-      s.mesh.material.dispose();
     }
     this.shells.length = 0;
+    for (const tr of this.tracers) {
+      this.scene.remove(tr.mesh);
+      tr.mesh.geometry.dispose();
+      tr.mesh.material.dispose();
+    }
+    this.tracers.length = 0;
+    for (const puff of this.muzzleSmoke) {
+      this.scene.remove(puff.mesh);
+      puff.mesh.geometry.dispose();
+      puff.mesh.material.dispose();
+    }
+    this.muzzleSmoke.length = 0;
   }
 
   startReload() {
@@ -601,12 +619,32 @@ export class WeaponSystem {
 
   _spawnTracer(from, to) {
     const mesh = createTracerMesh();
+    const direction = to.clone().sub(from);
+    const distance = direction.length();
+    if (distance <= 0.001) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      return;
+    }
+    direction.multiplyScalar(1 / distance);
+    const speed = this.currentDef.tracerSpeed || 720;
+    const trailLength = Math.min(0.7, distance);
     mesh.position.copy(from);
-    const dist = from.distanceTo(to);
-    mesh.scale.set(1, 1, dist);
+    mesh.scale.set(1, 1, trailLength);
     mesh.lookAt(to);
+    if (this.currentDef.energyColor) mesh.material.color.setHex(this.currentDef.energyColor);
     this.scene.add(mesh);
-    this.tracers.push({ mesh, life: TRACER_LIFE });
+    this.tracers.push({
+      mesh,
+      from: from.clone(),
+      to: to.clone(),
+      direction,
+      distance,
+      travelled: 0,
+      speed,
+      trailLength,
+      fade: 1,
+    });
   }
 
   _flash() {
@@ -629,8 +667,55 @@ export class WeaponSystem {
       muzzleObj.add(m);
       m.material.color.setHex(flashHex);
       m.material.opacity = 0.92;
+      const scale = this.currentDef.muzzleFlashScale ?? 1;
+      m.scale.setScalar(scale * (0.86 + Math.random() * 0.24));
       m.rotation.z += Math.random() * Math.PI;
     });
+  }
+
+  _spawnMuzzleSmoke() {
+    const def = this.currentDef;
+    if (!def.muzzleSmoke) return;
+    this.models.get(def.id).muzzle.getWorldPosition(this._muzzleWorld);
+    this.camera.getWorldDirection(this._fwdVec);
+    this._upVec.setFromMatrixColumn(this.camera.matrixWorld, 1);
+    this._rightVec.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    for (let i = 0; i < 2; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.026 + Math.random() * 0.012, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0xc9d2d4,
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false,
+        }),
+      );
+      mesh.position.copy(this._muzzleWorld);
+      mesh.position.addScaledVector(this._rightVec, (Math.random() - 0.5) * 0.025);
+      const velocity = this._fwdVec.clone().multiplyScalar(0.55 + Math.random() * 0.45);
+      velocity.addScaledVector(this._upVec, 0.12 + Math.random() * 0.18);
+      velocity.addScaledVector(this._rightVec, (Math.random() - 0.5) * 0.22);
+      this.scene.add(mesh);
+      this.muzzleSmoke.push({ mesh, velocity, age: 0, life: 0.13 + Math.random() * 0.08 });
+    }
+  }
+
+  _updateMuzzleSmoke(dt) {
+    for (let i = this.muzzleSmoke.length - 1; i >= 0; i--) {
+      const puff = this.muzzleSmoke[i];
+      puff.age += dt;
+      puff.mesh.position.addScaledVector(puff.velocity, dt);
+      puff.velocity.multiplyScalar(Math.exp(-5 * dt));
+      const t = Math.min(1, puff.age / puff.life);
+      puff.mesh.scale.setScalar(1 + t * 2.2);
+      puff.mesh.material.opacity = 0.2 * (1 - t) * (1 - t);
+      if (t >= 1) {
+        this.scene.remove(puff.mesh);
+        puff.mesh.geometry.dispose();
+        puff.mesh.material.dispose();
+        this.muzzleSmoke.splice(i, 1);
+      }
+    }
   }
 
   _spawnShell() {
@@ -753,8 +838,6 @@ export class WeaponSystem {
       s.life -= dt;
       if (s.life <= 0) {
         this.scene.remove(s.mesh);
-        s.mesh.geometry.dispose();
-        s.mesh.material.dispose();
         this.shells.splice(i, 1);
       }
     }
@@ -779,14 +862,18 @@ export class WeaponSystem {
     const targets = this._targets;
 
     const pelletCount = def.pellets || 1;
+    const spreadMin = def.spreadMin ?? def.spread ?? 0;
+    const spreadMax = def.spreadMax ?? def.spread ?? spreadMin;
+    const hipSpread = THREE.MathUtils.clamp(this._shotBloom, spreadMin, spreadMax);
+    const shotSpread = hipSpread * THREE.MathUtils.lerp(1, def.zoomSpreadMod ?? 0.45, this.scopeT);
     let anyHitBot = false;
     let lastImpact = null;
 
     for (let i = 0; i < pelletCount; i++) {
       this._pelletDir.copy(this._camDir);
-      if (def.spread > 0) {
-        const jx = (Math.random() - 0.5) * def.spread;
-        const jy = (Math.random() - 0.5) * def.spread;
+      if (shotSpread > 0) {
+        const jx = (Math.random() - 0.5) * shotSpread;
+        const jy = (Math.random() - 0.5) * shotSpread;
         this._pelletDir.addScaledVector(this._rightVec, jx).addScaledVector(this._upVec, jy).normalize();
       }
       this._raycaster.set(this._camPos, this._pelletDir);
@@ -1087,7 +1174,7 @@ export class WeaponSystem {
       this.audio.playSwing();
       this._doMeleeSwing(player, world, botManager);
       this.swingPhase = 0;
-      this.fireTimer = def.fireRate;
+      this.fireTimer = scheduleNextShot(this.fireTimer, def.fireRate);
       if (this.onShoot) this.onShoot(def);
       return;
     }
@@ -1101,7 +1188,7 @@ export class WeaponSystem {
     }
 
     st.magAmmo -= 1;
-    this.fireTimer = def.fireRate;
+    this.fireTimer = scheduleNextShot(this.fireTimer, def.fireRate);
     // A themed skin can override the fire SFX (anime pew, laser, fire whoosh).
     const activeSkin = this._activeSkinFor(def.id);
     const skinSound  = activeSkin?.shootSound;
@@ -1116,9 +1203,10 @@ export class WeaponSystem {
       this._spawnRocket(def);
     } else {
       this._doHitscanShot(world, botMeshes);
-      this._spawnShell();
+      if (def.spawnShells !== false) this._spawnShell();
     }
     this._flash();
+    this._spawnMuzzleSmoke();
     // Kawaii skins: spawn pink sparkle hearts at the muzzle
     if (CUTE_SOUNDS.has(skinSound)) this._spawnAnimeSparkles();
     // Fire skins with fireEmbers flag: spawn orange ember burst
@@ -1128,7 +1216,15 @@ export class WeaponSystem {
     // Recoil impulse: a displacement kick PLUS a velocity punch, so the spring
     // launches fast and settles smoothly (juicier than a pure position offset).
     this._applyViewmodelRecoil(def.recoil);
-    if (this.applyRecoilToPlayer) this.applyRecoilToPlayer(def.recoil * 0.6);
+    if (this.applyRecoilToPlayer) {
+      this.applyRecoilToPlayer(def.cameraRecoil ?? def.recoil * 0.6);
+    }
+    if (def.spreadMax != null) {
+      this._shotBloom = Math.min(
+        def.spreadMax,
+        Math.max(def.spreadMin || 0, this._shotBloom) + (def.spreadBloomPerShot || 0),
+      );
+    }
 
     if (this.onShoot) this.onShoot(def);
 
@@ -1138,7 +1234,14 @@ export class WeaponSystem {
   }
 
   update(dt, input, world, botManager, player) {
-    if (this.fireTimer > 0) this.fireTimer -= dt;
+    this.fireTimer = advanceFireCooldown(this.fireTimer, dt);
+    // Keep the trigger glove framed on narrow phones without pulling it away
+    // from the pistol grip on desktop aspect ratios.
+    if (this.armGroup) {
+      const portrait = this.camera.aspect < 1;
+      this.armGroup.position.x = portrait ? 0.010 : 0.035;
+      this.armGroup.position.y = portrait ? 0.045 : -0.020;
+    }
 
     for (const [code, index] of this.keyMap) {
       if (input.consumeJustPressed(code)) this.switchTo(index);
@@ -1179,12 +1282,16 @@ export class WeaponSystem {
     const landP = this._landT > 0 ? 1 - this._landT / 0.22 : 1;
     const landPulse = (this._landT > 0 ? Math.sin(landP * Math.PI) : 0) * this._landStrength;
 
-    const mouseJustPressed = input.mouseDown && !this.prevMouseDown;
-    const triggerPulled = def.automatic ? input.mouseDown : mouseJustPressed;
+    this._shotBloom = Math.max(
+      def.spreadMin || 0,
+      this._shotBloom - (def.spreadRecovery || 0) * dt,
+    );
+    const triggerPulled = wantsTriggerShot(def.automatic, input.mouseDown, this.prevMouseDown);
 
     if (triggerPulled && this.fireTimer <= 0) {
       this._fire(world, botManager.getRaycastTargets(), player, botManager);
     }
+    if (!input.mouseDown && this.fireTimer < 0) this.fireTimer = 0;
     this.prevMouseDown = input.mouseDown;
 
     // Knife throw (right-click): one-hit kill + 3x reward. Cooldown hides the
@@ -1205,14 +1312,16 @@ export class WeaponSystem {
     // Sprint blend for COD carry animation (blocks ADS)
     this._sprintT = expDamp(this._sprintT, player.isSprinting ? 1 : 0, 9, dt);
 
-    // scope zoom — disabled while sprinting
-    const wantScope = !!def.scoped && input.rightMouseDown && !player.isSprinting;
-    this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, 10, dt);
+    // Every EV.IO firearm can zoom. Snipers still use the full scope overlay;
+    // regular guns shoulder into a centered, lower-FOV sight picture.
+    const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
+    this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
     // Aiming keeps a trace of organic motion, but removes enough viewmodel
     // travel that the physical sight and fixed scope overlay do not disagree.
-    const adsMotionScale = THREE.MathUtils.lerp(1, 0.08, this.scopeT);
+    const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.08 : 0.24, this.scopeT);
     const sprintFovBoost = this._sprintT * 6;
-    const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, 28, this.scopeT);
+    const aimedFov = def.scoped ? 28 : (def.adsFov ?? Math.max(54, player.baseFov - 14));
+    const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, aimedFov, this.scopeT);
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
       this.camera.fov = targetFov;
       this.camera.updateProjectionMatrix();
@@ -1377,9 +1486,17 @@ export class WeaponSystem {
     // tracers
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tr = this.tracers[i];
-      tr.life -= dt;
-      tr.mesh.material.opacity = Math.max(0, tr.life / TRACER_LIFE) * 0.9;
-      if (tr.life <= 0) {
+      tr.travelled += tr.speed * dt;
+      const tail = Math.min(tr.distance, Math.max(0, tr.travelled - tr.trailLength));
+      const head = Math.min(tr.distance, Math.max(tr.trailLength, tr.travelled));
+      const visibleLength = Math.max(0.001, head - tail);
+      tr.mesh.position.copy(tr.from).addScaledVector(tr.direction, tail);
+      tr.mesh.scale.z = visibleLength;
+      tr.fade = tr.travelled > tr.distance
+        ? Math.max(0, 1 - (tr.travelled - tr.distance) / tr.trailLength)
+        : 1;
+      tr.mesh.material.opacity = tr.fade * 0.84;
+      if (tr.fade <= 0) {
         this.scene.remove(tr.mesh);
         tr.mesh.geometry.dispose();
         tr.mesh.material.dispose();
@@ -1392,6 +1509,7 @@ export class WeaponSystem {
     this._updateThrownKnives(dt, world, botManager);
     this._updateExplosions(dt);
     this._updateShells(dt);
+    this._updateMuzzleSmoke(dt);
     this._updateAnimeSparkles(dt);
     this._updateFireEmbers(dt);
 
@@ -1412,6 +1530,9 @@ export class WeaponSystem {
   getHudInfo() {
     const def = this.currentDef;
     const st = this.currentState;
+    const spreadMin = def.spreadMin ?? def.spread ?? 0;
+    const spreadMax = def.spreadMax ?? def.spread ?? spreadMin;
+    const spreadSpan = Math.max(1e-6, spreadMax - spreadMin);
     return {
       name: def.name,
       isMelee: def.kind === 'melee',
@@ -1423,6 +1544,10 @@ export class WeaponSystem {
         : 0,
       reloadRemaining: Math.max(0, st.reloadTimer),
       reloadDuration: def.reloadTime || 0,
+      aiming: this.scopeT,
+      spreadRatio: spreadMax > spreadMin
+        ? THREE.MathUtils.clamp((this._shotBloom - spreadMin) / spreadSpan, 0, 1)
+        : 0,
       currentIndex: this.currentIndex,
       slots: this.loadout.map((w, i) => ({ key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee' }))
     };

@@ -15,6 +15,8 @@
     "test:player-respawn": "node tools/player_respawn_check.mjs",
     "test:zombie-death": "node tools/zombie_death_check.mjs",
     "test:viewmodel": "node tools/viewmodel_check.mjs",
+    "test:gunfeel": "node tools/gunfeel_check.mjs",
+    "test:gui": "node tools/gui_contract_check.mjs",
     "test:tps-camera": "node tools/third_person_camera_check.mjs",
     "test:account": "node tools/user_account_check.mjs",
     "test:actions": "node tools/action_check.mjs",
