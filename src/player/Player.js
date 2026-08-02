@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {
   nextThirdPersonDistance,
   safeThirdPersonObstructionDistance,
+  setThirdPersonDesired,
+  findThirdPersonObstruction,
 } from './ThirdPersonCamera.js';
 
 const EYE_HEIGHT = 1.7;
@@ -396,22 +398,15 @@ export class Player {
 
     // --- apply to camera ---
     if (this._camDist > 0) {
-      const d    = this._camDist;
-      const sinY = Math.sin(this.yaw);
-      const cosY = Math.cos(this.yaw);
-      const pitchBlend = Math.sin(Math.max(0, this.pitch) * 0.5);
-      this._tpsDesired.set(
-        this.position.x + sinY * d * (1 - pitchBlend * 0.4),
-        this.position.y + 1.4 + 0.5 * d * 0.18 + pitchBlend * d * 0.6,
-        this.position.z + cosY * d * (1 - pitchBlend * 0.4)
+      setThirdPersonDesired(
+        this._tpsDesired, this.position, this.yaw, this.pitch, this._camDist,
       );
-      this._tpsTarget.set(this.position.x, this.position.y + 1.2, this.position.z);
+      this._tpsTarget.set(this.position.x, this.position.y + 1.25, this.position.z);
       const cameraOffset = this._tpsOffset.copy(this._tpsDesired).sub(this._tpsTarget);
-      const desiredDistance = cameraOffset.length();
-      this._tpsRaycaster.set(this._tpsTarget, cameraOffset.normalize());
-      this._tpsRaycaster.near = 0.05;
-      this._tpsRaycaster.far = desiredDistance;
-      const obstruction = this._tpsRaycaster.intersectObjects(world.raycastMeshes, true)[0];
+      const obstruction = findThirdPersonObstruction(
+        this._tpsRaycaster, world, this._tpsTarget, this._tpsDesired, cameraOffset,
+      );
+      cameraOffset.copy(this._tpsDesired).sub(this._tpsTarget).normalize();
       this._tpsObstructed = !!obstruction && obstruction.distance < 0.8;
       if (this._tpsObstructed) {
         this.camera.position.set(this.position.x, this.position.y + this._eyeHeight + bobOffset, this.position.z);
@@ -425,7 +420,12 @@ export class Player {
       } else {
         this.camera.position.copy(this._tpsDesired);
       }
-      if (!this._tpsObstructed) this.camera.lookAt(this._tpsTarget);
+      if (!this._tpsObstructed) {
+        this.camera.rotation.order = 'YXZ';
+        this.camera.rotation.y = this.yaw + recoilViewYaw;
+        this.camera.rotation.x = this.pitch + recoilView;
+        this.camera.rotation.z = this._sprintT * -0.025;
+      }
     } else {
       this._tpsObstructed = false;
       // First-person: camera sits at eye height with head-bob.

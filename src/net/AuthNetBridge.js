@@ -15,6 +15,8 @@ import { Avatar } from '../player/Avatar.js';
 import {
   nextThirdPersonDistance,
   safeThirdPersonObstructionDistance,
+  setThirdPersonDesired,
+  findThirdPersonObstruction,
 } from '../player/ThirdPersonCamera.js';
 import {
   advanceFireCooldown,
@@ -155,20 +157,15 @@ export class AuthNetBridge {
     p._eyeHeight = c.sim.eye;
     p.health = c.self.health;
     if (p._camDist > 0) {
-      const d = p._camDist;
-      const pitchBlend = Math.sin(Math.max(0, p.pitch) * 0.5);
-      this._tpsDesired.set(
-        p.position.x + Math.sin(p.yaw) * d * (1 - pitchBlend * 0.4),
-        p.position.y + 1.4 + 0.5 * d * 0.18 + pitchBlend * d * 0.6,
-        p.position.z + Math.cos(p.yaw) * d * (1 - pitchBlend * 0.4),
+      setThirdPersonDesired(
+        this._tpsDesired, p.position, p.yaw, p.pitch, p._camDist,
       );
-      p._tpsTarget.set(p.position.x, p.position.y + 1.2, p.position.z);
+      p._tpsTarget.set(p.position.x, p.position.y + 1.25, p.position.z);
       const cameraOffset = this._tpsOffset.copy(this._tpsDesired).sub(p._tpsTarget);
-      const desiredDistance = cameraOffset.length();
-      this._tpsRaycaster.set(p._tpsTarget, cameraOffset.normalize());
-      this._tpsRaycaster.near = 0.05;
-      this._tpsRaycaster.far = desiredDistance;
-      const obstruction = this._tpsRaycaster.intersectObjects(this.game.world.raycastMeshes, true)[0];
+      const obstruction = findThirdPersonObstruction(
+        this._tpsRaycaster, this.game.world, p._tpsTarget, this._tpsDesired, cameraOffset,
+      );
+      cameraOffset.copy(this._tpsDesired).sub(p._tpsTarget).normalize();
       p._tpsObstructed = !!obstruction && obstruction.distance < 0.8;
       if (p._tpsObstructed) {
         p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
@@ -182,7 +179,12 @@ export class AuthNetBridge {
       } else {
         p.camera.position.copy(this._tpsDesired);
       }
-      if (!p._tpsObstructed) p.camera.lookAt(p._tpsTarget);
+      if (!p._tpsObstructed) {
+        p.camera.rotation.order = 'YXZ';
+        p.camera.rotation.y = p.yaw;
+        p.camera.rotation.x = p.pitch;
+        p.camera.rotation.z = 0;
+      }
     } else {
       p._tpsObstructed = false;
       p.camera.position.set(p.position.x, p.position.y + p._eyeHeight, p.position.z);
