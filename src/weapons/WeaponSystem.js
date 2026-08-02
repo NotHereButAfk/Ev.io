@@ -50,6 +50,71 @@ function createTracerMesh() {
 // any gun in the arsenal reaches back inside the camera's near plane.
 const VIEWMODEL_Z = -0.58;
 
+// ── Aiming down the sights ───────────────────────────────────────────────────
+// ADS used to slide the gun to the middle of the screen and leave it there, at
+// the same height it rides at the hip. That is not aiming: at 28° of scoped FOV
+// the muzzle sat 57% of the way to the bottom edge (85% on the magnum), so you
+// were looking over the top of the weapon while the crosshair floated in the
+// middle of the screen on its own.
+//
+// Coming onto the sights now puts the weapon's BORE on the camera axis, which
+// is what makes the gun follow the crosshair instead of merely being near it.
+// The offset is derived per weapon from where that weapon's muzzle actually is
+// (boreOffset below), because the models do not agree — the bore sits 7.8cm
+// above the mount on the rifles and 7.2cm on the magnum, and a single hand-
+// tuned constant is right for exactly one of them.
+//
+// What lines up with the crosshair is the SIGHT, not the bore, and the models
+// disagree wildly about where that is: the magnum's blade stands 4cm over its
+// barrel, the m4's carry handle 12cm, the battlerifle's optic 13cm. Aligning
+// the bore and calling a single constant the sight height leaves the tall
+// optics floating above the crosshair. So the sight is measured off each model
+// — the highest thing on the weapon is its sighting furniture — and the eye
+// lands just UNDER that top edge, which is how irons are actually used.
+//
+// The dip is capped so a tall optic is looked THROUGH rather than over: on the
+// scoped weapons it puts the crosshair 3cm into the glass, while on the pistol
+// it stays a centimetre above the blade.
+const SIGHT_DIP_MAX = 0.030;
+const SIGHT_DIP_FRAC = 0.25;
+
+// Position of `node` in `ancestor`'s space, accumulated up the parent chain.
+// Deliberately not via world matrices: this runs at construction, when nothing
+// above the mount has been placed in the scene yet and every matrixWorld up
+// there is still stale.
+function _localPositionIn(ancestor, node) {
+  const p = new THREE.Vector3();
+  for (let o = node; o && o !== ancestor; o = o.parent) {
+    o.updateMatrix();
+    p.applyMatrix4(o.matrix);
+  }
+  return p;
+}
+
+// Highest point of a weapon model, in `ancestor` space. Same accumulation as
+// above rather than Box3.setFromObject(), which reports WORLD coordinates —
+// i.e. wherever the mount happened to be left on the previous frame.
+const _bb = new THREE.Box3(), _bbTmp = new THREE.Box3(), _bbM = new THREE.Matrix4();
+function _sightTopIn(ancestor, group) {
+  _bb.makeEmpty();
+  group.traverse((o) => {
+    if (!o.isMesh || !o.geometry || o.name === 'outline') return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    _bbTmp.copy(o.geometry.boundingBox);
+    _bbM.identity();
+    for (let n = o; n && n !== ancestor; n = n.parent) { n.updateMatrix(); _bbM.premultiply(n.matrix); }
+    _bb.union(_bbTmp.applyMatrix4(_bbM));
+  });
+  return _bb.isEmpty() ? null : _bb.max.y;
+}
+
+/** Mount height that puts this weapon's sight on the camera axis. */
+export function adsMountY(bore, sightTop) {
+  if (bore == null || sightTop == null) return -0.26;      // unmeasurable — leave it
+  const dip = Math.min(SIGHT_DIP_MAX, SIGHT_DIP_FRAC * Math.max(0, sightTop - bore.y));
+  return dip - sightTop;
+}
+
 export class WeaponSystem {
   constructor(camera, scene, audio) {
     this.camera = camera;
@@ -182,7 +247,11 @@ export class WeaponSystem {
       const { group, muzzle } = buildWeaponModel(w);
       group.visible = false;
       this.kickGroup.add(group);
-      this.models.set(w.id, { group, muzzle });
+      // Where this weapon's bore sits relative to the mount — what ADS has to
+      // cancel to put the barrel on the camera axis.
+      this.models.set(w.id, { group, muzzle,
+        bore: _localPositionIn(this.kickGroup, muzzle),
+        sightTop: _sightTopIn(this.kickGroup, group) });
     }
     this._setActiveModel(0);
     this._buildArm();
@@ -201,7 +270,12 @@ export class WeaponSystem {
       group.visible = old ? old.group.visible : false;
       if (old) this.kickGroup.remove(old.group);
       this.kickGroup.add(group);
-      this.models.set(w.id, { group, muzzle });
+      // Re-measure the bore: the GLB swaps in a different mesh with the muzzle
+      // somewhere else, so carrying the old offset over would un-align ADS the
+      // moment the models finished loading.
+      this.models.set(w.id, { group, muzzle,
+        bore: _localPositionIn(this.kickGroup, muzzle),
+        sightTop: _sightTopIn(this.kickGroup, group) });
     }
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
     if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
@@ -1254,13 +1328,21 @@ export class WeaponSystem {
 
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
-    const adsShiftX    = -this.scopeT * 0.32;
+    // Coming onto the sights moves the mount to wherever puts THIS weapon's
+    // bore on the camera axis, so the gun ends up between your eye and the
+    // crosshair rather than parked below it. Both axes come from the measured
+    // bore; the x term happens to land on the same -0.32 the hand-tuned value
+    // used, because every bore in the arsenal is centred, but the y term is the
+    // one that was missing entirely.
+    const vm = this.models.get(def.id);
+    const adsShiftX = this.scopeT * ((vm?.bore ? -vm.bore.x : 0) - 0.32);
+    const adsRaiseY = this.scopeT * (adsMountY(vm?.bore, vm?.sightTop) + 0.26);
     const sprintRaiseY =  this._sprintT * 0.12;
     const sprintShiftX = -this._sprintT * 0.12;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const tgtX = 0.32 + sprintShiftX + adsShiftX + bobH + 0.05 * rBell;
-    const tgtY = -0.26 + sprintRaiseY + bobV
+    const tgtY = -0.26 + adsRaiseY + sprintRaiseY + bobV
       - 0.17 * rBell - 0.03 * rack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
