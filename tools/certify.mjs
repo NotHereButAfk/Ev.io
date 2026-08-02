@@ -35,6 +35,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:actions'); return { ok: r.ok && /all action checks passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-MESH', phase: '—', name: 'Body mesh keeps the rig metrics the animation reads off it',
     fn: () => { const r = run('npm run test:mesh'); return { ok: r.ok && /all mesh checks passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-AIM', phase: '—', name: 'The gun points where the bullets go',
+    fn: () => { const r = run('npm run test:aim'); return { ok: r.ok && /all aim checks passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',
     fn: () => { const r = run('node authnet_test.mjs', join(root, 'server')); const m = r.out.match(/(\d+) passed, (\d+) failed/);
                 return { ok: !!m && m[2] === '0', detail: m ? `${m[1]} authority/abuse proofs pass` : tail(r.out) }; } },

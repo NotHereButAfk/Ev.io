@@ -49,6 +49,25 @@ const SHOULDER_Y = 1.76, SHOULDER_X = 0.27;
 const UP_ARM = 0.48;      // shoulder → elbow
 const FOREARM = 0.385;    // elbow → hand centre
 const REACH = (UP_ARM + FOREARM) * 0.995;
+
+// ── where the gun POINTS ─────────────────────────────────────────────────────
+// The AIM pose carries 0.020 rad of its own muzzle droop. `aimPitch` is given
+// against the true horizon — the angle the shot actually leaves at — so that
+// droop has to be cancelled or every body in the game aims 1.15° under its own
+// bullets. Callers pass the look/shot pitch and nothing else: the conversion
+// lives here so the local body, the network avatars and the bots cannot drift
+// apart, which is exactly what happened when each owned its own constant (bots
+// held the rifle dead level at every angle; the other two showed 62% of the
+// real pitch and were up to 24° out).
+const AIM_BASE_PITCH = -0.020;
+// Bound on the pose, matched to the player's own look clamp (Player.js stops
+// at PI/2 - 0.05) so nothing inside the reachable range is ever cut short. It
+// can safely be this wide: measured across the full sweep, both hands stay on
+// the gun to 0.00 cm and the rifle never crosses the torso, because the
+// shouldered carry already rides outboard of it on the right shoulder. The
+// 0.95 rad ceiling this replaces was not protecting against anything.
+export const AIM_PITCH_LIMIT = Math.PI / 2 - 0.05;   // ~87.1°, Player.js's own clamp
+
 // Elbow swivel about the shoulder→hand axis: where the elbow sits on the cone
 // of valid solutions. Tuned to drop the trigger elbow down/back against the
 // ribs and swing the support elbow out under the handguard.
@@ -106,7 +125,13 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
  * @param {THREE.Object3D} weapon  the weapon model parented to the body (or null)
  * @param {number} aim     0 = patrol carry, 1 = shouldered and aiming
  * @param {number} dt      frame delta (seconds) — unused, kept for callers
- * @param {object} [o]     { swing, kick, reload, swap, flinch, throwP }
+ * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP }
+ *   `aimPitch` is where this body is SHOOTING, in radians against the horizon
+ *   (positive up) — pass the look pitch, or for a bot the elevation of the ray
+ *   it actually fires. Shouldered, the muzzle comes out on exactly that angle.
+ *   Do not pre-scale it; the shoulder blend, the body's own lean (`bodyPitch`,
+ *   pass whatever you set on the body's rotation.x) and the pose's droop are
+ *   all handled here.
  *   reload/swap/flinch/throwP are 0→1 action progresses. They move the WEAPON
  *   (and, for a reload, the support hand's target on it) — never the arms
  *   directly, because the arms are IK'd onto wherever the weapon ends up and
@@ -125,11 +150,21 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // Working the bolt, a third of the way through the reload.
   const rack = reload > 0 ? Math.exp(-Math.pow((reload - 0.62) / 0.06, 2)) : 0;
 
+  // Where the shot is going. Scaled by the shoulder blend, because a patrol
+  // carry is not aimed at anything — at a = 1 the muzzle lands exactly on
+  // `aimPitch`, and it fades out as the rifle comes down off the shoulder.
+  // `bodyPitch` comes back out because the weapon hangs off the body and
+  // inherits its run lean; without that the muzzle sits up to 9° off at a
+  // sprinting lean while the shot still leaves along the camera.
+  const aimPitch = Math.max(-AIM_PITCH_LIMIT,
+    Math.min(AIM_PITCH_LIMIT, (o.aimPitch || 0) - (o.bodyPitch || 0)));
+
   // Everything that moves the rifle without changing the grip rides this one
-  // common-mode shoulder pitch: idle breathing / stride, recoil, and a lift
-  // through the middle of the patrol→aim blend (a straight interpolation drags
-  // the buttstock through the right pec on the way across).
-  const swing = (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
+  // common-mode shoulder pitch: the aim itself, idle breathing / stride, recoil,
+  // and a lift through the middle of the patrol→aim blend (a straight
+  // interpolation drags the buttstock through the right pec on the way across).
+  const swing = (aimPitch - AIM_BASE_PITCH) * a
+    + (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
     // Muzzle drops while the hands are busy, and again when hit.
     - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 

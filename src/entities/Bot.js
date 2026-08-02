@@ -114,6 +114,7 @@ export class Bot {
     this._footPhase   = 0;       // last walk-cycle phase a footstep played on
     this._weaponT     = Math.random() * Math.PI * 2; // phase offset for variety
     this._alertBlend  = 0;   // 0 = low-ready, 1 = high-ready/aiming
+    this._aimPitch    = 0;   // radians, + up — the elevation of its own shots
     this._weaponMesh  = null;
     this._rig         = null;
     this._walkT       = Math.random() * Math.PI * 2; // random phase so bots aren't in sync
@@ -490,6 +491,21 @@ export class Bot {
     if (this._reactT > 0) this._reactT -= dt;
     const engaged = this._provoked && inRange;
 
+    // Where this bot's own bullets leave at. Derived from the SAME two points
+    // _shootAt() fires between — its eye at y+1.5 and the target's chest — so
+    // the rifle it is holding points along the shot rather than at the horizon.
+    // Recomputed every frame rather than off the 0.12s sight cache, or the gun
+    // steps in visible jerks while tracking someone moving vertically.
+    {
+      let want = 0;
+      if (engaged) {
+        const aimAt = hasVisual ? player.position : this._lastSeenPos;
+        want = Math.atan2((aimAt.y + PLAYER_BODY_Y) - (this.position.y + 1.5),
+                          Math.hypot(aimAt.x - this.position.x, aimAt.z - this.position.z));
+      }
+      this._aimPitch += (want - this._aimPitch) * Math.min(1, dt * 10);
+    }
+
     let moveTarget = null;
     if (engaged) {
       // Face the player. The rig's forward is +Z — the aim and strafe layers
@@ -587,14 +603,14 @@ export class Bot {
         if (this._provoked || engaged) {
           const dx = player.position.x - this.position.x;
           const dz = player.position.z - this.position.z;
-          const dy = (player.position.y + 1.0) - (this.position.y + 1.5);
           const worldAim = Math.atan2(dx, dz);
           const dyaw = worldAim - this.mesh.rotation.y;
           // Wrap to [-π, π] so the twist takes the short way round.
           const wrapped = ((dyaw + Math.PI) % (Math.PI * 2)) - Math.PI;
-          const flat = Math.hypot(dx, dz);
-          const pitch = -Math.atan2(dy, flat);
-          ud.setAim(pitch, wrapped);
+          // The same elevation the procedural bodies point their rifle along, so
+          // a human bot's head and spine track where its bullets actually go.
+          // Negated: setAim() on this rig takes pitch positive-DOWN.
+          ud.setAim(-this._aimPitch, wrapped);
         } else {
           ud.setAim(0, 0);
         }
@@ -661,6 +677,7 @@ export class Bot {
         // levelled down the body's forward axis. `swing` breathes/rides the
         // stride, _gunKick shoves it back and climbs the muzzle.
         applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
+          aimPitch: this._aimPitch, bodyPitch: gait.lean,
           swing: gait.swing, kick: this._gunKick,
         });
       } else {

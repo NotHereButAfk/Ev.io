@@ -21,12 +21,6 @@ import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 // controller, or a network snapshot of somebody else — makes no difference.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// How much of your look-pitch the body shows. Not 1.0: a real shooter's head
-// and spine absorb part of it, and pinning the rifle to the full ±90° makes
-// the arms invert when someone looks at their feet.
-const PITCH_FOLLOW = 0.62;
-const PITCH_LIMIT  = 0.95;    // radians (~54°)
-
 // A position jump bigger than this in a single frame can't be running — the
 // fastest anyone moves is a 9.6 m/s sprint, which is 0.16m per frame at 60Hz
 // and under 0.5m even on a badly stuttering one.
@@ -287,16 +281,14 @@ export class Avatar {
     const want = (this._aimHold > 0 || s.aiming) ? 1 : 0;
     this._aim += (want - this._aim) * Math.min(1, dt * 8);
 
-    // Look-pitch rides the SAME common-mode shoulder rotation the stride uses,
-    // so the rifle points where this character is actually looking and the
-    // hands stay welded to it. Without this, a remote shooting up at you still
-    // reads as aiming flat at the horizon.
-    const pitchTarget = THREE.MathUtils.clamp(
-      (s.pitch || 0) * PITCH_FOLLOW, -PITCH_LIMIT, PITCH_LIMIT);
-    this._pitch += (pitchTarget - this._pitch) * Math.min(1, dt * 12);
+    // The rifle points where this character is actually shooting. Only the
+    // smoothing lives here — applyRifleCarry converts the angle, so a remote
+    // and its own local body cannot end up aiming at two different places.
+    this._pitch += ((s.pitch || 0) - this._pitch) * Math.min(1, dt * 12);
 
     applyRifleCarry(this.rig, this.weapon, this._aim, dt, {
-      swing: gait.swing + this._pitch * this._aim,
+      aimPitch: this._pitch, bodyPitch: gait.lean,
+      swing: gait.swing,
       kick:  this._kick,
       reload: s.reload || 0, swap: act.swap, flinch: act.flinch, throwP: act.throw,
     });

@@ -56,10 +56,6 @@ const SPAWN_POINT = new THREE.Vector3(0, 0, 18);
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
 const RESPAWN_DELAY = 3;
-// How much of your look-pitch the third-person body shows (must match
-// Avatar.js, which drives the copy of you that other players see).
-const TPS_PITCH_FOLLOW = 0.62;
-const TPS_PITCH_LIMIT  = 0.95;
 
 // The arena is an always-on server with a fixed capacity. You take one slot;
 // the rest are filled with bots and simulated remote players (see ServerSim).
@@ -1390,13 +1386,13 @@ export class Game {
       this._tpsGunKick = Math.max(0, (this._tpsGunKick || 0) - dt * 7);
       const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
       this._tpsAim = (this._tpsAim || 0) + (wantAim - (this._tpsAim || 0)) * Math.min(1, dt * 8);
-      // Look-pitch rides the same common-mode shoulder rotation as the stride,
-      // so your body aims where you're actually looking instead of always flat.
-      const pitchTgt = THREE.MathUtils.clamp(p.pitch * TPS_PITCH_FOLLOW,
-                                             -TPS_PITCH_LIMIT, TPS_PITCH_LIMIT);
-      this._tpsPitch = (this._tpsPitch || 0) + (pitchTgt - (this._tpsPitch || 0)) * Math.min(1, dt * 12);
+      // Your body aims where your shots actually go. applyRifleCarry owns the
+      // conversion — pass the raw look pitch and nothing else, or this drifts
+      // away from the copy of you that everyone else sees.
+      this._tpsPitch = (this._tpsPitch || 0) + (p.pitch - (this._tpsPitch || 0)) * Math.min(1, dt * 12);
       applyRifleCarry(rig, this._tpsWeaponMesh, this._tpsAim, dt, {
-        swing: gait.swing + this._tpsPitch * this._tpsAim,
+        aimPitch: this._tpsPitch, bodyPitch: gait.lean,
+        swing: gait.swing,
         kick:  this._tpsGunKick,
         reload, swap: act.swap, flinch: act.flinch, throwP: act.throw,
       });
