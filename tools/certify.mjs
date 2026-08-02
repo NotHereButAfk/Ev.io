@@ -43,6 +43,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:viewmodel'); return { ok: r.ok && /viewmodel passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-GUN', phase: '—', name: 'Gun cadence, trigger, ADS and Auto Rifle effects match the contract',
     fn: () => { const r = run('npm run test:gunfeel'); return { ok: r.ok && /gunfeel passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-AUDIO', phase: 'Phase 8', name: 'Compact weapon report, pitch variance, falloff and reload cues are wired',
+    fn: () => { const r = run('npm run test:audio'); return { ok: r.ok && /audio contract passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-GUI', phase: 'Phase 8', name: 'EV-style navigation, panels, auth pages and dynamic crosshair are wired',
     fn: () => { const r = run('npm run test:gui'); return { ok: r.ok && /gui contract passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-TPS', phase: 'camera', name: 'Third-person camera frames the complete player model',

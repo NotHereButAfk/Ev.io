@@ -11,6 +11,7 @@ const login = read('login.html');
 const register = read('register.html');
 const menu = read('src/ui/MainMenu.js');
 const hud = read('src/ui/HUD.js');
+const game = read('src/core/Game.js');
 const css = read('src/style.css');
 
 const failures = [];
@@ -38,6 +39,13 @@ requireMatch(register, /id=["']reg-btn["']/, 'register submit control');
 requireMatch(register, /id=["']guest-btn["']/, 'register guest control');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
+for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
+  requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
+}
+requireMatch(game, /Promise\.allSettled\(\[Promise\.resolve\(this\.world\.ready\)/, 'loading waits for map');
+requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
+requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');
+requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
 requireMatch(hud, /--xhair-size/, 'dynamic crosshair spread');
 requireMatch(hud, /classList\.toggle\(['"]ads/, 'ADS crosshair state');
 requireMatch(css, /#hud #crosshair[^}]*--xhair-size/s, 'crosshair style contract');

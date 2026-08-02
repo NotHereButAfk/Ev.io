@@ -232,113 +232,123 @@ export class WeaponSystem {
 
   _buildArm() {
     this.sleeveMat = new THREE.MeshStandardMaterial({
-      color: 0x2d3540, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.6
+      color: 0x2d3540, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.6,
     });
     this.gloveMat = new THREE.MeshStandardMaterial({
-      color: 0x191c22, roughness: 0.52, metalness: 0.12, envMapIntensity: 1.0
+      color: 0x242a33, roughness: 0.52, metalness: 0.12, envMapIntensity: 1.0,
     });
-    // Cuff ring — this is where the character's accent colour goes (see
-    // setSkin). Kept as an instance field so the tint can reach it.
     this.cuffMat = new THREE.MeshStandardMaterial({
-      color: 0x0c0e12, roughness: 0.6, metalness: 0.08
+      color: 0x0c0e12, roughness: 0.6, metalness: 0.08,
     });
     this.armPlateMat = new THREE.MeshStandardMaterial({
-      color: 0x657080, roughness: 0.5, metalness: 0.26, envMapIntensity: 0.8
+      color: 0x657080, roughness: 0.5, metalness: 0.26, envMapIntensity: 0.8,
     });
-    const gloveSeam = this.cuffMat;
 
-    const bx = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    const cy = (r1, r2, h, mat, segs = 12) => {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, segs), mat);
-      m.rotation.x = Math.PI / 2;
-      return m;
+    const box = (w, h, d, material) => new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d), material,
+    );
+    const up = new THREE.Vector3(0, 1, 0);
+    const segment = (a, b, startRadius, endRadius, material, sides = 12) => {
+      const direction = b.clone().sub(a);
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(endRadius, startRadius, direction.length(), sides),
+        material,
+      );
+      mesh.position.copy(a).add(b).multiplyScalar(0.5);
+      mesh.quaternion.setFromUnitVectors(up, direction.normalize());
+      return mesh;
     };
 
-    const arm = new THREE.Group();
-    // Trigger hand: seat the palm on the pistol grip. The old transform pushed
-    // the entire arm below the camera, so players saw a floating gun—or no hand
-    // at all—depending on FOV.
-    arm.position.set(0.035, -0.020, 0.200);
-    arm.rotation.y = 0.18;
-    arm.scale.setScalar(0.94);
+    // Distinct closed-grip poses replace the old negatively-scaled clone. The
+    // sleeves deliberately continue below the camera so every glove has an
+    // unbroken visual connection to the player's body.
+    const gripArm = ({ side, position, rotation, elbow, support = false }) => {
+      const sign = side === 'left' ? -1 : 1;
+      const arm = new THREE.Group();
+      arm.position.copy(position);
+      arm.rotation.copy(rotation);
+      arm.userData.viewmodelHand = support ? 'support' : 'trigger';
+      const hand = new THREE.Group();
+      hand.name = 'viewmodel_grip';
+      arm.add(hand);
 
-    // Forearm — tapered sleeve
-    const forearm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.026, 0.035, 0.13, 12), this.sleeveMat);
-    forearm.rotation.x = 1.18;
-    // Keep the sleeve behind the wrist. Extending it toward the eye makes its
-    // end cap balloon across half the screen even though the glove is small.
-    forearm.position.set(0, -0.034, 0.040);
-    arm.add(forearm);
+      const palm = box(0.086, 0.058, 0.094, this.gloveMat);
+      palm.position.set(0, -0.006, -0.034);
+      palm.rotation.x = support ? -0.08 : 0.10;
+      hand.add(palm);
 
-    // A compact armour plate carries the equipped character's authored colour.
-    // The sleeve remains dark, so this reads as the player's gauntlet instead
-    // of the old bright-white tube filling the bottom of the screen.
-    const forearmPlate = bx(0.040, 0.012, 0.050, this.armPlateMat);
-    forearmPlate.rotation.x = -0.34;
-    forearmPlate.position.set(0, -0.006, 0.035);
-    arm.add(forearmPlate);
+      const handPlate = box(0.070, 0.012, 0.060, this.armPlateMat);
+      handPlate.position.set(0, 0.026, -0.020);
+      handPlate.rotation.x = palm.rotation.x;
+      hand.add(handPlate);
 
-    // Sleeve cuff detail ring
-    const cuff = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.04, 0.016, 12), gloveSeam);
-    cuff.rotation.x = 1.18;
-    cuff.position.set(0, -0.032, 0.01);
-    arm.add(cuff);
+      [-0.027, -0.009, 0.009, 0.027].forEach((xOffset, index) => {
+        const finger = new THREE.Mesh(
+          new THREE.CapsuleGeometry(
+            0.0095,
+            index === 0 || index === 3 ? 0.024 : 0.030,
+            3,
+            7,
+          ),
+          this.gloveMat,
+        );
+        finger.position.set(xOffset, -0.030, -0.055);
+        finger.rotation.x = 0.58;
+        hand.add(finger);
+      });
 
-    // Wrist
-    const wrist = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.038, 0.046, 0.07, 12), this.gloveMat);
-    wrist.rotation.x = 1.18;
-    wrist.position.set(0, -0.022, -0.02);
-    arm.add(wrist);
+      const thumb = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.012, 0.032, 3, 7),
+        this.gloveMat,
+      );
+      thumb.position.set(sign * 0.044, -0.002, -0.018);
+      thumb.rotation.set(0.62, 0, -sign * 0.78);
+      hand.add(thumb);
 
-    // Palm
-    const palm = bx(0.088, 0.048, 0.095, this.gloveMat);
-    palm.position.set(0, 0.0, -0.098);
-    arm.add(palm);
+      arm.add(segment(
+        new THREE.Vector3(0, -0.005, 0.018),
+        new THREE.Vector3(0, -0.030, 0.098),
+        0.035,
+        0.042,
+        this.gloveMat,
+      ));
+      arm.add(segment(
+        new THREE.Vector3(0, -0.025, 0.080),
+        new THREE.Vector3(sign * elbow.x, elbow.y, elbow.z),
+        0.041,
+        0.064,
+        this.sleeveMat,
+      ));
 
-    // Knuckle ridge
-    const knuckleBar = bx(0.09, 0.014, 0.018, gloveSeam);
-    knuckleBar.position.set(0, 0.025, -0.148);
-    arm.add(knuckleBar);
+      arm.add(segment(
+        new THREE.Vector3(0, -0.024, 0.072),
+        new THREE.Vector3(0, -0.029, 0.098),
+        0.046,
+        0.046,
+        this.cuffMat,
+      ));
 
-    // 4 fingers
-    const fingerX = [-0.031, -0.010, 0.011, 0.032];
-    fingerX.forEach((xOff, i) => {
-      const len = i === 0 || i === 3 ? 0.055 : 0.065;
-      const fing = cy(0.009, 0.011, len, this.gloveMat, 8);
-      fing.rotation.x = 1.38;
-      fing.position.set(xOff, 0.018, -0.178 - (i === 0 || i === 3 ? 0.005 : 0));
-      arm.add(fing);
-      // fingertip cap
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 5), gloveSeam);
-      tip.position.set(xOff, 0.038, -0.207 - (i === 0 || i === 3 ? 0.004 : 0));
-      arm.add(tip);
+      arm.traverse((object) => { if (object.isMesh) object.castShadow = true; });
+      return arm;
+    };
+
+    const trigger = gripArm({
+      side: 'right',
+      position: new THREE.Vector3(0.000, -0.105, 0.185),
+      rotation: new THREE.Euler(-0.10, 0.20, -0.10),
+      elbow: new THREE.Vector3(0.15, -1.50, 0.62),
     });
+    this.kickGroup.add(trigger);
+    this.armGroup = trigger;
 
-    // Thumb
-    const thumb = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.013, 0.016, 0.055, 8), this.gloveMat);
-    thumb.rotation.x = 1.22;
-    thumb.rotation.z = -0.45;
-    thumb.position.set(-0.052, 0.01, -0.115);
-    arm.add(thumb);
-    const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), gloveSeam);
-    thumbTip.position.set(-0.068, 0.022, -0.148);
-    arm.add(thumbTip);
-
-    arm.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
-    this.kickGroup.add(arm);
-    this.armGroup = arm;
-
-    // Support hand: mirror the complete glove (including thumb) and reach it
-    // onto the rifle fore-end. It shares the same palette and the weapon's
-    // recoil/reload parent, so both hands remain attached through every action.
-    const support = arm.clone(true);
-    support.position.set(-0.015, -0.015, -0.18);
-    support.rotation.set(-0.05, -0.42, -0.08);
-    support.scale.set(-0.90, 0.90, 0.90);
+    const support = gripArm({
+      side: 'left',
+      position: new THREE.Vector3(-0.050, -0.095, -0.175),
+      rotation: new THREE.Euler(-0.05, -0.40, 0.08),
+      elbow: new THREE.Vector3(0.18, -1.70, 0.65),
+      support: true,
+    });
+    support.scale.setScalar(0.92);
     this.kickGroup.add(support);
     this.supportArmGroup = support;
   }
@@ -1239,8 +1249,14 @@ export class WeaponSystem {
     // from the pistol grip on desktop aspect ratios.
     if (this.armGroup) {
       const portrait = this.camera.aspect < 1;
-      this.armGroup.position.x = portrait ? 0.010 : 0.035;
-      this.armGroup.position.y = portrait ? 0.045 : -0.020;
+      const reloading = !!this.currentState?.isReloading;
+      const portraitReload = portrait && reloading;
+      this.armGroup.position.x = portraitReload ? -0.120 : (portrait ? 0.010 : 0.000);
+      this.armGroup.position.y = reloading
+        ? (portrait ? 0.160 : 0.050)
+        : (portrait ? 0.050 : -0.105);
+      this.armGroup.scale.set(portrait ? 0.72 : 1, 1, portrait ? 0.72 : 1);
+      this.supportArmGroup?.scale.set(portrait ? 0.66 : 0.92, 0.92, portrait ? 0.66 : 0.92);
     }
 
     for (const [code, index] of this.keyMap) {

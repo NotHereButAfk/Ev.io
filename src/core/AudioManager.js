@@ -1,4 +1,21 @@
 // Lightweight procedural sound effects via WebAudio — no external audio assets needed.
+export const WEAPON_AUDIO_PROFILES = Object.freeze({
+  sidearm: { dur: 0.105, body: 340, crackHz: 3300, sub: 96, dist: 4.0, reverb: 0.16, gain: 0.82 },
+  smg: { dur: 0.065, body: 300, crackHz: 3500, sub: 96, dist: 3.0, reverb: 0.09, gain: 0.72 },
+  shotgun: { dur: 0.24, body: 125, crackHz: 1700, sub: 58, dist: 8.0, reverb: 0.38, gain: 0.94 },
+  // EV.IO's Auto Rifle uses the compact `mg` report at volume 0.8. This is an
+  // original procedural approximation: short synthetic crack, restrained low
+  // end, audible bolt tick, and little tail so automatic fire stays readable.
+  rifle: {
+    dur: 0.078, body: 310, bodyGain: 0.46, crackHz: 3400, crack: 0.30,
+    click: 0.68, clickHP: 1900, sub: 98, subGain: 0.18, dist: 3.5,
+    reverb: 0.12, gain: 0.80, mech: 0.20, mechHz: 2050,
+  },
+  lmg: { dur: 0.13, body: 190, crackHz: 2800, sub: 68, dist: 7.0, reverb: 0.25, gain: 0.88 },
+  sniper: { dur: 0.34, body: 95, crackHz: 5600, sub: 50, dist: 10, reverb: 0.55, gain: 0.96 },
+  rpg: { dur: 0.36, body: 76, crackHz: 1200, sub: 42, dist: 9, reverb: 0.48, gain: 0.94 },
+});
+
 export class AudioManager {
   constructor() {
     this.ctx = null;
@@ -61,9 +78,9 @@ export class AudioManager {
     const p = this.ctx.createPanner();
     p.panningModel    = 'HRTF';
     p.distanceModel   = 'inverse';
-    p.refDistance     = 5;     // full volume within 5m
-    p.maxDistance     = 90;
-    p.rolloffFactor   = 1.1;
+    p.refDistance     = 3;
+    p.maxDistance     = 60;
+    p.rolloffFactor   = 1.6;
     if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; }
     else p.setPosition(pos.x, pos.y, pos.z);
     p.connect(this.master);
@@ -84,9 +101,9 @@ export class AudioManager {
   _initGunBus() {
     const ctx = this.ctx;
     this._gunVerb = ctx.createConvolver();
-    this._gunVerb.buffer = this._makeImpulseResponse(1.7, 3.4);
+    this._gunVerb.buffer = this._makeImpulseResponse(0.85, 4.8);
     const verbOut = ctx.createGain();
-    verbOut.gain.value = 0.9;
+    verbOut.gain.value = 0.55;
     this._gunVerb.connect(verbOut).connect(this.master);
     this._gunVerbIn = ctx.createGain();   // shared reverb-send input
     this._gunVerbIn.gain.value = 1.0;
@@ -169,7 +186,7 @@ export class AudioManager {
     // Per-weapon acoustic profile.
     //  body: muzzle-blast fundamental Hz · crackHz: supersonic snap band ·
     //  sub: chest-thump Hz · dist: transient saturation · reverb: send to arena IR
-    const P = {
+    let P = {
       // Pistols — tight crack, medium body, short report
       sidearm:  { dur: 0.13, body: 320, crackHz: 3600, sub: 92, dist: 6,  reverb: 0.34, gain: 0.9  },
       // SMGs — fast, bright, little body
@@ -185,6 +202,7 @@ export class AudioManager {
       // RPG launch thump (the blast itself is playExplosion)
       rpg:      { dur: 0.44, body:  72, crackHz: 1200, sub: 38, dist: 9,  reverb: 0.8,  gain: 1.0  },
     }[kind] || { dur: 0.135, body: 230, crackHz: 4200, sub: 72, dist: 7, reverb: 0.42, gain: 0.95 };
+    P = WEAPON_AUDIO_PROFILES[kind] || P;
 
     const g = P.gain * lvl;
 
@@ -198,10 +216,10 @@ export class AudioManager {
     const click = ctx.createBufferSource();
     click.buffer = this._noiseBuffer(0.03);
     const clickHP = ctx.createBiquadFilter();
-    clickHP.type = 'highpass'; clickHP.frequency.value = 1700;
+    clickHP.type = 'highpass'; clickHP.frequency.value = P.clickHP ?? 1700;
     const shaper = ctx.createWaveShaper();
     shaper.curve = this._distortionCurve(P.dist);
-    const clickGain = this._envGain(0.85 * g, 0.0004, 0.022, t);
+    const clickGain = this._envGain((P.click ?? 0.85) * g, 0.0004, 0.018, t);
     click.connect(clickHP).connect(shaper).connect(clickGain); out(clickGain);
 
     // 2) Supersonic crack — bright bandpass noise sweeping down (the bullet snap).
@@ -212,14 +230,14 @@ export class AudioManager {
     crackBP.frequency.setValueAtTime(P.crackHz * jit, t);
     crackBP.frequency.exponentialRampToValueAtTime(P.crackHz * 0.38, t + 0.055);
     crackBP.Q.value = 0.7;
-    const crackGain = this._envGain(0.5 * g, 0.0008, 0.055, t);
+    const crackGain = this._envGain((P.crack ?? 0.5) * g, 0.0008, 0.050, t);
     crack.connect(crackBP).connect(crackGain); out(crackGain);
 
     // 3) Body punch — detuned square+saw pair dropping in pitch, lowpassed: the
     //    gunpowder "boom" with weight and harmonic richness.
     const bodyLP = ctx.createBiquadFilter();
     bodyLP.type = 'lowpass'; bodyLP.frequency.value = P.body * 9;
-    const bodyGain = this._envGain(0.62 * g, 0.0009, P.dur, t);
+    const bodyGain = this._envGain((P.bodyGain ?? 0.62) * g, 0.0009, P.dur, t);
     bodyLP.connect(bodyGain); out(bodyGain);
     for (const [type, det] of [['square', 1.0], ['sawtooth', 0.5]]) {
       const o = ctx.createOscillator();
@@ -236,20 +254,20 @@ export class AudioManager {
     sub.type = 'sine';
     sub.frequency.setValueAtTime(P.sub * jit, t);
     sub.frequency.exponentialRampToValueAtTime(P.sub * 0.5, t + P.dur * 1.4);
-    const subGain = this._envGain(0.5 * g, 0.001, P.dur * 1.4, t);
+    const subGain = this._envGain((P.subGain ?? 0.5) * g, 0.001, P.dur * 1.25, t);
     sub.connect(subGain).connect(dry); // sub stays dry (reverb would muddy it)
 
     // 5) Mechanical action — a short metallic tick (slide/bolt) just after firing.
     const mech = ctx.createBufferSource();
     mech.buffer = this._noiseBuffer(0.03);
     const mechBP = ctx.createBiquadFilter();
-    mechBP.type = 'bandpass'; mechBP.frequency.value = 2600; mechBP.Q.value = 2.2;
-    const mechGain = this._envGain(0.12 * g, 0.0006, 0.03, t + 0.012);
+    mechBP.type = 'bandpass'; mechBP.frequency.value = P.mechHz ?? 2600; mechBP.Q.value = 2.8;
+    const mechGain = this._envGain((P.mech ?? 0.12) * g, 0.0006, 0.025, t + 0.014);
     mech.connect(mechBP).connect(mechGain).connect(dry);
 
     click.start(t); crack.start(t); sub.start(t); mech.start(t + 0.012);
     click.stop(t + 0.04); crack.stop(t + 0.07);
-    sub.stop(t + P.dur * 1.4 + 0.04); mech.stop(t + 0.05);
+    sub.stop(t + P.dur * 1.25 + 0.04); mech.stop(t + 0.05);
   }
 
   // Kawaii anime "pew~!" — a cute vocal-ish chirp with vibrato + sparkle.
@@ -913,13 +931,13 @@ export class AudioManager {
   // Brass shell casing ejecting and bouncing on concrete
   playShellCasing() {
     if (!this.ctx) return;
-    const delay = 0.09 + Math.random() * 0.07;
+    const delay = 0.12 + Math.random() * 0.10;
     const t = this.ctx.currentTime + delay;
     [860, 1280, 2100].forEach((freq, i) => {
       const osc = this.ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.value = freq * (0.96 + Math.random() * 0.08);
-      const g = this._envGain(0.055 / (i + 1), 0.001, 0.11 - i * 0.02, t);
+      const g = this._envGain(0.024 / (i + 1), 0.001, 0.075 - i * 0.015, t);
       osc.connect(g).connect(this.out);
       osc.start(t); osc.stop(t + 0.14);
     });
@@ -928,7 +946,7 @@ export class AudioManager {
     const nf = this.ctx.createBiquadFilter();
     nf.type = 'highpass';
     nf.frequency.value = 3200;
-    const nGain = this._envGain(0.07, 0.001, 0.03, t);
+    const nGain = this._envGain(0.025, 0.001, 0.022, t);
     noise.connect(nf).connect(nGain).connect(this.out);
     noise.start(t); noise.stop(t + 0.04);
   }
@@ -937,13 +955,13 @@ export class AudioManager {
   playReloadMag() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
-    [0, 0.045, 0.09].forEach((off, i) => {
+    [0, 0.055].forEach((off, i) => {
       const osc = this.ctx.createOscillator();
       osc.type = 'square';
-      osc.frequency.value = 370 - i * 35;
-      const g = this._envGain(0.14, 0.001, 0.06, t + off);
+      osc.frequency.value = i ? 760 : 520;
+      const g = this._envGain(i ? 0.085 : 0.11, 0.001, 0.042, t + off);
       osc.connect(g).connect(this.out);
-      osc.start(t + off); osc.stop(t + off + 0.08);
+      osc.start(t + off); osc.stop(t + off + 0.055);
     });
   }
 
@@ -953,15 +971,15 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(860, t);
-    osc.frequency.exponentialRampToValueAtTime(290, t + 0.065);
+    osc.frequency.setValueAtTime(1120, t);
+    osc.frequency.exponentialRampToValueAtTime(360, t + 0.052);
     const f = this.ctx.createBiquadFilter();
     f.type = 'bandpass';
-    f.frequency.value = 1700;
-    f.Q.value = 1.6;
-    const g = this._envGain(0.24, 0.001, 0.065, t);
+    f.frequency.value = 1900;
+    f.Q.value = 2.4;
+    const g = this._envGain(0.17, 0.001, 0.052, t);
     osc.connect(f).connect(g).connect(this.out);
-    osc.start(t); osc.stop(t + 0.08);
+    osc.start(t); osc.stop(t + 0.065);
   }
 
   // Zombie guttural growl

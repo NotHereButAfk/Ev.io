@@ -50,7 +50,7 @@ import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
@@ -96,10 +96,17 @@ export class Game {
         this._spawnMenuBots();
       }
     };
-    preloadHumanSoldier(swapPreview);
+    this._bootHumanReady = new Promise((resolve) => {
+      preloadHumanSoldier(() => { swapPreview(); resolve(); });
+      setTimeout(resolve, 5000); // degraded startup if the optional model CDN stalls
+    });
     preloadPlayerModel(swapPreview);
     preloadSpartanModel(swapPreview);
-    preloadWeaponModels();
+    this._bootWeaponsReady = new Promise((resolve) => {
+      onWeaponModelsReady(resolve);
+      preloadWeaponModels();
+      setTimeout(resolve, 5000);
+    });
 
     this.world        = new World();
 
@@ -261,15 +268,36 @@ export class Game {
   // ── Connect sequence ─────────────────────────────────────────────────────────
 
   // ev.io-style boot flow: pulsating logo → map-loading card (map name) → GUI.
-  _runConnectSequence() {
+  async _runConnectSequence() {
     const screen = document.getElementById('connect-screen');
-    setTimeout(() => {
-      screen.classList.add('fade-out');
-      setTimeout(() => {
-        screen.classList.add('hidden');
-        this._runMapIntro();
-      }, 700);
-    }, 2000);
+    const bar = document.getElementById('boot-progress');
+    const phase = document.getElementById('boot-phase');
+    const detail = document.getElementById('boot-detail');
+    const percent = document.getElementById('boot-percent');
+    const setBoot = (value, title, copy) => {
+      if (bar) bar.style.width = `${value}%`;
+      if (phase) phase.textContent = title;
+      if (detail) detail.textContent = copy;
+      if (percent) percent.textContent = `${value}%`;
+    };
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const minimumDisplay = delay(1050);
+
+    setBoot(12, 'INITIALIZING ARENA', 'Renderer online');
+    await delay(120);
+    setBoot(30, 'STREAMING DAYTIME ROOK', 'Loading map geometry');
+    await Promise.allSettled([Promise.resolve(this.world.ready), delay(350)]);
+    setBoot(68, 'PREPARING COMBAT', 'Building navigation and collision');
+    await Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]);
+    setBoot(92, 'SYNCING LOADOUT', 'Soldier rig and weapon models ready');
+    await minimumDisplay;
+    setBoot(100, 'DEPLOYMENT READY', 'Entering Rook Sector');
+    await delay(260);
+
+    screen.classList.add('fade-out');
+    await delay(700);
+    screen.classList.add('hidden');
+    this._runMapIntro();
   }
 
   // Show the Daytime Rook loading card over the fly-through,

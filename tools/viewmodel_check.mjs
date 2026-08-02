@@ -200,15 +200,56 @@ function viewportArea(root) {
   return width * height / 4;
 }
 
+function meshViewportArea(root) {
+  let area = 0;
+  root.traverse((object) => {
+    if (object.isMesh) area += viewportArea(object);
+  });
+  return Math.min(1, area);
+}
+
+let lastGloveBounds = null;
 function gloveRatio(group) {
-  // children 0..2 are sleeve/plate/cuff; the wrist, palm and fingers are the
-  // visible glove whose framing the player actually notices.
-  const box = new THREE.Box3().makeEmpty();
-  for (const child of group.children.slice(3)) {
-    child.updateWorldMatrix(true, true);
-    box.union(new THREE.Box3().setFromObject(child));
+  group.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(group);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const bounds = [Infinity, -Infinity, Infinity, -Infinity];
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
+    for (const z of [box.min.z, box.max.z]) {
+      const point = new THREE.Vector3(x, y, z).project(camera);
+      bounds[0] = Math.min(bounds[0], point.x);
+      bounds[1] = Math.max(bounds[1], point.x);
+      bounds[2] = Math.min(bounds[2], point.y);
+      bounds[3] = Math.max(bounds[3], point.y);
+    }
   }
-  return projectedRatioForBox(box);
+  lastGloveBounds = bounds;
+  const width = bounds[1] - bounds[0];
+  const height = bounds[3] - bounds[2];
+  if (!(width > 0 && height > 0)) return 0;
+  const visibleWidth = Math.max(0, Math.min(1, bounds[1]) - Math.max(-1, bounds[0]));
+  const visibleHeight = Math.max(0, Math.min(1, bounds[3]) - Math.max(-1, bounds[2]));
+  return visibleWidth * visibleHeight / (width * height);
+}
+
+let lastEdgeBounds = null;
+function reachesViewportEdge(root) {
+  root.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(root);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity;
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
+    for (const z of [box.min.z, box.max.z]) {
+      const point = new THREE.Vector3(x, y, z).project(camera);
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+    }
+  }
+  lastEdgeBounds = { minX, maxX, minY };
+  return minY <= -0.75 || minX <= -0.75 || maxX >= 0.75;
 }
 
 const viewports = [
@@ -310,7 +351,8 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         ['trigger', system.armGroup],
         ['support', system.supportArmGroup],
       ]) {
-        const ratio = gloveRatio(glove);
+        const grip = glove.getObjectByName('viewmodel_grip') || glove;
+        const ratio = gloveRatio(grip);
         const label = `${stateName}/${viewport.label}/${fov}/${side}`;
         if (ratio < worstGlove.value) worstGlove = { value: ratio, label };
         // Mid-reload intentionally lets part of the trigger glove leave frame;
@@ -318,11 +360,20 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         const minimum = viewport.aspect < 1 ? 0.15 : 0.35;
         assert(
           ratio >= minimum,
-          `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible`,
+          `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible (${JSON.stringify(lastGloveBounds)})`,
+        );
+        // Sum of per-mesh projected boxes intentionally over-estimates the
+        // curved/tapered cylinders; 36% keeps the real arm pixels compact while
+        // allowing a sleeve to cross the frame edge during the sprint carry.
+        const maxArea = viewport.aspect < 1 ? 0.56 : 0.40;
+        const armArea = meshViewportArea(glove);
+        assert(
+          armArea <= maxArea,
+          `${label} arm occupies ${(armArea * 100).toFixed(1)}% of the viewport`,
         );
         assert(
-          viewportArea(glove) <= 0.22,
-          `${label} arm occupies too much of the viewport`,
+          reachesViewportEdge(glove),
+          `${label} sleeve terminates inside the viewport (${JSON.stringify(lastEdgeBounds)})`,
         );
       }
     }

@@ -4676,6 +4676,40 @@ a.profile-menu-item { text-decoration: none; }
   animation: bootPulse 1.5s ease-in-out infinite;
 }
 .boot-tagline { margin-top: 10px; font-size: 13px; letter-spacing: 3px; animation: bootFade 1.5s ease-in-out infinite; }
+.boot-load {
+  width: min(430px, 78vw);
+  margin-top: 54px;
+  color: rgba(234, 242, 248, 0.82);
+  font-family: 'Rajdhani', system-ui, sans-serif;
+}
+.boot-phase {
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3.6px;
+  text-align: left;
+}
+.boot-track {
+  height: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.13);
+}
+#boot-progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #55cadb, #e8f9ff);
+  box-shadow: 0 0 14px rgba(85, 202, 219, 0.7);
+  transition: width 220ms ease-out;
+}
+.boot-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: rgba(196, 210, 221, 0.58);
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
 @keyframes bootPulse {
   0%, 100% { transform: scale(1);    text-shadow: 0 0 18px rgba(80,200,255,0.35); opacity: 0.85; }
   50%      { transform: scale(1.06); text-shadow: 0 0 42px rgba(80,220,255,0.85); opacity: 1; }
