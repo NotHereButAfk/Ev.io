@@ -185,6 +185,23 @@ nothing about the seam between parts.
   it and shots miss a body that is plainly there, so the bodies carry one
   generous sphere instead.
 
+**2i. Triangle winding follows the order a station table is swept in.**
+`loftSkinned()` and `plateGeometry()` both take that into account now — a table
+whose stations DESCEND (the legs, the arms, the shin plate, the tassets, the
+cape) is wound the other way round from one that ascends (torso, skull, boot,
+pauldrons). Get it wrong and the form is inside-out, which is close to
+invisible: the inside of a limb looks like the outside of one, and back-face
+culling quietly shows you the far wall instead. What it is NOT invisible to is
+anything reading the normal — the surface is lit from behind, and the
+inverted-hull outline, which pushes each vertex along its normal, collapses
+inward and fills the limb with solid black. Gated by `npm run test:mesh`
+("nothing is inside-out"), which fires rays in and checks the first hit is a
+front face.
+→ Related: a plate thinner than **twice the outline weight** (`OUT_T`) gets
+  swallowed by its own hull and renders as black hatching. `TRIM` is the floor.
+  And a plate's end rings must not taper to zero thickness, or the two faces
+  weld and `computeVertexNormals` averages them to garbage.
+
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
 `applyMeleeCarry()` owns them for a blade.
 Don't pose `armL/armR/elbowL/elbowR` anywhere else for a gun-carrying body —

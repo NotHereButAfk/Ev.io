@@ -91,10 +91,22 @@ export function loftSkinned(stations, radial, out) {
       pushWeights(out, st.bones);
     }
   }
+  // Which way the stations run decides the winding, and the tables here run
+  // BOTH ways — the torso and the skull are authored bottom-up, the legs and
+  // arms top-down. Wound blind, every descending table comes out inside-out:
+  // its faces point into the form, so the renderer culls the surface you are
+  // looking at and shows you the inside of the far wall instead. On a tube that
+  // is nearly invisible (the inside of a limb looks like the outside of one),
+  // but the lighting is then computed from a normal pointing the wrong way, and
+  // an inverted-hull outline built off those normals collapses inward and fills
+  // the limb with black. Both were live on this body: the legs and arms were
+  // lit inside-out from the day they were written.
+  const desc = S > 1 && stations[S - 1].y < stations[0].y;
   for (let s = 0; s < S - 1; s++) {
     for (let r = 0; r < radial; r++) {
       const a = base + s * radial + r, b = base + s * radial + (r + 1) % radial;
-      out.idx.push(a, b + radial, b, a, a + radial, b + radial);
+      if (desc) out.idx.push(a, b, b + radial, a, b + radial, a + radial);
+      else out.idx.push(a, b + radial, b, a, a + radial, b + radial);
     }
   }
   // Close each end onto its ring centre. The pole shares the rim's weights, so
@@ -103,9 +115,10 @@ export function loftSkinned(stations, radial, out) {
     const c = out.pos.length / 3, st = stations[s];
     out.pos.push(st.x || 0, st.y, st.z || 0);
     pushWeights(out, st.bones);
+    const outward = desc ? !up : up;
     for (let r = 0; r < radial; r++) {
       const a = base + s * radial + r, b = base + s * radial + (r + 1) % radial;
-      if (up) out.idx.push(a, c, b); else out.idx.push(a, b, c);
+      if (outward) out.idx.push(a, c, b); else out.idx.push(a, b, c);
     }
   };
   if (out.capTop !== false) cap(S - 1, true);

@@ -100,16 +100,28 @@ function _addOutlines(group, t = 0.011) {
   }
 }
 
-// ── Palettes — white/lavender endoskeleton armour + black frame + red glow.
-// Three armour tones; the red terminator eyes/lights are shared.
+// ── Palettes ─────────────────────────────────────────────────────────────────
+// Violet champion: saturated armour over a dark underframe, lighter lavender on
+// the trim and the raised edges, magenta on every powered accent.
+//
+// The four body tones are spaced deliberately, and the spacing is the whole
+// trick. A first pass ran the underframe at near-black and the trim at
+// near-white, on the theory that maximum separation would make the layered
+// plates read as layers. It does the opposite: on a six-band cel ramp the
+// armour's own shadow bands land on top of the underframe's lit ones, so every
+// unarmoured surface — arms, thighs, the sides of the torso — merges into one
+// silhouette, and the trim burns out to a white rim that reads as a highlight
+// rather than a plate edge. What separates plates on a cel ramp is HUE and a
+// step of about a third in value, not the full range of it.
 const PALETTES = {
-  vanguard: { armor: 0xe6e2ec, armor2: 0xc4bed2, frame: 0x1b1b22, joint: 0x0f0f13,
-              steel: 0x8f8a9e, bone: 0xe0dde8, glow: 0xff2a20, bulk: 1.08 },   // white T-800
-  striker:  { armor: 0x9aa6b4, armor2: 0x6c7684, frame: 0x181b20, joint: 0x0d0f13,
-              steel: 0xcbd4dd, bone: 0xaab4c0, glow: 0x36e0ff, bulk: 0.96 },   // steel-blue (cyan eyes)
-  phantom:  { armor: 0x585960, armor2: 0x393a40, frame: 0x121216, joint: 0x08090b,
-              steel: 0x8f9099, bone: 0x6f7078, glow: 0xff2f26, bulk: 0.92 },   // dark graphite
+  vanguard: { armor: 0x7a55d6, armor2: 0xb69cf0, frame: 0x342b52, joint: 0x120e20,
+              steel: 0x8f7fc4, bone: 0xe4dcf8, glow: 0xff2f8f, bulk: 1.08 },  // violet
+  striker:  { armor: 0x3286d8, armor2: 0x9dc4ef, frame: 0x22314a, joint: 0x0b1220,
+              steel: 0x7ba6cc, bone: 0xdff0fb, glow: 0x2ff0d8, bulk: 0.96 },  // azure
+  phantom:  { armor: 0x4b4760, armor2: 0x9d95bb, frame: 0x272433, joint: 0x0c0a14,
+              steel: 0x7f7899, bone: 0xcfc9e0, glow: 0xff3d5e, bulk: 0.92 },  // graphite
 };
+
 
 // Shared with the first-person viewmodel so the arm seen by the owner uses the
 // same armour/frame/joint/accent colours as their third-person cyborg.

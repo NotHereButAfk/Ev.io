@@ -73,7 +73,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   proximity. `BodyGeometry.js` is the superellipse-loft + skinning core;
   `LowPolyModels.js` owns the palettes/materials and keeps the previous
   segmented body as `buildSegmentedCharacter()` for comparison. 14 draw calls a
-  body instead of 178. See AGENTS.md 2g/2h and `npm run test:mesh`.
+  body instead of 178. See AGENTS.md 2g/2h/2i and `npm run test:mesh`.
+  The armour is a **violet champion**: crested helm w/ dark visor + magenta
+  optic, three stacked pauldron lames, sternum emblem, belt, hip skirt (side
+  panels on the pelvis, front tassets on the THIGHS so they swing with a
+  stride instead of being a fence the leg walks through), long black cape,
+  gauntlets and chunky boots. Azure (`striker`) and graphite (`phantom`)
+  variants use the same build.
   Historic note — the segmented body (the three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
   feet, arms, hands, skull — is one **lofted superelliptical surface** per part
   (`|x/rx|^n + |z/rz|^n = 1`, n 2 = limb, 2.8 = ribcage, 3.2 = boot sole), and

@@ -29,6 +29,7 @@ const ok = (c, msg, detail = '') => {
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const P = (o) => o.getWorldPosition(new THREE.Vector3());
+const boneIndex = (g, name) => g.userData.skeleton.bones.findIndex(b => b.name === name);
 
 // Deform a body by its skeleton and read a vertex back out — the same path the
 // renderer and the raycaster take, so what this measures is what is drawn.
@@ -70,13 +71,29 @@ for (const id of LOWPOLY_IDS) {
   // adult landmark fractions, so a future reshape cannot quietly drift back
   // toward a mech.
   {
-    const skull = meshes.find(m => m.name === 'body_bone');
+    // The head is found by BONE, not by which material buffer it landed in.
+    // This used to look for a mesh called `body_bone`, which was only ever true
+    // while the head was a bare skull — the moment it became a helmet the shell
+    // moved to the armour buffer and the lookup returned undefined.
+    // Only vertices bound ENTIRELY to the head bone: the top of the torso loft
+    // is 74% head where it blends into the neck, and counting it would drag the
+    // "chin" 6cm below the jaw and turn a 7.5-head figure into a 6-head one.
+    // What is wanted is the head as a rigid object — the shell, cheeks, chin.
+    const headBone = boneIndex(g, 'head');
     let crown = -Infinity, chin = Infinity, top = -Infinity;
     const q = new THREE.Vector3();
-    const sp = skull.geometry.attributes.position;
-    for (let i = 0; i < sp.count; i++) {
-      q.fromBufferAttribute(sp, i);
-      crown = Math.max(crown, q.y); chin = Math.min(chin, q.y);
+    for (const m of meshes) {
+      const sp = m.geometry.attributes.position;
+      const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+      for (let i = 0; i < sp.count; i++) {
+        const on = (si.getX(i) === headBone && sw.getX(i) > 0.99)
+                || (si.getY(i) === headBone && sw.getY(i) > 0.99)
+                || (si.getZ(i) === headBone && sw.getZ(i) > 0.99)
+                || (si.getW(i) === headBone && sw.getW(i) > 0.99);
+        if (!on) continue;
+        q.fromBufferAttribute(sp, i);
+        crown = Math.max(crown, q.y); chin = Math.min(chin, q.y);
+      }
     }
     for (const m of meshes) {
       const pp = m.geometry.attributes.position;
@@ -149,6 +166,48 @@ for (const id of LOWPOLY_IDS) {
      `${unweighted} orphans`);
   ok(badSum === 0, 'every vertex\'s weights sum to 1', `${badSum} off`);
   ok(crossLeg === 0, 'no weight leaks across to the opposite leg', `${crossLeg} leaked`);
+
+  // ── the surface faces outward ──────────────────────────────────────────────
+  // Winding follows the order a station table is swept in, and the tables here
+  // are authored both ways: torso and skull bottom-up, legs and arms top-down.
+  // Swept blind, a descending table comes out INSIDE-OUT — and that failure is
+  // nearly invisible to the eye, because the inside of a limb looks like the
+  // outside of one. What it is not invisible to is anything that reads the
+  // normal: the surface is lit from behind, and the inverted-hull outline,
+  // which pushes each vertex ALONG its normal, collapses inward and fills the
+  // limb with solid black. The legs, arms, tassets and cape were all shipping
+  // inside-out.
+  //
+  // The test is the one the renderer performs: fire a ray in and check the
+  // first thing it hits is a FRONT face. If it is not, back-face culling
+  // throws that surface away and you are looking at the far wall.
+  {
+    const rc = new THREE.Raycaster();
+    const probes = [];
+    for (const y of [1.62, 1.36, 1.16, 0.90, 0.72, 0.40, 0.16])
+      for (const [dx, dz] of [[0, -1], [0, 1], [-1, 0], [1, 0], [0.7, -0.7], [-0.7, 0.7]])
+        probes.push([y, dx, dz]);
+    const o = new THREE.Vector3(), d = new THREE.Vector3();
+    let flipped = 0, tested = 0, worst = '';
+    for (const [y, dx, dz] of probes) {
+      o.set(dx * 3, y, dz * 3);
+      d.set(-dx, 0, -dz).normalize();
+      rc.set(o, d);
+      for (const m of meshes) m.material.side = THREE.DoubleSide;
+      const either = rc.intersectObjects(meshes, false)[0];
+      for (const m of meshes) m.material.side = THREE.FrontSide;
+      const front = rc.intersectObjects(meshes, false)[0];
+      if (!either) continue;
+      tested++;
+      const gap = front ? front.distance - either.distance : Infinity;
+      if (gap > 0.004) {
+        flipped++;
+        if (!worst) worst = `y=${y} dir=(${dx},${dz}) on ${either.object.name}`;
+      }
+    }
+    ok(flipped === 0, 'every surface faces outward — nothing is inside-out',
+       `${flipped}/${tested} probes hit a back face first${worst ? ', first at ' + worst : ''}`);
+  }
 
   // ── the ground plane Locomotion solves against ─────────────────────────────
   ok(near(footBox.min.y, 0, 0.004), 'sole sits on y = 0', `min ${footBox.min.y.toFixed(4)}`);
