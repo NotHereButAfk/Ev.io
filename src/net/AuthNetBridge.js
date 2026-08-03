@@ -8,6 +8,9 @@
 // The single-player / ServerSim path is completely untouched when off.
 
 import * as THREE from 'three';
+import { STATURE } from '../player/Proportions.js';
+// Just above the crown. Was a flat 2.0, from when the body stood 2.2m.
+const NAMEPLATE_Y = STATURE + 0.16;
 import { AuthClient } from './AuthClient.js';
 import { DT } from '../sim/MoveSim.js';
 import { Avatar } from '../player/Avatar.js';
@@ -152,7 +155,7 @@ export class AuthNetBridge {
         crouch: r.crouch, firing: r.firing, alive: r.alive,
       });
       // nameplate
-      v.set(r.x, r.y + 2.0, r.z).project(cam);
+      v.set(r.x, r.y + NAMEPLATE_Y, r.z).project(cam);
       if (v.z < 1 && r.alive) {
         a.nameEl.style.display = 'block';
         a.nameEl.style.left = `${(v.x * 0.5 + 0.5) * w}px`;

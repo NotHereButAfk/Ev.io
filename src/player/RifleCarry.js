@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import { applyThrowArm } from './Actions.js';
+// The figure the IK runs against. From Proportions.js, not a private copy —
+// this file used to hold its own, which is fine right up until it changes.
+import { SHOULDER_Y, SHOULDER_X, UP_ARM, FOREARM } from './Proportions.js';
+
+const REACH = (UP_ARM + FOREARM) * 0.995;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Rifle carry — how a soldier actually holds the gun.
@@ -35,20 +40,26 @@ const MAG_LOCAL = new THREE.Vector3(0, -0.26, -0.02);
 // rifle rides clear of the chest instead of sinking into it — pose-lab.html
 // ?sweep=patrol|aim reports the deepest penetration for a candidate, and these
 // two measure ZERO against the torso/pelvis/head.
+// The two carries were hand-solved against the previous, much larger figure
+// (shoulders at 1.76, an 0.865m arm). Their ROTATIONS are scale-free and stand;
+// their positions are carried onto the new arm by scaling about the shoulder
+// line — the same place the carry's own swing pivots about — so the rifle sits
+// at the same point on the chest relative to the arm holding it.
+//
+// The gun itself is NOT scaled with the body, and should not be: a rifle is
+// about 0.9m whoever is holding it. On the old 2.2m figure it read as a
+// carbine; at human scale it reads as a rifle.
+const ARM_SCALE = (UP_ARM + FOREARM) / (0.48 + 0.385);
+const onArm = (x, y, z) => new THREE.Vector3(
+  x * ARM_SCALE, SHOULDER_Y + (y - 1.76) * ARM_SCALE, z * ARM_SCALE);
 const PATROL = {
-  wp: new THREE.Vector3(0.058, 1.390, -0.333),
+  wp: onArm(0.058, 1.390, -0.333),
   wr: new THREE.Euler(-0.679, 0.646, 0.702),
 };
 const AIM = {
-  wp: new THREE.Vector3(0.240, 1.538, -0.262),
+  wp: onArm(0.240, 1.538, -0.262),
   wr: new THREE.Euler(-0.020, 0, 0),
 };
-
-// ── rig metrics the IK runs against (shared by every low-poly body) ──────────
-const SHOULDER_Y = 1.76, SHOULDER_X = 0.27;
-const UP_ARM = 0.48;      // shoulder → elbow
-const FOREARM = 0.385;    // elbow → hand centre
-const REACH = (UP_ARM + FOREARM) * 0.995;
 
 // ── where the gun POINTS ─────────────────────────────────────────────────────
 // The AIM pose carries 0.020 rad of its own muzzle droop. `aimPitch` is given
@@ -105,6 +116,32 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
   if (swivel) _qArm.premultiply(_qSwing.setFromAxisAngle(_d, swivel));
   shoulder.quaternion.copy(_qArm);
   elbow.rotation.set(bend, 0, 0);
+}
+
+// The guns are NOT scaled to the body, and should not be — a rifle is about
+// 0.9m whoever is holding it. But that means the front of a long handguard can
+// sit past a shorter shooter's reach, and an arm that cannot get there leaves
+// the hand hovering off the end of the weapon.
+//
+// A real shooter answers this by gripping FURTHER BACK, so that is what happens
+// here: the support target slides along the weapon's own axis, toward the stock,
+// until it is inside the arm's reach. The hand stays on the handguard — just at
+// the part of it the arm can actually hold. Automatic, and right for every gun
+// in the arsenal rather than tuned for one.
+const _axis = new THREE.Vector3();
+function slideToReach(T, sx) {
+  _d.set(T.x - sx, T.y - SHOULDER_Y, T.z);
+  const D2 = _d.lengthSq(), R = REACH * 0.97;
+  if (D2 <= R * R) return;
+  _axis.set(0, 0, 1).applyQuaternion(_q);          // weapon's own +Z, toward the stock
+  const b = _d.dot(_axis);
+  const disc = b * b - D2 + R * R;
+  if (disc < 0) return;                            // unreachable at any grip point
+  // NEAREST intersection, not the far one. Both roots are positive here (the
+  // axis points away from the shoulder), and taking the larger slides the hand
+  // straight past the weapon and out the other side — 88cm off the gun.
+  const s0 = -b - Math.sqrt(disc);
+  T.addScaledVector(_axis, s0 > 0 ? s0 : -b + Math.sqrt(disc));
 }
 
 /**
@@ -216,8 +253,9 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     } else {
       _T.copy(HANDGUARD_LOCAL);
     }
-    solveArm(rig.armL, rig.elbowL, -SHOULDER_X,
-             _T.applyQuaternion(_q).add(_pos), SWIVEL_L);
+    _T.applyQuaternion(_q).add(_pos);
+    slideToReach(_T, -SHOULDER_X);
+    solveArm(rig.armL, rig.elbowL, -SHOULDER_X, _T, SWIVEL_L);
     // A grenade goes in the off hand, overriding the support grip entirely —
     // it has to be applied last or the IK above would put the hand back.
     if (o.throwP) applyThrowArm(rig, o.throwP);

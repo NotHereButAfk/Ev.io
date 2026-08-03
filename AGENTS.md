@@ -135,6 +135,27 @@ that is still drawing — the player's own model included. Anything that tears
 down a character must check `isSharedGeometry()` first; `Avatar.dispose()` and
 `ArmorPreviewRenderer` both do, and `test:mesh` fails if either stops.
 
+**2f-bis. The FIGURE lives in `Proportions.js`. There is one of it.**
+Joint heights, bone lengths, shoulder and hip spacing and the sole corners used
+to be private copies in `HeroBody.js`, `Locomotion.js`, `RifleCarry.js` and both
+test harnesses — five copies, kept equal only by nobody touching them. They are
+all imported now.
+→ The body is built from standard adult anthropometry at the ONE stature that
+  agrees with the game: `Player.js` puts your eyes at 1.70m, that is 0.936 of
+  stature, so the figure is 1.816m. It used to be a 2.21m giant on ankles 12%
+  of its height off the floor — the character you saw was not the character you
+  were, by 28cm at the eyes.
+→ `test:mesh` gates the landmarks against canon, the head count (7.5), and that
+  the model's eyes land on `EYE_HEIGHT`. A reshape cannot drift back to a mech
+  without failing.
+→ When you change the figure, check what was POSITIONED against the old one:
+  health bars, nameplates, camera framing. Those were absolute metres.
+→ The guns are NOT scaled with the body and must not be — a rifle is ~0.9m
+  whoever holds it. `applyRifleCarry()` slides the support hand back along the
+  handguard when the front of it is out of a shorter arm's reach, which is what
+  a real shooter does; `test:aim` checks the hand stays on the weapon AXIS
+  rather than at one fixed point on it.
+
 **2g. The body is SKINNED. Do not re-parent its meshes.**
 `HeroBody.js` builds the player/bot chassis as a few `SkinnedMesh`es on a real
 skeleton: a limb is ONE surface from hip to ankle, and it bends because its

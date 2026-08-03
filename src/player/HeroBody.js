@@ -16,13 +16,12 @@
 // ─── THE CONTRACT (do not move these) ────────────────────────────────────────
 // Locomotion.js solves ground contact against a fixed leg chain, and
 // RifleCarry.js IKs both arms against a fixed shoulder and fixed bone lengths.
-// Neither derives anything from the mesh, so the body may be reshaped freely
-// but these must stay exactly where they are:
+// Neither derives anything from the mesh, so the body may be reshaped freely,
+// but it has to be built on the same figure they solve against —
 //
-//   hip    y 1.21          shoulder  |x| 0.27, y 1.76
-//   knee   y 0.62          elbow     y 1.28        (UP_ARM  0.48)
-//   ankle  y 0.27          hand      y 0.895       (FOREARM 0.385)
-//   sole   y 0, from z +0.10 (heel) to −0.20 (toe)
+// every joint height, bone length and sole corner. They all come from
+// Proportions.js — which is also where Locomotion and RifleCarry read them, so
+// there is one figure rather than three copies of one.
 //
 // The rig object handed back exposes those joints under the names the animation
 // already uses (legL/kneeL/ankleL/armL/elbowL/…), so applyWalkCycle(),
@@ -37,6 +36,8 @@
 
 import * as THREE from 'three';
 import { getLowPolyPalette, makeBodyMaterials } from './LowPolyModels.js';
+import * as BODY from './Proportions.js';
+import { remapY, GIRTH as G, LEGACY as OLD } from './Proportions.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   chainWeights, loftSkinned, appendGeometry, newBuffer, toGeometry, sePoint,
@@ -61,25 +62,54 @@ function inflate(src, t) {
 // spine chain exists so the torso deforms as a torso rather than a barrel, and
 // so there is somewhere to hang a future lean or aim twist.
 const JOINTS = {
-  root:      { at: [0, 0, 0],          parent: null },
-  hips:      { at: [0, 1.06, 0],       parent: 'root' },
-  spine:     { at: [0, 1.30, 0],       parent: 'hips' },
-  chest:     { at: [0, 1.52, 0],       parent: 'spine' },
-  neck:      { at: [0, 1.72, 0],       parent: 'chest' },
-  head:      { at: [0, 1.86, 0],       parent: 'neck' },
-  shoulderL: { at: [-0.27, 1.76, 0],   parent: 'chest' },   // rig.armL
-  elbowL:    { at: [-0.27, 1.28, 0],   parent: 'shoulderL' },
-  handL:     { at: [-0.27, 0.895, 0],  parent: 'elbowL' },
-  shoulderR: { at: [0.27, 1.76, 0],    parent: 'chest' },   // rig.armR
-  elbowR:    { at: [0.27, 1.28, 0],    parent: 'shoulderR' },
-  handR:     { at: [0.27, 0.895, 0],   parent: 'elbowR' },
-  thighL:    { at: [-0.11, 1.21, 0],   parent: 'hips' },    // rig.legL
-  kneeL:     { at: [-0.11, 0.62, 0],   parent: 'thighL' },
-  ankleL:    { at: [-0.11, 0.27, 0],   parent: 'kneeL' },
-  thighR:    { at: [0.11, 1.21, 0],    parent: 'hips' },
-  kneeR:     { at: [0.11, 0.62, 0],    parent: 'thighR' },
-  ankleR:    { at: [0.11, 0.27, 0],    parent: 'kneeR' },
+  root:      { at: [0, 0, 0],                          parent: null },
+  hips:      { at: [0, BODY.PELVIS_Y, 0],              parent: 'root' },
+  spine:     { at: [0, BODY.LUMBAR_Y, 0],              parent: 'hips' },
+  chest:     { at: [0, BODY.THORAX_Y, 0],              parent: 'spine' },
+  neck:      { at: [0, BODY.NECK_Y, 0],                parent: 'chest' },
+  head:      { at: [0, BODY.HEAD_Y, 0],                parent: 'neck' },
+  shoulderL: { at: [-BODY.SHOULDER_X, BODY.SHOULDER_Y, 0], parent: 'chest' },   // rig.armL
+  elbowL:    { at: [-BODY.SHOULDER_X, BODY.ELBOW_Y, 0],    parent: 'shoulderL' },
+  handL:     { at: [-BODY.SHOULDER_X, BODY.WRIST_Y, 0],    parent: 'elbowL' },
+  shoulderR: { at: [BODY.SHOULDER_X, BODY.SHOULDER_Y, 0],  parent: 'chest' },   // rig.armR
+  elbowR:    { at: [BODY.SHOULDER_X, BODY.ELBOW_Y, 0],     parent: 'shoulderR' },
+  handR:     { at: [BODY.SHOULDER_X, BODY.WRIST_Y, 0],     parent: 'elbowR' },
+  thighL:    { at: [-BODY.HIP_X, BODY.HIP_Y, 0],       parent: 'hips' },        // rig.legL
+  kneeL:     { at: [-BODY.HIP_X, BODY.KNEE_Y, 0],      parent: 'thighL' },
+  ankleL:    { at: [-BODY.HIP_X, BODY.ANKLE_Y, 0],     parent: 'kneeL' },
+  thighR:    { at: [BODY.HIP_X, BODY.HIP_Y, 0],        parent: 'hips' },
+  kneeR:     { at: [BODY.HIP_X, BODY.KNEE_Y, 0],       parent: 'thighR' },
+  ankleR:    { at: [BODY.HIP_X, BODY.ANKLE_Y, 0],      parent: 'kneeR' },
 };
+
+// ── carrying the authored anatomy onto the new figure ────────────────────────
+// The station tables below were shaped against the previous 2.21m figure. They
+// are kept in that space and mapped, rather than 200 numbers being retyped:
+// the map is piecewise-linear between the joints, so the quad belly, the calf
+// and the ribcage taper land on the same part of the same bone instead of the
+// whole body being uniformly squashed and every muscle drifting off its joint.
+//
+// Legs and arms need SEPARATE maps even though they overlap in height — the
+// wrist sits between the knee and the hip, and a single global map would put it
+// at 0.72 instead of 0.88.
+const mapLeg   = remapY([[0, 0], [OLD.ANKLE_Y, BODY.ANKLE_Y],
+                         [OLD.KNEE_Y, BODY.KNEE_Y], [OLD.HIP_Y, BODY.HIP_Y]]);
+const mapArm   = remapY([[OLD.WRIST_Y, BODY.WRIST_Y], [OLD.ELBOW_Y, BODY.ELBOW_Y],
+                         [OLD.SHOULDER_Y, BODY.SHOULDER_Y]]);
+const mapTorso = remapY([[OLD.PELVIS_Y, BODY.PELVIS_Y], [OLD.LUMBAR_Y, BODY.LUMBAR_Y],
+                         [OLD.THORAX_Y, BODY.THORAX_Y], [OLD.NECK_Y, BODY.NECK_Y],
+                         [OLD.HEAD_Y, BODY.HEAD_Y]]);
+const mapHead  = remapY([[OLD.CHIN_Y, BODY.CHIN_Y], [OLD.CROWN_Y, BODY.CROWN_Y]]);
+
+/** Map a station table onto the new figure: heights by `m`, girth by GIRTH. */
+function xf(tbl, m) {
+  return tbl.map(q => ({
+    ...q, y: m(q.y),
+    rx: q.rx * G, rz: q.rz * G,
+    dz: q.dz === undefined ? undefined : q.dz * G,
+  }));
+}
+
 const BONE_ORDER = Object.keys(JOINTS);
 const B = {};
 BONE_ORDER.forEach((n, i) => { B[n] = i; });
@@ -104,21 +134,21 @@ function buildSkeleton() {
 // with it. Wider at a knee than a wrist, because a knee creases over more of
 // the leg. These are the only tuning numbers in the skinning.
 const legChain = (s) => [
-  { y: 1.21, bone: B['thigh' + s], band: 0.10 },
-  { y: 0.62, bone: B['knee' + s],  band: 0.105 },
-  { y: 0.27, bone: B['ankle' + s], band: 0.050 },
+  { y: BODY.HIP_Y,   bone: B['thigh' + s], band: 0.10 * G },
+  { y: BODY.KNEE_Y,  bone: B['knee' + s],  band: 0.105 * G },
+  { y: BODY.ANKLE_Y, bone: B['ankle' + s], band: 0.050 * G },
 ];
 const armChain = (s) => [
-  { y: 1.76, bone: B['shoulder' + s], band: 0.085 },
-  { y: 1.28, bone: B['elbow' + s],    band: 0.080 },
-  { y: 0.895, bone: B['hand' + s],    band: 0.045 },
+  { y: BODY.SHOULDER_Y, bone: B['shoulder' + s], band: 0.085 * G },
+  { y: BODY.ELBOW_Y,    bone: B['elbow' + s],    band: 0.080 * G },
+  { y: BODY.WRIST_Y,    bone: B['hand' + s],     band: 0.045 * G },
 ];
 const TORSO_CHAIN = [
-  { y: 1.86, bone: B.head,  band: 0.045 },
-  { y: 1.72, bone: B.neck,  band: 0.055 },
-  { y: 1.52, bone: B.chest, band: 0.110 },
-  { y: 1.30, bone: B.spine, band: 0.110 },
-  { y: 1.06, bone: B.hips,  band: 0.110 },
+  { y: BODY.HEAD_Y,   bone: B.head,  band: 0.045 * G },
+  { y: BODY.NECK_Y,   bone: B.neck,  band: 0.055 * G },
+  { y: BODY.THORAX_Y, bone: B.chest, band: 0.110 * G },
+  { y: BODY.LUMBAR_Y, bone: B.spine, band: 0.110 * G },
+  { y: BODY.PELVIS_Y, bone: B.hips,  band: 0.110 * G },
 ];
 
 // ── Station tables ───────────────────────────────────────────────────────────
@@ -386,7 +416,7 @@ export function buildHeroBody(id = 'vanguard') {
     // human: a skinned body is a handful of merged meshes, so there is no
     // per-part head mesh left to tag. Measured off this skeleton — the skull
     // runs 1.84 to 2.23 and the neck sits below it.
-    headshotY: 1.80,
+    headshotY: BODY.HEADSHOT_Y,
     primaryMat: M.armor, secondaryMat: M.armor2,
     outlineMat: olMat,
     skeleton, bones, meshes, outlines,
@@ -412,11 +442,24 @@ function buildHeroBuffers(id) {
   const bufs = {};
   const buf = (key) => (bufs[key] ||= newBuffer());
 
-  const legR = scaled(LEG, bulk), armR = scaled(ARM, bulk);
+  // Authored tables carried onto the new figure.
+  const legR = xf(scaled(LEG, bulk), mapLeg);
+  const armR = xf(scaled(ARM, bulk), mapArm);
+  const torsoT = xf(scaled(TORSO, bulk, true), mapTorso);
+  const skullT = xf(SKULL, mapHead);
+  const handT = xf(HAND, mapArm), fingerT = xf(FINGER, mapArm);
+  // The foot is swept along its own length, so its "y" is distance from the
+  // heel: scaled to the new foot length, and its height by girth. The ankle is
+  // 3.9% of stature off the floor now instead of 12.2%, so the boot shaft that
+  // used to reach a third of the way up the shin is a boot shaft again.
+  const footT = FOOT.map(q => ({ ...q,
+    y: q.y * (BODY.FOOT_LEN / 0.30), rx: q.rx * G, rz: q.rz * G, dz: q.dz * G }));
+  const ankleMap = remapY([[0.085, BODY.ANKLE_Y * 0.42], [0.300, BODY.ANKLE_Y * 1.62]]);
+  const ankleT = xf(ANKLE, ankleMap);
 
   for (const s of ['L', 'R']) {
-    const sx = s === 'L' ? -0.11 : 0.11;
-    const ax = s === 'L' ? -0.27 : 0.27;
+    const sx = s === 'L' ? -BODY.HIP_X : BODY.HIP_X;
+    const ax = s === 'L' ? -BODY.SHOULDER_X : BODY.SHOULDER_X;
     const out = s === 'L' ? -1 : 1;
     const legW = (y) => chainWeights(legChain(s), y);
     const armW = (y) => chainWeights(armChain(s), y);
@@ -429,22 +472,22 @@ function buildHeroBuffers(id) {
     // Boot and ankle ride the ankle bone rigidly.
     {
       const g = newBuffer();
-      loftSkinned(place(domed(FOOT, 0.6), 0, () => [[ankle, 1]]), 18, g);
+      loftSkinned(place(domed(footT, 0.6), 0, () => [[ankle, 1]]), 18, g);
       const geo = toGeometry(g);
       geo.rotateX(-Math.PI / 2);
-      geo.translate(sx, 0, 0.10);
+      geo.translate(sx, 0, BODY.HEEL_Z);
       appendGeometry(geo, [[ankle, 1]], buf('joint'));
       geo.dispose();
     }
-    loftSkinned(place(ANKLE, sx, () => [[ankle, 1]], 0.012), 14, buf('joint'));
+    loftSkinned(place(ankleT, sx, () => [[ankle, 1]], 0.012 * G), 14, buf('joint'));
     // Instep armour. Built in the boot's own upright frame and laid down with
     // it, so its arc (centred on the section's +Z, which becomes UP after the
     // turn) wraps the top of the foot rather than one side of it.
     {
-      const st = FOOT.slice(1).map(q => ({ ...q, x: 0, z: q.dz }));
+      const st = footT.slice(1).map(q => ({ ...q, x: 0, z: q.dz }));
       const geo = plateGeometry(st, arc(BACK, 1.15)[0], arc(BACK, 1.15)[1], 0.020, 9);
       geo.rotateX(-Math.PI / 2);
-      geo.translate(sx, 0, 0.10);
+      geo.translate(sx, 0, BODY.HEEL_Z);
       appendGeometry(geo, [[ankle, 1]], buf('armor'));
       geo.dispose();
     }
@@ -458,125 +501,124 @@ function buildHeroBuffers(id) {
     // shin loses the armour it had.
     addPlate(buf('armor'), legR.slice(11, 18).map(q => ({ ...q })), sx, knee,
              { a0: arc(FRONT, 1.02)[0], a1: arc(FRONT, 1.02)[1], t: 0.026 });
-    addPlate(buf('armor'), [
+    addPlate(buf('armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
       { y: 0.600, rx: 0.089, rz: 0.092, n: 2.2 },
       { y: 0.645, rx: 0.090, rz: 0.093, n: 2.2 },
       { y: 0.692, rx: 0.080, rz: 0.084, n: 2.2 },
-    ], sx, knee, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.028 });
-    addBox(buf('glow'), 0.048, 0.042, 0.026, sx, 0.628, -0.114, knee);
-    addPlate(buf('glow'), [
+    ], mapLeg), sx, knee, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.028 * G });
+    addBox(buf('glow'), 0.048 * G, 0.042 * G, 0.026 * G, sx, mapLeg(0.628), -0.114 * G, knee);
+    addPlate(buf('glow'), xf([
       { y: 0.880, rx: 0.107, rz: 0.118, n: 2.2 },
       { y: 0.930, rx: 0.112, rz: 0.123, n: 2.2 },
       { y: 0.990, rx: 0.115, rz: 0.127, n: 2.2 },
       { y: 1.040, rx: 0.112, rz: 0.124, n: 2.2 },
-    ], sx, thigh, { a0: out > 0 ? -0.30 : Math.PI + 0.30,
+    ], mapLeg), sx, thigh, { a0: out > 0 ? -0.30 : Math.PI + 0.30,
                     a1: out > 0 ? 0.30 : Math.PI - 0.30, t: 0.014, seg: 5 });
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
     loftSkinned(place(armR, ax, armW), 18, buf('frame'));
     addPlate(buf('armor'), armR.slice(9, 15).map(q => ({ ...q })), ax, elbow,
              { a0: arc(FRONT, 1.25)[0], a1: arc(FRONT, 1.25)[1], t: 0.028 });
-    addBox(buf('glow'), 0.028, 0.085, 0.022, ax, 1.090, -0.094, elbow);
+    addBox(buf('glow'), 0.028 * G, 0.085 * G, 0.022 * G, ax, mapArm(1.090), -0.094 * G, elbow);
 
     // Hand + fingers, rigid to the hand bone.
-    loftSkinned(place(domed(HAND, 0, 0.8), ax, () => [[hand, 1]]), 16, buf('joint'));
+    loftSkinned(place(domed(handT, 0, 0.8), ax, () => [[hand, 1]]), 16, buf('joint'));
     for (let f = 0; f < 3; f++) {
-      loftSkinned(place(domed(FINGER, 0, 0.9), ax + (f - 1) * 0.026,
-                        () => [[hand, 1]], -0.026), 8, buf('joint'));
+      loftSkinned(place(domed(fingerT, 0, 0.9), ax + (f - 1) * 0.026 * G,
+                        () => [[hand, 1]], -0.026 * G), 8, buf('joint'));
     }
 
     // Deltoid + pauldron sit on the chest, so they stay put while the arm swings
     // under them — a shoulder only reads as armour if the muscle shows beneath.
-    loftSkinned(place([
+    loftSkinned(place(xf([
       { y: 1.530, rx: 0.074, rz: 0.080, n: 2.2 },
       { y: 1.598, rx: 0.098, rz: 0.100, n: 2.3 },
       { y: 1.662, rx: 0.105, rz: 0.106, n: 2.4 },
       { y: 1.722, rx: 0.091, rz: 0.092, n: 2.4 },
       { y: 1.766, rx: 0.060, rz: 0.062, n: 2.3 },
-    ], ax * 0.945, () => [[B.chest, 1]]), 18, buf('frame'));
-    const PAUL = [
+    ], mapArm), ax * 0.945, () => [[B.chest, 1]]), 18, buf('frame'));
+    const PAUL = xf([
       { y: 1.512, rx: 0.100, rz: 0.104, n: 2.5 },
       { y: 1.550, rx: 0.117, rz: 0.119, n: 2.5 },
       { y: 1.602, rx: 0.111, rz: 0.113, n: 2.5 },
       { y: 1.662, rx: 0.109, rz: 0.110, n: 2.6 },
       { y: 1.716, rx: 0.095, rz: 0.096, n: 2.6 },
       { y: 1.762, rx: 0.064, rz: 0.066, n: 2.4 },
-    ];
+    ], mapArm);
     const pa = out > 0 ? 0 : Math.PI;
     addPlate(buf('armor'), PAUL, ax * 0.945, B.chest,
-             { a0: pa - out * 1.06, a1: pa + out * 1.06, t: 0.030, seg: 11 });
+             { a0: pa - out * 1.06, a1: pa + out * 1.06, t: 0.030 * G, seg: 11 });
     addPlate(buf('armor2'), PAUL.slice(0, 3), ax * 0.945, B.chest,
-             { a0: pa - out * 1.06, a1: pa + out * 1.06, t: 0.040, seg: 11 });
-    addBox(buf('glow'), 0.04, 0.04, 0.03, ax * 0.945 + out * 0.05, 1.630, -0.088, B.chest);
+             { a0: pa - out * 1.06, a1: pa + out * 1.06, t: 0.040 * G, seg: 11 });
+    addBox(buf('glow'), 0.04 * G, 0.04 * G, 0.03 * G, ax * 0.945 + out * 0.05 * G, mapArm(1.630), -0.088 * G, B.chest);
   }
 
   // ── torso: one trunk, pelvis to neck, weighted up the spine ──
-  loftSkinned(place(scaled(TORSO, bulk, true), 0, (y) => chainWeights(TORSO_CHAIN, y)),
-              26, buf('frame'));
+  loftSkinned(place(torsoT, 0, (y) => chainWeights(TORSO_CHAIN, y)), 26, buf('frame'));
 
   for (const s of [-1, 1]) {
-    addPlate(buf('armor'), TORSO.slice(0, 4), 0, B.hips,
+    addPlate(buf('armor'), torsoT.slice(0, 4), 0, B.hips,
              { a0: s > 0 ? -0.62 : Math.PI + 0.62, a1: s > 0 ? 0.62 : Math.PI - 0.62,
                t: 0.028, seg: 7 });
   }
-  addBox(buf('glow'), 0.05, 0.05, 0.03, 0, 1.150, -0.104, B.hips);
+  addBox(buf('glow'), 0.05 * G, 0.05 * G, 0.03 * G, 0, mapTorso(1.150), -0.104 * G, B.hips);
 
   for (let i = 0; i < 3; i++) {
     const y = 1.255 + i * 0.072;
-    addPlate(buf('armor2'), [
+    addPlate(buf('armor2'), xf([
       { y: y - 0.034, rx: 0.130, rz: 0.096, n: 2.6 },
       { y: y - 0.014, rx: 0.136, rz: 0.100, n: 2.6 },
       { y: y + 0.014, rx: 0.137, rz: 0.101, n: 2.6 },
       { y: y + 0.030, rx: 0.130, rz: 0.096, n: 2.6 },
-    ], 0, B.spine, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.022 });
+    ], mapTorso), 0, B.spine, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.022 * G });
   }
-  addBox(buf('glow'), 0.045, 0.06, 0.03, 0, 1.330, -0.116, B.spine);
+  addBox(buf('glow'), 0.045 * G, 0.06 * G, 0.03 * G, 0, mapTorso(1.330), -0.116 * G, B.spine);
 
-  const CHEST = [
+  const CHEST = xf([
     { y: 1.450, rx: 0.148, rz: 0.107, n: 2.8 },
     { y: 1.505, rx: 0.164, rz: 0.115, n: 2.8 },
     { y: 1.565, rx: 0.176, rz: 0.119, n: 2.9 },
     { y: 1.618, rx: 0.176, rz: 0.117, n: 2.9 },
     { y: 1.660, rx: 0.164, rz: 0.110, n: 2.9 },
-  ];
+  ], mapTorso);
   for (const s of [-1, 1]) {
     addPlate(buf('armor'), CHEST, 0, B.chest,
-             { a0: FRONT + s * 0.13, a1: FRONT + s * 1.02, t: 0.030, seg: 9 });
+             { a0: FRONT + s * 0.13, a1: FRONT + s * 1.02, t: 0.030 * G, seg: 9 });
   }
   addPlate(buf('frame'), CHEST.slice(0, 4), 0, B.chest,
-           { a0: FRONT - 0.10, a1: FRONT + 0.10, t: 0.013, seg: 3 });
-  addBox(buf('glow'), 0.04, 0.05, 0.03, 0, 1.455, -0.138, B.chest);
-  addPlate(buf('armor2'), [
+           { a0: FRONT - 0.10, a1: FRONT + 0.10, t: 0.013 * G, seg: 3 });
+  addBox(buf('glow'), 0.04 * G, 0.05 * G, 0.03 * G, 0, mapTorso(1.455), -0.138 * G, B.chest);
+  addPlate(buf('armor2'), xf([
     { y: 1.638, rx: 0.176, rz: 0.117, n: 2.9 },
     { y: 1.672, rx: 0.168, rz: 0.112, n: 2.8 },
     { y: 1.706, rx: 0.150, rz: 0.102, n: 2.8 },
     { y: 1.736, rx: 0.116, rz: 0.090, n: 2.6 },
-  ], 0, B.chest, { a0: -Math.PI * 1.32, a1: Math.PI * 0.32, t: 0.024, seg: 22 });
-  addPlate(buf('frame'), [
+  ], mapTorso), 0, B.chest, { a0: -Math.PI * 1.32, a1: Math.PI * 0.32, t: 0.024 * G, seg: 22 });
+  addPlate(buf('frame'), xf([
     { y: 1.440, rx: 0.144, rz: 0.106, n: 2.8 },
     { y: 1.500, rx: 0.162, rz: 0.115, n: 2.8 },
     { y: 1.580, rx: 0.178, rz: 0.119, n: 2.9 },
     { y: 1.650, rx: 0.168, rz: 0.112, n: 2.9 },
-  ], 0, B.chest, { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.040, seg: 6 });
+  ], mapTorso), 0, B.chest, { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.040 * G, seg: 6 });
 
   // ── head ──
-  loftSkinned(place(domed(SKULL, 0.55), 0, () => [[B.head, 1]]), 22, buf('bone'));
-  addPlate(buf('bone'), SKULL.slice(4).map(q => ({ ...q, z: q.dz })), 0, B.head,
+  loftSkinned(place(domed(skullT, 0.55), 0, () => [[B.head, 1]]), 22, buf('bone'));
+  addPlate(buf('bone'), skullT.slice(4).map(q => ({ ...q, z: q.dz })), 0, B.head,
            { a0: -Math.PI, a1: Math.PI, t: 0.012, seg: 22 });
-  addPlate(buf('joint'), SKULL.slice(3, 6).map(q => ({ ...q, z: q.dz })), 0, B.head,
+  addPlate(buf('joint'), skullT.slice(3, 6).map(q => ({ ...q, z: q.dz })), 0, B.head,
            { a0: -Math.PI, a1: Math.PI, t: 0.005, seg: 22 });
-  for (const s of [-1, 1]) addBox(buf('joint'), 0.026, 0.026, 0.026, s * 0.076, 2.100, 0.024, B.head);
-  addBox(buf('joint'), 0.182, 0.030, 0.05, 0, 2.026, -0.098, B.head);
-  addBox(buf('joint'), 0.166, 0.056, 0.040, 0, 1.982, -0.106, B.head);
-  for (const s of [-1, 1]) addBox(buf('glow'), 0.05, 0.036, 0.03, s * 0.045, 1.982, -0.124, B.head);
-  for (const s of [-1, 1]) addBox(buf('frame'), 0.034, 0.148, 0.112, s * 0.094, 1.992, 0.006, B.head);
-  addBox(buf('bone'), 0.028, 0.058, 0.038, 0, 1.928, -0.108, B.head);
-  addBox(buf('joint'), 0.126, 0.046, 0.030, 0, 1.886, -0.098, B.head);
-  addBox(buf('steel'), 0.112, 0.030, 0.026, 0, 1.889, -0.104, B.head);
+  for (const s of [-1, 1]) addBox(buf('joint'), 0.026 * G, 0.026 * G, 0.026 * G, (s * 0.076) * G, mapHead(2.100), 0.024 * G, B.head);
+  addBox(buf('joint'), 0.182 * G, 0.030 * G, 0.05 * G, 0, mapHead(2.026), -0.098 * G, B.head);
+  addBox(buf('joint'), 0.166 * G, 0.056 * G, 0.040 * G, 0, mapHead(1.982), -0.106 * G, B.head);
+  for (const s of [-1, 1]) addBox(buf('glow'), 0.05 * G, 0.036 * G, 0.03 * G, (s * 0.045) * G, mapHead(1.982), -0.124 * G, B.head);
+  for (const s of [-1, 1]) addBox(buf('frame'), 0.034 * G, 0.148 * G, 0.112 * G, (s * 0.094) * G, mapHead(1.992), 0.006 * G, B.head);
+  addBox(buf('bone'), 0.028 * G, 0.058 * G, 0.038 * G, 0, mapHead(1.928), -0.108 * G, B.head);
+  addBox(buf('joint'), 0.126 * G, 0.046 * G, 0.030 * G, 0, mapHead(1.886), -0.098 * G, B.head);
+  addBox(buf('steel'), 0.112 * G, 0.030 * G, 0.026 * G, 0, mapHead(1.889), -0.104 * G, B.head);
   for (let i = 0; i < 6; i++)
-    addBox(buf('joint'), 0.006, 0.032, 0.022, -0.05 + i * 0.02, 1.889, -0.112, B.head);
-  for (const s of [-1, 1]) addBox(buf('steel'), 0.016, 0.12, 0.016, s * 0.048, 1.800, 0.036, B.neck);
+    addBox(buf('joint'), 0.006 * G, 0.032 * G, 0.022 * G, (-0.05 + i * 0.02) * G, mapHead(1.889), -0.112 * G, B.head);
+  for (const s of [-1, 1]) addBox(buf('steel'), 0.016 * G, 0.12 * G, 0.016 * G, (s * 0.048) * G, mapTorso(1.800), 0.036 * G, B.neck);
 
   const parts = [];
   for (const [key, b] of Object.entries(bufs)) {

@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { buildHeroBody } from '../src/player/HeroBody.js';
 import { LOWPOLY_IDS, isSharedGeometry } from '../src/player/LowPolyModels.js';
 import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
+import * as BODY from '../src/player/Proportions.js';
 
 let fails = 0;
 const ok = (c, msg, detail = '') => {
@@ -49,16 +50,56 @@ for (const id of LOWPOLY_IDS) {
   // ── the contract ───────────────────────────────────────────────────────────
   const hip = P(rig.legL), knee = P(rig.kneeL), ankle = P(rig.ankleL);
   const sh = P(rig.armR), el = P(rig.elbowR), hand = P(bones.handR);
-  ok(near(hip.y, 1.21, 1e-6) && near(Math.abs(hip.x), 0.11, 1e-6),
-     'hip at (0.11, 1.21)', `${hip.x.toFixed(5)}, ${hip.y.toFixed(5)}`);
-  ok(near(knee.y, 0.62, 1e-6), 'knee at y 0.62', knee.y.toFixed(5));
-  ok(near(ankle.y, 0.27, 1e-6), 'ankle at y 0.27', ankle.y.toFixed(5));
-  ok(near(sh.y, 1.76, 1e-6) && near(sh.x, 0.27, 1e-6),
-     'shoulder at (0.27, 1.76)', `${sh.x.toFixed(5)}, ${sh.y.toFixed(5)}`);
-  ok(near(sh.y - el.y, 0.48, 1e-6), 'UP_ARM = 0.48', (sh.y - el.y).toFixed(5));
-  ok(near(el.y - hand.y, 0.385, 1e-6), 'FOREARM = 0.385', (el.y - hand.y).toFixed(5));
-  ok(near(hip.y - knee.y, 0.59, 1e-6), 'THIGH_L = 0.59', (hip.y - knee.y).toFixed(5));
-  ok(near(knee.y - ankle.y, 0.35, 1e-6), 'SHIN_L = 0.35', (knee.y - ankle.y).toFixed(5));
+  // Against Proportions.js, not against numbers typed in here. A harness with
+  // its own copy of the figure goes on measuring the new body with the old
+  // ruler, which is exactly what the gait harness did when this changed.
+  ok(near(hip.y, BODY.HIP_Y, 1e-6) && near(Math.abs(hip.x), BODY.HIP_X, 1e-6),
+     'hip on the figure', `${hip.x.toFixed(4)}, ${hip.y.toFixed(4)}`);
+  ok(near(knee.y, BODY.KNEE_Y, 1e-6), 'knee on the figure', knee.y.toFixed(4));
+  ok(near(ankle.y, BODY.ANKLE_Y, 1e-6), 'ankle on the figure', ankle.y.toFixed(4));
+  ok(near(sh.y, BODY.SHOULDER_Y, 1e-6) && near(sh.x, BODY.SHOULDER_X, 1e-6),
+     'shoulder on the figure', `${sh.x.toFixed(4)}, ${sh.y.toFixed(4)}`);
+  ok(near(sh.y - el.y, BODY.UP_ARM, 1e-6), 'UP_ARM', (sh.y - el.y).toFixed(4));
+  ok(near(el.y - hand.y, BODY.FOREARM, 1e-6), 'FOREARM', (el.y - hand.y).toFixed(4));
+  ok(near(hip.y - knee.y, BODY.THIGH_L, 1e-6), 'THIGH_L', (hip.y - knee.y).toFixed(4));
+  ok(near(knee.y - ankle.y, BODY.SHIN_L, 1e-6), 'SHIN_L', (knee.y - ankle.y).toFixed(4));
+
+  // ── and the figure itself is a HUMAN one ───────────────────────────────────
+  // The body used to be a 2.21m giant while Player.js put your eyes at 1.70m:
+  // the character you saw was not the character you were. These are standard
+  // adult landmark fractions, so a future reshape cannot quietly drift back
+  // toward a mech.
+  {
+    const skull = meshes.find(m => m.name === 'body_bone');
+    let crown = -Infinity, chin = Infinity, top = -Infinity;
+    const q = new THREE.Vector3();
+    const sp = skull.geometry.attributes.position;
+    for (let i = 0; i < sp.count; i++) {
+      q.fromBufferAttribute(sp, i);
+      crown = Math.max(crown, q.y); chin = Math.min(chin, q.y);
+    }
+    for (const m of meshes) {
+      const pp = m.geometry.attributes.position;
+      for (let i = 0; i < pp.count; i++) { q.fromBufferAttribute(pp, i); top = Math.max(top, q.y); }
+    }
+    const CANON = { shoulder: [sh.y, 0.820], elbow: [el.y, 0.630], wrist: [hand.y, 0.485],
+                    hip: [hip.y, 0.530], knee: [knee.y, 0.285], ankle: [ankle.y, 0.039],
+                    chin: [chin, 0.870] };
+    let worst = 0, worstAt = '';
+    for (const [k, [a, frac]] of Object.entries(CANON)) {
+      const d = Math.abs(a / top - frac);
+      if (d > worst) { worst = d; worstAt = k; }
+    }
+    ok(worst < 0.02, 'every landmark sits on human canon',
+       `worst ${(worst * 100).toFixed(1)}%H at the ${worstAt}`);
+    const heads = top / (crown - chin);
+    ok(heads > 7.0 && heads < 8.0, 'the figure is seven and a half heads tall',
+       `${heads.toFixed(2)} heads, stature ${top.toFixed(3)} m`);
+    // The body you see has to be the body you are.
+    ok(Math.abs(top * 0.936 - BODY.EYE_HEIGHT) < 0.05,
+       'its eyes land where the camera already is',
+       `${(top * 0.936).toFixed(3)} m vs Player.js ${BODY.EYE_HEIGHT} m`);
+  }
 
   // ── the surface ────────────────────────────────────────────────────────────
   const v = new THREE.Vector3();
@@ -87,13 +128,19 @@ for (const id of LOWPOLY_IDS) {
         const n = boneNames[idx[k]];
         if (FOOT_BONES.has(n)) onFoot = true;
         // A vertex on one leg must never be pulled by the other leg. Generic
-        // proximity auto-skinning gets this wrong constantly — the thighs are
-        // 0.22 apart and 0.12 thick, so an inner-thigh vertex is nearly as
-        // close to the far femur as to its own.
-        if (/^(thigh|knee|ankle)L$/.test(n) && v.x > 0.02) crossLeg++;
-        if (/^(thigh|knee|ankle)R$/.test(n) && v.x < -0.02) crossLeg++;
+        // proximity auto-skinning gets this wrong constantly — the femoral
+        // heads are only 2 x 4.5%H apart and the thighs are thicker than that,
+        // so an inner-thigh vertex is nearly as close to the far femur as its
+        // own.
+        //
+        // The margin is the hip spacing, not a fixed 2cm: at human proportions
+        // the thighs genuinely touch at the crotch and their surfaces cross the
+        // midline, which is anatomy rather than a weight leak. Real bleed puts
+        // vertices out at the FAR leg, well past this.
+        if (/^(thigh|knee|ankle)L$/.test(n) && v.x > BODY.HIP_X) crossLeg++;
+        if (/^(thigh|knee|ankle)R$/.test(n) && v.x < -BODY.HIP_X) crossLeg++;
       }
-      if (onFoot && v.y < 0.16) footBox.expandByPoint(v);
+      if (onFoot && v.y < BODY.ANKLE_Y + 0.06) footBox.expandByPoint(v);
     }
   }
   console.log(`        ${meshes.length} skinned meshes, ${verts} verts, ${tris | 0} tris`);
@@ -106,17 +153,17 @@ for (const id of LOWPOLY_IDS) {
   // ── the ground plane Locomotion solves against ─────────────────────────────
   ok(near(footBox.min.y, 0, 0.004), 'sole sits on y = 0', `min ${footBox.min.y.toFixed(4)}`);
   ok(bodyLow > -0.004, 'nothing pokes through the floor', `lowest ${bodyLow.toFixed(4)}`);
-  ok(footBox.min.z <= -0.19 && footBox.min.z >= -0.23,
-     'toe reaches z ≈ −0.20', footBox.min.z.toFixed(3));
-  ok(footBox.max.z >= 0.09 && footBox.max.z <= 0.14,
-     'heel reaches z ≈ +0.10', footBox.max.z.toFixed(3));
+  ok(Math.abs(footBox.min.z - BODY.TOE_Z) < 0.03,
+     'the toe reaches where Locomotion plants it', footBox.min.z.toFixed(3));
+  ok(Math.abs(footBox.max.z - BODY.HEEL_Z) < 0.03,
+     'the heel reaches where Locomotion plants it', footBox.max.z.toFixed(3));
 
   // ── headshots ──────────────────────────────────────────────────────────────
   // There is no per-part head mesh to tag any more, so bots resolve head hits
   // by height. The threshold has to sit above the shoulders and below the chin,
   // or every chest hit is a headshot or none of them are.
   const hy = g.userData.headshotY;
-  ok(typeof hy === 'number' && hy > 1.76 && hy < 1.86,
+  ok(typeof hy === 'number' && hy > BODY.SHOULDER_Y && hy < BODY.CHIN_Y + 0.02,
      'the head-hit height clears the shoulders and catches the skull', `${hy}`);
   {
     const src = readFileSync(new URL('../src/weapons/WeaponSystem.js', import.meta.url), 'utf8');
@@ -139,9 +186,9 @@ for (const id of LOWPOLY_IDS) {
       }
       return n;
     };
-    ok(ring(meshes[0], 0.55, 0.69) > 40,
+    ok(ring(meshes[0], BODY.KNEE_Y - 0.06, BODY.KNEE_Y + 0.06) > 40,
        'the knee carries enough loops to bend without pinching',
-       `${ring(meshes[0], 0.55, 0.69)} verts through the crease`);
+       `${ring(meshes[0], BODY.KNEE_Y - 0.06, BODY.KNEE_Y + 0.06)} verts through the crease`);
 
     // Linear blend skinning collapses a joint by averaging two rotated copies
     // of a vertex: the blended result is pulled off the surface and toward the
@@ -161,7 +208,7 @@ for (const id of LOWPOLY_IDS) {
         const pos = m.geometry.attributes.position;
         for (let i = 0; i < pos.count; i++) {
           v.fromBufferAttribute(pos, i);
-          if (v.x > 0 || v.y > 0.68 || v.y < 0.56) continue;   // left knee band
+          if (v.x > 0 || v.y > BODY.KNEE_Y + 0.06 || v.y < BODY.KNEE_Y - 0.06) continue;
           skinnedPosition(m, i, w);
           sum += w.distanceTo(j); n++;
         }
@@ -190,7 +237,7 @@ for (const id of LOWPOLY_IDS) {
     const pos = m.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      if (v.x < -0.05 && v.y > 0.30 && v.y < 0.36) { pick = i; break; }
+      if (v.x < -0.04 && v.y > BODY.ANKLE_Y + 0.10 && v.y < BODY.ANKLE_Y + 0.16) { pick = i; break; }
     }
     ok(pick >= 0, 'found a shin vertex to test');
     if (pick >= 0) {
@@ -199,7 +246,7 @@ for (const id of LOWPOLY_IDS) {
       rig.kneeL.rotation.x = -1.2;
       g.updateMatrixWorld(true);
       skinnedPosition(m, pick, after);
-      ok(before.distanceTo(after) > 0.12,
+      ok(before.distanceTo(after) > 0.08,
          'bending the knee carries the shin skin with it',
          `${before.distanceTo(after).toFixed(3)} m`);
       rig.kneeL.rotation.x = 0;

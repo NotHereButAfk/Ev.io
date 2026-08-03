@@ -5,6 +5,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
+import { STATURE } from '../player/Proportions.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
@@ -81,7 +82,9 @@ function buildHealthBar() {
   fg.userData.noHit = true;
   group.add(bg);
   group.add(fg);
-  group.position.y = 2.7; // above the tallest armor type (heavy ~2.5)
+  // Just clear of the crown. Was 2.7, set when the body was a 2.2m giant;
+  // on a human figure that left the bar floating a metre over its head.
+  group.position.y = STATURE + 0.22;
   return { group, fg };
 }
 
@@ -154,6 +157,9 @@ export class Bot {
       obj.userData.bot = this;
       // Procedural model: tag head-zone parts for headshots (human headshots are
       // resolved by hit-point height in WeaponSystem instead).
+      // (Skinned bodies have no per-part head mesh to tag — they resolve head
+      // hits by height via userData.headshotY. This still tags the legacy
+      // parts-based model, whose meshes do carry their own heights.)
       if (!this._isHuman && obj.isMesh && obj.position.y >= 1.90) obj.userData.isHead = true;
     });
 

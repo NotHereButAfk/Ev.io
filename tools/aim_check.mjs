@@ -20,6 +20,7 @@ import {
   applyRifleCarry, GRIP_LOCAL, HANDGUARD_LOCAL, AIM_PITCH_LIMIT,
 } from '../src/player/RifleCarry.js';
 import { adsMountY, viewmodelZ } from '../src/weapons/WeaponSystem.js';
+import * as BODY from '../src/player/Proportions.js';
 
 const R2D = 180 / Math.PI, D2R = Math.PI / 180;
 let fails = 0;
@@ -31,13 +32,15 @@ const ok = (c, msg, detail = '') => {
 // A real transform hierarchy, so the hands are read the way the renderer would
 // read them rather than re-derived from the IK's own intermediate maths.
 const root = new THREE.Object3D();
+// Built from the shared figure, not a copy of it — a harness with its own idea
+// of the skeleton measures the new pose against the old body.
 const mkArm = (x) => {
-  const sh = new THREE.Object3D(); sh.position.set(x, 1.76, 0); root.add(sh);
-  const el = new THREE.Object3D(); el.position.set(0, -0.48, 0); sh.add(el);
-  const hd = new THREE.Object3D(); hd.position.set(0, -0.385, 0); el.add(hd);
+  const sh = new THREE.Object3D(); sh.position.set(x, BODY.SHOULDER_Y, 0); root.add(sh);
+  const el = new THREE.Object3D(); el.position.set(0, -BODY.UP_ARM, 0); sh.add(el);
+  const hd = new THREE.Object3D(); hd.position.set(0, -BODY.FOREARM, 0); el.add(hd);
   return { sh, el, hd };
 };
-const R = mkArm(0.27), L = mkArm(-0.27);
+const R = mkArm(BODY.SHOULDER_X), L = mkArm(-BODY.SHOULDER_X);
 const rig = { armR: R.sh, elbowR: R.el, armL: L.sh, elbowL: L.el };
 const weapon = new THREE.Object3D(); root.add(weapon);
 const _d = new THREE.Vector3(), _t = new THREE.Vector3(), _h = new THREE.Vector3();
@@ -50,14 +53,34 @@ function pose(o) {
     elev: Math.asin(THREE.MathUtils.clamp(_d.y, -1, 1)) * R2D,
     gripErr: R.hd.getWorldPosition(_h)
       .distanceTo(_t.copy(GRIP_LOCAL).applyQuaternion(weapon.quaternion).add(weapon.position)),
-    guardErr: L.hd.getWorldPosition(_h)
-      .distanceTo(_t.copy(HANDGUARD_LOCAL).applyQuaternion(weapon.quaternion).add(weapon.position)),
+    // The support hand is allowed to slide back along the handguard when the
+    // front of it is out of reach — that is a shorter shooter gripping further
+    // back, not the hand coming off the gun. So what has to be true is that the
+    // hand is ON THE WEAPON'S AXIS, and that the slide is a grip adjustment
+    // rather than a journey: measured perpendicular to the gun, plus how far
+    // along it the hand ended up.
+    guardErr: perpToWeapon(L.hd.getWorldPosition(_h)),
+    guardSlide: alongWeapon(L.hd.getWorldPosition(_h)),
   };
+}
+
+const _ax = new THREE.Vector3(), _rel = new THREE.Vector3();
+function weaponFrame(p) {
+  _ax.set(0, 0, 1).applyQuaternion(weapon.quaternion);
+  _rel.copy(p).sub(_t.copy(HANDGUARD_LOCAL)
+    .applyQuaternion(weapon.quaternion).add(weapon.position));
+  return _rel.dot(_ax);
+}
+function alongWeapon(p) { return weaponFrame(p); }
+function perpToWeapon(p) {
+  const s = weaponFrame(p);
+  return _rel.addScaledVector(_ax, -s).length();
 }
 
 // Torso as an upright capsule and the head as a sphere, both a shade larger
 // than the real mesh so the answer errs toward complaining.
-const TORSO = { y0: 1.05, y1: 1.72, r: 0.185 }, HEAD = { y: 2.03, r: 0.135 };
+const TORSO = { y0: BODY.PELVIS_Y, y1: BODY.NECK_Y, r: 0.152 };
+const HEAD = { y: (BODY.CHIN_Y + BODY.CROWN_Y) / 2, r: 0.111 };
 function intrusion() {
   let worst = 0;
   const p = new THREE.Vector3();
@@ -76,19 +99,22 @@ function intrusion() {
 const SWEEP = [-87, -75, -60, -45, -30, -15, 0, 15, 30, 45, 60, 75, 87];
 
 console.log('\nshouldered — muzzle elevation against the angle it was asked for');
-let worstErr = 0, worstGrip = 0, worstGuard = 0, worstIn = 0;
+let worstErr = 0, worstGrip = 0, worstGuard = 0, worstIn = 0, worstSlide = 0;
 for (const deg of SWEEP) {
   const r = pose({ aimPitch: deg * D2R });
   const err = Math.abs(r.elev - deg);
   worstErr = Math.max(worstErr, err);
   worstGrip = Math.max(worstGrip, r.gripErr);
   worstGuard = Math.max(worstGuard, r.guardErr);
+  worstSlide = Math.max(worstSlide, Math.abs(r.guardSlide));
   worstIn = Math.max(worstIn, intrusion());
 }
 ok(worstErr < 0.15, 'the muzzle lands on the angle asked for, across ±87°',
    `worst ${worstErr.toFixed(3)}°`);
 ok(worstGrip < 0.01 && worstGuard < 0.01, 'both hands stay ON the gun through the sweep',
-   `grip ${(worstGrip * 100).toFixed(2)} cm, handguard ${(worstGuard * 100).toFixed(2)} cm`);
+   `grip ${(worstGrip * 100).toFixed(2)} cm off, support hand ${(worstGuard * 100).toFixed(2)} cm off the weapon axis`);
+ok(worstSlide < 0.14, 'the support hand grips the handguard, not somewhere past it',
+   `slides at most ${(worstSlide * 100).toFixed(1)} cm back along the gun`);
 ok(worstIn <= 0, 'the rifle never passes through the shooter',
    `deepest ${(worstIn * 100).toFixed(2)} cm`);
 

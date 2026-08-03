@@ -60,7 +60,12 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
-- `src/player/` — `HeroBody.js` builds the PRIMARY player/bot chassis: a few
+- `src/player/` — `Proportions.js` is the FIGURE: one source of truth for joint
+  heights, bone lengths and the sole corners, built from adult anthropometry at
+  the stature that matches `Player.js`'s 1.70m eye height (1.816m, 7.5 heads).
+  The body was a 2.21m giant on 12%-of-height ankles until this existed, and the
+  numbers were copied into five files. `HeroBody.js` builds the PRIMARY
+  player/bot chassis: a few
   **SkinnedMesh**es on a real 19-bone skeleton, where a limb is ONE surface from
   hip to ankle that bends because its vertices are weighted between bones (the
   old parts-on-pivots body came apart at any bend past ~60°). Weights are
