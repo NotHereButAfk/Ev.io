@@ -35,6 +35,7 @@
 
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildHeroBody } from './HeroBody.js';
 
 export const LOWPOLY_IDS = ['vanguard', 'striker', 'phantom'];
 export function isLowPolyId(id) { return LOWPOLY_IDS.includes(id); }
@@ -116,7 +117,7 @@ export function getLowPolyPalette(id) {
   return PALETTES[id] || PALETTES.vanguard;
 }
 
-function _mats(pal) {
+export function makeBodyMaterials(pal) {
   // Body materials carry a self-emissive floor so cel shadows keep their hue
   // instead of crushing to black on large flat plates under ACES tone mapping.
   const body = (hex, floor = 0.32) => {
@@ -657,7 +658,7 @@ function _endoBase(g, M, cfg) {
 
 function _build(id) {
   const pal = PALETTES[id] || PALETTES.vanguard;
-  const M = _mats(pal);
+  const M = makeBodyMaterials(pal);
   const g = new THREE.Group();
   _endoBase(g, M, { bulk: pal.bulk });
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -668,5 +669,10 @@ function _build(id) {
 
 // ── Public builder ───────────────────────────────────────────────────────────
 export function buildLowPolyCharacter(id = 'vanguard') {
+  return buildHeroBody(id);
+}
+
+/** The previous parts-on-pivots body, kept for comparison. */
+export function buildSegmentedCharacter(id = 'vanguard') {
   return _build(id);
 }

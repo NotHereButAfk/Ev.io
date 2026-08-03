@@ -856,10 +856,14 @@ export class WeaponSystem {
         const bot = hit.object.userData.bot;
         if (bot) {
           anyHitBot = true;
-          // Procedural bots tag head meshes; the human model is one skinned mesh,
-          // so resolve its headshots from the hit height (~1.5m+ above the feet).
-          const isHead = bot.mesh?.userData?.isHuman
-            ? (hit.point.y - bot.position.y) > 1.5
+          // A skinned body has no per-part head mesh to tag, so its headshots
+          // resolve from the hit height above the feet. Each body states its
+          // own threshold because they are not the same height; only the old
+          // parts-based model still carries a tag.
+          const headY = bot.mesh?.userData?.headshotY
+            ?? (bot.mesh?.userData?.isHuman ? 1.5 : null);
+          const isHead = headY != null
+            ? (hit.point.y - bot.position.y) > headY
             : !!hit.object.userData.isHead;
           const mult   = isHead && def.headshotMultiplier ? def.headshotMultiplier : 1;
           if (this.onHitBot) this.onHitBot(bot, def.damage * mult, hit.point, { headshot: isHead, hitscan: true });

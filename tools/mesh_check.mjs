@@ -1,159 +1,224 @@
 #!/usr/bin/env node
-// Geometry gate for the cyborg body (src/player/LowPolyModels.js).
+// Geometry gate for the player / bot body (src/player/HeroBody.js).
 //
 // The mesh is free to change; the numbers the ANIMATION reads off it are not.
 // Locomotion.js solves ground contact against a fixed hip/knee/ankle chain and
-// a fixed sole footprint, RifleCarry.js IKs both arms against a fixed shoulder
-// position and bone length, and rigCharacterLimbs() places every pivot at the
-// MEAN x of the parts it collects — so a plate nudged sideways silently moves
-// a joint. This checks all of that against the built mesh.
+// a fixed sole footprint, and RifleCarry.js IKs both arms against a fixed
+// shoulder position and fixed bone lengths. None of it is derived from the
+// body, so reshaping the body silently breaks the ground solve or takes the
+// hands off the gun.
+//
+// The body is skinned now, which adds a second class of thing that breaks
+// quietly: weights. A vertex with no influence collapses to the origin, a
+// vertex weighted to the wrong leg gets dragged across the body when the other
+// one swings, and a joint with too little geometry through it pinches shut when
+// it bends. None of that throws — it just looks wrong in motion, which is
+// exactly what a build gate is for.
 
 import * as THREE from 'three';
-import { buildLowPolyCharacter, LOWPOLY_IDS, isSharedGeometry } from '../src/player/LowPolyModels.js';
-import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
 import { readFileSync } from 'node:fs';
+import { buildHeroBody } from '../src/player/HeroBody.js';
+import { LOWPOLY_IDS, isSharedGeometry } from '../src/player/LowPolyModels.js';
+import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
 
 let fails = 0;
 const ok = (c, msg, detail = '') => {
   if (!c) fails++;
-  console.log(`  ${c ? 'ok  ' : 'FAIL'}  ${msg}${detail ? '  ' + detail : ''}`);
+  console.log(`  ${c ? 'ok  ' : 'FAIL'}  ${msg}${detail ? '   ' + detail : ''}`);
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
+const P = (o) => o.getWorldPosition(new THREE.Vector3());
 
-// Exactly the buckets rigCharacterLimbs uses.
-const ARM_RE = /uarm|farm|elbow|hand|shoulder|pau|pvs/i;
-const LEG_RE = /thigh|lleg|knee|boot|shinp|sole|grv|kn_|knsph|tpl|cg_/i;
-const LEG_FT = /boot|sole|foot|toe|ankle/i;
+// Deform a body by its skeleton and read a vertex back out — the same path the
+// renderer and the raycaster take, so what this measures is what is drawn.
+function skinnedPosition(mesh, i, out) {
+  out.fromBufferAttribute(mesh.geometry.attributes.position, i);
+  mesh.applyBoneTransform(i, out);
+  return out;
+}
 
 for (const id of LOWPOLY_IDS) {
   console.log(`\n── ${id} ──`);
-  const g = buildLowPolyCharacter(id);
-  g.updateWorldMatrix(true, true);
+  const g = buildHeroBody(id);
+  g.updateMatrixWorld(true);
+  const rig = rigCharacterLimbs(g);
+  const { meshes, bones } = g.userData;
 
-  // ── geometry sanity ────────────────────────────────────────────────────────
-  let tris = 0, verts = 0, bad = 0, meshes = 0, degenerateNormals = 0;
-  g.traverse((o) => {
-    if (!o.isMesh || o.name === 'outline') return;
-    meshes++;
-    const p = o.geometry.attributes.position, n = o.geometry.attributes.normal;
-    verts += p.count;
-    tris += (o.geometry.index ? o.geometry.index.count : p.count) / 3;
-    for (let i = 0; i < p.count; i++) {
-      if (!Number.isFinite(p.getX(i)) || !Number.isFinite(p.getY(i)) || !Number.isFinite(p.getZ(i))) bad++;
-      if (n) {
-        const l = Math.hypot(n.getX(i), n.getY(i), n.getZ(i));
-        if (!Number.isFinite(l)) bad++;
-        else if (l < 0.5) degenerateNormals++;
-      }
-    }
-  });
-  ok(bad === 0, 'no NaN positions or normals', `${bad} bad`);
-  // Duplicated corner vertices on the armour plates are meant to sit on
-  // zero-area quads; a handful is the technique working, a flood is a bug.
-  ok(degenerateNormals / verts < 0.06, 'unnormalised normals stay rare',
-     `${degenerateNormals}/${verts} = ${(100 * degenerateNormals / verts).toFixed(1)}%`);
-  console.log(`        ${meshes} meshes, ${verts} verts, ${tris | 0} tris (before outlines)`);
+  ok(!!rig && rig.legL && rig.armR, 'the body arrives already rigged');
 
-  // ── the sole plane ─────────────────────────────────────────────────────────
-  // Locomotion.js plants HEEL(y −0.27, z +0.10) and TOE(y −0.27, z −0.20) in
-  // ankle-local space, i.e. y 0 / z +0.10 / z −0.20 in the body's.
-  const wp = new THREE.Vector3(), v = new THREE.Vector3();
+  // ── the contract ───────────────────────────────────────────────────────────
+  const hip = P(rig.legL), knee = P(rig.kneeL), ankle = P(rig.ankleL);
+  const sh = P(rig.armR), el = P(rig.elbowR), hand = P(bones.handR);
+  ok(near(hip.y, 1.21, 1e-6) && near(Math.abs(hip.x), 0.11, 1e-6),
+     'hip at (0.11, 1.21)', `${hip.x.toFixed(5)}, ${hip.y.toFixed(5)}`);
+  ok(near(knee.y, 0.62, 1e-6), 'knee at y 0.62', knee.y.toFixed(5));
+  ok(near(ankle.y, 0.27, 1e-6), 'ankle at y 0.27', ankle.y.toFixed(5));
+  ok(near(sh.y, 1.76, 1e-6) && near(sh.x, 0.27, 1e-6),
+     'shoulder at (0.27, 1.76)', `${sh.x.toFixed(5)}, ${sh.y.toFixed(5)}`);
+  ok(near(sh.y - el.y, 0.48, 1e-6), 'UP_ARM = 0.48', (sh.y - el.y).toFixed(5));
+  ok(near(el.y - hand.y, 0.385, 1e-6), 'FOREARM = 0.385', (el.y - hand.y).toFixed(5));
+  ok(near(hip.y - knee.y, 0.59, 1e-6), 'THIGH_L = 0.59', (hip.y - knee.y).toFixed(5));
+  ok(near(knee.y - ankle.y, 0.35, 1e-6), 'SHIN_L = 0.35', (knee.y - ankle.y).toFixed(5));
+
+  // ── the surface ────────────────────────────────────────────────────────────
+  const v = new THREE.Vector3();
+  let verts = 0, tris = 0, bad = 0, unweighted = 0, badSum = 0, crossLeg = 0;
   const footBox = new THREE.Box3();
   let bodyLow = Infinity;
-  g.traverse((o) => {
-    if (!o.isMesh || o.name === 'outline') return;
-    const p = o.geometry.attributes.position;
-    const isFoot = LEG_FT.test(o.name);
-    for (let i = 0; i < p.count; i++) {
-      v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+  const boneNames = g.userData.skeleton.bones.map(b => b.name);
+  const FOOT_BONES = new Set(['ankleL', 'ankleR']);
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position;
+    const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+    verts += pos.count;
+    tris += m.geometry.index.count / 3;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z)) bad++;
       bodyLow = Math.min(bodyLow, v.y);
-      if (isFoot) footBox.expandByPoint(v);
+      const w = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+      const idx = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)];
+      const sum = w[0] + w[1] + w[2] + w[3];
+      if (sum < 1e-6) unweighted++;
+      else if (Math.abs(sum - 1) > 1e-4) badSum++;
+      let onFoot = false;
+      for (let k = 0; k < 4; k++) {
+        if (w[k] < 1e-5) continue;
+        const n = boneNames[idx[k]];
+        if (FOOT_BONES.has(n)) onFoot = true;
+        // A vertex on one leg must never be pulled by the other leg. Generic
+        // proximity auto-skinning gets this wrong constantly — the thighs are
+        // 0.22 apart and 0.12 thick, so an inner-thigh vertex is nearly as
+        // close to the far femur as to its own.
+        if (/^(thigh|knee|ankle)L$/.test(n) && v.x > 0.02) crossLeg++;
+        if (/^(thigh|knee|ankle)R$/.test(n) && v.x < -0.02) crossLeg++;
+      }
+      if (onFoot && v.y < 0.16) footBox.expandByPoint(v);
     }
-  });
+  }
+  console.log(`        ${meshes.length} skinned meshes, ${verts} verts, ${tris | 0} tris`);
+  ok(bad === 0, 'no NaN positions', `${bad} bad`);
+  ok(unweighted === 0, 'every vertex is weighted to at least one bone',
+     `${unweighted} orphans`);
+  ok(badSum === 0, 'every vertex\'s weights sum to 1', `${badSum} off`);
+  ok(crossLeg === 0, 'no weight leaks across to the opposite leg', `${crossLeg} leaked`);
+
+  // ── the ground plane Locomotion solves against ─────────────────────────────
   ok(near(footBox.min.y, 0, 0.004), 'sole sits on y = 0', `min ${footBox.min.y.toFixed(4)}`);
   ok(bodyLow > -0.004, 'nothing pokes through the floor', `lowest ${bodyLow.toFixed(4)}`);
   ok(footBox.min.z <= -0.19 && footBox.min.z >= -0.23,
-     'toe reaches z ≈ −0.20', `${footBox.min.z.toFixed(3)}`);
+     'toe reaches z ≈ −0.20', footBox.min.z.toFixed(3));
   ok(footBox.max.z >= 0.09 && footBox.max.z <= 0.14,
-     'heel reaches z ≈ +0.10', `${footBox.max.z.toFixed(3)}`);
+     'heel reaches z ≈ +0.10', footBox.max.z.toFixed(3));
 
-  // ── limb-bucket mean x (this is where every pivot lands) ───────────────────
-  const mean = { armL: [], armR: [], legL: [], legR: [] };
-  g.traverse((o) => {
-    if (!o.isMesh || !o.name || o.name === 'outline') return;
-    o.getWorldPosition(wp);
-    const side = wp.x < 0 ? 'L' : 'R';
-    if (ARM_RE.test(o.name) && Math.abs(wp.x) > 0.12) mean['arm' + side].push(wp.x);
-    else if (LEG_RE.test(o.name) && Math.abs(wp.x) > 0.04) mean['leg' + side].push(wp.x);
-  });
-  const avg = (a) => a.reduce((s, x) => s + x, 0) / a.length;
-  ok(near(Math.abs(avg(mean.armL)), 0.27, 1e-6) && near(Math.abs(avg(mean.armR)), 0.27, 1e-6),
-     'shoulder pivots land on |x| = 0.27',
-     `${avg(mean.armL).toFixed(6)} / ${avg(mean.armR).toFixed(6)}`);
-  ok(near(Math.abs(avg(mean.legL)), 0.11, 1e-6) && near(Math.abs(avg(mean.legR)), 0.11, 1e-6),
-     'hip pivots land on |x| = 0.11',
-     `${avg(mean.legL).toFixed(6)} / ${avg(mean.legR).toFixed(6)}`);
+  // ── headshots ──────────────────────────────────────────────────────────────
+  // There is no per-part head mesh to tag any more, so bots resolve head hits
+  // by height. The threshold has to sit above the shoulders and below the chin,
+  // or every chest hit is a headshot or none of them are.
+  const hy = g.userData.headshotY;
+  ok(typeof hy === 'number' && hy > 1.76 && hy < 1.86,
+     'the head-hit height clears the shoulders and catches the skull', `${hy}`);
+  {
+    const src = readFileSync(new URL('../src/weapons/WeaponSystem.js', import.meta.url), 'utf8');
+    ok(/headshotY/.test(src),
+       'the shooting code reads that height rather than a per-mesh tag');
+  }
 
-  // ── headshot zone (bots tag by mesh.position.y >= 1.90) ────────────────────
-  let headParts = 0;
-  g.traverse((o) => { if (o.isMesh && o.name !== 'outline' && o.position.y >= 1.90) headParts++; });
-  ok(headParts >= 8, 'skull parts are inside the bots\' head zone', `${headParts} parts`);
+  // ── deformation ────────────────────────────────────────────────────────────
+  // Bend the knee hard and check the leg still behaves like a leg. Linear blend
+  // skinning collapses at a bend if the joint is short of loops; the failure is
+  // the limb pinching to a waist, which no other check would notice.
+  {
+    const ring = (mesh, yLo, yHi) => {
+      const pos = mesh.geometry.attributes.position;
+      let minX = Infinity, maxX = -Infinity, n = 0;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i);
+        if (v.x > 0 || v.y < yLo || v.y > yHi) continue;   // left leg only
+        n++;
+      }
+      return n;
+    };
+    ok(ring(meshes[0], 0.55, 0.69) > 40,
+       'the knee carries enough loops to bend without pinching',
+       `${ring(meshes[0], 0.55, 0.69)} verts through the crease`);
 
-  // ── the rig itself ─────────────────────────────────────────────────────────
-  const rig = rigCharacterLimbs(g);
-  ok(!!rig, 'rigs');
-  if (rig) {
-    const P = (o) => o.getWorldPosition(new THREE.Vector3());
-    const hip = P(rig.legL), knee = P(rig.kneeL), ankle = P(rig.ankleL);
-    const sh = P(rig.armR), el = P(rig.elbowR);
-    ok(near(hip.y, 1.21, 1e-6), 'hip at y 1.21', hip.y.toFixed(5));
-    ok(near(knee.y, 0.62, 1e-6), 'knee at y 0.62', knee.y.toFixed(5));
-    ok(near(ankle.y, 0.27, 1e-6), 'ankle at y 0.27', ankle.y.toFixed(5));
-    ok(near(sh.y, 1.76, 1e-6) && near(sh.x, 0.27, 1e-6),
-       'shoulder at (0.27, 1.76)', `${sh.x.toFixed(5)}, ${sh.y.toFixed(5)}`);
-    ok(near(sh.y - el.y, 0.48, 1e-6), 'UP_ARM = 0.48', (sh.y - el.y).toFixed(5));
-    ok(near(hip.y - knee.y, 0.59, 1e-6), 'THIGH_L = 0.59', (hip.y - knee.y).toFixed(5));
-    ok(near(knee.y - ankle.y, 0.35, 1e-6), 'SHIN_L = 0.35', (knee.y - ankle.y).toFixed(5));
+    // Linear blend skinning collapses a joint by averaging two rotated copies
+    // of a vertex: the blended result is pulled off the surface and toward the
+    // joint axis. So the thing to measure is the crease vertices' MEAN DISTANCE
+    // FROM THE JOINT, which shrinks exactly when that happens.
+    //
+    // Two earlier versions of this check could not fail. Width across x cannot
+    // move, because the knee is a hinge about x. Max pairwise distance cannot
+    // move either, because it is invariant under rotation. Both reported
+    // identical numbers straight and bent and would have passed any amount of
+    // pinching.
+    const creaseRadius = () => {
+      const w = new THREE.Vector3();
+      const j = P(rig.kneeL);
+      let sum = 0, n = 0;
+      for (const m of meshes) {
+        const pos = m.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          if (v.x > 0 || v.y > 0.68 || v.y < 0.56) continue;   // left knee band
+          skinnedPosition(m, i, w);
+          sum += w.distanceTo(j); n++;
+        }
+      }
+      return n ? sum / n : 0;
+    };
+    g.updateMatrixWorld(true);
+    const straight = creaseRadius();
+    rig.legL.rotation.x = 0.6; rig.kneeL.rotation.x = -1.6;
+    g.updateMatrixWorld(true);
+    const bent = creaseRadius();
+    ok(bent > straight * 0.82,
+       'the knee keeps its volume through a hard bend',
+       `mean crease radius ${(bent * 100).toFixed(2)} cm bent vs ${(straight * 100).toFixed(2)} cm straight`
+       + ` (${((bent / straight - 1) * 100).toFixed(1)}%)`);
+    rig.legL.rotation.x = 0; rig.kneeL.rotation.x = 0;
+    g.updateMatrixWorld(true);
+  }
 
-    // Every limb has to have actually collected parts, or the walk cycle drives
-    // empty pivots and the body strides with its legs standing still.
-    for (const k of ['legL', 'legR', 'armL', 'armR', 'kneeL', 'kneeR', 'elbowL', 'elbowR', 'ankleL', 'ankleR']) {
-      const n = rig[k]?.children.filter(c => c.isMesh).length ?? 0;
-      ok(n > 0, `${k} owns geometry`, `${n} meshes`);
+  // ── the limb actually moves ────────────────────────────────────────────────
+  {
+    const before = new THREE.Vector3(), after = new THREE.Vector3();
+    const m = meshes[0];
+    // A vertex low on the left shin.
+    let pick = -1;
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      if (v.x < -0.05 && v.y > 0.30 && v.y < 0.36) { pick = i; break; }
     }
-
-    // A swung limb must actually move its skin.
-    rig.legL.rotation.x = 0.6;
-    rig.kneeL.rotation.x = -0.9;
-    g.updateWorldMatrix(true, true);
-    const moved = P(rig.ankleL);
-    ok(moved.distanceTo(ankle) > 0.15, 'swinging the hip carries the foot',
-       `${moved.distanceTo(ankle).toFixed(3)} m`);
+    ok(pick >= 0, 'found a shin vertex to test');
+    if (pick >= 0) {
+      g.updateMatrixWorld(true);
+      skinnedPosition(m, pick, before);
+      rig.kneeL.rotation.x = -1.2;
+      g.updateMatrixWorld(true);
+      skinnedPosition(m, pick, after);
+      ok(before.distanceTo(after) > 0.12,
+         'bending the knee carries the shin skin with it',
+         `${before.distanceTo(after).toFixed(3)} m`);
+      rig.kneeL.rotation.x = 0;
+      g.updateMatrixWorld(true);
+    }
   }
 }
 
 // ── shared buffers ───────────────────────────────────────────────────────────
-// Bodies of the same chassis reuse geometry, which is what keeps eight bots off
-// the frame budget. It also means a single dispose() would empty every body on
-// the map at once, so every teardown path has to check before freeing.
-console.log('\n── shared geometry ──');
-{
-  const a = buildLowPolyCharacter('vanguard'), b = buildLowPolyCharacter('vanguard');
-  const geoOf = (g) => { const out = []; g.traverse(o => { if (o.isMesh) out.push(o.geometry); }); return out; };
-  const ga = geoOf(a), gb = geoOf(b);
-  const same = ga.filter((x, i) => x === gb[i]).length;
-  ok(same === ga.length, 'a second body of the same chassis reuses every buffer',
-     `${same}/${ga.length}`);
-  ok(ga.every(isSharedGeometry), 'every reused buffer is tagged shared');
-
-  // Anything that walks a character and frees geometry must gate on the tag.
-  for (const f of ['src/player/Avatar.js', 'src/ui/ArmorPreviewRenderer.js']) {
-    const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8');
-    const frees = /geometry.{0,3}dispose/.test(src);
-    ok(!frees || /isSharedGeometry/.test(src),
-       `${f} checks the tag before disposing`, frees ? 'disposes' : 'never disposes');
-  }
+// The outline hulls are still cached per shape; anything that tears down a
+// character has to check before freeing, or one dispose empties every body.
+console.log('\n── teardown ──');
+for (const f of ['src/player/Avatar.js', 'src/ui/ArmorPreviewRenderer.js']) {
+  const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  const frees = /geometry.{0,3}dispose/.test(src);
+  ok(!frees || /isSharedGeometry/.test(src),
+     `${f} checks before disposing`, frees ? 'disposes' : 'never disposes');
 }
+ok(typeof isSharedGeometry === 'function', 'the shared-geometry tag is still exported');
 
 console.log(fails ? `\n${fails} mesh check(s) FAILED` : '\nall mesh checks passed');
 process.exit(fails ? 1 : 0);

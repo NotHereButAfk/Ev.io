@@ -60,8 +60,16 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
-- `src/player/` — `LowPolyModels.js` builds the PRIMARY player/bot chassis (the
-  three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
+- `src/player/` — `HeroBody.js` builds the PRIMARY player/bot chassis: a few
+  **SkinnedMesh**es on a real 19-bone skeleton, where a limb is ONE surface from
+  hip to ankle that bends because its vertices are weighted between bones (the
+  old parts-on-pivots body came apart at any bend past ~60°). Weights are
+  derived from position along the limb, not painted and not guessed from bone
+  proximity. `BodyGeometry.js` is the superellipse-loft + skinning core;
+  `LowPolyModels.js` owns the palettes/materials and keeps the previous
+  segmented body as `buildSegmentedCharacter()` for comparison. 14 draw calls a
+  body instead of 178. See AGENTS.md 2g/2h and `npm run test:mesh`.
+  Historic note — the segmented body (the three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
   feet, arms, hands, skull — is one **lofted superelliptical surface** per part
   (`|x/rx|^n + |z/rz|^n = 1`, n 2 = limb, 2.8 = ribcage, 3.2 = boot sole), and
   the armour is `plate()`d as curved shells that wrap the form underneath rather
@@ -130,9 +138,11 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   kill-plane recovery to last safe support, deterministic teleport ray.
 - `src/sim/fixtures.js` — 10 sealed fixtures (flat-floor, wall, corner, ramp,
   step, ceiling, crouch tunnel, slide, teleport, recovery), shared by runner+lab.
-- `npm run test:mesh` (tools/mesh_check.mjs) — the body mesh still carries the
-  rig metrics the animation reads off it (pivot heights, sole plane, limb mean-x,
-  head zone), for all three chassis, plus the shared-buffer teardown rule.
+- `npm run test:mesh` (tools/mesh_check.mjs) — the skinned body still carries
+  the rig metrics the animation reads off it (bone heights, bone lengths, sole
+  plane, head-hit height), for all three chassis, PLUS the skinning: no
+  unweighted vertex, no weight crossing between the legs, enough loops through
+  a joint, and a knee that keeps its volume through a 92° bend.
 - `npm run test:move` (tools/movesim_fixtures.mjs) — invariants, double-run
   bit-identity, frame-schedule parity (two seeded irregular frame schedules →
   identical 20Hz hashes), golden hashes in tests/movesim.golden.json, movement

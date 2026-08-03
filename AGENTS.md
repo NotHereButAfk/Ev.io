@@ -27,7 +27,7 @@ npm run build                 # must be clean
 npm run test:move             # 10 movement fixtures, exact hashes
 npm run test:gait             # walk cycle: foot planting in every direction, jump pose
 npm run test:actions          # every action moves the body
-npm run test:mesh             # body mesh still carries the rig metrics
+npm run test:mesh             # rig metrics, skin weights, joint deformation
 cd server && npm run test:auth   # 25 authority/abuse proofs
 ```
 
@@ -134,6 +134,35 @@ hit. It also means `geometry.dispose()` on one body empties every other body
 that is still drawing — the player's own model included. Anything that tears
 down a character must check `isSharedGeometry()` first; `Avatar.dispose()` and
 `ArmorPreviewRenderer` both do, and `test:mesh` fails if either stops.
+
+**2g. The body is SKINNED. Do not re-parent its meshes.**
+`HeroBody.js` builds the player/bot chassis as a few `SkinnedMesh`es on a real
+skeleton: a limb is ONE surface from hip to ankle, and it bends because its
+vertices are weighted between bones. The old body was rigid parts on pivot
+groups, and it fell apart at any bend past ~60° — smoothness within a part does
+nothing about the seam between parts.
+→ `rigCharacterLimbs()` returns `group.userData.rig` unchanged for a skinned
+  body. It must: re-parenting the meshes into pivot groups, which is what it
+  does to a parts body, tears the skin off the skeleton.
+→ The rig it hands back is BONES under the old names (legL/kneeL/ankleL/armL/
+  elbowL/…), so `applyWalkCycle()`, `applyRifleCarry()` and `Actions.js` drive
+  it with no changes — a bone is an Object3D like any other.
+→ Weights are DERIVED from where a vertex sits along its limb, not painted and
+  not guessed from bone proximity. Proximity auto-skinning bleeds across the gap
+  between the thighs (0.22 apart, 0.12 thick), and `test:mesh` fails on any
+  weight that crosses.
+→ Geometry is cached per chassis and SHARED; only the skeleton and materials are
+  per body. Without that cache a body costs ~60ms to build instead of ~7.
+
+**2h. Two things about a skinned body break silently, and both are gated.**
+→ There is no per-part head mesh left to tag, so headshots resolve by hit height
+  from `userData.headshotY`. The old `mesh.position.y >= 1.90` tag matches
+  nothing on a skinned body — every mesh sits at the origin — so leaving it
+  would have quietly disabled headshots on every bot.
+→ A raycast culls against the geometry's bounding sphere, which for a skinned
+  mesh is computed from the BIND pose. A leg thrown out in a slide reaches past
+  it and shots miss a body that is plainly there, so the bodies carry one
+  generous sphere instead.
 
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
 `applyMeleeCarry()` owns them for a blade.
