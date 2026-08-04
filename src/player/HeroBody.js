@@ -371,13 +371,43 @@ function plateGeometry(st, a0, a1, t, seg) {
 const FRONT = -Math.PI / 2, BACK = Math.PI / 2;
 const arc = (c, half) => [c - half, c + half];
 
+// A trim strip that hugs ONE edge of a plate instead of covering half of it.
+//
+// Trims were being cut with `st.slice(2)` — three of a five-station plate, so
+// 60% of every panel was pale trim and the armour read as two-tone stripes
+// rather than a plate with a lit edge. This walks `frac` of the way back from
+// the end station toward the previous one and lands three rings in that sliver:
+// three because a two-ring plate is all end-rings and degenerates, and `frac`
+// small because an edge highlight is an edge.
+function edgeStrip(st, frac = 0.30, atEnd = true) {
+  const i = atEnd ? st.length - 1 : 0, j = atEnd ? st.length - 2 : 1;
+  const a = st[i], b = st[j];
+  const lerp = (u) => {
+    const q = { ...a };
+    for (const k of ['y', 'rx', 'rz', 'z', 'dz']) {
+      if (a[k] === undefined || b[k] === undefined) continue;
+      q[k] = a[k] + (b[k] - a[k]) * u;
+    }
+    return q;
+  };
+  const out = [lerp(0), lerp(frac * 0.5), lerp(frac)];
+  return atEnd ? out.reverse() : out;
+}
+
 // `o.lift` raises the plate's station radii before it is built — how a rim
 // stacks ON another plate rather than through it. Without it a trim strip built
 // from its parent's stations shares that parent's inner face and fights it.
+// `o.hard` overrides the superellipse exponent: the station tables carry the
+// exponent of the BODY under the plate (n ≈ 2.2, a round limb), so armour built
+// straight off them comes out as an inflated pillow wrapped round the arm. A
+// plate is a pressed sheet — it wants a flat face and a tight corner, which is
+// a high exponent. This is the single biggest difference between armour that
+// reads as armour and armour that reads as upholstery.
 function addPlate(buf, st, sx, bone, o) {
   const lift = o.lift || 0;
   const placed = st.map(q => ({
     ...q, rx: q.rx + lift, rz: q.rz + lift,
+    n: o.hard ?? q.n,
     x: sx, z: (q.z || 0) + (q.dz || 0),
   }));
   const g = plateGeometry(placed, o.a0, o.a1, o.t ?? 0.024, o.seg ?? 9);
@@ -526,14 +556,17 @@ function buildHeroBuffers(id) {
     // swing 13cm of armour every heel strike.
     {
       const SHAFT = [
-        { y: 0.106, rx: 0.056, rz: 0.059, n: 2.4 },
-        { y: 0.152, rx: 0.064, rz: 0.067, n: 2.3 },
-        { y: 0.204, rx: 0.070, rz: 0.073, n: 2.3 },
-        { y: 0.242, rx: 0.065, rz: 0.068, n: 2.3 },
+        { y: 0.106, rx: 0.050, rz: 0.055, n: 3.0 },
+        { y: 0.152, rx: 0.055, rz: 0.060, n: 3.0 },
+        { y: 0.198, rx: 0.058, rz: 0.063, n: 2.9 },
+        { y: 0.234, rx: 0.052, rz: 0.057, n: 2.8 },
       ];
-      loftSkinned(place(SHAFT, sx, () => [[knee, 1]]), 16, buf('armor'));
-      addPlate(buf('armor2'), SHAFT.slice(1, 4), sx, knee,
-               { a0: -Math.PI, a1: Math.PI, lift: 0.007, t: TRIM, seg: 16 });
+      addPlate(buf('armor'), SHAFT, sx, knee,
+               { a0: arc(FRONT, 1.02)[0], a1: arc(FRONT, 1.02)[1],
+                 t: 0.014, seg: 12, hard: 3.4 });
+      addPlate(buf('armor2'), edgeStrip(SHAFT, 0.36, true), sx, knee,
+               { a0: arc(FRONT, 1.02)[0], a1: arc(FRONT, 1.02)[1],
+                 lift: 0.014, t: TRIM, seg: 12, hard: 3.4 });
     }
     // Heel block — kept inside the sole footprint Locomotion plants, so the boot
     // reads chunky without moving the contact corners.
@@ -555,18 +588,18 @@ function buildHeroBuffers(id) {
     // Down to just above the knee: the skirt now covers the top of the thigh,
     // so a plate that stops at mid-thigh leaves a bare band between the two.
     addPlate(buf('armor'), legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
-             { a0: arc(FRONT, 0.86)[0], a1: arc(FRONT, 0.86)[1], t: 0.026 });
+             { a0: arc(FRONT, 0.50)[0], a1: arc(FRONT, 0.50)[1], t: 0.030, hard: 3.4 });
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
     addPlate(buf('armor'), legR.slice(11, 18).map(q => ({ ...q })), sx, knee,
-             { a0: arc(FRONT, 1.02)[0], a1: arc(FRONT, 1.02)[1], t: 0.026 });
+             { a0: arc(FRONT, 0.62)[0], a1: arc(FRONT, 0.62)[1], t: 0.030, hard: 3.4 });
     addPlate(buf('armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
       { y: 0.600, rx: 0.089, rz: 0.092, n: 2.2 },
       { y: 0.645, rx: 0.090, rz: 0.093, n: 2.2 },
       { y: 0.692, rx: 0.080, rz: 0.084, n: 2.2 },
-    ], mapLeg), sx, knee, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.028 * G });
+    ], mapLeg), sx, knee, { a0: arc(FRONT, 0.58)[0], a1: arc(FRONT, 0.58)[1], t: 0.030 * G, hard: 3.4 });
     addBox(buf('glow'), 0.048 * G, 0.042 * G, 0.026 * G, sx, mapLeg(0.628), -0.114 * G, knee);
     addPlate(buf('glow'), xf([
       { y: 0.880, rx: 0.107, rz: 0.118, n: 2.2 },
@@ -583,40 +616,43 @@ function buildHeroBuffers(id) {
     // could stand off to. On the thigh it simply travels with the leg.
     {
       const TAS = [
-        { y: 0.958, rx: 0.106, rz: 0.134, n: 2.4 },
-        { y: 0.906, rx: 0.116, rz: 0.152, n: 2.4 },
-        { y: 0.850, rx: 0.118, rz: 0.156, n: 2.4 },
-        { y: 0.796, rx: 0.112, rz: 0.150, n: 2.4 },
-        { y: 0.760, rx: 0.100, rz: 0.134, n: 2.4 },
+        { y: 0.962, rx: 0.100, rz: 0.130, n: 2.4 },
+        { y: 0.916, rx: 0.110, rz: 0.146, n: 2.4 },
+        { y: 0.868, rx: 0.112, rz: 0.149, n: 2.4 },
+        { y: 0.824, rx: 0.104, rz: 0.141, n: 2.4 },
       ];
       addPlate(buf('armor'), TAS, sx, thigh,
-               { a0: arc(FRONT, 0.62)[0], a1: arc(FRONT, 0.62)[1], t: 0.024, seg: 9 });
-      addPlate(buf('armor2'), TAS.slice(2), sx, thigh,
-               { a0: arc(FRONT, 0.62)[0], a1: arc(FRONT, 0.62)[1],
-                 lift: 0.024, t: TRIM, seg: 9 });
-      addBox(buf('glow'), 0.030, 0.044, 0.022, sx, 0.872, -0.176, thigh);
+               { a0: arc(FRONT, 0.58)[0], a1: arc(FRONT, 0.58)[1],
+                 t: 0.024, seg: 9, hard: 4.0 });
+      addPlate(buf('armor2'), edgeStrip(TAS, 0.30, true), sx, thigh,
+               { a0: arc(FRONT, 0.58)[0], a1: arc(FRONT, 0.58)[1],
+                 lift: 0.024, t: TRIM, seg: 9, hard: 4.0 });
+      addBox(buf('glow'), 0.026, 0.038, 0.022, sx, 0.900, -0.168, thigh);
     }
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
     loftSkinned(place(armR, ax, armW), 18, buf('frame'));
     addPlate(buf('armor'), armR.slice(9, 15).map(q => ({ ...q })), ax, elbow,
-             { a0: arc(FRONT, 1.25)[0], a1: arc(FRONT, 1.25)[1], t: 0.028 });
+             { a0: arc(FRONT, 0.78)[0], a1: arc(FRONT, 0.78)[1], t: 0.032, hard: 3.2 });
     addBox(buf('glow'), 0.028 * G, 0.085 * G, 0.022 * G, ax, mapArm(1.090), -0.094 * G, elbow);
 
     // Gauntlet: a cuff that flares out toward the wrist. Rigid to the forearm,
     // so it stays a hard shell while the skin under it creases at the elbow.
     {
       const CUFF = xf([
-        { y: 1.096, rx: 0.062, rz: 0.068, n: 2.3 },
-        { y: 1.040, rx: 0.074, rz: 0.080, n: 2.3 },
-        { y: 0.982, rx: 0.078, rz: 0.084, n: 2.3 },
-        { y: 0.938, rx: 0.068, rz: 0.074, n: 2.3 },
+        { y: 1.096, rx: 0.062, rz: 0.067, n: 3.0 },
+        { y: 1.040, rx: 0.058, rz: 0.063, n: 3.0 },
+        { y: 0.982, rx: 0.052, rz: 0.057, n: 2.9 },
+        { y: 0.938, rx: 0.046, rz: 0.051, n: 2.8 },
       ], mapArm);
-      loftSkinned(place(CUFF, ax, () => [[elbow, 1]]), 14, buf('armor'));
-      addPlate(buf('armor2'), CUFF.slice(1, 4), ax, elbow,
-               { a0: -Math.PI, a1: Math.PI, lift: 0.007, t: TRIM, seg: 14 });
-      addBox(buf('glow'), 0.020 * G, 0.056 * G, 0.018 * G,
-             ax, mapArm(1.012), -0.084 * G, elbow);
+      addPlate(buf('armor'), CUFF, ax, elbow,
+               { a0: arc(FRONT, 1.06)[0], a1: arc(FRONT, 1.06)[1],
+                 t: 0.014, seg: 12, hard: 3.4 });
+      addPlate(buf('armor2'), edgeStrip(CUFF, 0.36, true), ax, elbow,
+               { a0: arc(FRONT, 1.06)[0], a1: arc(FRONT, 1.06)[1],
+                 lift: 0.014, t: TRIM, seg: 12, hard: 3.4 });
+      addBox(buf('glow'), 0.018 * G, 0.050 * G, 0.016 * G,
+             ax, mapArm(1.012), -0.062 * G, elbow);
     }
 
     // Hand + fingers, rigid to the hand bone.
@@ -646,10 +682,10 @@ function buildHeroBuffers(id) {
     const lame = (st, half, t) => {
       const T = xf(st, mapArm);
       addPlate(buf('armor'), T, px, B.chest,
-               { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11 });
-      addPlate(buf('armor2'), T.slice(0, 3), px, B.chest,
+               { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11, hard: 4.0 });
+      addPlate(buf('armor2'), edgeStrip(T, 0.34, false), px, B.chest,
                { a0: pa - out * half, a1: pa + out * half,
-                 lift: t * G, t: TRIM * G, seg: 11 });
+                 lift: t * G, t: TRIM * G, seg: 11, hard: 4.0 });
       return T;
     };
     lame([                                  // top cap, over the deltoid
@@ -661,28 +697,28 @@ function buildHeroBuffers(id) {
       { y: 1.762, rx: 0.064, rz: 0.066, n: 2.4 },
     ], 1.06, 0.030);
     lame([                                  // middle lame
-      { y: 1.466, rx: 0.106, rz: 0.110, n: 2.5 },
-      { y: 1.506, rx: 0.126, rz: 0.128, n: 2.5 },
-      { y: 1.552, rx: 0.131, rz: 0.133, n: 2.5 },
-      { y: 1.608, rx: 0.127, rz: 0.128, n: 2.6 },
-      { y: 1.664, rx: 0.117, rz: 0.118, n: 2.6 },
+      { y: 1.512, rx: 0.104, rz: 0.108, n: 2.5 },
+      { y: 1.548, rx: 0.124, rz: 0.126, n: 2.5 },
+      { y: 1.592, rx: 0.129, rz: 0.131, n: 2.5 },
+      { y: 1.642, rx: 0.125, rz: 0.126, n: 2.6 },
+      { y: 1.692, rx: 0.114, rz: 0.115, n: 2.6 },
     ], 1.12, 0.026);
     lame([                                  // outer flare, the widest point
-      { y: 1.418, rx: 0.110, rz: 0.114, n: 2.5 },
-      { y: 1.454, rx: 0.134, rz: 0.137, n: 2.5 },
-      { y: 1.496, rx: 0.142, rz: 0.144, n: 2.5 },
-      { y: 1.548, rx: 0.138, rz: 0.139, n: 2.6 },
+      { y: 1.470, rx: 0.112, rz: 0.116, n: 2.5 },
+      { y: 1.502, rx: 0.136, rz: 0.139, n: 2.5 },
+      { y: 1.540, rx: 0.144, rz: 0.146, n: 2.5 },
+      { y: 1.586, rx: 0.139, rz: 0.140, n: 2.6 },
     ], 1.16, 0.024);
     // Accent burning on the outer face of the flare.
-    addBox(buf('glow'), 0.030 * G, 0.070 * G, 0.024 * G,
-           px + out * 0.148 * G, mapArm(1.500), -0.050 * G, B.chest);
+    addBox(buf('glow'), 0.028 * G, 0.062 * G, 0.022 * G,
+           px + out * 0.150 * G, mapArm(1.546), -0.048 * G, B.chest);
     addBox(buf('glow'), 0.04 * G, 0.04 * G, 0.03 * G,
            px + out * 0.05 * G, mapArm(1.630), -0.088 * G, B.chest);
 
     // Upper-arm plate. Without it the whole arm between pauldron and gauntlet is
     // bare underframe, and the figure reads sleeveless.
-    addPlate(buf('armor'), armR.slice(2, 7).map(q => ({ ...q })), ax, B['shoulder' + s],
-             { a0: pa - out * 0.92, a1: pa + out * 0.92, t: 0.024, seg: 9 });
+    addPlate(buf('armor'), armR.slice(3, 7).map(q => ({ ...q })), ax, B['shoulder' + s],
+             { a0: pa - out * 0.68, a1: pa + out * 0.68, t: 0.026, seg: 9, hard: 3.4 });
   }
 
   // ── torso: one trunk, pelvis to neck, weighted up the spine ──
@@ -701,48 +737,53 @@ function buildHeroBuffers(id) {
   // and it has to clear limbs whose swept volumes are known in this space.
   {
     const BELT = [
-      { y: 1.006, rx: 0.134, rz: 0.096, n: 2.6 },
-      { y: 1.046, rx: 0.141, rz: 0.101, n: 2.6 },
-      { y: 1.086, rx: 0.136, rz: 0.098, n: 2.6 },
+      { y: 1.010, rx: 0.120, rz: 0.090, n: 2.6 },
+      { y: 1.048, rx: 0.127, rz: 0.095, n: 2.6 },
+      { y: 1.086, rx: 0.122, rz: 0.092, n: 2.6 },
     ];
     addPlate(buf('joint'), BELT, 0, B.hips, { a0: -Math.PI, a1: Math.PI, t: 0.016, seg: 26 });
     addPlate(buf('armor'), BELT, 0, B.hips,
              { a0: -Math.PI, a1: Math.PI, lift: 0.016, t: TRIM, seg: 26 });
-    addBox(buf('armor2'), 0.078, 0.056, 0.028, 0, 1.046, -0.106, B.hips);
-    addBox(buf('glow'), 0.030, 0.030, 0.024, 0, 1.046, -0.116, B.hips, Math.PI / 4);
+    addBox(buf('armor2'), 0.070, 0.052, 0.026, 0, 1.048, -0.100, B.hips);
+    addBox(buf('glow'), 0.028, 0.028, 0.024, 0, 1.048, -0.110, B.hips, Math.PI / 4);
   }
   // Side tassets. These CAN hang off the pelvis — the thigh's lateral travel is
   // a couple of centimetres where its fore/aft travel is ten, so a side panel
   // standing 2cm proud of the widest point of the leg stays clear all cycle.
   {
+    // 14cm of panel, not 22. The long version hung to mid-thigh the whole way
+    // round and the figure read as wearing a skirt rather than hip armour — the
+    // LENGTH did that, more than the width.
     const SIDE = [
-      { y: 0.990, rx: 0.176, rz: 0.128, n: 2.6 },
-      { y: 0.935, rx: 0.196, rz: 0.142, n: 2.6 },
-      { y: 0.872, rx: 0.204, rz: 0.148, n: 2.5 },
-      { y: 0.812, rx: 0.198, rz: 0.144, n: 2.4 },
-      { y: 0.772, rx: 0.184, rz: 0.134, n: 2.4 },
+      { y: 1.012, rx: 0.150, rz: 0.112, n: 2.6 },
+      { y: 0.972, rx: 0.170, rz: 0.126, n: 2.6 },
+      { y: 0.936, rx: 0.178, rz: 0.131, n: 2.5 },
+      { y: 0.906, rx: 0.170, rz: 0.125, n: 2.5 },
     ];
     for (const s of [-1, 1]) {
       const c = s > 0 ? 0 : Math.PI;
       addPlate(buf('armor'), SIDE, 0, B.hips,
-               { a0: c - s * 0.66, a1: c + s * 0.66, t: 0.026, seg: 9 });
-      addPlate(buf('armor2'), SIDE.slice(2), 0, B.hips,
-               { a0: c - s * 0.66, a1: c + s * 0.66, lift: 0.026, t: TRIM, seg: 9 });
-      addBox(buf('glow'), 0.022, 0.052, 0.030, s * 0.196, 0.902, -0.030, B.hips);
+               { a0: c - s * 0.62, a1: c + s * 0.62, t: 0.026, seg: 9, hard: 4.0 });
+      addPlate(buf('armor2'), edgeStrip(SIDE, 0.30, true), 0, B.hips,
+               { a0: c - s * 0.62, a1: c + s * 0.62,
+                 lift: 0.026, t: TRIM, seg: 9, hard: 4.0 });
+      addBox(buf('glow'), 0.018, 0.038, 0.026, s * 0.174, 0.952, -0.030, B.hips);
     }
     // Rear panel, tucked under the cape.
-    addPlate(buf('armor'), SIDE.slice(0, 4), 0, B.hips,
-             { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.024, seg: 7 });
+    addPlate(buf('armor'), SIDE, 0, B.hips,
+             { a0: arc(BACK, 0.50)[0], a1: arc(BACK, 0.50)[1],
+               t: 0.024, seg: 7, hard: 4.0 });
   }
 
   for (let i = 0; i < 3; i++) {
     const y = 1.255 + i * 0.072;
-    addPlate(buf('armor2'), xf(scaled([
-      { y: y - 0.034, rx: 0.130, rz: 0.096, n: 2.6 },
-      { y: y - 0.014, rx: 0.136, rz: 0.100, n: 2.6 },
-      { y: y + 0.014, rx: 0.137, rz: 0.101, n: 2.6 },
-      { y: y + 0.030, rx: 0.130, rz: 0.096, n: 2.6 },
-    ], bulk), mapTorso), 0, B.spine, { a0: arc(FRONT, 0.95)[0], a1: arc(FRONT, 0.95)[1], t: 0.022 * G });
+    addPlate(buf('armor'), xf(scaled([
+      { y: y - 0.034, rx: 0.116, rz: 0.090, n: 2.6 },
+      { y: y - 0.014, rx: 0.122, rz: 0.094, n: 2.6 },
+      { y: y + 0.014, rx: 0.123, rz: 0.095, n: 2.6 },
+      { y: y + 0.030, rx: 0.116, rz: 0.090, n: 2.6 },
+    ], bulk), mapTorso), 0, B.spine,
+      { a0: arc(FRONT, 0.74)[0], a1: arc(FRONT, 0.74)[1], t: 0.022 * G, hard: 3.6 });
   }
   addBox(buf('glow'), 0.045 * G, 0.06 * G, 0.03 * G, 0, mapTorso(1.330), -0.116 * G, B.spine);
 
@@ -759,23 +800,31 @@ function buildHeroBuffers(id) {
   ], bulk), mapTorso);
   for (const s of [-1, 1]) {
     addPlate(buf('armor'), CHEST, 0, B.chest,
-             { a0: FRONT + s * 0.13, a1: FRONT + s * 1.34, t: 0.030 * G, seg: 12 });
+             { a0: FRONT + s * 0.13, a1: FRONT + s * 1.34,
+               t: 0.030 * G, seg: 12, hard: 4.2 });
   }
   addPlate(buf('frame'), CHEST.slice(0, 4), 0, B.chest,
            { a0: FRONT - 0.10, a1: FRONT + 0.10, t: 0.013 * G, seg: 3 });
   addBox(buf('glow'), 0.04 * G, 0.05 * G, 0.03 * G, 0, mapTorso(1.455), -0.138 * G, B.chest);
-  addPlate(buf('armor2'), xf(scaled([
-    { y: 1.638, rx: 0.176, rz: 0.117, n: 2.9 },
-    { y: 1.672, rx: 0.168, rz: 0.112, n: 2.8 },
-    { y: 1.706, rx: 0.150, rz: 0.102, n: 2.8 },
-    { y: 1.736, rx: 0.116, rz: 0.090, n: 2.6 },
-  ], bulk), mapTorso), 0, B.chest, { a0: -Math.PI * 1.32, a1: Math.PI * 0.32, t: 0.024 * G, seg: 22 });
+  {
+    const YOKE = xf(scaled([
+      { y: 1.638, rx: 0.176, rz: 0.117, n: 2.9 },
+      { y: 1.672, rx: 0.168, rz: 0.112, n: 2.8 },
+      { y: 1.706, rx: 0.150, rz: 0.102, n: 2.8 },
+      { y: 1.736, rx: 0.116, rz: 0.090, n: 2.6 },
+    ], bulk), mapTorso);
+    const YA = { a0: -Math.PI * 1.32, a1: Math.PI * 0.32, seg: 22, hard: 3.4 };
+    addPlate(buf('armor'), YOKE, 0, B.chest, { ...YA, t: 0.024 * G });
+    addPlate(buf('armor2'), edgeStrip(YOKE, 0.26, false), 0, B.chest,
+             { ...YA, lift: 0.024 * G, t: TRIM });
+  }
   addPlate(buf('armor'), xf(scaled([
     { y: 1.440, rx: 0.144, rz: 0.106, n: 2.8 },
     { y: 1.500, rx: 0.162, rz: 0.115, n: 2.8 },
     { y: 1.580, rx: 0.178, rz: 0.119, n: 2.9 },
     { y: 1.650, rx: 0.168, rz: 0.112, n: 2.9 },
-  ], bulk), mapTorso), 0, B.chest, { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.040 * G, seg: 6 });
+  ], bulk), mapTorso), 0, B.chest,
+    { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.040 * G, seg: 6, hard: 3.8 });
 
   // Sternum emblem. The chest plates leave a ±0.13rad gap down the midline for
   // the frame to show through; the emblem sits in it and stands proud of both,
@@ -822,13 +871,18 @@ function buildHeroBuffers(id) {
   // tones on the shell (armour over the crown, trim on the brow and crest) so
   // the helmet reads as built out of plates rather than moulded in one piece.
   loftSkinned(place(domed(skullT, 0.55), 0, () => [[B.head, 1]]), 22, buf('armor'));
-  // Crown plate + brow band, each a wrapped shell so the helm has edges.
-  addPlate(buf('armor'), skullT.slice(4).map(q => ({ ...q, z: q.dz })), 0, B.head,
-           { a0: -Math.PI, a1: Math.PI, t: 0.014 * G, seg: 22 });
-  addPlate(buf('armor2'), skullT.slice(4, 7).map(q => ({ ...q, z: q.dz })), 0, B.head,
-           { a0: -Math.PI, a1: Math.PI, lift: 0.014 * G, t: TRIM, seg: 22 });
+  // Crown plate, hard-faced so the helm has flats and a temple corner rather
+  // than being a bowl. Its trim is a band at the BROW, where a helmet's seam
+  // actually is — a pale cap over the whole crown reads as a bald head.
+  {
+    const CROWN = skullT.slice(4).map(q => ({ ...q, z: q.dz }));
+    const CA = { a0: -Math.PI, a1: Math.PI, seg: 22, hard: 3.8 };
+    addPlate(buf('armor'), CROWN, 0, B.head, { ...CA, t: 0.014 * G });
+    addPlate(buf('armor2'), edgeStrip(CROWN, 0.24, false), 0, B.head,
+             { ...CA, lift: 0.014 * G, t: TRIM });
+  }
   addPlate(buf('joint'), skullT.slice(3, 5).map(q => ({ ...q, z: q.dz })), 0, B.head,
-           { a0: -Math.PI, a1: Math.PI, t: 0.007 * G, seg: 22 });
+           { a0: -Math.PI, a1: Math.PI, t: 0.012 * G, seg: 22, hard: 3.4 });
 
   // Visor: a dark band sunk across the eye line, with the optic burning out of
   // the middle of it.
@@ -841,11 +895,14 @@ function buildHeroBuffers(id) {
   // wedge, so the silhouette steps the way the plates elsewhere do.
   for (let i = 0; i < 5; i++) {
     const t0 = i / 4;
+    addBox(buf('armor'),
+           0.030 * G, (0.132 - 0.078 * t0) * G, (0.070 + 0.020 * t0) * G,
+           0, mapHead(2.126 + 0.026 * t0), (-0.075 + 0.086 * t0) * G, B.head);
     addBox(buf('armor2'),
-           0.026 * G, (0.10 - 0.055 * t0) * G, (0.070 + 0.020 * t0) * G,
-           0, mapHead(2.115 + 0.030 * t0), (-0.075 + 0.086 * t0) * G, B.head);
+           0.034 * G, (0.030 - 0.014 * t0) * G, (0.066 + 0.018 * t0) * G,
+           0, mapHead(2.176 + 0.010 * t0), (-0.075 + 0.086 * t0) * G, B.head);
   }
-  addBox(buf('glow'), 0.014 * G, 0.052 * G, 0.036 * G, 0, mapHead(2.128), -0.078 * G, B.head);
+  addBox(buf('glow'), 0.016 * G, 0.070 * G, 0.036 * G, 0, mapHead(2.132), -0.082 * G, B.head);
 
   // Cheek guards + chin plate close the jaw.
   for (const s of [-1, 1])

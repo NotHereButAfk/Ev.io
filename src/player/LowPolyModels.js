@@ -44,11 +44,18 @@ export function isLowPolyId(id) { return LOWPOLY_IDS.includes(id); }
 let _rampTex = null;
 function _ramp() {
   if (_rampTex) return _rampTex;
-  // Lifted shadow floor so big flat plates don't crush to black under ACES.
   // Six bands rather than four: a rounded limb crosses far more of the ramp
   // than a flat plate does, and at four bands the terminator lands as three
   // wide steps that read as facets on a form that is actually smooth.
-  const d = new Uint8Array([150, 174, 196, 216, 234, 255]);
+  //
+  // The floor was at 150 — 59% brightness in the darkest band — to stop big
+  // plates crushing to black under ACES. Combined with the emissive floors
+  // below it left the body a total range of about a third of a stop, so every
+  // form on it rendered flat: a shoulder, a chest plate and a thigh all came
+  // out the same value and the character read as one inflated violet mass no
+  // matter how the armour was shaped. Plates are separated by SHADING before
+  // they are separated by colour, and there was no shading to do it with.
+  const d = new Uint8Array([84, 122, 158, 192, 224, 255]);
   _rampTex = new THREE.DataTexture(d, 6, 1, THREE.RedFormat);
   _rampTex.minFilter = _rampTex.magFilter = THREE.NearestFilter;
   _rampTex.needsUpdate = true;
@@ -114,11 +121,11 @@ function _addOutlines(group, t = 0.011) {
 // rather than a plate edge. What separates plates on a cel ramp is HUE and a
 // step of about a third in value, not the full range of it.
 const PALETTES = {
-  vanguard: { armor: 0x7a55d6, armor2: 0xb69cf0, frame: 0x342b52, joint: 0x120e20,
-              steel: 0x8f7fc4, bone: 0xe4dcf8, glow: 0xff2f8f, bulk: 1.08 },  // violet
-  striker:  { armor: 0x3286d8, armor2: 0x9dc4ef, frame: 0x22314a, joint: 0x0b1220,
+  vanguard: { armor: 0x7a55d6, armor2: 0xb69cf0, frame: 0x1f1934, joint: 0x0d0a18,
+              steel: 0x8f7fc4, bone: 0xe4dcf8, glow: 0xff2f8f, bulk: 1.00 },  // violet
+  striker:  { armor: 0x3286d8, armor2: 0x9dc4ef, frame: 0x141d2e, joint: 0x070b14,
               steel: 0x7ba6cc, bone: 0xdff0fb, glow: 0x2ff0d8, bulk: 0.96 },  // azure
-  phantom:  { armor: 0x4b4760, armor2: 0x9d95bb, frame: 0x272433, joint: 0x0c0a14,
+  phantom:  { armor: 0x4b4760, armor2: 0x9d95bb, frame: 0x191722, joint: 0x08070d,
               steel: 0x7f7899, bone: 0xcfc9e0, glow: 0xff3d5e, bulk: 0.92 },  // graphite
 };
 
@@ -140,12 +147,12 @@ export function makeBodyMaterials(pal) {
   };
   const red = pal.glow;
   return {
-    armor:  body(pal.armor, 0.34),
-    armor2: body(pal.armor2, 0.34),
-    frame:  body(pal.frame, 0.6),
-    joint:  body(pal.joint, 0.7),
-    steel:  body(pal.steel, 0.3),
-    bone:   body(pal.bone, 0.36),
+    armor:  body(pal.armor, 0.16),
+    armor2: body(pal.armor2, 0.16),
+    frame:  body(pal.frame, 0.24),
+    joint:  body(pal.joint, 0.30),
+    steel:  body(pal.steel, 0.16),
+    bone:   body(pal.bone, 0.20),
     glow:   T(new THREE.Color(red).multiplyScalar(0.15).getHex(), { role: 'energy', emissive: red, emissiveIntensity: 1.5 }),
     eye:    T(new THREE.Color(red).multiplyScalar(0.2).getHex(),  { role: 'energy', emissive: red, emissiveIntensity: 2.2 }),
   };
