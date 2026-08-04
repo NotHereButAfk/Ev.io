@@ -22,7 +22,7 @@ the arm and a boot that flares toward the floor read as designed hardware at
 the same triangle count. Nothing is smooth-shaded, nothing is textured, and
 the silhouette does all the work.
 
-Budget: 53 blocks x 12 = 636 triangles. The build asserts it stays under 1200.
+Budget: 92 blocks x 12 = 1104 triangles. The build asserts it stays under 1200.
 """
 
 import os
@@ -200,8 +200,13 @@ def build_mesh(M):
 
     # ── abdomen + pelvis ─────────────────────────────────────────────────────
     block("Abdomen_Core", D, "Spine", (0, 0.005, 1.195), (0.230, 0.190, 0.145))
-    block("Abdomen_Plate", A, "Spine", (0, -0.070, 1.180), (0.185, 0.075, 0.105),
+    block("Abdomen_Plate", A, "Spine", (0, -0.072, 1.222), (0.185, 0.075, 0.070),
           top=(1.10, 1.0))
+    # Three stacked lames rather than one slab: a segmented belly is the single
+    # cheapest thing that says "armour" instead of "torso-shaped box", and each
+    # step is a free silhouette break at 12 triangles.
+    block("Ab_Lame_Mid", A, "Spine", (0, -0.074, 1.170), (0.176, 0.072, 0.036))
+    block("Ab_Lame_Low", A, "Spine", (0, -0.070, 1.130), (0.166, 0.068, 0.034))
     block("Pelvis_Core", D, "Pelvis", (0, 0.005, 1.055), (0.265, 0.205, 0.135))
     block("Belt", D, "Pelvis", (0, 0.005, 1.118), (0.280, 0.220, 0.040))
     mirrored("Hip_Plate", A, "Pelvis", (0.128, -0.020, 1.020),
@@ -249,6 +254,68 @@ def build_mesh(M):
              (0.182, 0.270, 0.105), top=(0.82, 0.88), top_off=(0, 0.016))
     mirrored("Boot_Sole", D, "Shin", (0.112, -0.022, 0.022),
              (0.190, 0.284, 0.044), top=(0.97, 0.98))
+
+    # ── detail pass ──────────────────────────────────────────────────────────
+    # Every one of these is another 12-triangle block. They are placed to break
+    # a long unbroken face or to bridge a gap between two parts — detail that
+    # sits in the middle of a flat panel costs the same and reads as nothing.
+
+    # helmet: brow over the visor, ear pods, chin vent
+    block("Helm_Brow", A, "Head", (0, -0.150, 1.706), (0.196, 0.036, 0.026),
+          top=(0.90, 1.0))
+    mirrored("Helm_Ear", D, "Head", (0.116, 0.005, 1.672),
+             (0.028, 0.090, 0.078), top=(0.85, 0.9))
+    block("Helm_Vent", D, "Head", (0, -0.100, 1.566), (0.100, 0.048, 0.026))
+
+    # chest: sternum ridge, collar clamps, vents under the pectorals, and the
+    # bolt the pauldron pivots on — that gap between torso and shoulder was
+    # reading as a missing part rather than an articulation.
+    block("Chest_Sternum", A, "Chest", (0, -0.140, 1.395), (0.052, 0.030, 0.140),
+          top=(0.80, 1.0))
+    mirrored("Collar_Clamp", D, "Chest", (0.118, -0.030, 1.492),
+             (0.052, 0.100, 0.040))
+    mirrored("Chest_Vent", D, "Chest", (0.082, -0.118, 1.286),
+             (0.086, 0.038, 0.040))
+    mirrored("Shoulder_Bolt", D, "Chest", (0.196, -0.004, 1.432),
+             (0.060, 0.110, 0.090), top=(0.92, 0.94))
+
+    # back pack — the back was one flat plate from every rear angle
+    block("Pack_Main", A, "Chest", (0, 0.176, 1.372), (0.190, 0.080, 0.190),
+          top=(0.86, 0.90))
+    mirrored("Pack_Vent", D, "Chest", (0.062, 0.212, 1.318), (0.060, 0.036, 0.070))
+    mirrored("Pack_Glow", V, "Chest", (0.062, 0.232, 1.318), (0.040, 0.016, 0.048))
+
+    # pelvis
+    block("Belt_Buckle", A, "Pelvis", (0, -0.112, 1.118), (0.072, 0.026, 0.050))
+    block("Groin_Plate", A, "Pelvis", (0, -0.062, 0.988), (0.110, 0.096, 0.090),
+          top=(1.10, 1.0))
+    block("Hip_Rear", A, "Pelvis", (0, 0.112, 1.030), (0.180, 0.070, 0.120),
+          top=(0.95, 0.95))
+
+    # arms: deltoid under the pauldron, elbow bridging bicep to forearm,
+    # cuff at the wrist, knuckles on the hand
+    mirrored("Deltoid_Cap", A, "UpperArm", (0.222, -0.006, 1.424),
+             (0.126, 0.140, 0.070), top=(0.86, 0.88))
+    mirrored("Elbow_Pad", D, "LowerArm", (0.222, -0.012, 1.160),
+             (0.122, 0.132, 0.070))
+    mirrored("Wrist_Cuff", A, "LowerArm", (0.222, -0.008, 0.928),
+             (0.118, 0.108, 0.046))
+    mirrored("Knuckle", A, "LowerArm", (0.220, -0.040, 0.878),
+             (0.092, 0.030, 0.052))
+
+    # legs: knee cap over the joint, an outboard thigh pod, a calf behind the
+    # shin, an ankle collar and a toe cap on the boot
+    mirrored("Knee_Cap", A, "Thigh", (0.114, -0.080, 0.520),
+             (0.130, 0.070, 0.100), top=(0.90, 0.90))
+    mirrored("Thigh_Pod", A, "Thigh", (0.196, -0.010, 0.800),
+             (0.048, 0.150, 0.170), top=(0.90, 0.90))
+    mirrored("Calf_Plate", A, "Shin", (0.112, 0.082, 0.330),
+             (0.130, 0.060, 0.230), top=(0.90, 0.90))
+    mirrored("Ankle_Guard", D, "Shin", (0.112, -0.010, 0.168),
+             (0.152, 0.170, 0.060))
+    mirrored("Boot_Toe", D, "Shin", (0.112, -0.132, 0.062),
+             (0.166, 0.056, 0.062), top=(0.95, 0.90))
+
 
 
 # ── armature ─────────────────────────────────────────────────────────────────
