@@ -60,7 +60,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
-- `src/player/` — `Proportions.js` is the FIGURE: one source of truth for joint
+- `src/player/` — `BlockBody.js` is the SHIPPING player/bot chassis: hard-surface
+  armour plates authored in Blender (`tools/model_player.py`), emitted as the
+  data module `heroParts.js` and assembled here into one SkinnedMesh per
+  material on the game's own 20-bone skeleton. No runtime asset load — the
+  generator writes JS, not a .glb. Regenerate with
+  `python3 tools/model_player.py -- --js src/player/heroParts.js`.
+  `Proportions.js` is the FIGURE: one source of truth for joint
   heights, bone lengths and the sole corners, built from adult anthropometry at
   the stature that matches `Player.js`'s 1.70m eye height (1.816m, 7.5 heads).
   The body was a 2.21m giant on 12%-of-height ankles until this existed, and the
@@ -80,6 +86,9 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   stride instead of being a fence the leg walks through), long black cape,
   gauntlets and chunky boots. Azure (`striker`) and graphite (`phantom`)
   variants use the same build.
+  `HeroBody.js` (the lofted, graded-weight body) is still built and still gated
+  — it is the technique for anything that has to CREASE at a joint, which rigid
+  plates cannot do. Reach it via `buildLoftedCharacter()`.
   Historic note — the segmented body (the three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
   feet, arms, hands, skull — is one **lofted superelliptical surface** per part
   (`|x/rx|^n + |z/rz|^n = 1`, n 2 = limb, 2.8 = ribcage, 3.2 = boot sole), and

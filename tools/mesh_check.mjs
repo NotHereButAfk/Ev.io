@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 import { buildHeroBody } from '../src/player/HeroBody.js';
+import { buildBlockBody } from '../src/player/BlockBody.js';
 import { LOWPOLY_IDS, isSharedGeometry } from '../src/player/LowPolyModels.js';
 import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
 import * as BODY from '../src/player/Proportions.js';
@@ -311,6 +312,109 @@ for (const id of LOWPOLY_IDS) {
       rig.kneeL.rotation.x = 0;
       g.updateMatrixWorld(true);
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// The BLOCK chassis — hard-surface plates, the body the game actually builds.
+//
+// Same contract as the lofted body, checked the same way. What is NOT checked
+// is creasing: every vertex here is weighted 1.0 to one bone because these are
+// rigid plates, so there is no crease to keep the volume of. What replaces it
+// is the check that matters for a rigid body instead — that no part is left
+// behind at the origin when its bone moves, which is the characteristic
+// failure when parts are bulk-generated and one bone name is misspelt.
+// ═══════════════════════════════════════════════════════════════════════════
+for (const id of LOWPOLY_IDS) {
+  console.log(`\n── block:${id} ──`);
+  const g = buildBlockBody(id);
+  g.updateMatrixWorld(true);
+  const rig = rigCharacterLimbs(g);
+  const { meshes, bones } = g.userData;
+
+  const hip = P(rig.legL), knee = P(rig.kneeL), ankle = P(rig.ankleL);
+  const sh = P(rig.armR), el = P(rig.elbowR), hand = P(bones.handR);
+  ok(near(hip.y, BODY.HIP_Y, 1e-4) && near(Math.abs(hip.x), BODY.HIP_X, 1e-4),
+     'hip on the figure', `${hip.x.toFixed(4)}, ${hip.y.toFixed(4)}`);
+  ok(near(knee.y, BODY.KNEE_Y, 1e-4), 'knee on the figure', knee.y.toFixed(4));
+  ok(near(ankle.y, BODY.ANKLE_Y, 1e-4), 'ankle on the figure', ankle.y.toFixed(4));
+  ok(near(sh.y, BODY.SHOULDER_Y, 1e-4) && near(sh.x, BODY.SHOULDER_X, 1e-4),
+     'shoulder on the figure', `${sh.x.toFixed(4)}, ${sh.y.toFixed(4)}`);
+  ok(near(sh.y - el.y, BODY.UP_ARM, 1e-4), 'UP_ARM', (sh.y - el.y).toFixed(4));
+  ok(near(el.y - hand.y, BODY.FOREARM, 1e-4), 'FOREARM', (el.y - hand.y).toFixed(4));
+  ok(near(hip.y - knee.y, BODY.THIGH_L, 1e-4), 'THIGH_L', (hip.y - knee.y).toFixed(4));
+  ok(near(knee.y - ankle.y, BODY.SHIN_L, 1e-4), 'SHIN_L', (knee.y - ankle.y).toFixed(4));
+
+  const v = new THREE.Vector3();
+  let verts = 0, tris = 0, unweighted = 0, badSum = 0, crossLeg = 0, low = Infinity;
+  const boneNames = g.userData.skeleton.bones.map(b => b.name);
+  const footBox = new THREE.Box3();
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position;
+    const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight;
+    verts += pos.count; tris += m.geometry.index.count / 3;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      low = Math.min(low, v.y);
+      const w = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
+      const idx = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)];
+      const sum = w[0] + w[1] + w[2] + w[3];
+      if (sum < 1e-6) unweighted++;
+      else if (Math.abs(sum - 1) > 1e-4) badSum++;
+      let onFoot = false;
+      for (let k = 0; k < 4; k++) {
+        if (w[k] < 1e-5) continue;
+        const n = boneNames[idx[k]];
+        if (n === 'ankleL' || n === 'ankleR') onFoot = true;
+        if (/^(thigh|knee|ankle)L$/.test(n) && v.x > BODY.HIP_X) crossLeg++;
+        if (/^(thigh|knee|ankle)R$/.test(n) && v.x < -BODY.HIP_X) crossLeg++;
+      }
+      if (onFoot && v.y < BODY.ANKLE_Y + 0.09) footBox.expandByPoint(v);
+    }
+  }
+  console.log(`        ${meshes.length} skinned meshes, ${verts} verts, ${tris | 0} tris`);
+  ok(unweighted === 0, 'every vertex is weighted', `${unweighted} orphans`);
+  ok(badSum === 0, 'every vertex\'s weights sum to 1', `${badSum} off`);
+  ok(crossLeg === 0, 'no weight leaks across to the opposite leg', `${crossLeg} leaked`);
+  ok(Math.abs(footBox.min.y) < 0.006, 'sole sits on y = 0', `min ${footBox.min.y.toFixed(4)}`);
+  ok(low > -0.006, 'nothing pokes through the floor', `lowest ${low.toFixed(4)}`);
+  ok(typeof g.userData.headshotY === 'number'
+     && g.userData.headshotY > BODY.SHOULDER_Y
+     && g.userData.headshotY < BODY.CHIN_Y + 0.02, 'head-hit height is sane');
+
+  // Nothing left behind: drive every bone the animation drives and confirm the
+  // skin under it actually travels.
+  {
+    const w = new THREE.Vector3();
+    const sample = (boneName) => {
+      const bi = boneNames.indexOf(boneName);
+      for (const m of meshes) {
+        const si = m.geometry.attributes.skinIndex;
+        for (let i = 0; i < si.count; i++) {
+          if (si.getX(i) === bi) return [m, i];
+        }
+      }
+      return null;
+    };
+    const driven = ['thighL', 'kneeL', 'ankleL', 'shoulderR', 'elbowR', 'handR',
+                    'hips', 'spine', 'chest', 'head'];
+    const stuck = [];
+    for (const bn of driven) {
+      const hit = sample(bn);
+      if (!hit) { stuck.push(bn + '(no geometry)'); continue; }
+      const [m, i] = hit;
+      g.updateMatrixWorld(true);
+      skinnedPosition(m, i, v);
+      const before = v.clone();
+      bones[bn].rotation.x -= 0.5;
+      g.updateMatrixWorld(true);
+      skinnedPosition(m, i, w);
+      if (before.distanceTo(w) < 0.01) stuck.push(bn);
+      bones[bn].rotation.x += 0.5;
+      g.updateMatrixWorld(true);
+    }
+    ok(stuck.length === 0, 'every driven bone carries geometry with it',
+       stuck.length ? stuck.join(', ') : `${driven.length} bones checked`);
   }
 }
 

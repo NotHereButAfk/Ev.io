@@ -85,7 +85,7 @@ MP.build_mesh(mats)
 
 # ── bones the rig will actually contain ─────────────────────────────────────
 bones, order = [], []
-for name, head, tail, parent, conn in MP.BONES:
+for name, head, tail, parent, conn, _g in MP.BONES:
     order.append((name, head, tail, parent, conn)); bones.append(name)
     if name.endswith(".L"):
         r = name[:-2] + ".R"
@@ -93,9 +93,11 @@ for name, head, tail, parent, conn in MP.BONES:
         mx = lambda v: (-v[0], v[1], v[2])
         order.append((r, mx(head), mx(tail), rp, conn)); bones.append(r)
 
+# The brief's list, plus the Hand and Foot bones the game drives.
 SPEC = ["Root", "Pelvis", "Spine", "Chest", "Neck", "Head",
         "Clavicle.L", "Clavicle.R", "UpperArm.L", "UpperArm.R",
-        "LowerArm.L", "LowerArm.R", "Thigh.L", "Thigh.R", "Shin.L", "Shin.R"]
+        "LowerArm.L", "LowerArm.R", "Hand.L", "Hand.R",
+        "Thigh.L", "Thigh.R", "Shin.L", "Shin.R", "Foot.L", "Foot.R"]
 print("\n── rig ──")
 ok(sorted(bones) == sorted(SPEC), "every bone the brief asks for, and no others",
    f"{len(bones)} bones")
@@ -153,6 +155,15 @@ for o, b in MP.PARTS:
 print("\n── figure ──")
 ok(abs(lo) < 0.005, "the soles sit on z = 0", f"lowest {lo:.4f}")
 ok(1.70 < hi < 1.90, "stature is human", f"{hi:.3f} m")
+
+# the rig has to land on the figure the game solves against
+FIG = {"Thigh.L": MP.HIP_Z, "Shin.L": MP.KNEE_Z, "Foot.L": MP.ANKLE_Z,
+       "UpperArm.L": MP.SHOULDER_Z, "LowerArm.L": MP.ELBOW_Z,
+       "Hand.L": MP.WRIST_Z}
+byn = {n: (h, t) for n, h, t, p_, c in order}
+off = [f"{n} {byn[n][0][2]:.4f} != {z}" for n, z in FIG.items()
+       if abs(byn[n][0][2] - z) > 1e-9]
+ok(not off, "every joint sits on the Proportions.js figure", "; ".join(off))
 ok(0.25 < wide < 0.45, "half-width is plausible for a hero build", f"{wide:.3f} m")
 
 # material spec

@@ -36,6 +36,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildHeroBody } from './HeroBody.js';
+import { buildBlockBody } from './BlockBody.js';
 
 export const LOWPOLY_IDS = ['vanguard', 'striker', 'phantom'];
 export function isLowPolyId(id) { return LOWPOLY_IDS.includes(id); }
@@ -704,6 +705,16 @@ function _build(id) {
 
 // ── Public builder ───────────────────────────────────────────────────────────
 export function buildLowPolyCharacter(id = 'vanguard') {
+  return buildBlockBody(id);
+}
+
+/**
+ * The lofted, graded-weight body. Kept and still gated: it is the technique
+ * for anything organic, and the block chassis is not a replacement for it —
+ * a limb that has to CREASE at a joint still needs weights blended along its
+ * length, which rigid plates cannot do.
+ */
+export function buildLoftedCharacter(id = 'vanguard') {
   return buildHeroBody(id);
 }
 

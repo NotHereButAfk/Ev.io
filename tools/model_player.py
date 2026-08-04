@@ -34,13 +34,22 @@ import bpy
 from mathutils import Euler, Vector
 
 # ── the figure ───────────────────────────────────────────────────────────────
-# One table of landmark heights so the mesh and the skeleton are built off the
-# same numbers instead of two sets that drift apart. Metres, 1.80m stature.
-ANKLE_Z, KNEE_Z, HIP_Z = 0.09, 0.50, 0.96
-WAIST_Z, CHEST_Z = 1.10, 1.32
-SHOULDER_Z, NECK_Z, CHIN_Z, CROWN_Z = 1.47, 1.53, 1.59, 1.80
-SHOULDER_X, HIP_X = 0.215, 0.105
-ELBOW_Z, WRIST_Z = 1.16, 0.90
+# These are src/player/Proportions.js, to the digit. They have to be: the game's
+# Locomotion solves ground contact against a fixed hip/knee/ankle chain and
+# RifleCarry IKs both arms against a fixed shoulder and fixed bone lengths, and
+# neither derives anything from the mesh. A rig that is 2cm off at the ankle
+# does not look 2cm wrong, it makes the feet skate.
+#
+# `npm run test:mesh` measures these off the built body against Proportions.js
+# at 1e-6, so a drift here fails the build rather than shipping.
+STATURE = 1.816
+ANKLE_Z, KNEE_Z, HIP_Z = 0.0708, 0.5176, 0.9625
+WAIST_Z, CHEST_Z = 1.1259, 1.3075                 # LUMBAR_Y, THORAX_Y
+PELVIS_Z = 0.9988
+SHOULDER_Z, NECK_Z, CHIN_Z, CROWN_Z = 1.4891, 1.4982, 1.5799, 1.816
+HEAD_Z = 1.6253
+SHOULDER_X, HIP_X = 0.2088, 0.0817
+ELBOW_Z, WRIST_Z = 1.1441, 0.8808
 
 # ── detail level ─────────────────────────────────────────────────────────────
 # Every part carries a tier. --detail 1 builds only tiers 0-1 and lands under
@@ -90,6 +99,7 @@ def make_materials():
 
 # ── geometry ─────────────────────────────────────────────────────────────────
 PARTS = []          # (object, bone_name)
+_MATS = {}
 
 
 def block(name, material, bone, at, size,
@@ -145,7 +155,7 @@ def block(name, material, bone, at, size,
 
 def sided_bones():
     """The bone names that exist per-side, e.g. {'Clavicle', 'Thigh', …}."""
-    return {n[:-2] for n, *_ in BONES if n.endswith(".L")}
+    return {n[:-2] for n, *_ in BONES if n.endswith(".L")}   # noqa
 
 
 def mirrored(name, material, bone, at, size, **kw):
@@ -273,7 +283,7 @@ def build_mesh(M):
              (0.104, 0.114, 0.235), top=(1.10, 1.10))
     mirrored("Forearm_Guard", A, "LowerArm", (0.224, -0.020, 1.010),
              (0.126, 0.118, 0.165), top=(0.82, 0.88), bot_off=(0.006, 0))
-    mirrored("Hand", D, "LowerArm", (0.220, -0.004, 0.856),
+    mirrored("Hand", D, "Hand", (0.220, -0.004, 0.856),
              (0.096, 0.086, 0.115), top=(1.06, 1.08))
 
     # ── legs ─────────────────────────────────────────────────────────────────
@@ -291,9 +301,9 @@ def build_mesh(M):
              (0.032, 0.022, 0.075))
     # Thick, flat-bottomed sci-fi boot: the block flares DOWNWARD (top scale
     # below 1) so the widest line is the one on the floor.
-    mirrored("Boot", A, "Shin", (0.112, -0.022, 0.098),
+    mirrored("Boot", A, "Foot", (0.112, -0.022, 0.098),
              (0.182, 0.270, 0.105), top=(0.82, 0.88), top_off=(0, 0.016))
-    mirrored("Boot_Sole", D, "Shin", (0.112, -0.022, 0.022),
+    mirrored("Boot_Sole", D, "Foot", (0.112, -0.022, 0.022),
              (0.190, 0.284, 0.044), top=(0.97, 0.98))
 
     # ── detail pass ──────────────────────────────────────────────────────────
@@ -339,9 +349,9 @@ def build_mesh(M):
              (0.126, 0.140, 0.070), top=(0.86, 0.88), tier=1)
     mirrored("Elbow_Pad", D, "LowerArm", (0.222, -0.012, 1.160),
              (0.122, 0.132, 0.070), tier=1)
-    mirrored("Wrist_Cuff", A, "LowerArm", (0.222, -0.008, 0.928),
+    mirrored("Wrist_Cuff", A, "Hand", (0.222, -0.008, 0.928),
              (0.118, 0.108, 0.046), tier=1)
-    mirrored("Knuckle", A, "LowerArm", (0.220, -0.040, 0.878),
+    mirrored("Knuckle", A, "Hand", (0.220, -0.040, 0.878),
              (0.092, 0.030, 0.052), tier=1)
 
     # legs: knee cap over the joint, an outboard thigh pod, a calf behind the
@@ -352,9 +362,9 @@ def build_mesh(M):
              (0.048, 0.150, 0.170), top=(0.90, 0.90), tier=1)
     mirrored("Calf_Plate", A, "Shin", (0.112, 0.082, 0.330),
              (0.130, 0.060, 0.230), top=(0.90, 0.90), tier=1)
-    mirrored("Ankle_Guard", D, "Shin", (0.112, -0.010, 0.168),
+    mirrored("Ankle_Guard", D, "Foot", (0.112, -0.010, 0.168),
              (0.152, 0.170, 0.060), tier=1)
-    mirrored("Boot_Toe", D, "Shin", (0.112, -0.132, 0.062),
+    mirrored("Boot_Toe", D, "Foot", (0.112, -0.132, 0.062),
              (0.166, 0.056, 0.062), top=(0.95, 0.90), tier=1)
 
     # ═══ tier 2 ═══════════════════════════════════════════════════════════════
@@ -367,9 +377,9 @@ def build_mesh(M):
     # ── hands: fingers ──────────────────────────────────────────────────────
     # A hand as one block is the single most obviously unfinished thing on the
     # model, and four small blocks fix it for 48 triangles a side.
-    mrow("Finger", D, "LowerArm", (0.190, -0.012, 0.772), (0.020, 0, 0), 4,
+    mrow("Finger", D, "Hand", (0.190, -0.012, 0.772), (0.020, 0, 0), 4,
          (0.017, 0.056, 0.058), top=(0.9, 0.9), tier=2)
-    mirrored("Thumb", D, "LowerArm", (0.176, -0.032, 0.812),
+    mirrored("Thumb", D, "Hand", (0.176, -0.032, 0.812),
              (0.024, 0.030, 0.050), tier=2)
 
     # ── helmet ──────────────────────────────────────────────────────────────
@@ -437,30 +447,115 @@ def build_mesh(M):
          (0.020, 0.020, 0.020), tier=2)
     mrow("Shin_Fin", A, "Shin", (0.192, -0.048, 0.376), (0, 0, -0.070), 2,
          (0.022, 0.076, 0.048), top=(0.7, 0.8), tier=2)
-    mrow("Boot_Buckle", D, "Shin", (0.112, -0.104, 0.118), (0, 0, -0.046), 2,
+    mrow("Boot_Buckle", D, "Foot", (0.112, -0.104, 0.118), (0, 0, -0.046), 2,
          (0.150, 0.040, 0.020), tier=2)
-    mirrored("Boot_Heel", D, "Shin", (0.112, 0.106, 0.062),
+    mirrored("Boot_Heel", D, "Foot", (0.112, 0.106, 0.062),
              (0.140, 0.048, 0.062), top=(0.9, 0.9), tier=2)
-    mirrored("Boot_Glow", V, "Shin", (0.176, -0.030, 0.084),
+    mirrored("Boot_Glow", V, "Foot", (0.176, -0.030, 0.084),
              (0.016, 0.070, 0.024), tier=2)
 
 
 
 
+
+
+# ── emitting the model for the game ──────────────────────────────────────────
+# The engine builds its characters procedurally, with no runtime asset load, so
+# this ships a DATA MODULE rather than a .glb: the same eight corners per block
+# and the same bone table, written out as JS. One source of truth, no fetch to
+# fail, and the parts arrive as a real SkinnedMesh instead of a node hierarchy.
+#
+# Frame conversion. Blender here is +Z up with the character facing −Y; the game
+# is +Y up with characters facing −Z (AGENTS.md 4). The map is
+#
+#     (x, y, z)_blender  →  (−x, z, y)_game
+#
+# which has determinant +1, so it is a rotation and no winding flips. The x
+# negation matters for more than handedness: Blender's .L is +X, the game's left
+# is −X, and without the flip every left-side part would arrive on the right
+# with the animation driving the opposite limb.
+def to_game(v):
+    return (-v[0], v[2], v[1])
+
+
+FACES = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4),
+         (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+
+
+def emit_js(path):
+    import json
+
+    game = {}
+    for name, head, tail, parent, connect, g in BONES:
+        game[name] = g
+        if name.endswith(".L"):
+            game[name[:-2] + ".R"] = g[:-1] + "R" if g.endswith("L") else g + "R"
+
+    bones = []
+    for name, head, tail, parent, connect, g in BONES:
+        bones.append((name, head, parent, g))
+        if name.endswith(".L"):
+            r = name[:-2] + ".R"
+            rp = parent[:-2] + ".R" if parent and parent.endswith(".L") else parent
+            bones.append((r, (-head[0], head[1], head[2]), rp, game[r]))
+
+    lines = ["// GENERATED by tools/model_player.py — do not edit by hand.",
+             "//",
+             "// Re-generate with:  python3 tools/model_player.py -- --js src/player/heroParts.js",
+             "//",
+             "// Coordinates are already in the GAME's frame (+Y up, facing -Z) and on",
+             "// the Proportions.js figure, so nothing here needs a fix-up rotation or a",
+             "// scale. Each part is eight corners and one bone; weights are rigid.",
+             "",
+             "export const BONES = ["]
+    for name, head, parent, g in bones:
+        h = to_game(head)
+        pg = game.get(parent) if parent else None
+        lines.append("  { name: %s, parent: %s, at: [%.5f, %.5f, %.5f] }," % (
+            json.dumps(g), json.dumps(pg) if pg else "null", h[0], h[1], h[2]))
+    lines += ["];", "", "export const FACES = %s;" % json.dumps(FACES), "",
+              "export const PARTS = ["]
+
+    mat_key = {}
+    for k, m in _MATS.items():
+        mat_key[m.name] = k
+    for obj, bone in PARTS:
+        mw = obj.matrix_world
+        vs = [to_game(mw @ v.co) for v in obj.data.vertices]
+        flat = ", ".join("%.5f" % c for v in vs for c in v)
+        lines.append("  { n: %s, m: %s, b: %s, v: [%s] }," % (
+            json.dumps(obj.name), json.dumps(mat_key[obj.data.materials[0].name]),
+            json.dumps(game[bone] if bone in game else bone), flat))
+    lines += ["];", ""]
+
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+    print(f"[hero] wrote {path} ({len(PARTS)} parts, {len(bones)} bones)")
+
+
 # ── armature ─────────────────────────────────────────────────────────────────
 #           name          head                       tail                      parent      connected
+# Hand and Foot were not in the original brief's bone list, but the game drives
+# both: Locomotion rotates the ankle to plant a foot, and RifleCarry IKs to the
+# wrist. Without them the boots would swing off the shin and the hands off the
+# forearm. GAME is the name each bone takes when the model is emitted for the
+# engine — the game's chain is offset by one from the anatomical naming here
+# (its `kneeL` is the SHIN, the bone AT the knee; its `ankleL` is the foot).
 BONES = [
-    ("Root",       (0, 0, 0.0),                (0, 0, 0.16),               None,        False),
-    ("Pelvis",     (0, 0, HIP_Z),              (0, 0, WAIST_Z),            "Root",      False),
-    ("Spine",      (0, 0, WAIST_Z),            (0, 0, 1.235),              "Pelvis",    True),
-    ("Chest",      (0, 0, 1.235),              (0, 0, NECK_Z),             "Spine",     True),
-    ("Neck",       (0, 0, NECK_Z),             (0, 0, CHIN_Z),             "Chest",     True),
-    ("Head",       (0, 0, CHIN_Z),             (0, 0, CROWN_Z),            "Neck",      True),
-    ("Clavicle.L", (0.035, 0, 1.442),          (SHOULDER_X, 0, SHOULDER_Z), "Chest",    False),
-    ("UpperArm.L", (SHOULDER_X, 0, SHOULDER_Z), (SHOULDER_X, 0, ELBOW_Z),  "Clavicle.L", True),
-    ("LowerArm.L", (SHOULDER_X, 0, ELBOW_Z),   (SHOULDER_X, 0, WRIST_Z),   "UpperArm.L", True),
-    ("Thigh.L",    (HIP_X, 0, HIP_Z),          (HIP_X, 0, KNEE_Z),         "Pelvis",    False),
-    ("Shin.L",     (HIP_X, 0, KNEE_Z),         (HIP_X, 0, ANKLE_Z),        "Thigh.L",   True),
+    #  name          head                        tail                        parent        connect  GAME
+    ("Root",       (0, 0, 0.0),                (0, 0, 0.16),               None,         False, "root"),
+    ("Pelvis",     (0, 0, PELVIS_Z),           (0, 0, WAIST_Z),            "Root",       False, "hips"),
+    ("Spine",      (0, 0, WAIST_Z),            (0, 0, CHEST_Z),            "Pelvis",     True,  "spine"),
+    ("Chest",      (0, 0, CHEST_Z),            (0, 0, NECK_Z),             "Spine",      True,  "chest"),
+    ("Neck",       (0, 0, NECK_Z),             (0, 0, HEAD_Z),             "Chest",      True,  "neck"),
+    ("Head",       (0, 0, HEAD_Z),             (0, 0, CROWN_Z),            "Neck",       True,  "head"),
+    ("Clavicle.L", (0.034, 0, 1.452),          (SHOULDER_X, 0, SHOULDER_Z), "Chest",     False, "clavicleL"),
+    ("UpperArm.L", (SHOULDER_X, 0, SHOULDER_Z), (SHOULDER_X, 0, ELBOW_Z),  "Clavicle.L", True,  "shoulderL"),
+    ("LowerArm.L", (SHOULDER_X, 0, ELBOW_Z),   (SHOULDER_X, 0, WRIST_Z),   "UpperArm.L", True,  "elbowL"),
+    ("Hand.L",     (SHOULDER_X, 0, WRIST_Z),   (SHOULDER_X, 0, WRIST_Z - 0.10), "LowerArm.L", True, "handL"),
+    ("Thigh.L",    (HIP_X, 0, HIP_Z),          (HIP_X, 0, KNEE_Z),         "Pelvis",     False, "thighL"),
+    ("Shin.L",     (HIP_X, 0, KNEE_Z),         (HIP_X, 0, ANKLE_Z),        "Thigh.L",    True,  "kneeL"),
+    ("Foot.L",     (HIP_X, 0, ANKLE_Z),        (HIP_X, -0.16, ANKLE_Z),    "Shin.L",     True,  "ankleL"),
 ]
 
 
@@ -482,7 +577,7 @@ def build_armature():
             b.use_connect = connect
         return b
 
-    for name, head, tail, parent, connect in BONES:
+    for name, head, tail, parent, connect, _game in BONES:
         add(name, head, tail, parent, connect)
         if name.endswith(".L"):          # mirror the whole arm/leg chain
             mx = lambda v: (-v[0], v[1], v[2])
@@ -555,6 +650,8 @@ def main():
     PARTS.clear()
 
     mats = make_materials()
+    global _MATS
+    _MATS = mats
     build_mesh(mats)
     arm = build_armature()
     parent_to_bones(arm)
@@ -571,6 +668,9 @@ def main():
 
     bpy.ops.wm.save_as_mainfile(filepath=out)
     print(f"[hero] wrote {out}")
+
+    if "--js" in args:
+        emit_js(os.path.abspath(args[args.index("--js") + 1]))
 
     if "--glb" in args:
         glb = os.path.splitext(out)[0] + ".glb"
