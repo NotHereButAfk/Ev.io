@@ -202,6 +202,20 @@ front face.
   And a plate's end rings must not taper to zero thickness, or the two faces
   weld and `computeVertexNormals` averages them to garbage.
 
+**2j. Map geometry belongs to `world._mapRoot`, not to the scene.**
+Anything a map builder creates must end up under that group, or it survives the
+next `loadMap()` as invisible collision and leaked GPU buffers. The builders get
+this for free — `loadMap` points `this.scene` at the map root while they run —
+so the rule only bites if you add map geometry from OUTSIDE a builder. Per-map
+state (`colliders`, `platforms`, `spawnPoints`, `gravLifts`, `teleporters`,
+`_raycastMeshes`) is rebuilt on every load, never appended to.
+→ Constructor-owned geometry/materials (`_geo`, `_mats`, the facade atlases) are
+  registered in `_sharedDisposables` and must NOT be freed by teardown. Free one
+  and the FIRST match still looks perfect while every later one renders wrong.
+→ `npm run test:maps` rotates three full laps and asserts the counts come back
+  identical, one map root exists at a time, every owned resource is disposed and
+  no shared one is.
+
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
 `applyMeleeCarry()` owns them for a blade.
 Don't pose `armL/armR/elbowL/elbowR` anywhere else for a gun-carrying body —

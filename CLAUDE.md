@@ -46,7 +46,17 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 
 ## Layout
 - `src/core/Game.js` — main loop, state, match flow, HUD wiring, map-loading card.
-- `src/world/World.js` — the active map is an official-image-led recreation of
+- `src/world/World.js` — **map rotation**: `MAPS` is the registry (id, name,
+  region, sky/fog, `build(world)`), `world.loadMap(id)` swaps the arena and
+  `nextMapId()` advances it. Every map builds into its own root Group — the
+  builders' hundreds of `this.scene.add()` calls are captured by pointing
+  `this.scene` at that group for the duration of the build — so switching is
+  detach + dispose + rebuild, and everything Game.js owns in the scene is
+  untouched. Game.js rotates in `_restart()`, i.e. whenever a match ends.
+  Maps with no hand-authored spawn list get one derived from their colliders.
+  Gated by `npm run test:maps`.
+  The rotation is Winter-Graveyard → Sunken Colonnade → Nightfall Complex; the
+  first is an official-image-led recreation of
   **ev.io Winter-Graveyard** from [node 644](https://ev.io/node/644).
   `_buildWinterGraveyard()` builds the complete visible composition: snow basin
   and grave field, monumental sealed rear gate, nested crescent ribs and wreath,

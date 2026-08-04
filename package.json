@@ -1,7 +1,7 @@
 {
   "name": "kyx.io",
   "version": "1.0.0",
-  "description": "Browser-based low-poly arena FPS — deathmatch and zombie survival.",
+  "description": "Browser-based low-poly arena FPS \u2014 deathmatch and zombie survival.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,8 @@
     "arena:metrics": "node tools/arena_metrics.mjs",
     "stress:soak": "node tools/stress_soak.mjs",
     "assets": "node tools/asset_pipeline.mjs",
-    "certify": "node tools/certify.mjs"
+    "certify": "node tools/certify.mjs",
+    "test:maps": "node tools/map_rotation_check.mjs"
   },
   "repository": {
     "type": "git",

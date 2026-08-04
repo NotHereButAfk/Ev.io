@@ -540,12 +540,93 @@ function makeBarbedWireTexture() {
   return tex;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Map rotation
+// ───────────────────────────────────────────────────────────────────────────
+// The world used to build exactly one arena in its constructor and keep it for
+// the life of the page. Rotating maps between matches means the arena has to be
+// swappable, and the awkward part is not building the new one — it is throwing
+// the old one away without taking the rest of the scene with it.
+//
+// So every map builds into its own root Group rather than straight into the
+// scene. Switching is then: detach that root, dispose what it owns, build the
+// next one. Everything Game.js puts in the scene — the player camera, bots,
+// pickups, the third-person body — hangs off the scene itself and never moves.
+//
+// The builders all call `this.scene.add(...)` in a few hundred places. Rather
+// than rewrite those, `loadMap` points `this.scene` at the map root for the
+// duration of the build and puts it back afterwards. A Group takes .add() and
+// .traverse() exactly like a Scene does, so nothing else notices; the two
+// things that only a Scene has, `background` and `fog`, are set from the map's
+// own entry instead.
+export const MAPS = [
+  {
+    id: 'winter-graveyard',
+    name: 'Winter-Graveyard',
+    region: 'Arctic Sector',
+    background: 0xdba5b6,
+    fog: [0xd8c4cd, 105, 260],
+    build(w) {
+      w._buildLighting();
+      w._buildGround();
+      w._buildSky();
+      w._buildWinterGraveyard();
+      w._buildSpawnPoints();
+      w.previewPedestalPos.set(0, 0, 52);
+    },
+  },
+  {
+    id: 'evio-arena',
+    name: 'Sunken Colonnade',
+    region: 'Stonework Sector',
+    background: 0x9fb2c8,
+    fog: [0xb6c3d4, 110, 300],
+    build(w) {
+      w._buildLighting({
+        sky: 0xdce6f2, ground: 0x6b6257, hemi: 1.5,
+        sunColor: 0xfff2d8, sun: 1.7, sunAt: [64, 96, 58],
+        rimColor: 0x9fc2e8, rim: 0.5, rimAt: [-70, 40, -60],
+      });
+      w._buildGround();
+      w._buildEvioArena();
+      w.previewPedestalPos.set(0, 0, 34);
+    },
+  },
+  {
+    id: 'legacy-arena',
+    name: 'Nightfall Complex',
+    region: 'Deep Orbit',
+    background: 0x0b0e14,
+    fog: [0x10141c, 90, 260],
+    build(w) {
+      // Cool and much brighter than the snow map's rig: this arena's own
+      // materials are near-black, so the light has to carry the read.
+      w._buildLighting({
+        sky: 0x9fc4e8, ground: 0x1a2030, hemi: 2.1,
+        sunColor: 0xdCE8ff, sun: 2.0, sunAt: [58, 90, -70],
+        rimColor: 0x35d6ff, rim: 1.0, rimAt: [-70, 34, 62],
+      });
+      w._buildGround();
+      w._buildLegacyEvioArena();
+      w.previewPedestalPos.set(0, 0, 30);
+    },
+  },
+];
+
+export function mapById(id) {
+  return MAPS.find((m) => m.id === id) || MAPS[0];
+}
+
+/** The map after `id` in the rotation — wraps at the end. */
+export function nextMapId(id) {
+  const i = MAPS.findIndex((m) => m.id === id);
+  return MAPS[(i + 1 + MAPS.length) % MAPS.length].id;
+}
+
 export class World {
-  constructor() {
+  constructor(mapId = MAPS[0].id) {
     this.scene = new THREE.Scene();
-    // Winter-Graveyard's sunrise is warm at the horizon and mauve overhead.
-    this.scene.background = new THREE.Color(0xdba5b6);
-    this.scene.fog = new THREE.Fog(0xd8c4cd, 105, 260);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -650,39 +731,160 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // Official ev.io Winter-Graveyard (node 644): a snow basin framed by a
-    // monumental sealed gate, crescent ribs, graves, cliffs and a raised keep.
-    this._buildLighting();
-    this._buildGround();
-    this._buildSky();
-    this._buildWinterGraveyard();
-    this._buildSpawnPoints();
-
     this.previewPedestalPos = new THREE.Vector3(0, 0, 52);
 
-    // Lock world matrix on every static mesh built above so Three.js skips
-    // recomputing it on every frame. Dynamic objects (bots, player, pickups)
-    // are added later by Game.js and are not affected.
-    this.scene.traverse((obj) => {
+    // Geometry and materials created ONCE in this constructor and reused by
+    // every map. loadMap() disposes what a map owns; these must survive it, so
+    // they are tagged here rather than recognised by guesswork later — the
+    // failure mode is a second match rendering untextured because the first
+    // match's teardown freed a shared material out from under it.
+    this._sharedDisposables = new Set([
+      ...Object.values(this._geo), ...Object.values(this._mats),
+    ]);
+
+    this.mapId = null;
+    this._mapRoot = null;
+    this.loadMap(mapId);
+  }
+
+  // ── Map rotation ────────────────────────────────────────────────────────────
+
+  /**
+   * Swap the arena. Safe to call between matches; leaves everything Game.js
+   * owns in the scene untouched.
+   */
+  loadMap(id) {
+    const def = mapById(id);
+    this._disposeMap();
+
+    // Per-map state. All of it is REBUILT rather than appended to — a stale
+    // collider from the previous arena is an invisible wall in the new one, and
+    // a stale spawn point drops you inside its geometry.
+    this.colliders = [];
+    this.platforms = [];
+    this.spawnPoints = [];
+    this.gravLifts = [];
+    this.teleporters = [];
+    this._airVehicles = [];
+    this._pulseMats = [];
+    this._spinRings = [];
+    this._raycastMeshes = null;      // cached getter — must not outlive the map
+    this._signPlaced = false;
+
+    const root = new THREE.Group();
+    root.name = 'map:' + def.id;
+
+    // Point `scene` at the map root for the build (see the note above MAPS).
+    const scene = this.scene;
+    this.scene = root;
+    try {
+      def.build(this);
+    } finally {
+      this.scene = scene;
+    }
+    scene.add(root);
+    this._mapRoot = root;
+
+    scene.background = new THREE.Color(def.background);
+    scene.fog = new THREE.Fog(def.fog[0], def.fog[1], def.fog[2]);
+
+    // A map that ships no spawn list gets one derived from its own colliders,
+    // so adding an arena to the rotation does not also mean hand-placing
+    // sixteen safe starts in it.
+    if (!this.spawnPoints.length) this._deriveSpawnPoints();
+
+    // Lock world matrices on the static meshes so Three.js skips recomputing
+    // them every frame; re-enable the ones we animate.
+    root.traverse((obj) => {
       if (obj.isMesh && obj.matrixAutoUpdate) {
         obj.matrixAutoUpdate = false;
         obj.updateMatrix();
       }
     });
-    // Re-enable matrix updates on meshes we animate every frame (the lock above
-    // would otherwise freeze their spin).
     for (const r of this._spinRings) r.mesh.matrixAutoUpdate = true;
+
+    this.mapId = def.id;
+    this.mapDef = def;
+    return def;
   }
 
-  _buildLighting() {
-    const hemi = new THREE.HemisphereLight(0xffdfd1, 0x554956, 1.32);
+  _disposeMap() {
+    const root = this._mapRoot;
+    if (!root) return;
+    root.parent?.remove(root);
+    const seen = new Set();
+    root.traverse((o) => {
+      if (!o.isMesh && !o.isLine && !o.isPoints) return;
+      if (o.geometry && !this._sharedDisposables.has(o.geometry) && !seen.has(o.geometry)) {
+        seen.add(o.geometry);
+        o.geometry.dispose();
+      }
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        // Material.dispose() does NOT free its textures, which is what makes
+        // this safe: the facade/brick/billboard atlases are shared across maps
+        // and are freed only when the World itself goes.
+        if (m && !this._sharedDisposables.has(m) && !seen.has(m)) {
+          seen.add(m);
+          m.dispose();
+        }
+      }
+    });
+    this._mapRoot = null;
+  }
+
+  /**
+   * Grid-sample the arena floor and keep the points that are clear of every
+   * collider. Cheap, and it means a new map in the rotation needs geometry and
+   * nothing else.
+   */
+  _deriveSpawnPoints(want = 16) {
+    const half = this.arenaHalf - 8;
+    const step = Math.max(6, (half * 2) / 12);
+    const CLEAR = 1.2;                 // player half-width plus a margin
+    const box = new THREE.Box3();
+    const cand = [];
+    for (let x = -half; x <= half; x += step) {
+      for (let z = -half; z <= half; z += step) {
+        box.min.set(x - CLEAR, 0.1, z - CLEAR);
+        box.max.set(x + CLEAR, 2.4, z + CLEAR);
+        let blocked = false;
+        for (const c of this.colliders) {
+          if (c.box && c.box.intersectsBox(box)) { blocked = true; break; }
+        }
+        if (!blocked) cand.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    // Spread them out rather than taking the first N, which would cluster every
+    // start in one corner of the grid.
+    cand.sort(() => Math.random() - 0.5);
+    const picked = [];
+    for (const p of cand) {
+      if (picked.length >= want) break;
+      if (picked.every((q) => q.distanceTo(p) > step * 0.9)) picked.push(p);
+    }
+    this.spawnPoints = picked.length ? picked
+      : [new THREE.Vector3(0, 0, 0)];   // last resort: never leave it empty
+  }
+
+  /**
+   * Lighting belongs to the MAP, not to the world.
+   *
+   * Every arena shared one warm sunrise rig because there was only ever one
+   * arena. Rotation broke that immediately: the orbital complex is built from
+   * near-black concrete and reads by its neon, and lit like a snowfield at
+   * dawn it came out as a black rectangle you could not play in.
+   */
+  _buildLighting(o = {}) {
+    const hemi = new THREE.HemisphereLight(
+      o.sky ?? 0xffdfd1, o.ground ?? 0x554956, o.hemi ?? 1.32);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffd7aa, 1.45);
-    sun.position.set(72, 86, -95);
+    const sun = new THREE.DirectionalLight(o.sunColor ?? 0xffd7aa, o.sun ?? 1.45);
+    sun.position.set(...(o.sunAt ?? [72, 86, -95]));
     sun.castShadow = false;
     this.scene.add(sun);
-    const skyRim = new THREE.DirectionalLight(0xc99ad5, 0.38);
-    skyRim.position.set(-75, 46, 54);
+    const skyRim = new THREE.DirectionalLight(o.rimColor ?? 0xc99ad5, o.rim ?? 0.38);
+    skyRim.position.set(...(o.rimAt ?? [-75, 46, 54]));
     skyRim.castShadow = false;
     this.scene.add(skyRim);
   }

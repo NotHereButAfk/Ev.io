@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { World } from '../world/World.js';
+import { World, nextMapId } from '../world/World.js';
 import { Player } from '../player/Player.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
 import { BotManager } from '../entities/BotManager.js';
@@ -556,7 +556,8 @@ export class Game {
     this.player.name = name;
     this.player.skin = this.selectedSkin;
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
-    this.player.respawn(SPAWN_POINT);
+    // The map's own starts — a fixed constant only ever suited one arena.
+    this.player.respawn(this.world.randomSpawnPoint());
     this.weaponSystem.resetState(this.player.baseFov);
     this.grenadeSystem.reset();
 
@@ -693,7 +694,8 @@ export class Game {
     sm.onRevive = () => {
       this._playerDowned = false;
       this.hud.hideDowned();
-      this.player.respawn(SPAWN_POINT);
+      // The map's own starts — a fixed constant only ever suited one arena.
+    this.player.respawn(this.world.randomSpawnPoint());
       this.player.health = 50;
       this.player.shield = Math.min(this.player.maxShield, this.player.maxShield * 0.3);
       this.hud.addKillFeed('REVIVED BY TEAMMATE — 50 HP');
@@ -935,6 +937,11 @@ export class Game {
       deathmatch: 'Deathmatch', teamslayer: 'Team Slayer', ctf: 'Capture the Flag',
       koth: 'King of the Hill', survival: 'Firefight',
     };
+    const def = this.world.mapDef;
+    const nameEl = document.querySelector('#map-loading .ml-name');
+    if (nameEl && def) nameEl.textContent = def.name.toUpperCase();
+    const region = document.getElementById('ml-region');
+    if (region && def) region.textContent = def.region;
     const mode = document.getElementById('ml-mode');
     if (mode) mode.textContent = modeNames[modeId] || 'Deathmatch';
     const players = document.getElementById('ml-players');
@@ -994,10 +1001,27 @@ export class Game {
     this.menu.showMain();
   }
 
+  /**
+   * Advance the map rotation. Called when a match ENDS, so the next one is
+   * somewhere else.
+   *
+   * Everything that cached a position from the outgoing arena has to be
+   * re-seated here — the menu preview stands on a pedestal whose coordinates
+   * are per-map, and the pickup system is rebuilt against new geometry by
+   * _startGame. Anything reading world.colliders / world.spawnPoints does so
+   * live and needs nothing.
+   */
+  _rotateMap() {
+    const def = this.world.loadMap(nextMapId(this.world.mapId));
+    this.previewCharacter?.position.copy(this.world.previewPedestalPos);
+    return def;
+  }
+
   _restart() {
     this._saveStats();
     this.hud.hideLeaderboard();
     this.menu.hideGameOver();
+    this._rotateMap();
     this._startGame(
       this.player.name,
       this.selectedSkin.id,
