@@ -22,7 +22,8 @@ the arm and a boot that flares toward the floor read as designed hardware at
 the same triangle count. Nothing is smooth-shaded, nothing is textured, and
 the silhouette does all the work.
 
-Budget: 92 blocks x 12 = 1104 triangles. The build asserts it stays under 1200.
+Detail 1 = 92 blocks / 1104 tris (the original game budget);
+detail 2 adds greeble on top. The build asserts it stays inside its budget.
 """
 
 import os
@@ -41,7 +42,16 @@ SHOULDER_Z, NECK_Z, CHIN_Z, CROWN_Z = 1.47, 1.53, 1.59, 1.80
 SHOULDER_X, HIP_X = 0.215, 0.105
 ELBOW_Z, WRIST_Z = 1.16, 0.90
 
-TRI_BUDGET = 1200
+# ── detail level ─────────────────────────────────────────────────────────────
+# Every part carries a tier. --detail 1 builds only tiers 0-1 and lands under
+# the original 1200-triangle game budget; the default builds everything.
+#
+# This is a switch rather than a rewrite because the two are wanted for
+# different jobs: tier 1 is what you ship to run 24 of on screen, tier 2 is
+# what you put in the menu, the store card and the render. Deleting the
+# low-poly build to get a detailed one trades one for the other for no reason.
+DETAIL = 2
+TRI_BUDGETS = {0: 700, 1: 1200, 2: 2700}
 
 
 # ── materials ────────────────────────────────────────────────────────────────
@@ -83,7 +93,8 @@ PARTS = []          # (object, bone_name)
 
 
 def block(name, material, bone, at, size,
-          top=(1.0, 1.0), top_off=(0.0, 0.0), bot_off=(0.0, 0.0), rot=None):
+          top=(1.0, 1.0), top_off=(0.0, 0.0), bot_off=(0.0, 0.0), rot=None,
+          tier=0):
     """A tapered box: 8 verts, 6 quads, 12 triangles.
 
     at        centre of the block
@@ -92,6 +103,8 @@ def block(name, material, bone, at, size,
     top_off   / bot_off   lateral shift of each face, for a leaning slab
     rot       Euler XYZ about the block's own centre
     """
+    if tier > DETAIL:
+        return None
     cx, cy, cz = at
     hx, hy, hz = size[0] / 2.0, size[1] / 2.0, size[2] / 2.0
     tx, ty = hx * top[0], hy * top[1]
@@ -147,6 +160,8 @@ def mirrored(name, material, bone, at, size, **kw):
     outward on one side tilts it inward on the other unless its Y and Z
     components flip too.
     """
+    if kw.get("tier", 0) > DETAIL:
+        return
     two_sided = bone in sided_bones()
     for side, s in (("L", 1.0), ("R", -1.0)):
         k = dict(kw)
@@ -159,6 +174,32 @@ def mirrored(name, material, bone, at, size, **kw):
         block(f"{name}.{side}", material,
               f"{bone}.{side}" if two_sided else bone,
               (at[0] * s, at[1], at[2]), size, **k)
+
+
+def row(name, material, bone, start, step, count, size, **kw):
+    """`count` copies of one block marching along `step`.
+
+    Louvres, rivet lines and finger stacks are most of what a detail pass is,
+    and hand-placing forty near-identical blocks is how you get one at the
+    wrong offset that nobody spots until it is in the render.
+    """
+    for i in range(count):
+        block(f"{name}{i}", material, bone,
+              (start[0] + step[0] * i, start[1] + step[1] * i, start[2] + step[2] * i),
+              size, **kw)
+
+
+def mrow(name, material, bone, start, step, count, size, **kw):
+    """`row`, mirrored — the step's x is mirrored with the start."""
+    if kw.get("tier", 0) > DETAIL:
+        return
+    two_sided = bone in sided_bones()
+    for side, sg in (("L", 1.0), ("R", -1.0)):
+        for i in range(count):
+            block(f"{name}{i}.{side}", material,
+                  f"{bone}.{side}" if two_sided else bone,
+                  (sg * (start[0] + step[0] * i), start[1] + step[1] * i,
+                   start[2] + step[2] * i), size, **kw)
 
 
 def build_mesh(M):
@@ -262,59 +303,147 @@ def build_mesh(M):
 
     # helmet: brow over the visor, ear pods, chin vent
     block("Helm_Brow", A, "Head", (0, -0.150, 1.706), (0.196, 0.036, 0.026),
-          top=(0.90, 1.0))
+          top=(0.90, 1.0), tier=1)
     mirrored("Helm_Ear", D, "Head", (0.116, 0.005, 1.672),
-             (0.028, 0.090, 0.078), top=(0.85, 0.9))
-    block("Helm_Vent", D, "Head", (0, -0.100, 1.566), (0.100, 0.048, 0.026))
+             (0.028, 0.090, 0.078), top=(0.85, 0.9), tier=1)
+    block("Helm_Vent", D, "Head", (0, -0.100, 1.566), (0.100, 0.048, 0.026), tier=1)
 
     # chest: sternum ridge, collar clamps, vents under the pectorals, and the
     # bolt the pauldron pivots on — that gap between torso and shoulder was
     # reading as a missing part rather than an articulation.
     block("Chest_Sternum", A, "Chest", (0, -0.140, 1.395), (0.052, 0.030, 0.140),
-          top=(0.80, 1.0))
+          top=(0.80, 1.0), tier=1)
     mirrored("Collar_Clamp", D, "Chest", (0.118, -0.030, 1.492),
-             (0.052, 0.100, 0.040))
+             (0.052, 0.100, 0.040), tier=1)
     mirrored("Chest_Vent", D, "Chest", (0.082, -0.118, 1.286),
-             (0.086, 0.038, 0.040))
+             (0.086, 0.038, 0.040), tier=1)
     mirrored("Shoulder_Bolt", D, "Chest", (0.196, -0.004, 1.432),
-             (0.060, 0.110, 0.090), top=(0.92, 0.94))
+             (0.060, 0.110, 0.090), top=(0.92, 0.94), tier=1)
 
     # back pack — the back was one flat plate from every rear angle
     block("Pack_Main", A, "Chest", (0, 0.176, 1.372), (0.190, 0.080, 0.190),
-          top=(0.86, 0.90))
-    mirrored("Pack_Vent", D, "Chest", (0.062, 0.212, 1.318), (0.060, 0.036, 0.070))
-    mirrored("Pack_Glow", V, "Chest", (0.062, 0.232, 1.318), (0.040, 0.016, 0.048))
+          top=(0.86, 0.90), tier=1)
+    mirrored("Pack_Vent", D, "Chest", (0.062, 0.212, 1.318), (0.060, 0.036, 0.070), tier=1)
+    mirrored("Pack_Glow", V, "Chest", (0.062, 0.232, 1.318), (0.040, 0.016, 0.048), tier=1)
 
     # pelvis
-    block("Belt_Buckle", A, "Pelvis", (0, -0.112, 1.118), (0.072, 0.026, 0.050))
+    block("Belt_Buckle", A, "Pelvis", (0, -0.112, 1.118), (0.072, 0.026, 0.050), tier=1)
     block("Groin_Plate", A, "Pelvis", (0, -0.062, 0.988), (0.110, 0.096, 0.090),
-          top=(1.10, 1.0))
+          top=(1.10, 1.0), tier=1)
     block("Hip_Rear", A, "Pelvis", (0, 0.112, 1.030), (0.180, 0.070, 0.120),
-          top=(0.95, 0.95))
+          top=(0.95, 0.95), tier=1)
 
     # arms: deltoid under the pauldron, elbow bridging bicep to forearm,
     # cuff at the wrist, knuckles on the hand
     mirrored("Deltoid_Cap", A, "UpperArm", (0.222, -0.006, 1.424),
-             (0.126, 0.140, 0.070), top=(0.86, 0.88))
+             (0.126, 0.140, 0.070), top=(0.86, 0.88), tier=1)
     mirrored("Elbow_Pad", D, "LowerArm", (0.222, -0.012, 1.160),
-             (0.122, 0.132, 0.070))
+             (0.122, 0.132, 0.070), tier=1)
     mirrored("Wrist_Cuff", A, "LowerArm", (0.222, -0.008, 0.928),
-             (0.118, 0.108, 0.046))
+             (0.118, 0.108, 0.046), tier=1)
     mirrored("Knuckle", A, "LowerArm", (0.220, -0.040, 0.878),
-             (0.092, 0.030, 0.052))
+             (0.092, 0.030, 0.052), tier=1)
 
     # legs: knee cap over the joint, an outboard thigh pod, a calf behind the
     # shin, an ankle collar and a toe cap on the boot
     mirrored("Knee_Cap", A, "Thigh", (0.114, -0.080, 0.520),
-             (0.130, 0.070, 0.100), top=(0.90, 0.90))
+             (0.130, 0.070, 0.100), top=(0.90, 0.90), tier=1)
     mirrored("Thigh_Pod", A, "Thigh", (0.196, -0.010, 0.800),
-             (0.048, 0.150, 0.170), top=(0.90, 0.90))
+             (0.048, 0.150, 0.170), top=(0.90, 0.90), tier=1)
     mirrored("Calf_Plate", A, "Shin", (0.112, 0.082, 0.330),
-             (0.130, 0.060, 0.230), top=(0.90, 0.90))
+             (0.130, 0.060, 0.230), top=(0.90, 0.90), tier=1)
     mirrored("Ankle_Guard", D, "Shin", (0.112, -0.010, 0.168),
-             (0.152, 0.170, 0.060))
+             (0.152, 0.170, 0.060), tier=1)
     mirrored("Boot_Toe", D, "Shin", (0.112, -0.132, 0.062),
-             (0.166, 0.056, 0.062), top=(0.95, 0.90))
+             (0.166, 0.056, 0.062), top=(0.95, 0.90), tier=1)
+
+    # ═══ tier 2 ═══════════════════════════════════════════════════════════════
+    # Everything below is skipped by --detail 1. It is greeble: panel lines,
+    # louvres, rivets and rims. None of it changes the silhouette, which is why
+    # it is the part you can afford to drop — but on a flat-shaded model with no
+    # textures it is the ONLY thing standing between a big white panel and a
+    # blank one, because there is no normal map doing that job.
+
+    # ── hands: fingers ──────────────────────────────────────────────────────
+    # A hand as one block is the single most obviously unfinished thing on the
+    # model, and four small blocks fix it for 48 triangles a side.
+    mrow("Finger", D, "LowerArm", (0.190, -0.012, 0.772), (0.020, 0, 0), 4,
+         (0.017, 0.056, 0.058), top=(0.9, 0.9), tier=2)
+    mirrored("Thumb", D, "LowerArm", (0.176, -0.032, 0.812),
+             (0.024, 0.030, 0.050), tier=2)
+
+    # ── helmet ──────────────────────────────────────────────────────────────
+    block("Visor_Rim_Top", D, "Head", (0, -0.152, 1.700), (0.192, 0.026, 0.014), tier=2)
+    block("Visor_Rim_Bot", D, "Head", (0, -0.150, 1.640), (0.186, 0.026, 0.012), tier=2)
+    row("Jaw_Vent", D, "Head", (-0.042, -0.128, 1.566), (0.042, 0, 0), 3,
+        (0.024, 0.020, 0.030), tier=2)
+    block("Antenna", A, "Head", (0.070, 0.086, 1.808), (0.014, 0.014, 0.070),
+          top=(0.5, 0.5), tier=2)
+    mirrored("Crest_Fin", A, "Head", (0.030, 0.030, 1.776),
+             (0.014, 0.140, 0.028), top=(0.6, 0.7), tier=2)
+
+    # ── torso panelling ─────────────────────────────────────────────────────
+    mrow("Rib_Louvre", D, "Chest", (0.104, -0.126, 1.246), (0, 0, -0.030), 3,
+         (0.072, 0.024, 0.018), tier=2)
+    mirrored("Chest_Strap", D, "Chest", (0.052, -0.132, 1.452),
+             (0.040, 0.040, 0.070), rot=(0, 0, 0), tier=2)
+    mirrored("Torso_Side", A, "Chest", (0.152, 0.004, 1.330),
+             (0.030, 0.180, 0.150), top=(0.85, 0.9), tier=2)
+    mirrored("Tech_Port", V, "Chest", (0.150, -0.070, 1.240),
+             (0.016, 0.030, 0.030), tier=2)
+    block("Spine_Line", D, "Chest", (0, 0.152, 1.372), (0.030, 0.030, 0.180),
+          top=(0.8, 1.0), tier=2)
+
+    # ── pauldron rims and rivets ────────────────────────────────────────────
+    mirrored("Pauldron_Rim", D, "Clavicle", (0.246, -0.010, 1.386),
+             (0.164, 0.238, 0.020), rot=(0, math.radians(14), 0), tier=2)
+    mrow("Pauldron_Rivet", D, "Clavicle", (0.196, -0.086, 1.470), (0.030, 0.020, -0.008), 3,
+         (0.016, 0.016, 0.016), tier=2)
+
+    # ── back pack ───────────────────────────────────────────────────────────
+    row("Pack_Rib", D, "Chest", (0, 0.216, 1.430), (0, 0, -0.052), 3,
+        (0.150, 0.024, 0.018), tier=2)
+    mirrored("Pack_Pipe", D, "Chest", (0.104, 0.190, 1.392),
+             (0.026, 0.026, 0.140), top=(0.8, 0.8), tier=2)
+    block("Pack_Core", V, "Chest", (0, 0.222, 1.430), (0.058, 0.020, 0.014), tier=2)
+
+    # ── waist ───────────────────────────────────────────────────────────────
+    mirrored("Oblique", D, "Spine", (0.110, -0.020, 1.180),
+             (0.030, 0.130, 0.120), top=(0.85, 0.9), tier=2)
+    row("Lame_Edge", D, "Spine", (0, -0.106, 1.152), (0, 0, -0.040), 2,
+        (0.150, 0.018, 0.010), tier=2)
+    block("Ab_Glow", V, "Spine", (0, -0.108, 1.208), (0.034, 0.018, 0.020), tier=2)
+
+    # ── pelvis / thigh straps ───────────────────────────────────────────────
+    mirrored("Hip_Vent", D, "Pelvis", (0.150, -0.070, 1.052),
+             (0.036, 0.048, 0.056), tier=2)
+    mirrored("Thigh_Strap", D, "Thigh", (0.113, -0.012, 0.906),
+             (0.190, 0.210, 0.028), tier=2)
+
+    # ── arms ────────────────────────────────────────────────────────────────
+    mirrored("Bicep_Band", D, "UpperArm", (0.221, 0.0, 1.238),
+             (0.128, 0.138, 0.026), tier=2)
+    mrow("Forearm_Fin", A, "LowerArm", (0.286, -0.030, 1.058), (0, 0, -0.058), 2,
+         (0.020, 0.086, 0.040), top=(0.7, 0.8), tier=2)
+    mirrored("Forearm_Glow", V, "LowerArm", (0.224, -0.084, 1.056),
+             (0.020, 0.020, 0.062), tier=2)
+    mirrored("Elbow_Spike", D, "LowerArm", (0.222, 0.062, 1.160),
+             (0.056, 0.050, 0.048), top=(0.5, 0.5), tier=2)
+
+    # ── legs ────────────────────────────────────────────────────────────────
+    mrow("Thigh_Louvre", D, "Thigh", (0.196, -0.052, 0.856), (0, 0, -0.038), 3,
+         (0.052, 0.026, 0.020), tier=2)
+    mrow("Knee_Bolt", D, "Thigh", (0.076, -0.108, 0.540), (0.076, 0, 0), 2,
+         (0.020, 0.020, 0.020), tier=2)
+    mrow("Shin_Fin", A, "Shin", (0.192, -0.048, 0.376), (0, 0, -0.070), 2,
+         (0.022, 0.076, 0.048), top=(0.7, 0.8), tier=2)
+    mrow("Boot_Buckle", D, "Shin", (0.112, -0.104, 0.118), (0, 0, -0.046), 2,
+         (0.150, 0.040, 0.020), tier=2)
+    mirrored("Boot_Heel", D, "Shin", (0.112, 0.106, 0.062),
+             (0.140, 0.048, 0.062), top=(0.9, 0.9), tier=2)
+    mirrored("Boot_Glow", V, "Shin", (0.176, -0.030, 0.084),
+             (0.016, 0.070, 0.024), tier=2)
+
 
 
 
@@ -414,10 +543,13 @@ def script_args():
 
 
 def main():
+    global DETAIL
     args = script_args()
     out = os.path.abspath("ev_io_player_model.blend")
     if "--out" in args:
         out = os.path.abspath(args[args.index("--out") + 1])
+    if "--detail" in args:
+        DETAIL = int(args[args.index("--detail") + 1])
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     PARTS.clear()
@@ -428,9 +560,11 @@ def main():
     parent_to_bones(arm)
 
     tris = count_triangles()
-    print(f"[hero] {len(PARTS)} parts, {tris} triangles")
-    if tris >= TRI_BUDGET:
-        raise SystemExit(f"[hero] over budget: {tris} >= {TRI_BUDGET} triangles")
+    budget = TRI_BUDGETS[DETAIL]
+    print(f"[hero] detail {DETAIL}: {len(PARTS)} parts, {tris} triangles "
+          f"(budget {budget})")
+    if tris >= budget:
+        raise SystemExit(f"[hero] over budget: {tris} >= {budget} triangles")
 
     set_viewport_shading()
     bpy.context.view_layer.objects.active = arm

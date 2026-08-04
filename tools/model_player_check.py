@@ -130,7 +130,8 @@ ok(not wrong, "every part is parented to a bone that exists", ", ".join(wrong))
 tris = 0
 for o, b in MP.PARTS:
     o.data.calc_loop_triangles(); tris += len(o.data.loop_triangles)
-ok(tris < MP.TRI_BUDGET, f"under the {MP.TRI_BUDGET}-triangle budget", f"{tris} tris")
+budget = MP.TRI_BUDGETS[MP.DETAIL]
+ok(tris < budget, f"detail {MP.DETAIL} is under its {budget}-triangle budget", f"{tris} tris")
 
 flat = all(not p.use_smooth for o, b in MP.PARTS for p in o.data.polygons)
 ok(flat, "every polygon is flat-shaded")
@@ -165,6 +166,21 @@ ok(abs(bs(d)["Roughness"].default_value - 0.8) < 1e-9, "undersuit roughness 0.8"
 ok(abs(bs(v)["Emission Strength"].default_value - 5.0) < 1e-9, "visor emission strength 5.0")
 ok(all(m.use_backface_culling is False for m in MATS), "standard backface settings")
 ok(all(m.diffuse_color is not None for m in MATS), "solid-mode viewport colour set")
+
+# ── every detail level builds, and each stays inside its own budget ─────────
+print("\n── detail levels ──")
+for lvl in sorted(MP.TRI_BUDGETS):
+    MP.DETAIL = lvl
+    MP.PARTS.clear()
+    MESHES.clear(); OBJECTS.clear()
+    MP.build_mesh(MP.make_materials())
+    t = 0
+    for o, b in MP.PARTS:
+        o.data.calc_loop_triangles(); t += len(o.data.loop_triangles)
+    bad = sorted({b for o, b in MP.PARTS if b not in bones})
+    ok(t < MP.TRI_BUDGETS[lvl] and not bad,
+       f"detail {lvl}: {len(MP.PARTS)} parts, {t} tris < {MP.TRI_BUDGETS[lvl]}",
+       ", ".join(bad))
 
 print(f"\n{fails} check(s) FAILED" if fails else "\nall static checks passed")
 sys.exit(1 if fails else 0)
