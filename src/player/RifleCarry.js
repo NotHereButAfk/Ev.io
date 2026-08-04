@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import { applyThrowArm } from './Actions.js';
+// The figure the IK runs against. From Proportions.js, not a private copy —
+// this file used to hold its own, which is fine right up until it changes.
+import { SHOULDER_Y, SHOULDER_X, UP_ARM, FOREARM } from './Proportions.js';
+
+const REACH = (UP_ARM + FOREARM) * 0.995;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Rifle carry — how a soldier actually holds the gun.
@@ -35,20 +40,45 @@ const MAG_LOCAL = new THREE.Vector3(0, -0.26, -0.02);
 // rifle rides clear of the chest instead of sinking into it — pose-lab.html
 // ?sweep=patrol|aim reports the deepest penetration for a candidate, and these
 // two measure ZERO against the torso/pelvis/head.
+// The two carries were hand-solved against the previous, much larger figure
+// (shoulders at 1.76, an 0.865m arm). Their ROTATIONS are scale-free and stand;
+// their positions are carried onto the new arm by scaling about the shoulder
+// line — the same place the carry's own swing pivots about — so the rifle sits
+// at the same point on the chest relative to the arm holding it.
+//
+// The gun itself is NOT scaled with the body, and should not be: a rifle is
+// about 0.9m whoever is holding it. On the old 2.2m figure it read as a
+// carbine; at human scale it reads as a rifle.
+const ARM_SCALE = (UP_ARM + FOREARM) / (0.48 + 0.385);
+const onArm = (x, y, z) => new THREE.Vector3(
+  x * ARM_SCALE, SHOULDER_Y + (y - 1.76) * ARM_SCALE, z * ARM_SCALE);
 const PATROL = {
-  wp: new THREE.Vector3(0.058, 1.390, -0.333),
+  wp: onArm(0.058, 1.390, -0.333),
   wr: new THREE.Euler(-0.679, 0.646, 0.702),
 };
 const AIM = {
-  wp: new THREE.Vector3(0.240, 1.538, -0.262),
+  wp: onArm(0.240, 1.538, -0.262),
   wr: new THREE.Euler(-0.020, 0, 0),
 };
 
-// ── rig metrics the IK runs against (shared by every low-poly body) ──────────
-const SHOULDER_Y = 1.76, SHOULDER_X = 0.27;
-const UP_ARM = 0.48;      // shoulder → elbow
-const FOREARM = 0.385;    // elbow → hand centre
-const REACH = (UP_ARM + FOREARM) * 0.995;
+// ── where the gun POINTS ─────────────────────────────────────────────────────
+// The AIM pose carries 0.020 rad of its own muzzle droop. `aimPitch` is given
+// against the true horizon — the angle the shot actually leaves at — so that
+// droop has to be cancelled or every body in the game aims 1.15° under its own
+// bullets. Callers pass the look/shot pitch and nothing else: the conversion
+// lives here so the local body, the network avatars and the bots cannot drift
+// apart, which is exactly what happened when each owned its own constant (bots
+// held the rifle dead level at every angle; the other two showed 62% of the
+// real pitch and were up to 24° out).
+const AIM_BASE_PITCH = -0.020;
+// Bound on the pose, matched to the player's own look clamp (Player.js stops
+// at PI/2 - 0.05) so nothing inside the reachable range is ever cut short. It
+// can safely be this wide: measured across the full sweep, both hands stay on
+// the gun to 0.00 cm and the rifle never crosses the torso, because the
+// shouldered carry already rides outboard of it on the right shoulder. The
+// 0.95 rad ceiling this replaces was not protecting against anything.
+export const AIM_PITCH_LIMIT = Math.PI / 2 - 0.05;   // ~87.1°, Player.js's own clamp
+
 // Elbow swivel about the shoulder→hand axis: where the elbow sits on the cone
 // of valid solutions. Tuned to drop the trigger elbow down/back against the
 // ribs and swing the support elbow out under the handguard.
@@ -88,6 +118,32 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
   elbow.rotation.set(bend, 0, 0);
 }
 
+// The guns are NOT scaled to the body, and should not be — a rifle is about
+// 0.9m whoever is holding it. But that means the front of a long handguard can
+// sit past a shorter shooter's reach, and an arm that cannot get there leaves
+// the hand hovering off the end of the weapon.
+//
+// A real shooter answers this by gripping FURTHER BACK, so that is what happens
+// here: the support target slides along the weapon's own axis, toward the stock,
+// until it is inside the arm's reach. The hand stays on the handguard — just at
+// the part of it the arm can actually hold. Automatic, and right for every gun
+// in the arsenal rather than tuned for one.
+const _axis = new THREE.Vector3();
+function slideToReach(T, sx) {
+  _d.set(T.x - sx, T.y - SHOULDER_Y, T.z);
+  const D2 = _d.lengthSq(), R = REACH * 0.97;
+  if (D2 <= R * R) return;
+  _axis.set(0, 0, 1).applyQuaternion(_q);          // weapon's own +Z, toward the stock
+  const b = _d.dot(_axis);
+  const disc = b * b - D2 + R * R;
+  if (disc < 0) return;                            // unreachable at any grip point
+  // NEAREST intersection, not the far one. Both roots are positive here (the
+  // axis points away from the shoulder), and taking the larger slides the hand
+  // straight past the weapon and out the other side — 88cm off the gun.
+  const s0 = -b - Math.sqrt(disc);
+  T.addScaledVector(_axis, s0 > 0 ? s0 : -b + Math.sqrt(disc));
+}
+
 /**
  * Place the rifle, then solve both arms onto it.
  *
@@ -106,7 +162,13 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
  * @param {THREE.Object3D} weapon  the weapon model parented to the body (or null)
  * @param {number} aim     0 = patrol carry, 1 = shouldered and aiming
  * @param {number} dt      frame delta (seconds) — unused, kept for callers
- * @param {object} [o]     { swing, kick, reload, swap, flinch, throwP }
+ * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP }
+ *   `aimPitch` is where this body is SHOOTING, in radians against the horizon
+ *   (positive up) — pass the look pitch, or for a bot the elevation of the ray
+ *   it actually fires. Shouldered, the muzzle comes out on exactly that angle.
+ *   Do not pre-scale it; the shoulder blend, the body's own lean (`bodyPitch`,
+ *   pass whatever you set on the body's rotation.x) and the pose's droop are
+ *   all handled here.
  *   reload/swap/flinch/throwP are 0→1 action progresses. They move the WEAPON
  *   (and, for a reload, the support hand's target on it) — never the arms
  *   directly, because the arms are IK'd onto wherever the weapon ends up and
@@ -125,11 +187,21 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // Working the bolt, a third of the way through the reload.
   const rack = reload > 0 ? Math.exp(-Math.pow((reload - 0.62) / 0.06, 2)) : 0;
 
+  // Where the shot is going. Scaled by the shoulder blend, because a patrol
+  // carry is not aimed at anything — at a = 1 the muzzle lands exactly on
+  // `aimPitch`, and it fades out as the rifle comes down off the shoulder.
+  // `bodyPitch` comes back out because the weapon hangs off the body and
+  // inherits its run lean; without that the muzzle sits up to 9° off at a
+  // sprinting lean while the shot still leaves along the camera.
+  const aimPitch = Math.max(-AIM_PITCH_LIMIT,
+    Math.min(AIM_PITCH_LIMIT, (o.aimPitch || 0) - (o.bodyPitch || 0)));
+
   // Everything that moves the rifle without changing the grip rides this one
-  // common-mode shoulder pitch: idle breathing / stride, recoil, and a lift
-  // through the middle of the patrol→aim blend (a straight interpolation drags
-  // the buttstock through the right pec on the way across).
-  const swing = (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
+  // common-mode shoulder pitch: the aim itself, idle breathing / stride, recoil,
+  // and a lift through the middle of the patrol→aim blend (a straight
+  // interpolation drags the buttstock through the right pec on the way across).
+  const swing = (aimPitch - AIM_BASE_PITCH) * a
+    + (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
     // Muzzle drops while the hands are busy, and again when hit.
     - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 
@@ -181,8 +253,9 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     } else {
       _T.copy(HANDGUARD_LOCAL);
     }
-    solveArm(rig.armL, rig.elbowL, -SHOULDER_X,
-             _T.applyQuaternion(_q).add(_pos), SWIVEL_L);
+    _T.applyQuaternion(_q).add(_pos);
+    slideToReach(_T, -SHOULDER_X);
+    solveArm(rig.armL, rig.elbowL, -SHOULDER_X, _T, SWIVEL_L);
     // A grenade goes in the off hand, overriding the support grip entirely —
     // it has to be applied last or the IK above would put the hand back.
     if (o.throwP) applyThrowArm(rig, o.throwP);

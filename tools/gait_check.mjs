@@ -21,9 +21,12 @@
 // exactly 0mm, which is what groundBob() independently solves for.
 import { applyWalkCycle, triggerHop, HOP_SECONDS } from '../src/player/Locomotion.js';
 
-const HIP_Y = 1.21, KNEE_Y = 0.62, ANKLE_Y = 0.27;
-const THIGH_L = HIP_Y - KNEE_Y, SHIN_L = KNEE_Y - ANKLE_Y;
-const CORNERS = [[-0.27, 0.10], [-0.27, -0.20]];      // heel, toe in ankle space
+// From Proportions.js, like the code under test. This harness used to keep its
+// own copy of the figure, which meant that the moment the body's proportions
+// changed it went on measuring the new pose against the old legs and reported
+// skating that was not there.
+import { HIP_Y, THIGH_L, SHIN_L, SOLE_Y, HEEL_Z, TOE_Z } from '../src/player/Proportions.js';
+const CORNERS = [[SOLE_Y, HEEL_Z], [SOLE_Y, TOE_Z]];   // heel, toe in ankle space
 const EPS = 0.01;                                     // soft stance weight, metres
 
 const joint = () => ({ rotation: { x: 0, y: 0, z: 0, order: 'XYZ' } });

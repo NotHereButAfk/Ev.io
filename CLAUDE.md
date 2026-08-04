@@ -131,11 +131,66 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   exact ground, capsule and weapon ray tests. `_buildRookArena()` is retained
   only as inactive historical code and is never called.
   `_buildWinterGraveyard()` preserves the previous node-644 map for comparison.
+- `src/world/World.js` — **map rotation**: `MAPS` is the registry (id, name,
+  region, sky/fog, `build(world)`), `world.loadMap(id)` swaps the arena and
+  `nextMapId()` advances it. Every map builds into its own root Group — the
+  builders' hundreds of `this.scene.add()` calls are captured by pointing
+  `this.scene` at that group for the duration of the build — so switching is
+  detach + dispose + rebuild, and everything Game.js owns in the scene is
+  untouched. Game.js rotates in `_restart()`, i.e. whenever a match ends.
+  Maps with no hand-authored spawn list get one derived from their colliders.
+  Gated by `npm run test:maps`.
+  The rotation is Winter-Graveyard → Sunken Colonnade → Nightfall Complex; the
+  first is an official-image-led recreation of
+  **ev.io Winter-Graveyard** from [node 644](https://ev.io/node/644).
+  `_buildWinterGraveyard()` builds the complete visible composition: snow basin
+  and grave field, monumental sealed rear gate, nested crescent ribs and wreath,
+  raised right-side keep and parapet, left canyon cliffs, snowbank lanes,
+  holiday props, lit bare trees, warm mauve sunrise and live snowfall. The
+  proprietary `.evmap` file was downloaded for identification but is not parsed
+  or shipped. The route topology stays native to this game: walkable keep
+  surfaces and ramps are registered in `platforms[]`; solid walls, cliffs and
+  selected cover use `colliders[]`.
   `_buildEvioArena()` preserves the previous Jinx-led pass for comparison.
   `_buildLegacyEvioArena()` preserves the first dark-megastructure pass for
   comparison. The old mall, city, winter-town and legacy arena builders remain
   defined but are not called.
-- `src/player/` — `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
+- `src/player/` — `BlockBody.js` is the SHIPPING player/bot chassis: hard-surface
+  armour plates authored in Blender (`tools/model_player.py`), emitted as the
+  data module `heroParts.js` and assembled here into one SkinnedMesh per
+  material on the game's own 20-bone skeleton. No runtime asset load — the
+  generator writes JS, not a .glb. Regenerate with
+  `python3 tools/model_player.py -- --js src/player/heroParts.js`.
+  `Proportions.js` is the FIGURE: one source of truth for joint
+  heights, bone lengths and the sole corners, built from adult anthropometry at
+  the stature that matches `Player.js`'s 1.70m eye height (1.816m, 7.5 heads).
+  The body was a 2.21m giant on 12%-of-height ankles until this existed, and the
+  numbers were copied into five files. `HeroBody.js` builds the PRIMARY
+  player/bot chassis: a few
+  **SkinnedMesh**es on a real 19-bone skeleton, where a limb is ONE surface from
+  hip to ankle that bends because its vertices are weighted between bones (the
+  old parts-on-pivots body came apart at any bend past ~60°). Weights are
+  derived from position along the limb, not painted and not guessed from bone
+  proximity. `BodyGeometry.js` is the superellipse-loft + skinning core;
+  `LowPolyModels.js` owns the palettes/materials and keeps the previous
+  segmented body as `buildSegmentedCharacter()` for comparison. 14 draw calls a
+  body instead of 178. See AGENTS.md 2g/2h/2i and `npm run test:mesh`.
+  The armour is a **violet champion**: crested helm w/ dark visor + magenta
+  optic, three stacked pauldron lames, sternum emblem, belt, hip skirt (side
+  panels on the pelvis, front tassets on the THIGHS so they swing with a
+  stride instead of being a fence the leg walks through), long black cape,
+  gauntlets and chunky boots. Azure (`striker`) and graphite (`phantom`)
+  variants use the same build.
+  `HeroBody.js` (the lofted, graded-weight body) is still built and still gated
+  — it is the technique for anything that has to CREASE at a joint, which rigid
+  plates cannot do. Reach it via `buildLoftedCharacter()`.
+  Historic note — the segmented body (the three cel-shaded cyborgs). Everything organic on it — torso, thighs, calves,
+  feet, arms, hands, skull — is one **lofted superelliptical surface** per part
+  (`|x/rx|^n + |z/rz|^n = 1`, n 2 = limb, 2.8 = ribcage, 3.2 = boot sole), and
+  the armour is `plate()`d as curved shells that wrap the form underneath rather
+  than boxes bolted over it. Buffers are cached by shape and SHARED between
+  bodies — see AGENTS.md 2e/2f, and `npm run test:mesh`.
+  `HumanSoldier.js` (rigged Mixamo Vanguard w/ procedural armor,
   worn-metal PBR detail textures, `setLocomotion()` speed-scaled anim + idle
   breathing), `PreviewCharacter.js` (also loads Blender `public/spartan.glb` for
   the menu preview), `skins.js` (default = white/silver spartan), `Player.js`.
@@ -211,6 +266,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `src/sim/fixtures.js` — 11 sealed fixtures (flat-floor, wall, corner, ramp,
   step, ceiling, crouch tunnel, slide, mobility, teleport, recovery), shared by
   runner+lab.
+- `src/sim/fixtures.js` — 10 sealed fixtures (flat-floor, wall, corner, ramp,
+  step, ceiling, crouch tunnel, slide, teleport, recovery), shared by runner+lab.
+- `npm run test:mesh` (tools/mesh_check.mjs) — the skinned body still carries
+  the rig metrics the animation reads off it (bone heights, bone lengths, sole
+  plane, head-hit height), for all three chassis, PLUS the skinning: no
+  unweighted vertex, no weight crossing between the legs, enough loops through
+  a joint, and a knee that keeps its volume through a 92° bend.
 - `npm run test:move` (tools/movesim_fixtures.mjs) — invariants, double-run
   bit-identity, frame-schedule parity (two seeded irregular frame schedules →
   identical 20Hz hashes), golden hashes in tests/movesim.golden.json, movement

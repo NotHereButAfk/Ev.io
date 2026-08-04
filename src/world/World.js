@@ -543,12 +543,115 @@ function makeBarbedWireTexture() {
   return tex;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Map rotation
+// ───────────────────────────────────────────────────────────────────────────
+// The world used to build exactly one arena in its constructor and keep it for
+// the life of the page. Rotating maps between matches means the arena has to be
+// swappable, and the awkward part is not building the new one — it is throwing
+// the old one away without taking the rest of the scene with it.
+//
+// So every map builds into its own root Group rather than straight into the
+// scene. Switching is then: detach that root, dispose what it owns, build the
+// next one. Everything Game.js puts in the scene — the player camera, bots,
+// pickups, the third-person body — hangs off the scene itself and never moves.
+//
+// The builders all call `this.scene.add(...)` in a few hundred places. Rather
+// than rewrite those, `loadMap` points `this.scene` at the map root for the
+// duration of the build and puts it back afterwards. A Group takes .add() and
+// .traverse() exactly like a Scene does, so nothing else notices; the two
+// things that only a Scene has, `background` and `fog`, are set from the map's
+// own entry instead.
+export const MAPS = [
+  {
+    // The official ev.io Daytime Rook (node 755), decoded from its native
+    // binary. This is the ONLY asynchronous entry, which is why loadMap is a
+    // promise: a map that has to fetch and parse 5.7MB cannot pretend to be
+    // ready on the same tick as one that is built from primitives, and having
+    // the fast maps fake it would just move the stutter somewhere less honest.
+    id: 'rook',
+    name: 'Daytime Rook',
+    region: 'Official',
+    background: 0xcfe9ef,
+    fog: [0xc8d7dc, 145, 360],
+    async build(w) {
+      w._buildLighting({
+        sky: 0xf4fbff, ground: 0x41464d, hemi: 1.45,
+        sunColor: 0xfff4df, sun: 1.58, sunAt: [-82, 118, 66],
+        rimColor: 0x8fd7ff, rim: 0.28, rimAt: [72, 42, -64],
+      });
+      w.spawnPoints.push(new THREE.Vector3(0, 3, 0));
+      w.previewPedestalPos.set(0, 3, 0);
+      await w._loadOfficialRook();
+    },
+  },
+  {
+    id: 'winter-graveyard',
+    name: 'Winter-Graveyard',
+    region: 'Arctic Sector',
+    background: 0xdba5b6,
+    fog: [0xd8c4cd, 105, 260],
+    build(w) {
+      w._buildLighting();
+      w._buildGround({ color: 0xeee5ec, roughness: 1, metalness: 0, seams: false });
+      w._buildSky();
+      w._buildWinterGraveyard();
+      w._buildSpawnPoints();
+      w.previewPedestalPos.set(0, 0, 52);
+    },
+  },
+  {
+    id: 'evio-arena',
+    name: 'Sunken Colonnade',
+    region: 'Stonework Sector',
+    background: 0x9fb2c8,
+    fog: [0xb6c3d4, 110, 300],
+    build(w) {
+      w._buildLighting({
+        sky: 0xdce6f2, ground: 0x6b6257, hemi: 1.5,
+        sunColor: 0xfff2d8, sun: 1.7, sunAt: [64, 96, 58],
+        rimColor: 0x9fc2e8, rim: 0.5, rimAt: [-70, 40, -60],
+      });
+      w._buildGround({ color: 0xc9c2ba, roughness: 0.9, metalness: 0.03, seams: false });
+      w._buildEvioArena();
+      w.previewPedestalPos.set(0, 0, 34);
+    },
+  },
+  {
+    id: 'legacy-arena',
+    name: 'Nightfall Complex',
+    region: 'Deep Orbit',
+    background: 0x0b0e14,
+    fog: [0x10141c, 90, 260],
+    build(w) {
+      // Cool and much brighter than the snow map's rig: this arena's own
+      // materials are near-black, so the light has to carry the read.
+      w._buildLighting({
+        sky: 0x9fc4e8, ground: 0x1a2030, hemi: 2.1,
+        sunColor: 0xdCE8ff, sun: 2.0, sunAt: [58, 90, -70],
+        rimColor: 0x35d6ff, rim: 1.0, rimAt: [-70, 34, 62],
+      });
+      w._buildGround({ color: 0x2a2f38, roughness: 0.7, metalness: 0.25, seams: false });
+      w._buildLegacyEvioArena();
+      w.previewPedestalPos.set(0, 0, 30);
+    },
+  },
+];
+
+export function mapById(id) {
+  return MAPS.find((m) => m.id === id) || MAPS[0];
+}
+
+/** The map after `id` in the rotation — wraps at the end. */
+export function nextMapId(id) {
+  const i = MAPS.findIndex((m) => m.id === id);
+  return MAPS[(i + 1 + MAPS.length) % MAPS.length].id;
+}
+
 export class World {
-  constructor() {
+  constructor(mapId = MAPS[0].id) {
     this.scene = new THREE.Scene();
-    // Daytime Rook uses an almost white horizon over a clean pale-blue sky.
-    this.scene.background = new THREE.Color(0xcfe9ef);
-    this.scene.fog = new THREE.Fog(0xc8d7dc, 145, 360);
 
     this.arenaHalf = ARENA_HALF;
     this.colliders = []; // { box, mesh }
@@ -663,13 +766,192 @@ export class World {
     this.gravLifts   = []; // { x,z, r, topY, power }
     this.teleporters = []; // { x,z, r, dest:Vector3 }
 
-    // Official ev.io Daytime Rook (node 755). Its native binary is decoded
-    // below; no procedural arena geometry is active.
-    this._buildLighting();
-    this.spawnPoints.push(new THREE.Vector3(0, 3, 0));
+    // The arena is chosen by the rotation, not fixed here — see MAPS.
     this.previewPedestalPos = new THREE.Vector3(0, 3, 0);
-    this.ready = this._loadOfficialRook();
+
+
+    // Geometry and materials created ONCE in this constructor and reused by
+    // every map. loadMap() disposes what a map owns; these must survive it, so
+    // they are tagged here rather than recognised by guesswork later — the
+    // failure mode is a second match rendering untextured because the first
+    // match's teardown freed a shared material out from under it.
+    this._sharedDisposables = new Set([
+      ...Object.values(this._geo), ...Object.values(this._mats),
+    ]);
+
+    this.mapId = null;
+    this._mapRoot = null;
+    this.ready = this.loadMap(mapId);
   }
+
+  // ── Map rotation ────────────────────────────────────────────────────────────
+
+  /**
+   * Swap the arena. Safe to call between matches; leaves everything Game.js
+   * owns in the scene untouched.
+   *
+   * ASYNC because one map in the rotation decodes an official binary. The
+   * procedural ones still finish on the same tick — awaiting a promise that is
+   * already resolved costs a microtask, not a frame.
+   */
+  async loadMap(id) {
+    const def = mapById(id);
+    this._disposeMap();
+
+    // Per-map state. All of it is REBUILT rather than appended to — a stale
+    // collider from the previous arena is an invisible wall in the new one, and
+    // a stale spawn point drops you inside its geometry.
+    this.colliders = [];
+    this.platforms = [];
+    this.spawnPoints = [];
+    this.gravLifts = [];
+    this.teleporters = [];
+    this._airVehicles = [];
+    this._pulseMats = [];
+    this._spinRings = [];
+    this._raycastMeshes = null;      // cached getter — must not outlive the map
+    this._signPlaced = false;
+    // From the official-map path: an octree and mesh collision belong to the
+    // map that built them, and a stale one collides against geometry that is
+    // no longer on screen.
+    this.weaponSpawnPoints = [];
+    this._mapOctree = null;
+    this._evMapRoot = null;
+    this._evMapColliderRoot = null;
+    this.arenaHalf = ARENA_HALF;
+
+    const root = new THREE.Group();
+    root.name = 'map:' + def.id;
+
+    // Point `scene` at the map root for the build (see the note above MAPS).
+    // The scene swap has to be restored BEFORE any await inside a builder
+    // hands control back, or anything Game.js adds while the map is loading
+    // lands inside the map root and is destroyed by the next rotation. So the
+    // async builders get the root passed in explicitly and the swap only wraps
+    // the synchronous part.
+    const scene = this.scene;
+    this.scene = root;
+    let building;
+    try {
+      building = def.build(this);
+    } finally {
+      this.scene = scene;
+    }
+    if (building && typeof building.then === 'function') {
+      // Re-point for the remainder of the async build, then restore again.
+      const prev = this.scene;
+      this.scene = root;
+      try { await building; } finally { this.scene = prev; }
+    }
+    scene.add(root);
+    this._mapRoot = root;
+
+    scene.background = new THREE.Color(def.background);
+    scene.fog = new THREE.Fog(def.fog[0], def.fog[1], def.fog[2]);
+
+    // A map that ships no spawn list gets one derived from its own colliders,
+    // so adding an arena to the rotation does not also mean hand-placing
+    // sixteen safe starts in it.
+    this._validateSpawnPoints();
+
+    // Lock world matrices on the static meshes so Three.js skips recomputing
+    // them every frame; re-enable the ones we animate.
+    root.traverse((obj) => {
+      if (obj.isMesh && obj.matrixAutoUpdate) {
+        obj.matrixAutoUpdate = false;
+        obj.updateMatrix();
+      }
+    });
+    for (const r of this._spinRings) r.mesh.matrixAutoUpdate = true;
+
+    this.mapId = def.id;
+    this.mapDef = def;
+    return def;
+  }
+
+  _disposeMap() {
+    const root = this._mapRoot;
+    if (!root) return;
+    root.parent?.remove(root);
+    const seen = new Set();
+    root.traverse((o) => {
+      if (!o.isMesh && !o.isLine && !o.isPoints) return;
+      if (o.geometry && !this._sharedDisposables.has(o.geometry) && !seen.has(o.geometry)) {
+        seen.add(o.geometry);
+        o.geometry.dispose();
+      }
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        // Material.dispose() does NOT free its textures, which is what makes
+        // this safe: the facade/brick/billboard atlases are shared across maps
+        // and are freed only when the World itself goes.
+        if (m && !this._sharedDisposables.has(m) && !seen.has(m)) {
+          seen.add(m);
+          m.dispose();
+        }
+      }
+    });
+    this._mapRoot = null;
+  }
+
+  /**
+   * Keep only the spawn points you can actually stand in, and derive more if
+   * that leaves too few.
+   *
+   * A hand-authored list is not self-evidently valid: it is authored against
+   * the arena as it was, and anything that later changes the geometry — a
+   * different ground pass, a moved wall — buries some of it without a word.
+   * Cheaper to check every load than to find out by spawning inside a cliff.
+   */
+  _validateSpawnPoints(want = 12) {
+    const box = new THREE.Box3();
+    const clear = (p) => {
+      box.min.set(p.x - 0.45, p.y + 0.15, p.z - 0.45);
+      box.max.set(p.x + 0.45, p.y + 1.7, p.z + 0.45);
+      return !this.colliders.some((c) => c.box && c.box.intersectsBox(box));
+    };
+    const kept = this.spawnPoints.filter(clear);
+    if (kept.length >= want) { this.spawnPoints = kept; return; }
+    const authored = kept.slice();
+    this._deriveSpawnPoints(want - authored.length);
+    this.spawnPoints = authored.concat(this.spawnPoints.filter(clear));
+    if (!this.spawnPoints.length) this.spawnPoints = [new THREE.Vector3(0, 0, 0)];
+  }
+
+  /**
+   * Grid-sample the arena floor and keep the points that are clear of every
+   * collider. Cheap, and it means a new map in the rotation needs geometry and
+   * nothing else.
+   */
+  _deriveSpawnPoints(want = 16) {
+    const half = this.arenaHalf - 8;
+    const step = Math.max(6, (half * 2) / 12);
+    const CLEAR = 1.2;                 // player half-width plus a margin
+    const box = new THREE.Box3();
+    const cand = [];
+    for (let x = -half; x <= half; x += step) {
+      for (let z = -half; z <= half; z += step) {
+        box.min.set(x - CLEAR, 0.1, z - CLEAR);
+        box.max.set(x + CLEAR, 2.4, z + CLEAR);
+        let blocked = false;
+        for (const c of this.colliders) {
+          if (c.box && c.box.intersectsBox(box)) { blocked = true; break; }
+        }
+        if (!blocked) cand.push(new THREE.Vector3(x, 0, z));
+      }
+    }
+    // Spread them out rather than taking the first N, which would cluster every
+    // start in one corner of the grid.
+    cand.sort(() => Math.random() - 0.5);
+    const picked = [];
+    for (const p of cand) {
+      if (picked.length >= want) break;
+      if (picked.every((q) => q.distanceTo(p) > step * 0.9)) picked.push(p);
+    }
+    this.spawnPoints = picked.length ? picked
+      : [new THREE.Vector3(0, 0, 0)];   // last resort: never leave it empty
+  }
+
 
   async _loadOfficialRook() {
     const map = await loadEvMap('/maps/RookLit_0.evmap');
@@ -703,22 +985,37 @@ export class World {
     return map;
   }
 
-  _buildLighting() {
-    const hemi = new THREE.HemisphereLight(0xf4fbff, 0x41464d, 1.45);
+  /**
+   * Lighting belongs to the MAP, not to the world.
+   *
+   * Every arena shared one rig because there was only ever one arena. Rotation
+   * broke that immediately: the orbital complex is built from near-black
+   * concrete and reads by its neon, and lit like a snowfield at dawn it came
+   * out as a black rectangle you could not play in.
+   */
+  _buildLighting(o = {}) {
+    const hemi = new THREE.HemisphereLight(
+      o.sky ?? 0xffdfd1, o.ground ?? 0x554956, o.hemi ?? 1.32);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff4df, 1.58);
-    sun.position.set(-82, 118, 66);
+    const sun = new THREE.DirectionalLight(o.sunColor ?? 0xffd7aa, o.sun ?? 1.45);
+    sun.position.set(...(o.sunAt ?? [72, 86, -95]));
     sun.castShadow = false;
     this.scene.add(sun);
-    const skyRim = new THREE.DirectionalLight(0x8fd7ff, 0.28);
-    skyRim.position.set(72, 42, -64);
+    const skyRim = new THREE.DirectionalLight(o.rimColor ?? 0xc99ad5, o.rim ?? 0.38);
+    skyRim.position.set(...(o.rimAt ?? [-75, 46, 54]));
     skyRim.castShadow = false;
     this.scene.add(skyRim);
   }
 
-  _buildGround() {
+  /**
+   * @param {object} o  { color, seams } — the deck seams are Rook's panel
+   *   language and belong to Rook. Left on under a snowfield they draw a grid
+   *   across the graveyard.
+   */
+  _buildGround(o = {}) {
     const floor = new THREE.MeshStandardMaterial({
-      color: 0xaeb4b8, roughness: 0.82, metalness: 0.12, envMapIntensity: 0.42,
+      color: o.color ?? 0xaeb4b8, roughness: o.roughness ?? 0.82,
+      metalness: o.metalness ?? 0.12, envMapIntensity: 0.42,
     });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(ARENA_HALF * 2, ARENA_HALF * 2), floor);
     ground.rotation.x = -Math.PI / 2;
@@ -727,6 +1024,7 @@ export class World {
     ground.updateMatrix();
     this.scene.add(ground);
 
+    if (o.seams === false) return;
     // Rook's floor is made from broad square panels with restrained bevel lines.
     const seam = new THREE.MeshBasicMaterial({ color: 0x727a82, transparent: true, opacity: 0.42 });
     for (let p = -54; p <= 54; p += 12) {

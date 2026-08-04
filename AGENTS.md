@@ -39,6 +39,8 @@ npm run test:evmap            # official Rook hash, geometry/spawns, authored we
 npm run test:skins            # character catalog, starter finishes, themed silhouettes
 cd server && npm run test:auth   # 33 authority/abuse proofs
 npm run certify               # build, movement, actions, net authority, topology, soak, assets, a11y
+npm run test:mesh             # rig metrics, skin weights, joint deformation
+npm run test:maps             # map rotation: no leaks, no buried spawns
 ```
 
 There is no test runner for rendering or gameplay feel. The pattern used
@@ -120,6 +122,111 @@ melee strike off its `swingPhase` — pass that progress straight through; do no
 start a second timer, it will drift out of step with the thing it depicts.
 `npm run test:actions` fails on any action whose pose is identical to not doing
 it, which is the actual failure mode: silence, not a wrong number.
+
+**2e. The body MESH is free to change; the numbers the animation reads off it
+are not.** `Locomotion.js` solves ground contact against a hard-coded leg chain
+(hip 1.21 / knee 0.62 / ankle 0.27, sole on y 0 spanning z +0.10 → −0.20) and
+`RifleCarry.js` IKs both arms against a hard-coded shoulder (|x| 0.27, y 1.76)
+and bone lengths (0.48 / 0.385). None of it is derived from the mesh, so
+reshaping the body silently breaks the ground solve or puts the hands off the
+gun. Two of these bite from an odd direction:
+→ `rigCharacterLimbs()` places each pivot at the MEAN x of the parts it
+  collected, so nudging one plate sideways moves the whole joint. Sideways shape
+  offsets belong in the geometry, not in `mesh.position`.
+→ Bots tag headshot zones with `mesh.position.y >= 1.90`, so a part whose
+  position sits at the origin with its height baked into the vertices drops out
+  of the head hitbox even though it renders in the right place.
+`npm run test:mesh` measures all of it off the built mesh, for all three
+chassis.
+
+**2f. The cyborg chassis SHARE their geometry between every body on the map.**
+`LowPolyModels.js` caches each buffer by shape, which is what keeps eight bots
+cheap to build (~8ms a body instead of ~34ms) and lets the outline hull cache
+hit. It also means `geometry.dispose()` on one body empties every other body
+that is still drawing — the player's own model included. Anything that tears
+down a character must check `isSharedGeometry()` first; `Avatar.dispose()` and
+`ArmorPreviewRenderer` both do, and `test:mesh` fails if either stops.
+
+**2f-bis. The FIGURE lives in `Proportions.js`. There is one of it.**
+Joint heights, bone lengths, shoulder and hip spacing and the sole corners used
+to be private copies in `HeroBody.js`, `Locomotion.js`, `RifleCarry.js` and both
+test harnesses — five copies, kept equal only by nobody touching them. They are
+all imported now.
+→ The body is built from standard adult anthropometry at the ONE stature that
+  agrees with the game: `Player.js` puts your eyes at 1.70m, that is 0.936 of
+  stature, so the figure is 1.816m. It used to be a 2.21m giant on ankles 12%
+  of its height off the floor — the character you saw was not the character you
+  were, by 28cm at the eyes.
+→ `test:mesh` gates the landmarks against canon, the head count (7.5), and that
+  the model's eyes land on `EYE_HEIGHT`. A reshape cannot drift back to a mech
+  without failing.
+→ When you change the figure, check what was POSITIONED against the old one:
+  health bars, nameplates, camera framing. Those were absolute metres.
+→ The guns are NOT scaled with the body and must not be — a rifle is ~0.9m
+  whoever holds it. `applyRifleCarry()` slides the support hand back along the
+  handguard when the front of it is out of a shorter arm's reach, which is what
+  a real shooter does; `test:aim` checks the hand stays on the weapon AXIS
+  rather than at one fixed point on it.
+
+**2g. The body is SKINNED. Do not re-parent its meshes.**
+`HeroBody.js` builds the player/bot chassis as a few `SkinnedMesh`es on a real
+skeleton: a limb is ONE surface from hip to ankle, and it bends because its
+vertices are weighted between bones. The old body was rigid parts on pivot
+groups, and it fell apart at any bend past ~60° — smoothness within a part does
+nothing about the seam between parts.
+→ `rigCharacterLimbs()` returns `group.userData.rig` unchanged for a skinned
+  body. It must: re-parenting the meshes into pivot groups, which is what it
+  does to a parts body, tears the skin off the skeleton.
+→ The rig it hands back is BONES under the old names (legL/kneeL/ankleL/armL/
+  elbowL/…), so `applyWalkCycle()`, `applyRifleCarry()` and `Actions.js` drive
+  it with no changes — a bone is an Object3D like any other.
+→ Weights are DERIVED from where a vertex sits along its limb, not painted and
+  not guessed from bone proximity. Proximity auto-skinning bleeds across the gap
+  between the thighs (0.22 apart, 0.12 thick), and `test:mesh` fails on any
+  weight that crosses.
+→ Geometry is cached per chassis and SHARED; only the skeleton and materials are
+  per body. Without that cache a body costs ~60ms to build instead of ~7.
+
+**2h. Two things about a skinned body break silently, and both are gated.**
+→ There is no per-part head mesh left to tag, so headshots resolve by hit height
+  from `userData.headshotY`. The old `mesh.position.y >= 1.90` tag matches
+  nothing on a skinned body — every mesh sits at the origin — so leaving it
+  would have quietly disabled headshots on every bot.
+→ A raycast culls against the geometry's bounding sphere, which for a skinned
+  mesh is computed from the BIND pose. A leg thrown out in a slide reaches past
+  it and shots miss a body that is plainly there, so the bodies carry one
+  generous sphere instead.
+
+**2i. Triangle winding follows the order a station table is swept in.**
+`loftSkinned()` and `plateGeometry()` both take that into account now — a table
+whose stations DESCEND (the legs, the arms, the shin plate, the tassets, the
+cape) is wound the other way round from one that ascends (torso, skull, boot,
+pauldrons). Get it wrong and the form is inside-out, which is close to
+invisible: the inside of a limb looks like the outside of one, and back-face
+culling quietly shows you the far wall instead. What it is NOT invisible to is
+anything reading the normal — the surface is lit from behind, and the
+inverted-hull outline, which pushes each vertex along its normal, collapses
+inward and fills the limb with solid black. Gated by `npm run test:mesh`
+("nothing is inside-out"), which fires rays in and checks the first hit is a
+front face.
+→ Related: a plate thinner than **twice the outline weight** (`OUT_T`) gets
+  swallowed by its own hull and renders as black hatching. `TRIM` is the floor.
+  And a plate's end rings must not taper to zero thickness, or the two faces
+  weld and `computeVertexNormals` averages them to garbage.
+
+**2j. Map geometry belongs to `world._mapRoot`, not to the scene.**
+Anything a map builder creates must end up under that group, or it survives the
+next `loadMap()` as invisible collision and leaked GPU buffers. The builders get
+this for free — `loadMap` points `this.scene` at the map root while they run —
+so the rule only bites if you add map geometry from OUTSIDE a builder. Per-map
+state (`colliders`, `platforms`, `spawnPoints`, `gravLifts`, `teleporters`,
+`_raycastMeshes`) is rebuilt on every load, never appended to.
+→ Constructor-owned geometry/materials (`_geo`, `_mats`, the facade atlases) are
+  registered in `_sharedDisposables` and must NOT be freed by teardown. Free one
+  and the FIRST match still looks perfect while every later one renders wrong.
+→ `npm run test:maps` rotates three full laps and asserts the counts come back
+  identical, one map root exists at a time, every owned resource is disposed and
+  no shared one is.
 
 **3. `applyRifleCarry()` owns both arms *and* the weapon transform** — and
 `applyMeleeCarry()` owns them for a blade.

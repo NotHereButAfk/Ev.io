@@ -50,13 +50,16 @@ export function triggerHop(rig, seconds = HOP_SECONDS) {
   rig._airLead = undefined;      // re-pick the leading leg from the live stride
 }
 
-// ── leg geometry, straight off the low-poly model ────────────────────────────
-const HIP_Y = 1.21, KNEE_Y = 0.62, ANKLE_Y = 0.27;
-const THIGH_L = HIP_Y - KNEE_Y;      // 0.59
-const SHIN_L  = KNEE_Y - ANKLE_Y;    // 0.35
+// ── leg geometry ─────────────────────────────────────────────────────────────
+// From Proportions.js, not copied. These used to be three private copies of the
+// same figure — here, in RifleCarry, and in the skeleton — with nothing keeping
+// them equal but the fact that nobody had touched them.
+import {
+  HIP_Y, KNEE_Y, ANKLE_Y, THIGH_L, SHIN_L, SOLE_Y, HEEL_Z, TOE_Z,
+} from './Proportions.js';
+
 // The two corners of the sole that can touch down, in ankle-local space.
-const HEEL_Y = -0.27, HEEL_Z =  0.10;
-const TOE_Y  = -0.27, TOE_Z  = -0.20;
+const HEEL_Y = SOLE_Y, TOE_Y = SOLE_Y;
 
 // A sole corner's position, walking the chain ankle → knee → hip → hip-yaw →
 // body lean. The leg swings in a plane, so within it only y and z matter (every

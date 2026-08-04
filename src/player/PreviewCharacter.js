@@ -475,6 +475,10 @@ const _LEG_FT = /boot|sole|foot|toe|ankle/i;
 
 export function rigCharacterLimbs(group) {
   try {
+    // A skinned body arrives already rigged: its joints are bones, positioned
+    // by construction, and re-parenting its meshes into pivot groups would tear
+    // the skin off the skeleton. Hand back the rig it was built with.
+    if (group.userData?.rig) return group.userData.rig;
     group.updateWorldMatrix(true, true);
     // Work in the GROUP's local space, not world space. Limbs are bucketed
     // left/right by their x, and callers rig AFTER placing the character — so
