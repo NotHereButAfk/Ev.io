@@ -38,7 +38,7 @@ from mathutils import Euler, Vector
 ANKLE_Z, KNEE_Z, HIP_Z = 0.09, 0.50, 0.96
 WAIST_Z, CHEST_Z = 1.10, 1.32
 SHOULDER_Z, NECK_Z, CHIN_Z, CROWN_Z = 1.47, 1.53, 1.59, 1.80
-SHOULDER_X, HIP_X = 0.20, 0.10
+SHOULDER_X, HIP_X = 0.215, 0.105
 ELBOW_Z, WRIST_Z = 1.16, 0.90
 
 TRI_BUDGET = 1200
@@ -166,89 +166,89 @@ def build_mesh(M):
     R = math.radians
 
     # ── head: a segmented helm with the visor let into the front plate ───────
-    block("Helm_Crown", A, "Head", (0, -0.005, 1.715), (0.215, 0.235, 0.13),
+    block("Helm_Crown", A, "Head", (0, -0.005, 1.712), (0.230, 0.255, 0.135),
           top=(0.72, 0.78), top_off=(0, 0.012))
-    block("Helm_Face", A, "Head", (0, -0.075, 1.665), (0.20, 0.10, 0.10),
+    block("Helm_Face", A, "Head", (0, -0.086, 1.668), (0.212, 0.115, 0.104),
           top=(1.05, 1.0), bot_off=(0, 0.012))
-    block("Helm_Nape", D, "Head", (0, 0.085, 1.665), (0.175, 0.075, 0.135),
+    block("Helm_Nape", D, "Head", (0, 0.094, 1.665), (0.190, 0.090, 0.140),
           top=(0.85, 0.9))
-    block("Helm_Jaw", D, "Head", (0, -0.035, 1.588), (0.165, 0.175, 0.055),
+    block("Helm_Jaw", D, "Head", (0, -0.040, 1.586), (0.176, 0.195, 0.058),
           top=(1.12, 1.05))
     # The visor sits proud of the face plate so it catches its own silhouette
     # edge; buried flush it reads as a decal rather than a lens.
-    block("Visor", V, "Head", (0, -0.126, 1.668), (0.176, 0.030, 0.046),
+    block("Visor", V, "Head", (0, -0.146, 1.670), (0.186, 0.030, 0.050),
           top=(0.92, 1.0))
     block("Helm_Crest", A, "Head", (0, 0.012, 1.788), (0.036, 0.20, 0.036),
           top=(0.45, 0.80))
-    mirrored("Helm_Cheek", A, "Head", (0.088, -0.045, 1.640),
-             (0.030, 0.115, 0.085), top=(0.8, 0.85))
-    block("Neck", D, "Neck", (0, 0.005, 1.545), (0.088, 0.092, 0.075))
+    mirrored("Helm_Cheek", A, "Head", (0.096, -0.052, 1.640),
+             (0.034, 0.130, 0.088), top=(0.8, 0.85))
+    block("Neck", D, "Neck", (0, 0.005, 1.545), (0.100, 0.104, 0.075))
 
     # ── torso: white plate over a recessed dark core ─────────────────────────
     # The core is deliberately NARROWER and set back, not merely darker: a
     # recess is read from the step in the silhouette, and two coplanar slabs in
     # different colours read as paint.
-    block("Torso_Core", D, "Chest", (0, 0.005, 1.345), (0.255, 0.175, 0.235))
-    mirrored("Chest_Pec", A, "Chest", (0.078, -0.055, 1.385),
-             (0.135, 0.105, 0.175), top=(0.95, 0.85), top_off=(0.012, 0.010),
-             rot=(0, R(-7), 0))
-    block("Chest_Collar", A, "Chest", (0, -0.012, 1.470), (0.245, 0.170, 0.055),
+    block("Torso_Core", D, "Chest", (0, 0.005, 1.345), (0.300, 0.225, 0.235))
+    mirrored("Chest_Pec", A, "Chest", (0.086, -0.072, 1.385),
+             (0.150, 0.140, 0.180), top=(0.95, 0.85), top_off=(0.012, 0.012),
+             rot=(0, R(-6), 0))
+    block("Chest_Collar", A, "Chest", (0, -0.012, 1.470), (0.290, 0.215, 0.058),
           top=(0.70, 0.80), top_off=(0, 0.015))
-    block("Back_Plate", A, "Chest", (0, 0.088, 1.375), (0.225, 0.070, 0.215),
+    block("Back_Plate", A, "Chest", (0, 0.112, 1.375), (0.265, 0.085, 0.215),
           top=(0.88, 0.85))
-    block("Chest_Glow", V, "Chest", (0, -0.108, 1.300), (0.052, 0.022, 0.030))
+    block("Chest_Glow", V, "Chest", (0, -0.130, 1.300), (0.056, 0.024, 0.032))
 
     # ── abdomen + pelvis ─────────────────────────────────────────────────────
-    block("Abdomen_Core", D, "Spine", (0, 0.005, 1.195), (0.195, 0.150, 0.145))
-    block("Abdomen_Plate", A, "Spine", (0, -0.055, 1.180), (0.155, 0.065, 0.105),
+    block("Abdomen_Core", D, "Spine", (0, 0.005, 1.195), (0.230, 0.190, 0.145))
+    block("Abdomen_Plate", A, "Spine", (0, -0.070, 1.180), (0.185, 0.075, 0.105),
           top=(1.10, 1.0))
-    block("Pelvis_Core", D, "Pelvis", (0, 0.005, 1.055), (0.225, 0.165, 0.135))
-    block("Belt", D, "Pelvis", (0, 0.005, 1.118), (0.238, 0.178, 0.038))
-    mirrored("Hip_Plate", A, "Pelvis", (0.108, -0.020, 1.020),
-             (0.070, 0.150, 0.135), top=(1.0, 0.9), bot_off=(0.014, 0),
+    block("Pelvis_Core", D, "Pelvis", (0, 0.005, 1.055), (0.265, 0.205, 0.135))
+    block("Belt", D, "Pelvis", (0, 0.005, 1.118), (0.280, 0.220, 0.040))
+    mirrored("Hip_Plate", A, "Pelvis", (0.128, -0.020, 1.020),
+             (0.080, 0.190, 0.140), top=(1.0, 0.9), bot_off=(0.014, 0),
              rot=(0, R(9), 0))
 
     # ── pauldrons, offset outboard of the torso so the arm swings under ──────
-    mirrored("Pauldron", A, "Clavicle", (0.223, -0.010, 1.452),
-             (0.135, 0.185, 0.115), top=(0.80, 0.85), bot_off=(0.020, 0),
-             rot=(0, R(-13), 0))
-    mirrored("Pauldron_Lame", A, "Clavicle", (0.232, -0.008, 1.360),
-             (0.120, 0.160, 0.075), top=(1.05, 1.05), bot_off=(0.014, 0),
-             rot=(0, R(-16), 0))
-    mirrored("Pauldron_Glow", V, "Clavicle", (0.288, -0.052, 1.408),
-             (0.018, 0.026, 0.046))
+    mirrored("Pauldron", A, "Clavicle", (0.246, -0.010, 1.448),
+             (0.160, 0.235, 0.125), top=(0.78, 0.84), top_off=(-0.014, 0),
+             rot=(0, R(14), 0))
+    mirrored("Pauldron_Lame", A, "Clavicle", (0.262, -0.008, 1.352),
+             (0.150, 0.205, 0.080), top=(0.92, 0.96), top_off=(-0.010, 0),
+             rot=(0, R(18), 0))
+    mirrored("Pauldron_Glow", V, "Clavicle", (0.318, -0.070, 1.408),
+             (0.020, 0.030, 0.050))
 
     # ── arms: guard over undersuit, joints left bare ─────────────────────────
-    mirrored("Bicep_Under", D, "UpperArm", (0.205, 0.0, 1.315),
-             (0.092, 0.098, 0.235), top=(0.90, 0.92))
-    mirrored("Bicep_Guard", A, "UpperArm", (0.212, -0.018, 1.330),
-             (0.098, 0.070, 0.150), top=(0.88, 0.95), bot_off=(0.008, 0))
-    mirrored("Forearm_Under", D, "LowerArm", (0.205, 0.0, 1.030),
-             (0.080, 0.086, 0.235), top=(1.10, 1.10))
-    mirrored("Forearm_Guard", A, "LowerArm", (0.208, -0.012, 1.010),
-             (0.098, 0.082, 0.160), top=(0.82, 0.88), bot_off=(0.006, 0))
-    mirrored("Hand", D, "LowerArm", (0.205, 0.0, 0.862),
-             (0.072, 0.062, 0.105), top=(1.08, 1.10))
+    mirrored("Bicep_Under", D, "UpperArm", (0.220, 0.0, 1.315),
+             (0.120, 0.130, 0.235), top=(0.90, 0.92))
+    mirrored("Bicep_Guard", A, "UpperArm", (0.228, -0.026, 1.330),
+             (0.128, 0.105, 0.155), top=(0.88, 0.95), bot_off=(0.008, 0))
+    mirrored("Forearm_Under", D, "LowerArm", (0.220, 0.0, 1.030),
+             (0.104, 0.114, 0.235), top=(1.10, 1.10))
+    mirrored("Forearm_Guard", A, "LowerArm", (0.224, -0.020, 1.010),
+             (0.126, 0.118, 0.165), top=(0.82, 0.88), bot_off=(0.006, 0))
+    mirrored("Hand", D, "LowerArm", (0.220, -0.004, 0.856),
+             (0.096, 0.086, 0.115), top=(1.06, 1.08))
 
     # ── legs ─────────────────────────────────────────────────────────────────
-    mirrored("Thigh_Under", D, "Thigh", (0.104, 0.0, 0.760),
-             (0.135, 0.145, 0.360), top=(1.12, 1.10))
-    mirrored("Thigh_Plate", A, "Thigh", (0.106, -0.048, 0.800),
-             (0.140, 0.085, 0.230), top=(0.92, 0.90), top_off=(0.004, -0.006))
-    mirrored("Knee", D, "Thigh", (0.104, -0.012, 0.520),
-             (0.118, 0.128, 0.090), top=(1.05, 1.02))
-    mirrored("Shin_Under", D, "Shin", (0.104, 0.0, 0.315),
-             (0.110, 0.118, 0.330), top=(1.05, 1.05))
-    mirrored("Shin_Plate", A, "Shin", (0.104, -0.042, 0.330),
-             (0.120, 0.078, 0.270), top=(0.85, 0.88))
-    mirrored("Shin_Glow", V, "Shin", (0.104, -0.086, 0.430),
-             (0.030, 0.020, 0.070))
+    mirrored("Thigh_Under", D, "Thigh", (0.112, 0.0, 0.760),
+             (0.175, 0.195, 0.360), top=(1.10, 1.08))
+    mirrored("Thigh_Plate", A, "Thigh", (0.114, -0.070, 0.800),
+             (0.180, 0.115, 0.235), top=(0.92, 0.90), top_off=(0.004, -0.008))
+    mirrored("Knee", D, "Thigh", (0.112, -0.014, 0.520),
+             (0.156, 0.170, 0.090), top=(1.04, 1.02))
+    mirrored("Shin_Under", D, "Shin", (0.112, 0.0, 0.315),
+             (0.146, 0.160, 0.330), top=(1.04, 1.04))
+    mirrored("Shin_Plate", A, "Shin", (0.114, -0.062, 0.330),
+             (0.156, 0.105, 0.275), top=(0.86, 0.88))
+    mirrored("Shin_Glow", V, "Shin", (0.114, -0.118, 0.430),
+             (0.032, 0.022, 0.075))
     # Thick, flat-bottomed sci-fi boot: the block flares DOWNWARD (top scale
     # below 1) so the widest line is the one on the floor.
-    mirrored("Boot", A, "Shin", (0.104, -0.028, 0.098),
-             (0.150, 0.255, 0.105), top=(0.80, 0.86), top_off=(0, 0.016))
-    mirrored("Boot_Sole", D, "Shin", (0.104, -0.028, 0.022),
-             (0.158, 0.268, 0.044), top=(0.97, 0.98))
+    mirrored("Boot", A, "Shin", (0.112, -0.022, 0.098),
+             (0.182, 0.270, 0.105), top=(0.82, 0.88), top_off=(0, 0.016))
+    mirrored("Boot_Sole", D, "Shin", (0.112, -0.022, 0.022),
+             (0.190, 0.284, 0.044), top=(0.97, 0.98))
 
 
 # ── armature ─────────────────────────────────────────────────────────────────
