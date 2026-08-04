@@ -108,25 +108,41 @@ function _addOutlines(group, t = 0.011) {
 }
 
 // ── Palettes ─────────────────────────────────────────────────────────────────
-// Violet champion: saturated armour over a dark underframe, lighter lavender on
-// the trim and the raised edges, magenta on every powered accent.
+// A character needs MATERIALS, not one colour at five brightnesses.
 //
-// The four body tones are spaced deliberately, and the spacing is the whole
-// trick. A first pass ran the underframe at near-black and the trim at
-// near-white, on the theory that maximum separation would make the layered
-// plates read as layers. It does the opposite: on a six-band cel ramp the
-// armour's own shadow bands land on top of the underframe's lit ones, so every
-// unarmoured surface — arms, thighs, the sides of the torso — merges into one
-// silhouette, and the trim burns out to a white rim that reads as a highlight
-// rather than a plate edge. What separates plates on a cel ramp is HUE and a
-// step of about a third in value, not the full range of it.
+// The first violet pass tinted every slot violet — armour, trim, underframe,
+// joints, and even the slot literally called `steel`. Five tints of one hue is
+// not a palette, it is a monochrome, and a monochrome model reads as a single
+// lump of plastic no matter how the forms underneath are shaped: with nothing
+// but value separating a pauldron from the arm beneath it, the eye takes the
+// whole silhouette as one object. Shading and shape cannot rescue that,
+// because the problem is not contrast — it is that there is only one material.
+//
+// So the slots are different MATERIALS now, and only one of them is coloured:
+//
+//   armor   the identity colour — the only saturated hue on the body
+//   bone    the light plate: pauldrons, gauntlets, shins, helm crown
+//   armor2  a near-white trim, NEUTRAL, so a lit edge reads as a lit edge
+//   frame   the undersuit: neutral near-black, no hue at all
+//   joint   black, for recesses, the visor and the cape
+//   steel   real gunmetal — hands, ankles, belt, fittings
+//   glow    the accent
+//
+// The armour is deliberately split two-tone. Even with neutral blacks and
+// greys elsewhere, armour that is ALL the identity colour still leaves ~70% of
+// the visible character in one saturated hue, and it reads as dipped. Hero
+// armour is mostly neutral plate with the colour placed on it — the colour is
+// the identity, not the substrate.
+//
+// The armour reads MORE violet now than it did when everything was violet,
+// which is the point: a hue needs something neutral next to it to be a hue.
 const PALETTES = {
-  vanguard: { armor: 0x7a55d6, armor2: 0xb69cf0, frame: 0x1f1934, joint: 0x0d0a18,
-              steel: 0x8f7fc4, bone: 0xe4dcf8, glow: 0xff2f8f, bulk: 1.00 },  // violet
-  striker:  { armor: 0x3286d8, armor2: 0x9dc4ef, frame: 0x141d2e, joint: 0x070b14,
-              steel: 0x7ba6cc, bone: 0xdff0fb, glow: 0x2ff0d8, bulk: 0.96 },  // azure
-  phantom:  { armor: 0x4b4760, armor2: 0x9d95bb, frame: 0x191722, joint: 0x08070d,
-              steel: 0x7f7899, bone: 0xcfc9e0, glow: 0xff3d5e, bulk: 0.92 },  // graphite
+  vanguard: { armor: 0x6d3fd2, armor2: 0xe9e7f1, frame: 0x191920, joint: 0x0a0a0e,
+              steel: 0x6c6f7d, bone: 0xcdc9d8, glow: 0xff2f8f, bulk: 1.00 },  // violet
+  striker:  { armor: 0x2478d4, armor2: 0xe4edf5, frame: 0x171b22, joint: 0x090b0f,
+              steel: 0x69707d, bone: 0xc7cfd9, glow: 0x2ff0d8, bulk: 0.96 },  // azure
+  phantom:  { armor: 0x3d3a4d, armor2: 0xdedbe6, frame: 0x141319, joint: 0x08080b,
+              steel: 0x6a6775, bone: 0xc9c6d2, glow: 0xff3d5e, bulk: 0.92 },  // graphite
 };
 
 
@@ -152,7 +168,7 @@ export function makeBodyMaterials(pal) {
     frame:  body(pal.frame, 0.24),
     joint:  body(pal.joint, 0.30),
     steel:  body(pal.steel, 0.16),
-    bone:   body(pal.bone, 0.20),
+    bone:   body(pal.bone, 0.16),
     glow:   T(new THREE.Color(red).multiplyScalar(0.15).getHex(), { role: 'energy', emissive: red, emissiveIntensity: 1.5 }),
     eye:    T(new THREE.Color(red).multiplyScalar(0.2).getHex(),  { role: 'energy', emissive: red, emissiveIntensity: 2.2 }),
   };

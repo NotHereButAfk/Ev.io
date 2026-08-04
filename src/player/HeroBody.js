@@ -547,10 +547,10 @@ function buildHeroBuffers(id) {
       const geo = toGeometry(g);
       geo.rotateX(-Math.PI / 2);
       geo.translate(sx, 0, BODY.HEEL_Z);
-      appendGeometry(geo, [[ankle, 1]], buf('joint'));
+      appendGeometry(geo, [[ankle, 1]], buf('steel'));
       geo.dispose();
     }
-    loftSkinned(place(ankleT, sx, () => [[ankle, 1]], 0.012 * G), 14, buf('joint'));
+    loftSkinned(place(ankleT, sx, () => [[ankle, 1]], 0.012 * G), 14, buf('steel'));
     // Boot shaft. Rides the SHIN, not the foot: a boot's cuff stays with the leg
     // while the ankle rolls under it, and hanging it off the ankle bone would
     // swing 13cm of armour every heel strike.
@@ -561,7 +561,7 @@ function buildHeroBuffers(id) {
         { y: 0.198, rx: 0.058, rz: 0.063, n: 2.9 },
         { y: 0.234, rx: 0.052, rz: 0.057, n: 2.8 },
       ];
-      addPlate(buf('armor'), SHAFT, sx, knee,
+      addPlate(buf('bone'), SHAFT, sx, knee,
                { a0: arc(FRONT, 1.02)[0], a1: arc(FRONT, 1.02)[1],
                  t: 0.014, seg: 12, hard: 3.4 });
       addPlate(buf('armor2'), edgeStrip(SHAFT, 0.36, true), sx, knee,
@@ -570,7 +570,7 @@ function buildHeroBuffers(id) {
     }
     // Heel block — kept inside the sole footprint Locomotion plants, so the boot
     // reads chunky without moving the contact corners.
-    addBox(buf('armor'), 0.098 * G, 0.062, 0.070, sx, 0.033, 0.038, ankle);
+    addBox(buf('steel'), 0.098 * G, 0.062, 0.070, sx, 0.033, 0.038, ankle);
     // Instep armour. Built in the boot's own upright frame and laid down with
     // it, so its arc (centred on the section's +Z, which becomes UP after the
     // turn) wraps the top of the foot rather than one side of it.
@@ -579,10 +579,10 @@ function buildHeroBuffers(id) {
       const geo = plateGeometry(st, arc(BACK, 1.15)[0], arc(BACK, 1.15)[1], 0.020, 9);
       geo.rotateX(-Math.PI / 2);
       geo.translate(sx, 0, BODY.HEEL_Z);
-      appendGeometry(geo, [[ankle, 1]], buf('armor'));
+      appendGeometry(geo, [[ankle, 1]], buf('bone'));
       geo.dispose();
     }
-    addBox(buf('armor'), 0.104, 0.052, 0.062, sx, 0.030, -0.176, ankle);
+    addBox(buf('steel'), 0.104, 0.052, 0.062, sx, 0.030, -0.176, ankle);
 
     // Leg armour
     // Down to just above the knee: the skirt now covers the top of the thigh,
@@ -592,7 +592,7 @@ function buildHeroBuffers(id) {
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
-    addPlate(buf('armor'), legR.slice(11, 18).map(q => ({ ...q })), sx, knee,
+    addPlate(buf('bone'), legR.slice(11, 18).map(q => ({ ...q })), sx, knee,
              { a0: arc(FRONT, 0.62)[0], a1: arc(FRONT, 0.62)[1], t: 0.030, hard: 3.4 });
     addPlate(buf('armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
@@ -632,7 +632,7 @@ function buildHeroBuffers(id) {
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
     loftSkinned(place(armR, ax, armW), 18, buf('frame'));
-    addPlate(buf('armor'), armR.slice(9, 15).map(q => ({ ...q })), ax, elbow,
+    addPlate(buf('bone'), armR.slice(9, 15).map(q => ({ ...q })), ax, elbow,
              { a0: arc(FRONT, 0.78)[0], a1: arc(FRONT, 0.78)[1], t: 0.032, hard: 3.2 });
     addBox(buf('glow'), 0.028 * G, 0.085 * G, 0.022 * G, ax, mapArm(1.090), -0.094 * G, elbow);
 
@@ -645,7 +645,7 @@ function buildHeroBuffers(id) {
         { y: 0.982, rx: 0.052, rz: 0.057, n: 2.9 },
         { y: 0.938, rx: 0.046, rz: 0.051, n: 2.8 },
       ], mapArm);
-      addPlate(buf('armor'), CUFF, ax, elbow,
+      addPlate(buf('bone'), CUFF, ax, elbow,
                { a0: arc(FRONT, 1.06)[0], a1: arc(FRONT, 1.06)[1],
                  t: 0.014, seg: 12, hard: 3.4 });
       addPlate(buf('armor2'), edgeStrip(CUFF, 0.36, true), ax, elbow,
@@ -656,10 +656,10 @@ function buildHeroBuffers(id) {
     }
 
     // Hand + fingers, rigid to the hand bone.
-    loftSkinned(place(domed(handT, 0, 0.8), ax, () => [[hand, 1]]), 16, buf('joint'));
+    loftSkinned(place(domed(handT, 0, 0.8), ax, () => [[hand, 1]]), 16, buf('steel'));
     for (let f = 0; f < 3; f++) {
       loftSkinned(place(domed(fingerT, 0, 0.9), ax + (f - 1) * 0.026 * G,
-                        () => [[hand, 1]], -0.026 * G), 8, buf('joint'));
+                        () => [[hand, 1]], -0.026 * G), 8, buf('steel'));
     }
 
     // Deltoid + pauldron sit on the chest, so they stay put while the arm swings
@@ -681,7 +681,7 @@ function buildHeroBuffers(id) {
     const pa = out > 0 ? 0 : Math.PI;
     const lame = (st, half, t) => {
       const T = xf(st, mapArm);
-      addPlate(buf('armor'), T, px, B.chest,
+      addPlate(buf('bone'), T, px, B.chest,
                { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11, hard: 4.0 });
       addPlate(buf('armor2'), edgeStrip(T, 0.34, false), px, B.chest,
                { a0: pa - out * half, a1: pa + out * half,
@@ -741,7 +741,7 @@ function buildHeroBuffers(id) {
       { y: 1.048, rx: 0.127, rz: 0.095, n: 2.6 },
       { y: 1.086, rx: 0.122, rz: 0.092, n: 2.6 },
     ];
-    addPlate(buf('joint'), BELT, 0, B.hips, { a0: -Math.PI, a1: Math.PI, t: 0.016, seg: 26 });
+    addPlate(buf('steel'), BELT, 0, B.hips, { a0: -Math.PI, a1: Math.PI, t: 0.016, seg: 26 });
     addPlate(buf('armor'), BELT, 0, B.hips,
              { a0: -Math.PI, a1: Math.PI, lift: 0.016, t: TRIM, seg: 26 });
     addBox(buf('armor2'), 0.070, 0.052, 0.026, 0, 1.048, -0.100, B.hips);
@@ -814,7 +814,7 @@ function buildHeroBuffers(id) {
       { y: 1.736, rx: 0.116, rz: 0.090, n: 2.6 },
     ], bulk), mapTorso);
     const YA = { a0: -Math.PI * 1.32, a1: Math.PI * 0.32, seg: 22, hard: 3.4 };
-    addPlate(buf('armor'), YOKE, 0, B.chest, { ...YA, t: 0.024 * G });
+    addPlate(buf('bone'), YOKE, 0, B.chest, { ...YA, t: 0.024 * G });
     addPlate(buf('armor2'), edgeStrip(YOKE, 0.26, false), 0, B.chest,
              { ...YA, lift: 0.024 * G, t: TRIM });
   }
@@ -877,7 +877,7 @@ function buildHeroBuffers(id) {
   {
     const CROWN = skullT.slice(4).map(q => ({ ...q, z: q.dz }));
     const CA = { a0: -Math.PI, a1: Math.PI, seg: 22, hard: 3.8 };
-    addPlate(buf('armor'), CROWN, 0, B.head, { ...CA, t: 0.014 * G });
+    addPlate(buf('bone'), CROWN, 0, B.head, { ...CA, t: 0.014 * G });
     addPlate(buf('armor2'), edgeStrip(CROWN, 0.24, false), 0, B.head,
              { ...CA, lift: 0.014 * G, t: TRIM });
   }
