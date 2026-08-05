@@ -1090,7 +1090,12 @@ export class Game {
    * live and needs nothing.
    */
   async _rotateMap() {
-    const def = await this.world.loadMap(nextMapId(this.world.mapId));
+    // One map in the rotation means there is nothing to rotate TO. Reloading it
+    // anyway would tear the arena down and re-decode 5.7MB of binary between
+    // every match to arrive back where it started.
+    const next = nextMapId(this.world.mapId);
+    if (next === this.world.mapId) return this.world.mapDef;
+    const def = await this.world.loadMap(next);
     this.previewCharacter?.position.copy(this.world.previewPedestalPos);
     return def;
   }

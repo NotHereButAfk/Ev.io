@@ -565,11 +565,14 @@ function makeBarbedWireTexture() {
 // own entry instead.
 export const MAPS = [
   {
-    // The official ev.io Daytime Rook (node 755), decoded from its native
-    // binary. This is the ONLY asynchronous entry, which is why loadMap is a
-    // promise: a map that has to fetch and parse 5.7MB cannot pretend to be
-    // ready on the same tick as one that is built from primitives, and having
-    // the fast maps fake it would just move the stutter somewhere less honest.
+    // The ONLY map in rotation, and deliberately so: it is the only one that is
+    // an actual downloaded ev.io asset rather than a recreation of one. Its
+    // native binary is decoded by EvMapLoader.
+    //
+    // The procedural builders — _buildWinterGraveyard, _buildEvioArena,
+    // _buildRookArena, _buildLegacyEvioArena and the mall/city/winter-town set —
+    // all still exist in this file and all still work. They are simply not in
+    // the rotation. Adding one back is a single entry here.
     id: 'rook',
     name: 'Daytime Rook',
     region: 'Official',
@@ -586,61 +589,8 @@ export const MAPS = [
       await w._loadOfficialRook();
     },
   },
-  {
-    id: 'winter-graveyard',
-    name: 'Winter-Graveyard',
-    region: 'Arctic Sector',
-    background: 0xdba5b6,
-    fog: [0xd8c4cd, 105, 260],
-    build(w) {
-      w._buildLighting();
-      w._buildGround({ color: 0xeee5ec, roughness: 1, metalness: 0, seams: false });
-      w._buildSky();
-      w._buildWinterGraveyard();
-      w._buildSpawnPoints();
-      w.previewPedestalPos.set(0, 0, 52);
-    },
-  },
-  {
-    id: 'evio-arena',
-    name: 'Sunken Colonnade',
-    region: 'Stonework Sector',
-    background: 0x9fb2c8,
-    fog: [0xb6c3d4, 110, 300],
-    build(w) {
-      w._buildLighting({
-        sky: 0xdce6f2, ground: 0x6b6257, hemi: 1.5,
-        sunColor: 0xfff2d8, sun: 1.7, sunAt: [64, 96, 58],
-        rimColor: 0x9fc2e8, rim: 0.5, rimAt: [-70, 40, -60],
-      });
-      w._buildGround({ color: 0xc9c2ba, roughness: 0.9, metalness: 0.03, seams: false });
-      w._buildEvioArena();
-      w.previewPedestalPos.set(0, 0, 34);
-    },
-  },
-  {
-    // Codex's geometry-level recreation of the same arena from the node 755
-    // reference. It was written, complete, and then never called once the
-    // native .evmap loader landed — 28 platforms of finished map sitting as
-    // dead code. It earns a rotation slot far better than the superseded
-    // comparison build it replaces.
-    id: 'rook-built',
-    name: 'Rook Foundry',
-    region: 'Reconstruction',
-    background: 0xcfe9ef,
-    fog: [0xc8d7dc, 150, 380],
-    build(w) {
-      w._buildLighting({
-        sky: 0xf4fbff, ground: 0x41464d, hemi: 1.45,
-        sunColor: 0xfff4df, sun: 1.58, sunAt: [-82, 118, 66],
-        rimColor: 0x8fd7ff, rim: 0.28, rimAt: [72, 42, -64],
-      });
-      w._buildGround({ color: 0xb4b7b7, roughness: 0.78, metalness: 0.12, seams: false });
-      w._buildRookArena();
-      w.previewPedestalPos.set(0, 0, 30);
-    },
-  },
 ];
+
 
 export function mapById(id) {
   return MAPS.find((m) => m.id === id) || MAPS[0];
@@ -927,13 +877,43 @@ export class World {
    * nothing else.
    */
   _deriveSpawnPoints(want = 16) {
-    const half = this.arenaHalf - 8;
-    const step = Math.max(6, (half * 2) / 12);
-    const CLEAR = 1.2;                 // player half-width plus a margin
+    // Sample the PLAYABLE area, which is where the collision is — not the
+    // arena's nominal half-extent.
+    //
+    // Sampling the full 128m grid and rejecting anything inside a collider
+    // sounds right and is badly wrong: an arena that occupies the middle 60m
+    // of the map is surrounded by empty ground plane, and empty ground has no
+    // colliders to reject against. So every derived spawn landed out in the
+    // open field, and players started a hundred metres from the arena looking
+    // at it across a featureless plain. Both procedural maps shipped like that.
+    // PLATFORMS first, colliders only as a fallback. An arena's boundary walls
+    // are colliders sitting on the map edge, so unioning colliders returns the
+    // whole 256m plane and the sample spreads right back out across the empty
+    // field. The walkable tops are where the match actually happens.
+    const bounds = new THREE.Box3();
+    for (const p of this.platforms) {
+      if (p.minX === undefined) continue;
+      bounds.expandByPoint(new THREE.Vector3(p.minX, p.y0 ?? 0, p.minZ));
+      bounds.expandByPoint(new THREE.Vector3(p.maxX, p.y1 ?? 0, p.maxZ));
+    }
+    if (bounds.isEmpty()) for (const c of this.colliders) if (c.box) bounds.union(c.box);
+    if (bounds.isEmpty()) {
+      bounds.set(new THREE.Vector3(-this.arenaHalf, 0, -this.arenaHalf),
+                 new THREE.Vector3(this.arenaHalf, 0, this.arenaHalf));
+    }
+    // A little outside the built geometry is fine — well outside is not.
+    // ...and still inside the arena: an arena whose walls sit on the boundary
+    // has collision right up to the edge, and the pad would push spawns past it.
+    const pad = 6, lim = this.arenaHalf - 2;
+    const clamp = (v) => Math.max(-lim, Math.min(lim, v));
+    const minX = clamp(bounds.min.x - pad), maxX = clamp(bounds.max.x + pad);
+    const minZ = clamp(bounds.min.z - pad), maxZ = clamp(bounds.max.z + pad);
+    const step = Math.max(4, Math.min(maxX - minX, maxZ - minZ) / 10);
+    const CLEAR = 1.2;
     const box = new THREE.Box3();
     const cand = [];
-    for (let x = -half; x <= half; x += step) {
-      for (let z = -half; z <= half; z += step) {
+    for (let x = minX; x <= maxX; x += step) {
+      for (let z = minZ; z <= maxZ; z += step) {
         box.min.set(x - CLEAR, 0.1, z - CLEAR);
         box.max.set(x + CLEAR, 2.4, z + CLEAR);
         let blocked = false;
@@ -954,6 +934,7 @@ export class World {
     this.spawnPoints = picked.length ? picked
       : [new THREE.Vector3(0, 0, 0)];   // last resort: never leave it empty
   }
+
 
 
   async _loadOfficialRook() {

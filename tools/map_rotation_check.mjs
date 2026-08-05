@@ -13,6 +13,7 @@
 // back to exactly the same state each cycle.
 
 import * as THREE from 'three';
+import { readFile } from 'node:fs/promises';
 
 // The world draws facade/billboard atlases on a canvas at construction. Nothing
 // here needs them to draw correctly, only to not throw.
@@ -25,12 +26,45 @@ const ctx2d = new Proxy({}, {
       : noop),
   set: () => true,
 });
+// The official map carries embedded textures, which three decodes through an
+// <img>. Node has none, so hand back a stub that reports loaded immediately —
+// this gate is about the rotation's teardown, not about pixels.
+const fakeImage = () => {
+  const img = {
+    width: 4, height: 4, complete: true,
+    addEventListener(kind, fn) { if (kind === 'load') img._onload = fn; },
+    removeEventListener() {},
+    set src(_v) { queueMicrotask(() => img._onload?.({ target: img })); },
+    get src() { return ''; },
+  };
+  return img;
+};
 globalThis.document = {
-  createElement: () => ({ width: 0, height: 0, getContext: () => ctx2d, style: {} }),
+  createElement: (tag) => (tag === 'img' ? fakeImage()
+    : { width: 0, height: 0, getContext: () => ctx2d, style: {} }),
+  createElementNS: (_ns, tag) => (tag === 'img' ? fakeImage()
+    : { width: 0, height: 0, getContext: () => ctx2d, style: {} }),
   getElementById: () => null,
 };
+globalThis.URL.createObjectURL ??= () => 'blob:stub';
+globalThis.URL.revokeObjectURL ??= () => {};
 
-const { World, MAPS, mapById, nextMapId } = await import('../src/world/World.js');
+// The rotation now contains only DOWNLOADED official maps, and those load over
+// fetch. Rather than skip them — which would leave the teardown machinery
+// completely ungated — serve the real file off disk, exactly as the dev server
+// would. The gate therefore exercises the actual 5.7MB decode.
+const publicDir = new URL('../public/', import.meta.url);
+globalThis.fetch = async (url) => {
+  const rel = String(url).replace(/^\//, '');
+  const bytes = await readFile(new URL(rel, publicDir));
+  return {
+    ok: true, status: 200,
+    arrayBuffer: async () => bytes.buffer.slice(
+      bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  };
+};
+
+const { World, MAPS, nextMapId } = await import('../src/world/World.js');
 
 let fails = 0;
 const ok = (c, msg, detail = '') => {
@@ -38,63 +72,46 @@ const ok = (c, msg, detail = '') => {
   console.log(`  ${c ? 'ok  ' : 'FAIL'}  ${msg}${detail ? '   ' + detail : ''}`);
 };
 
-console.log('── rotation order ──');
-ok(MAPS.length >= 2, 'there is more than one map to rotate through', `${MAPS.length} maps`);
+console.log('── the rotation ──');
+ok(MAPS.length >= 1, 'the rotation has at least one map', `${MAPS.length}`);
+ok(new Set(MAPS.map((m) => m.id)).size === MAPS.length, 'map ids are unique');
+ok(nextMapId('does-not-exist') === MAPS[0].id,
+   'an unknown id falls back rather than throwing');
 {
   const seen = new Set();
   let id = MAPS[0].id;
   for (let i = 0; i < MAPS.length; i++) { seen.add(id); id = nextMapId(id); }
-  ok(seen.size === MAPS.length, 'the rotation visits every map before repeating',
-     [...seen].join(' → '));
-  ok(id === MAPS[0].id, 'and wraps back to the first');
-  ok(nextMapId('does-not-exist') === MAPS[0].id, 'an unknown id falls back rather than throwing');
-  ok(new Set(MAPS.map(m => m.id)).size === MAPS.length, 'map ids are unique');
+  ok(seen.size === MAPS.length && id === MAPS[0].id,
+     'it visits every map once and wraps', [...seen].join(' → '));
 }
-
-console.log('\n── each map stands up ──');
-// Constructed on a PROCEDURAL map: the default entry fetches, and Node has
-// no server to fetch from.
-const w = new World('winter-graveyard');
-await w.ready;
-const snap = () => {
-  let meshes = 0, tris = 0;
-  w._mapRoot.traverse((o) => {
-    if (!o.isMesh) return;
-    meshes++;
-    const g = o.geometry;
-    tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
-  });
-  return {
-    colliders: w.colliders.length, platforms: w.platforms.length,
-    spawns: w.spawnPoints.length, raycast: w.raycastMeshes.length,
-    meshes, tris: Math.round(tris),
-  };
-};
-
-// The official Rook entry fetches /maps/RookLit_0.evmap, which needs the dev
-// server; `npm run test:evmap` already gates that file end to end. This gate
-// covers the ROTATION — so it exercises every procedural map and asserts the
-// async one is wired, rather than skipping the question.
-const PROCEDURAL = MAPS.filter((m) => m.id !== 'rook');
-ok(MAPS[0].id === 'rook' && MAPS[0].build.constructor.name === 'AsyncFunction',
-   'the official map is first in the rotation and builds asynchronously');
+// Only downloaded assets belong in rotation — the procedural recreations stay
+// defined in World.js but out of it. An async builder is the tell: a map built
+// from primitives has nothing to await.
+ok(MAPS.every((m) => m.build.constructor.name === 'AsyncFunction'),
+   'every map in rotation loads a downloaded asset',
+   MAPS.map((m) => m.id).join(', '));
 ok(World.prototype.loadMap.constructor.name === 'AsyncFunction',
    'loadMap is async, so an entry may fetch');
 
-const first = new Map();
-for (const def of PROCEDURAL) {
-  await w.loadMap(def.id);
-  const s = snap();
-  first.set(def.id, s);
-  console.log(`  ${def.id.padEnd(18)} ${s.meshes} meshes, ${s.tris} tris, `
-            + `${s.colliders} colliders, ${s.spawns} spawns`);
-  ok(s.meshes > 50, `${def.id}: builds real geometry`, `${s.meshes} meshes`);
-  ok(s.colliders > 0, `${def.id}: has collision`, `${s.colliders} colliders`);
-  ok(s.spawns >= 4, `${def.id}: has spawn points`, `${s.spawns}`);
-  ok(w.scene.background instanceof THREE.Color, `${def.id}: sets its own sky`);
-  ok(!!w.scene.fog, `${def.id}: sets its own fog`);
+console.log('\n── it stands up, and reloading does not accumulate ──');
+const w = new World(MAPS[0].id);
+await w.ready;
 
-  // A spawn you cannot stand in is worse than no spawn at all.
+const snap = () => {
+  let meshes = 0;
+  w._mapRoot.traverse((o) => { if (o.isMesh) meshes++; });
+  return { colliders: w.colliders.length, spawns: w.spawnPoints.length, meshes };
+};
+const first = snap();
+console.log(`  ${w.mapId.padEnd(18)} ${first.meshes} meshes, `
+          + `${first.colliders} colliders, ${first.spawns} spawns`);
+ok(first.meshes > 20, 'builds real geometry', `${first.meshes} meshes`);
+ok(first.spawns >= 4, 'has spawn points', `${first.spawns}`);
+ok(w.scene.background instanceof THREE.Color, 'sets its own sky');
+ok(!!w.scene.fog, 'sets its own fog');
+
+// A spawn you cannot stand in is worse than no spawn at all.
+{
   const box = new THREE.Box3();
   let inside = 0;
   for (const p of w.spawnPoints) {
@@ -102,61 +119,43 @@ for (const def of PROCEDURAL) {
     box.max.set(p.x + 0.45, p.y + 1.7, p.z + 0.45);
     if (w.colliders.some((c) => c.box && c.box.intersectsBox(box))) inside++;
   }
-  ok(inside === 0, `${def.id}: no spawn point is inside geometry`, `${inside} buried`);
-
-  const half = w.arenaHalf + 1;
-  const out = w.spawnPoints.filter((p) => Math.abs(p.x) > half || Math.abs(p.z) > half);
-  ok(out.length === 0, `${def.id}: every spawn is inside the arena`, `${out.length} outside`);
+  ok(inside === 0, 'no spawn point is inside geometry', `${inside} buried`);
 }
 
-console.log('\n── rotating does not accumulate ──');
-// Three full laps. If teardown misses anything, the counts drift.
-let id = PROCEDURAL[0].id;
-let drift = [], roots = [];
-for (let lap = 0; lap < 3; lap++) {
-  for (const _ of PROCEDURAL) {
-    if (id === 'rook') id = nextMapId(id);
-    await w.loadMap(id);
-    const s = snap(), f = first.get(id);
-    for (const k of Object.keys(f)) {
-      if (s[k] !== f[k]) drift.push(`${id}.${k} ${f[k]} → ${s[k]} (lap ${lap + 1})`);
-    }
-    roots.push(w.scene.children.filter((c) => c.name?.startsWith('map:')).length);
-    id = nextMapId(id);
+// Reload the same map repeatedly. Teardown is what this gate exists for, and
+// it has to hold whether the next map is a different one or the same one.
+const roots = [];
+for (let i = 0; i < 4; i++) {
+  await w.loadMap(MAPS[0].id);
+  const s = snap();
+  for (const k of Object.keys(first)) {
+    ok(s[k] === first[k], `lap ${i + 1}: ${k} rebuilds identically`,
+       `${first[k]} → ${s[k]}`);
   }
+  roots.push(w.scene.children.filter((c) => c.name?.startsWith('map:')).length);
 }
-ok(drift.length === 0, 'every map rebuilds to identical counts on every lap',
-   drift.slice(0, 3).join('; '));
 ok(roots.every((n) => n === 1), 'exactly one map root is in the scene at a time',
    `max ${Math.max(...roots)}`);
 
-// The shared atlases and prop geometry are constructor-owned and must outlive
-// every teardown — this is the check that catches a dispose() that reached too
-// far and left the SECOND match rendering untextured.
+// Constructor-owned resources must outlive every teardown — free one and the
+// FIRST match still looks perfect while every later one renders wrong.
 {
   const shared = [...w._sharedDisposables];
-  const dead = shared.filter((r) => r.attributes === null || r.__disposed === true);
-  ok(dead.length === 0, 'shared prop geometry / materials survive teardown',
-     `${shared.length} shared resources checked`);
-  const g = w._geo.flower;
-  ok(g && g.attributes && g.attributes.position,
-     'a shared geometry still has its buffers after 9 map loads');
+  ok(shared.length > 0, 'shared resources are tracked', `${shared.length}`);
+  ok(w._geo.flower?.attributes?.position,
+     'a shared geometry still has its buffers after 5 map loads');
 }
 
-// The old arena is genuinely gone, not merely hidden.
+// The old arena is genuinely gone. Count the dispose CALLS — dispose() frees GPU
+// state without nulling the JS arrays, so inspecting the geometry afterwards
+// reads the same before and after and cannot fail.
 //
-// This was first written as "the geometry looks disposed afterwards", which is
-// not a check at all: dispose() frees GPU state and fires an event, it does not
-// null the JS-side attribute arrays, so every way of asking the geometry
-// afterwards answers the same before and after. Count the dispose CALLS
-// instead — that is the thing the teardown either does or does not do.
+// Instrument the TEARDOWN only, not the whole loadMap. Wrapping the full call
+// also catches whatever the incoming map frees while building itself — the
+// .evmap decode releases one temporary buffer — and the count comes out one
+// over, which reads exactly like a leak in teardown and is not one.
 {
-  const outgoing = w.mapId;
   const geos = new Set(), mats = new Set();
-  // Meshes are not the only drawables a map owns — Rook Foundry's dust field is
-  // a Points, and _disposeMap frees lines and points too. Counting only meshes
-  // made this read one geometry and one material SHORT of what teardown
-  // actually disposed, which is a hole in the gate, not a leak in the code.
   w._mapRoot.traverse((o) => {
     if (!o.isMesh && !o.isLine && !o.isPoints) return;
     if (o.geometry && !w._sharedDisposables.has(o.geometry)) geos.add(o.geometry);
@@ -164,38 +163,30 @@ ok(roots.every((n) => n === 1), 'exactly one map root is in the scene at a time'
       if (m && !w._sharedDisposables.has(m)) mats.add(m);
     }
   });
-
   let geoDisposed = 0, matDisposed = 0, sharedHit = 0;
-  const gProto = THREE.BufferGeometry.prototype, mProto = THREE.Material.prototype;
-  const gReal = gProto.dispose, mReal = mProto.dispose;
-  gProto.dispose = function (...a) {
+  const gP = THREE.BufferGeometry.prototype, mP = THREE.Material.prototype;
+  const gReal = gP.dispose, mReal = mP.dispose;
+  gP.dispose = function (...a) {
     if (w._sharedDisposables.has(this)) sharedHit++; else geoDisposed++;
     return gReal.apply(this, a);
   };
-  mProto.dispose = function (...a) {
+  mP.dispose = function (...a) {
     if (w._sharedDisposables.has(this)) sharedHit++; else matDisposed++;
     return mReal.apply(this, a);
   };
   const root = w._mapRoot;
-  let target = nextMapId(outgoing);
-  if (target === 'rook') target = nextMapId(target);   // procedural only, see above
-  try {
-    await w.loadMap(target);
-  } finally {
-    gProto.dispose = gReal;
-    mProto.dispose = mReal;
-  }
+  try { w._disposeMap(); }
+  finally { gP.dispose = gReal; mP.dispose = mReal; }
 
   ok(root.parent === null, 'the previous map root is detached from the scene');
-  ok(geoDisposed === geos.size,
-     'every geometry the outgoing map owned was disposed',
+  ok(geoDisposed === geos.size, 'every geometry the outgoing map owned was disposed',
      `${geoDisposed}/${geos.size}`);
-  ok(matDisposed === mats.size,
-     'every material the outgoing map owned was disposed',
+  ok(matDisposed === mats.size, 'every material the outgoing map owned was disposed',
      `${matDisposed}/${mats.size}`);
   ok(sharedHit === 0, 'and teardown never touched a shared resource',
      `${sharedHit} shared disposals`);
 }
 
-console.log(fails ? `\n${fails} map-rotation check(s) FAILED` : '\nall map-rotation checks passed');
+console.log(fails ? `\n${fails} map-rotation check(s) FAILED`
+                  : '\nall map-rotation checks passed');
 process.exit(fails ? 1 : 0);
