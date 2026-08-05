@@ -140,8 +140,13 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   untouched. Game.js rotates in `_restart()`, i.e. whenever a match ends.
   Maps with no hand-authored spawn list get one derived from their colliders.
   Gated by `npm run test:maps`.
-  The rotation is Winter-Graveyard → Sunken Colonnade → Nightfall Complex; the
-  first is an official-image-led recreation of
+  The rotation is Daytime Rook (the official .evmap) → Winter-Graveyard →
+  Sunken Colonnade → Rook Foundry, i.e. the maps main actually contains.
+  `_buildRookArena()` (Rook Foundry) was a complete node-755 recreation left
+  as dead code once the native loader landed; it is in the rotation now.
+  `_buildLegacyEvioArena()` and the mall/city/winter-town builders stay defined
+  but out of rotation as superseded passes. Winter-Graveyard is an
+  official-image-led recreation of
   **ev.io Winter-Graveyard** from [node 644](https://ev.io/node/644).
   `_buildWinterGraveyard()` builds the complete visible composition: snow basin
   and grave field, monumental sealed rear gate, nested crescent ribs and wreath,

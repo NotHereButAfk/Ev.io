@@ -153,8 +153,12 @@ ok(roots.every((n) => n === 1), 'exactly one map root is in the scene at a time'
 {
   const outgoing = w.mapId;
   const geos = new Set(), mats = new Set();
+  // Meshes are not the only drawables a map owns — Rook Foundry's dust field is
+  // a Points, and _disposeMap frees lines and points too. Counting only meshes
+  // made this read one geometry and one material SHORT of what teardown
+  // actually disposed, which is a hole in the gate, not a leak in the code.
   w._mapRoot.traverse((o) => {
-    if (!o.isMesh) return;
+    if (!o.isMesh && !o.isLine && !o.isPoints) return;
     if (o.geometry && !w._sharedDisposables.has(o.geometry)) geos.add(o.geometry);
     for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
       if (m && !w._sharedDisposables.has(m)) mats.add(m);

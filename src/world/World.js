@@ -619,21 +619,24 @@ export const MAPS = [
     },
   },
   {
-    id: 'legacy-arena',
-    name: 'Nightfall Complex',
-    region: 'Deep Orbit',
-    background: 0x0b0e14,
-    fog: [0x10141c, 90, 260],
+    // Codex's geometry-level recreation of the same arena from the node 755
+    // reference. It was written, complete, and then never called once the
+    // native .evmap loader landed — 28 platforms of finished map sitting as
+    // dead code. It earns a rotation slot far better than the superseded
+    // comparison build it replaces.
+    id: 'rook-built',
+    name: 'Rook Foundry',
+    region: 'Reconstruction',
+    background: 0xcfe9ef,
+    fog: [0xc8d7dc, 150, 380],
     build(w) {
-      // Cool and much brighter than the snow map's rig: this arena's own
-      // materials are near-black, so the light has to carry the read.
       w._buildLighting({
-        sky: 0x9fc4e8, ground: 0x1a2030, hemi: 2.1,
-        sunColor: 0xdCE8ff, sun: 2.0, sunAt: [58, 90, -70],
-        rimColor: 0x35d6ff, rim: 1.0, rimAt: [-70, 34, 62],
+        sky: 0xf4fbff, ground: 0x41464d, hemi: 1.45,
+        sunColor: 0xfff4df, sun: 1.58, sunAt: [-82, 118, 66],
+        rimColor: 0x8fd7ff, rim: 0.28, rimAt: [72, 42, -64],
       });
-      w._buildGround({ color: 0x2a2f38, roughness: 0.7, metalness: 0.25, seams: false });
-      w._buildLegacyEvioArena();
+      w._buildGround({ color: 0xb4b7b7, roughness: 0.78, metalness: 0.12, seams: false });
+      w._buildRookArena();
       w.previewPedestalPos.set(0, 0, 30);
     },
   },
