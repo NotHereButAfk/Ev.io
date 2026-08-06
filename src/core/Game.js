@@ -31,6 +31,7 @@ import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { cameraYawToBodyYaw } from '../player/Facing.js';
+import { applyArenaLook, ContactShadow } from '../player/ArenaLook.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
@@ -722,6 +723,12 @@ export class Game {
     // The human soldier animates via its own skeleton; only the procedural
     // block character needs the limb-pivot rig.
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
+    // Shade it the way the arena is shaded, and give it something to stand on.
+    // Without both, the body reads as a model dropped into a downloaded map
+    // rather than a character in it.
+    applyArenaLook(this._playerBody);
+    this._playerShadow?.dispose();
+    this._playerShadow = new ContactShadow(this.world.scene);
     // Yaw-first, so the run lean (rotation.x) pitches about the body's own axis.
     this._playerBody.rotation.order = 'YXZ';
     this._playerBody.visible = false;
@@ -1061,6 +1068,8 @@ export class Game {
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
+    this._playerShadow?.dispose();
+    this._playerShadow = null;
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'menu';
     this.mobileControls?.hide();
@@ -1319,6 +1328,11 @@ export class Game {
       this._syncTpsWeapon();
       this._animatePlayerBody(dt);
     }
+    // The shadow tracks the player whether or not the body is drawn: it is the
+    // player's contact with the floor, not part of the third-person body, and
+    // in first person it is still visible under your own feet.
+    this._playerShadow?.update(
+      this.world, this.player.position, this.player.isCrouching ? 1.12 : 1);
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
 
     // While the menu is open, downed, or dead-and-awaiting-respawn, block

@@ -191,6 +191,33 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   drives speed and strafe, automatic fire produces repeated recoil, death holds
   a short fall instead of popping out, and respawn triggers the same reform beat
   used by teleporting human bodies.
+- `src/player/ArenaLook.js` — makes a character read as part of the arena rather
+  than a model dropped into one. Two findings drove it. The map is decoded by
+  `EvMapLoader` into **MeshToonMaterial** for all 23 of its materials, the
+  authored guns are toon, and the procedural cyborg chassis are toon — but the
+  rigged human, which a migration made the DEFAULT character, was still
+  **MeshStandardMaterial** with metalness up to 0.95 and `envMapIntensity` above
+  1. Metal has almost no diffuse, so its colour is mostly reflection, and the
+  scene's only IBL is a PMREM of `RoomEnvironment` at `environmentIntensity 0.5`
+  — a dim grey studio box. A metallic pauldron in a bright daylit arena was
+  reflecting an indoor room. `applyArenaLook()` converts to MeshToonMaterial
+  with NO gradientMap (matching the map's own default two-tone ramp exactly; a
+  ramp here would band the character MORE finely than the arena), and lifts the
+  albedo to replace the brightness the metal used to borrow from reflection —
+  without that compensation the conversion makes the body DARKER, not better
+  integrated. Second, `renderer.shadowMap.enabled = false` ("sky-only lighting")
+  means nothing in the arena grounds anything, so `ContactShadow` puts an
+  explicit soft blob under each figure, found via the new
+  `World.surfaceBelow()` octree query so it lands on whatever deck, ramp or
+  crate that body is actually over. It is a scene sibling, not a child of the
+  body: the body leans and bobs with the gait and a parented shadow slides off
+  the floor every stride. Applied to the local TPS body (Game.js), bots
+  (Bot.js) and remote avatars (Avatar.js). The MENU pedestal preview is
+  deliberately untouched — it is a showroom, not the arena.
+  Known adjacent bug, NOT fixed: `findThirdPersonObstruction` reads
+  `world.colliders` and `world.raycastMeshes`, and the downloaded Rook carries
+  ZERO colliders because it collides through an octree — so `_tpsObstructed`
+  never fires on the shipping map and the third-person camera clips into walls.
 - `src/entities/Bot.js` + `BotCombat.js` — active arena-opponent behavior:
   sight acquisition with short last-seen memory, close/orbit/retreat/rush
   steering, imperfect burst fire, jump/lift/teleporter traversal and

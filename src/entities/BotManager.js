@@ -1,4 +1,5 @@
 import { Bot } from './Bot.js';
+import { ContactShadow } from '../player/ArenaLook.js';
 
 // Gamertag pool for simulated remote players and named bots, so the kill feed
 // and server roster read like a live lobby instead of "Bot-7".
@@ -29,7 +30,7 @@ export class BotManager {
   // Spawn a fresh set of bots. noRespawn prevents auto-respawn (wave/elimination modes).
   // healthMult scales max HP (used by wave survival to ramp up difficulty).
   spawnAll(count = 7, noRespawn = false, healthMult = 1) {
-    for (const bot of this.bots) this.scene.remove(bot.mesh);
+    for (const bot of this.bots) { this.scene.remove(bot.mesh); bot.shadow?.dispose(); }
     this.bots = [];
     this._usedTags.clear();
     for (let i = 0; i < count; i++) {
@@ -49,6 +50,10 @@ export class BotManager {
     bot.isBot       = true;   // every combatant here is a bot — labelled as one
     bot.displayName = randomTag(this._usedTags);
     this.scene.add(bot.mesh);
+    // Grounds the bot on whatever it is standing over. The scene is known here
+    // and not inside Bot, so the shadow is created alongside the mesh and torn
+    // down on every path that removes it.
+    bot.shadow = new ContactShadow(this.scene, 0.58);
     this.bots.push(bot);
     return bot;
   }
@@ -67,6 +72,8 @@ export class BotManager {
     if (idx === -1) idx = this.bots.length - 1;
     const [bot] = this.bots.splice(idx, 1);
     this.scene.remove(bot.mesh);
+    bot.shadow?.dispose();
+    bot.shadow = null;
     if (bot.displayName) this._usedTags.delete(bot.displayName);
     return bot;
   }
@@ -143,7 +150,7 @@ export class BotManager {
   }
 
   clear() {
-    for (const bot of this.bots) this.scene.remove(bot.mesh);
+    for (const bot of this.bots) { this.scene.remove(bot.mesh); bot.shadow?.dispose(); }
     this.bots = [];
     this._usedTags.clear();
   }

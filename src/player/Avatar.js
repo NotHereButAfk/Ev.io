@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from './PreviewCharacter.js';
+import { applyArenaLook, ContactShadow } from './ArenaLook.js';
 import { isSharedGeometry } from './LowPolyModels.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
@@ -34,14 +35,21 @@ export class Avatar {
    */
   constructor(scene, opts = {}) {
     this.scene = scene;
+    // Optional: the contact shadow needs to ask what surface is underneath.
+    // Without a world it simply stays hidden rather than guessing a floor.
+    this.world = opts.world || null;
     this.group = buildPreviewCharacter(
       opts.skin || null, opts.armorTypeId || 'vanguard', null,
       { allowHuman: opts.allowHuman ?? false });
+    // Remote players share the arena's shading and grounding — otherwise the
+    // other people in the match are the ones that look pasted in.
+    applyArenaLook(this.group);
     this.isHuman = !!this.group.userData?.isHuman;
     this.rig = this.isHuman ? null : rigCharacterLimbs(this.group);
     // Yaw-first, so the run lean pitches about the body's own axis.
     this.group.rotation.order = 'YXZ';
     scene.add(this.group);
+    this.shadow = new ContactShadow(scene, 0.58);
     this._baseScale = this.group.scale.clone();
 
     this.weaponId = null;
@@ -112,6 +120,7 @@ export class Avatar {
    *  snapshot only has to carry a boolean rather than a synchronised clock.
    */
   update(dt, s) {
+    if (this.world && s?.position) this.shadow?.update(this.world, s.position);
     const g = this.group;
     const alive = s.alive !== false;
 
@@ -324,6 +333,8 @@ export class Avatar {
 
   dispose() {
     this.scene.remove(this.group);
+    this.shadow?.dispose();
+    this.shadow = null;
     this.group.traverse((o) => {
       if (!o.isMesh) return;
       // The cyborg chassis share their buffers between every body on the map

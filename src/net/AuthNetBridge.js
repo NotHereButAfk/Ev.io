@@ -102,6 +102,7 @@ export class AuthNetBridge {
       armorTypeId: REMOTE_CHASSIS[hashId(id) % REMOTE_CHASSIS.length],
       weaponId: 'm4',
       allowHuman: true,
+      world: this.game.world,
     });
     const nameEl = document.createElement('div');
     nameEl.style.cssText = 'position:absolute;transform:translate(-50%,-100%);font:700 12px monospace;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap';

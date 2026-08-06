@@ -6,6 +6,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
+import { applyArenaLook, ContactShadow } from '../player/ArenaLook.js';
 import { BOT_TACTICS, advanceBurst, chooseCombatSteering } from './BotCombat.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
@@ -165,6 +166,10 @@ export class Bot {
     // Bots use the SAME rigged human model as the player (falls back to the
     // procedural body only if the GLB hasn't loaded yet).
     this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: true });
+    // Same arena shading as the player's own body — an opponent that shades
+    // differently from the map is the same "imported separately" tell, and
+    // there are seven of them on screen.
+    applyArenaLook(this.mesh);
     this._isHuman = !!this.mesh.userData?.isHuman;
     this.bodyMat = this.mesh.userData.primaryMat;
 
@@ -447,6 +452,7 @@ export class Bot {
       if (p >= 1) {
         this._dying = false;
         this.mesh.visible = false;
+        if (this.shadow) this.shadow.mesh.visible = false;
         this.mesh.rotation.set(0, 0, 0);
         this.mesh.position.y = this._deathBaseY;
         this.mesh.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material) {
@@ -724,6 +730,7 @@ export class Bot {
     }
 
     this.mesh.position.set(this.position.x, this.position.y, this.position.z);
+    this.shadow?.update(this.world, this.position);
 
     // Smooth turn toward the desired facing — no more instant snap-arounds.
     if (this._yawInit) {

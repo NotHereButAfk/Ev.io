@@ -5781,6 +5781,30 @@ export class World {
     return best;
   }
 
+  /**
+   * Height of the first surface directly below (x, y, z), or null if there is
+   * nothing under it. Unlike groundHeightAt() this asks a plain "what am I
+   * standing over" question with no step-up, no sweep and no walkability test —
+   * a contact shadow lands on a ramp or a crate the same as it lands on deck.
+   */
+  surfaceBelow(x, y, z, reach = 6) {
+    if (this._mapOctree) {
+      this._groundRay.origin.set(x, y + 0.4, z);
+      this._groundRay.direction.set(0, -1, 0);
+      const hit = this._mapOctree.rayIntersect(this._groundRay);
+      if (hit && hit.position && y + 0.4 - hit.position.y <= reach) return hit.position.y;
+      return null;
+    }
+    let best = null;
+    for (const { box } of this.colliders) {
+      if (x < box.min.x || x > box.max.x || z < box.min.z || z > box.max.z) continue;
+      if (box.max.y > y + 0.4) continue;
+      if (best === null || box.max.y > best) best = box.max.y;
+    }
+    if (best === null && y + 0.4 <= reach) best = 0; // the base ground plane
+    return best;
+  }
+
   /** Resolve horizontal collisions for the player/bot capsule against box colliders. */
   resolveCollisions(position, radius) {
     if (this._mapOctree) {
