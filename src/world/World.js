@@ -613,6 +613,9 @@ export class World {
     this.usesMeshCollision = true;
     this._mapOctree = null;
     this._mapBounds = null;
+    // The menu/spectator fly-through lane. Authored maps ship their own; see
+    // the note in loadMap() about why these have to travel with the map.
+    this.spectatorWaypoints = [];
     this._groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
     this._playerCapsule = new Capsule(
       new THREE.Vector3(),
@@ -769,6 +772,8 @@ export class World {
     // no longer on screen.
     this.weaponSpawnPoints = [];
     this._mapOctree = null;
+    this._mapBounds = null;
+    this.spectatorWaypoints = [];
     this._evMapRoot = null;
     this._evMapColliderRoot = null;
     this.arenaHalf = ARENA_HALF;
@@ -819,7 +824,72 @@ export class World {
 
     this.mapId = def.id;
     this.mapDef = def;
-    return def;
+    // Resolve with the registry entry PLUS the geometry the menu camera needs.
+    //
+    // This used to resolve with `def` alone, which carries only id/name/region/
+    // sky/fog — no bounds and no spectator lane. Game._configureMapCamera
+    // destructures `bounds` off it and calls bounds.getCenter(), so it threw on
+    // undefined. That throw landed in _runMapIntro's catch, which reported
+    // "Map load failed" for a map that had in fact loaded perfectly, and left
+    // the menu camera at its constructor default — underneath the arena.
+    // The camera data belongs to the MAP, so it travels with the map.
+    return { ...def, bounds: this.mapBounds, spectatorWaypoints: this.spectatorWaypoints };
+  }
+
+  /**
+   * Choose the menu fly-through lane: the spawn with the most open view.
+   *
+   * Same shape as the authored lane — eye height over a spawn, looking along
+   * that spawn's facing, with a short drift — but the spawn is picked by
+   * measuring rather than assumed. Falls back to whatever was authored if the
+   * octree cannot answer, so this can only improve on the previous behaviour.
+   */
+  _bestSpectatorLane(authored) {
+    if (!this._mapOctree || !this.spawnPoints.length) return authored;
+    const ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3());
+    const clearance = (from, dir) => {
+      ray.origin.copy(from); ray.direction.copy(dir).normalize();
+      const hit = this._mapOctree.rayIntersect(ray);
+      return hit && hit.distance != null ? hit.distance : 60;
+    };
+    const EYE = 1.7;
+    let best = null, bestScore = -1;
+    for (const spawn of this.spawnPoints) {
+      const yaw = spawn.spawnYaw ?? Math.PI;
+      const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const eye = spawn.clone().add(new THREE.Vector3(0, EYE, 0));
+      // A good vantage sees far ahead AND has headroom — inside a tunnel the
+      // forward ray may run a long way while the ceiling is centimetres up.
+      const ahead = Math.min(clearance(eye, forward), 60);
+      const up = Math.min(clearance(eye, new THREE.Vector3(0, 1, 0)), 20);
+      const score = ahead + up * 2.5;
+      if (score > bestScore) { bestScore = score; best = { spawn, forward, eye }; }
+    }
+    if (!best) return authored;
+    const { forward, eye } = best;
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
+    const target = eye.clone().addScaledVector(forward, 26).add(new THREE.Vector3(0, 1.9, 0));
+    return [
+      { p: eye.clone(), t: target.clone() },
+      { p: eye.clone().addScaledVector(forward, 2), t: target.clone() },
+      { p: eye.clone().addScaledVector(right, 1.7), t: target.clone() },
+      { p: eye.clone().addScaledVector(right, -1.7), t: target.clone() },
+    ];
+  }
+
+  /**
+   * The arena's extent. Authored maps supply their own; a procedural one is
+   * measured from what it actually built, so every map can frame a camera.
+   */
+  get mapBounds() {
+    if (this._mapBounds) return this._mapBounds;
+    const box = new THREE.Box3();
+    if (this._mapRoot) box.setFromObject(this._mapRoot);
+    if (box.isEmpty()) {
+      box.set(new THREE.Vector3(-this.arenaHalf, 0, -this.arenaHalf),
+              new THREE.Vector3(this.arenaHalf, 40, this.arenaHalf));
+    }
+    return box;
   }
 
   _disposeMap() {
@@ -945,8 +1015,17 @@ export class World {
     this._raycastMeshes = map.raycastMeshes;
     this._mapOctree = new Octree().fromGraphNode(map.colliderRoot);
     this._mapBounds = map.bounds;
-
     if (map.spawnPoints.length) this.spawnPoints = map.spawnPoints;
+    // Authored lane for the menu fly-through. EvMapLoader keeps it deliberately
+    // tight around one spawn: sweeping between distant spawns interpolates
+    // straight through Rook's walls and overhangs. It has no octree though, so
+    // it can only take spawn 0 on faith — and spawn 0 sits inside a ring
+    // tunnel, which framed the whole menu as a wall of concentric arcs. Now
+    // that the octree exists, pick the spawn that actually looks at something.
+    //
+    // Must run AFTER the real spawn list replaces the placeholder one, or it
+    // scores a single (0,3,0) stub and picks it every time.
+    this.spectatorWaypoints = this._bestSpectatorLane(map.spectatorWaypoints || []);
     this.weaponSpawnPoints = map.weaponSpawnPoints;
     const maxXZ = Math.max(
       Math.abs(map.bounds.min.x),

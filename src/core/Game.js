@@ -313,17 +313,26 @@ export class Game {
       el.classList.remove('hidden', 'ml-fade');
     }
 
+    let map;
     try {
-      const map = await this.world.ready;
+      map = await this.world.ready;
       const mode = document.getElementById('ml-mode');
       if (mode) mode.textContent = 'Map ready';
-      this.previewCharacter.position.copy(this.world.previewPedestalPos);
-      this._configureMapCamera(map);
     } catch (error) {
       console.error('[map] official Daytime Rook failed to load', error);
       const mode = document.getElementById('ml-mode');
       if (mode) mode.textContent = 'Map load failed';
       return;
+    }
+    // Framing the camera is NOT loading the map, and must not be reported as
+    // it. This block used to share the catch above, so one bad property here
+    // told the player the arena had failed to load when it was already on
+    // screen — and then returned early, leaving the fly-through unconfigured.
+    try {
+      this.previewCharacter.position.copy(this.world.previewPedestalPos);
+      this._configureMapCamera(map);
+    } catch (error) {
+      console.error('[map] could not frame the spectator camera', error);
     }
 
     if (el) {
@@ -335,13 +344,16 @@ export class Game {
   }
 
   _configureMapCamera(map) {
-    if (map.spectatorWaypoints?.length >= 2) {
+    if (map?.spectatorWaypoints?.length >= 2) {
       this._camWpts = map.spectatorWaypoints;
       this._camSeg = 0;
       this._camSegTime = 0;
       return;
     }
-    const { bounds } = map;
+    // Fall back to the world's own extent rather than trusting the caller to
+    // carry it. A missing box used to throw here, and a camera that never gets
+    // configured sits at its constructor default — under the arena.
+    const bounds = map?.bounds ?? this.world.mapBounds;
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
     const pad = Math.max(55, Math.min(size.x, size.z) * 0.23);
