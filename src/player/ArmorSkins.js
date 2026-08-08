@@ -12,8 +12,8 @@ export const ARMOR_SKINS = [
     id: 'cobalt_circuit', name: 'Cobalt Circuit', rarity: 'common', starter: true,
     // Bright segmented shell over a graphite flex suit. The previous saturated
     // blue-on-black finish crushed the model into one dark military silhouette.
-    primary: 0xb9c4cf, secondary: 0x101721, emissive: 0x38ddff,
-    emissiveIntensity: 0.88, roughness: 0.34, metalness: 0.70, price: 0, shield: 0,
+    primary: 0xaeb3b5, secondary: 0x20252a, emissive: 0x79cbd6,
+    emissiveIntensity: 0.52, roughness: 0.78, metalness: 0.08, price: 0, shield: 0,
   },
   {
     id: 'crimson_guard', name: 'Crimson Guard', rarity: 'common', starter: true,

@@ -29,6 +29,18 @@ let _template   = null;   // { scene, animations }
 let _loading    = false;
 const _callbacks = [];
 
+function _asMapToonMaterial(source) {
+  const material = new THREE.MeshToonMaterial({
+    color: source.color?.clone?.() ?? new THREE.Color(0x343a40),
+    transparent: source.transparent,
+    opacity: source.opacity,
+    alphaTest: source.alphaTest,
+    side: source.side,
+  });
+  material.name = source.name;
+  return material;
+}
+
 export function preloadHumanSoldier(onLoad) {
   if (onLoad) _callbacks.push(onLoad);
   if (_template) { onLoad?.(); return; }
@@ -69,9 +81,9 @@ const HEAD_SQUASH = new THREE.Vector3(0.82, 0.6, 0.86);
 // scale. This is what makes the loadout's armor cards each preview a different
 // "model" instead of the same green Chief four times.
 export const ARMOR_LOOKS = {
-  assault: { // bright silver exosuit with cyan energy glow (default)
-    body: 0xb9c4cf, visor: 0x38ddff,
-    roughness: 0.34, metalness: 0.70, scale: 1.00,
+  assault: { // matte warm-gray exosuit with restrained cyan signal light
+    body: 0xaeb3b5, visor: 0x79cbd6,
+    roughness: 0.78, metalness: 0.08, scale: 1.00,
   },
   recon: {   // sleek light-blue scout exo
     body: 0x2f6fae, visor: 0x36f0ff,
@@ -123,8 +135,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   const visorMats = [];
   root.traverse((o) => {
     if (o.isMesh && o.material) {
-      o.material = o.material.clone();
-      const n = (o.material.name || '') + ' ' + (o.name || '');
+      const source = o.material;
+      const n = (source.name || '') + ' ' + (o.name || '');
+      o.material = _asMapToonMaterial(source);
       if (/visor/i.test(n)) visorMats.push(o.material);
       else                  bodyMats.push(o.material);
     }
@@ -947,46 +960,18 @@ function _getDetailTex() {
   return _detailTex;
 }
 
-const _tintC = new THREE.Color();
 function _applyArmorLook(bodyMats, visorMats, look) {
-  _tintC.setHex(look.body);
-  const det = _getDetailTex();
   for (const m of bodyMats) {
-    if (m.map) {
-      // REALISTIC: keep the GLB's authored texture (skin, fatigues, gear, wear)
-      // and apply only a gentle tint so the armour variant still reads — instead
-      // of flattening the whole soldier to a solid plastic colour.
-      m.color.setRGB(0.68 + 0.32 * _tintC.r, 0.68 + 0.32 * _tintC.g, 0.68 + 0.32 * _tintC.b);
-      m.map.colorSpace = THREE.SRGBColorSpace;
-      m.map.anisotropy = 8;
-    } else {
-      // No authored texture — give the plate a realistic worn-metal albedo tinted
-      // to the variant colour.
-      m.color.setRGB(0.5 + 0.5 * _tintC.r, 0.5 + 0.5 * _tintC.g, 0.5 + 0.5 * _tintC.b);
-      m.map = det.map;
-    }
-    // Surface detail on every body material — adds depth even over a real albedo.
-    m.normalMap = det.normalMap;
-    m.normalScale = new THREE.Vector2(1.4, 1.4);
-    m.roughnessMap = det.roughnessMap;
-    m.roughness = Math.min(1, look.roughness + 0.1);
-    m.metalness = Math.min(1, look.metalness + 0.15); // shinier so the bevels read
-    m.envMapIntensity = 1.1;
-    // A tiny material-space fill keeps the rear silhouette readable when the
-    // arena's key light is entirely in front of the player. This is not a glow:
-    // it only lifts crushed blacks enough to separate arms, torso, and legs.
-    if (m.emissive) {
-      m.emissive.copy(_tintC).multiplyScalar(0.10);
-      m.emissiveIntensity = 0.22;
-    }
+    // Match the imported arena: clean graphite albedo with stepped toon light,
+    // no realistic fabric texture, scratches, normal map, or specular metal.
+    m.map = null;
+    m.color.setHex(0x30363c);
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
     m.color.setHex(look.visor);
     m.emissive?.setHex?.(look.visor);
-    m.emissiveIntensity = 0.9;
-    m.metalness = 0.95;
-    m.roughness = 0.14;
+    m.emissiveIntensity = 0.48;
     m.needsUpdate = true;
   }
 }
@@ -1043,52 +1028,39 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const plateColor = armorSkin?.primary ?? look.body;
   const underColor = armorSkin?.secondary ?? 0x0d1016;
   const glowColor = armorSkin?.emissive ?? look.visor;
-  const finishRoughness = armorSkin?.roughness ?? look.roughness ?? 0.5;
-  const finishMetalness = armorSkin?.metalness ?? 0.66;
-  const plate = new THREE.MeshStandardMaterial({
+  const plate = new THREE.MeshToonMaterial({
     color: new THREE.Color(plateColor).multiplyScalar(0.92),
-    emissive: new THREE.Color(plateColor).multiplyScalar(0.10),
-    emissiveIntensity: 0.24,
-    roughness: finishRoughness * 0.85, metalness: finishMetalness, envMapIntensity: 1.1,
   });
   plate.userData.armorRole = 'plate';
   const readableUnder = new THREE.Color(underColor).lerp(new THREE.Color(0x303844), 0.28);
-  const dark = new THREE.MeshStandardMaterial({
+  const dark = new THREE.MeshToonMaterial({
     color: readableUnder.clone().multiplyScalar(0.72),
-    emissive: readableUnder.clone().multiplyScalar(0.07), emissiveIntensity: 0.18,
-    roughness: 0.42, metalness: 0.82,
   });
   dark.userData.armorRole = 'dark';
-  const trim = new THREE.MeshStandardMaterial({
+  const trim = new THREE.MeshToonMaterial({
     color: new THREE.Color(plateColor).lerp(new THREE.Color(0xe8edf2), 0.58),
-    emissive: new THREE.Color(plateColor).multiplyScalar(0.06), emissiveIntensity: 0.16,
-    roughness: 0.24, metalness: 0.95, envMapIntensity: 1.25,
   });
   trim.userData.armorRole = 'trim';
-  const accent = new THREE.MeshStandardMaterial({
+  const accent = new THREE.MeshToonMaterial({
     color: glowColor, emissive: glowColor,
-    emissiveIntensity: armorSkin?.emissiveIntensity ?? 0.9,
-    roughness: 0.26, metalness: 0.5,
+    emissiveIntensity: armorSkin?.emissiveIntensity ?? 0.52,
   });
   accent.userData.armorRole = 'accent';
-  const cape = new THREE.MeshStandardMaterial({
-    color: readableUnder.clone().multiplyScalar(0.72), roughness: 0.92, metalness: 0.05,
+  const cape = new THREE.MeshToonMaterial({
+    color: readableUnder.clone().multiplyScalar(0.72),
     side: THREE.DoubleSide,
   });
   cape.userData.armorRole = 'dark';
   // Compact plate-coloured helmet shell over a recessed dark faceplate. The
   // shell joins the outer armor language while its small proportions avoid the
   // oversized round dome that made the previous body look toy-like.
-  const helmetMat = new THREE.MeshStandardMaterial({
+  const helmetMat = new THREE.MeshToonMaterial({
     color: new THREE.Color(plateColor).multiplyScalar(0.88),
-    emissive: new THREE.Color(plateColor).multiplyScalar(0.06), emissiveIntensity: 0.16,
-    roughness: finishRoughness * 0.92, metalness: finishMetalness, envMapIntensity: 1.15,
   });
   helmetMat.userData.armorRole = 'plate';
-  // Dark glossy visor glass — a near-black reflective faceplate (Halo/Titanfall
-  // style) so the face reads as a real visor, not a bright oval.
-  const visorMat = new THREE.MeshStandardMaterial({
-    color: 0x0a0e14, roughness: 0.12, metalness: 0.92, envMapIntensity: 1.3,
+  // Near-black toon faceplate: one quiet value block instead of reflective glass.
+  const visorMat = new THREE.MeshToonMaterial({
+    color: 0x11161b,
   });
   visorMat.userData.armorRole = 'visor';
 
@@ -1418,19 +1390,9 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
       else if (role === 'accent') {
         m.color.copy(glow);
         m.emissive?.copy?.(glow);
-        m.emissiveIntensity = armorSkin.emissiveIntensity ?? 0.9;
-      }
-      if (role === 'plate' || role === 'trim') {
-        m.emissive?.copy?.(plate).multiplyScalar(role === 'plate' ? 0.10 : 0.06);
-        m.roughness = armorSkin.roughness ?? m.roughness;
-        m.metalness = armorSkin.metalness ?? m.metalness;
+        m.emissiveIntensity = armorSkin.emissiveIntensity ?? 0.52;
       }
       m.needsUpdate = true;
     }
-  }
-  for (const m of mats) {
-    m.emissive?.copy?.(tint).multiplyScalar(0.10);
-    m.emissiveIntensity = 0.22;
-    m.needsUpdate = true;
   }
 }

@@ -23,6 +23,10 @@ assert.ok(luminance(starter.secondary) <= 0.15,
   'default character must retain a dark flexible undersuit');
 assert.ok(starter.emissive !== starter.primary,
   'default character must retain a distinct energy accent');
+assert.ok(starter.roughness >= 0.7 && starter.metalness <= 0.15,
+  'default character must retain the arena-compatible matte finish');
+assert.ok(starter.emissiveIntensity <= 0.6,
+  'default character accent must not overpower the arena lighting');
 
 for (const skin of ARMOR_SKINS) {
   for (const field of ['primary', 'secondary', 'emissive']) {
