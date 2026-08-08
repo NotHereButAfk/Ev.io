@@ -69,7 +69,7 @@ export class AuthNetBridge {
     this._edges = { jump: false, crouch: false, tele: false };
     this._nameLayer = this._makeNameLayer();
     this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
-    this.client.onWelcome = () => {
+    this.client.onWelcome = (arena, match) => {
       this.ready = true;
       // Authoritative matches must have one ownership model. Local AI used to
       // keep fighting underneath the real server snapshots, causing phantom
@@ -78,6 +78,10 @@ export class AuthNetBridge {
       game.serverSim?.stop?.();
       game._netDriven = true;
       game.hud?.setServerPop?.(1, 8);
+      game._onAuthoritativeMap?.(arena?.id, match, true);
+    };
+    this.client.onMapChange = (mapId, match) => {
+      game._onAuthoritativeMap?.(mapId, match, false);
     };
     this.client.connect();
   }

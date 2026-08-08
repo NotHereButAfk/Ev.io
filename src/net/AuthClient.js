@@ -36,7 +36,11 @@ export class AuthClient {
     this.events = [];                       // drained by the game each frame
     this.roster = [];
     this.arena = null;
+    this.mapId = null;
+    this.matchStart = null;
+    this.matchDurationMs = null;
     this.onWelcome = null;
+    this.onMapChange = null;
     this.postStep = null;
     this._acc = 0;
   }
@@ -58,6 +62,9 @@ export class AuthClient {
       case 'welcome':
         this.you = m.you;
         this.arena = m.arena;
+        this.mapId = m.arena?.id || null;
+        this.matchStart = m.matchStart ?? null;
+        this.matchDurationMs = m.matchDurationMs ?? null;
         this.simWorld = {
           half: m.arena.half, killY: -25,
           noBaseFloor: !!m.arena.noBaseFloor,
@@ -65,7 +72,10 @@ export class AuthClient {
           gravLifts: [], teleporters: [],
         };
         this.sim = createState(0, 0, 0);
-        this.onWelcome?.(m.arena);
+        this.onWelcome?.(m.arena, {
+          start: this.matchStart,
+          durationMs: this.matchDurationMs,
+        });
         break;
       case 'ping':
         this.ws?.send(JSON.stringify({ t: 'pong', id: m.id }));
@@ -78,6 +88,30 @@ export class AuthClient {
 
   _reconcile(snap) {
     if (!this.sim) return;
+    const previousMapId = this.mapId;
+    this.mapId = snap.mapId || this.mapId;
+    this.matchStart = snap.matchStart ?? this.matchStart;
+    this.matchDurationMs = snap.matchDurationMs ?? this.matchDurationMs;
+    if (snap.arena) {
+      this.arena = snap.arena;
+      this.simWorld = {
+        half: snap.arena.half,
+        killY: -25,
+        noBaseFloor: !!snap.arena.noBaseFloor,
+        platforms: snap.arena.platforms,
+        boxes: snap.arena.boxes,
+        gravLifts: [],
+        teleporters: [],
+      };
+    }
+    if (previousMapId && this.mapId !== previousMapId) {
+      this.onMapChange?.(this.mapId, {
+        name: snap.mapName,
+        start: this.matchStart,
+        durationMs: this.matchDurationMs,
+        arena: snap.arena || null,
+      });
+    }
     // authoritative self
     const y = snap.you;
     this.self = { health: y.health, shield: y.shield, alive: y.alive,

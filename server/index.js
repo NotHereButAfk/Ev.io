@@ -1,5 +1,6 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
+import { IMPORTED_MAPS } from '../src/world/MapRegistry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 // kyx.io match-state relay.
@@ -23,6 +24,7 @@ const MAX_NAME_LEN = 24;
 const KILL_RATE_LIMIT_MS = 150; // guards against a client spamming fake kills
 
 let matchStart = Date.now();
+let mapIndex = 0;
 /** @type {Map<import('ws').WebSocket, {id:number, name:string, kills:number, score:number, lastKillAt:number}>} */
 const players = new Map();
 let nextId = 1;
@@ -44,7 +46,13 @@ function broadcast(msg) {
 }
 
 function broadcastState() {
-  broadcast({ type: 'state', matchStart, matchDurationMs: MATCH_DURATION_MS, players: rosterPayload() });
+  broadcast({
+    type: 'state',
+    matchStart,
+    matchDurationMs: MATCH_DURATION_MS,
+    mapId: IMPORTED_MAPS[mapIndex].id,
+    players: rosterPayload(),
+  });
 }
 
 // Cycle the match automatically so the arena never actually "ends" — this is
@@ -52,6 +60,7 @@ function broadcastState() {
 setInterval(() => {
   if (Date.now() - matchStart >= MATCH_DURATION_MS) {
     matchStart = Date.now();
+    mapIndex = (mapIndex + 1) % IMPORTED_MAPS.length;
     for (const p of players.values()) { p.kills = 0; p.score = 0; }
     broadcastState();
   }
@@ -77,6 +86,7 @@ wss.on('connection', (ws) => {
     id: player.id,
     matchStart,
     matchDurationMs: MATCH_DURATION_MS,
+    mapId: IMPORTED_MAPS[mapIndex].id,
     players: rosterPayload(),
   }));
 

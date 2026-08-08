@@ -59,3 +59,26 @@ console.log(
   + `${map.geometries.length} geometries, ${map.materials.length} materials, `
   + `${map.playerSpawns.length} spawns`,
 );
+
+const WINTER_SHA256 = 'd400c49458f0f54bdb4d6c5aa0d0e0aae6c6aa0d3e49b12a15cca0aa3f5f181a';
+const winterBytes = await readFile(new URL('../public/maps/XmasGraveyard_1.evmap', import.meta.url));
+assert.equal(
+  createHash('sha256').update(winterBytes).digest('hex'),
+  WINTER_SHA256,
+  'XmasGraveyard_1.evmap does not match the official node-644 download',
+);
+const winterBuffer = winterBytes.buffer.slice(
+  winterBytes.byteOffset,
+  winterBytes.byteOffset + winterBytes.byteLength,
+);
+const winter = parseEvMap(winterBuffer);
+assert.equal(winter.bytesRead, winter.byteLength, 'Winter decoder did not consume the complete .evmap file');
+assert.equal(winter.geometries.length, 65);
+assert.equal(winter.textures.length, 10);
+assert.equal(winter.playerSpawns.filter((spawn) => spawn.enabled).length, 6);
+assert.equal(winter.markers.length, 4);
+console.log(
+  `ok   Winter-Graveyard ${winterBytes.length.toLocaleString()} bytes, `
+  + `${winter.geometries.length} geometries, ${winter.materials.length} materials, `
+  + `${winter.playerSpawns.length} spawns`,
+);

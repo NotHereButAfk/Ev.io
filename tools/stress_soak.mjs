@@ -13,7 +13,7 @@
 //   node tools/stress_soak.mjs --soak 10  # 10 min soak on the 32p cohort
 
 import { AuthRoom } from '../server/authroom.mjs';
-import { INKFALL } from '../src/sim/arenas.js';
+import { AUTHORITY_TEST_ARENA } from './fixtures/authorityArena.mjs';
 
 const TICK_MS = 50, BUDGET_MS = 50;
 const soakMin = (() => { const i = process.argv.indexOf('--soak'); return i > 0 ? +process.argv[i + 1] : 3; })();
@@ -27,7 +27,7 @@ function driveBots(room, bots, t) {
     const me = room.players.get(bot.id);
     if (!me || !me.alive) continue;
     if (!bot.target || bot.retargetIn-- <= 0) {
-      bot.target = INKFALL.callouts[Math.floor(bot.rnd() * INKFALL.callouts.length)];
+      bot.target = AUTHORITY_TEST_ARENA.callouts[Math.floor(bot.rnd() * AUTHORITY_TEST_ARENA.callouts.length)];
       bot.retargetIn = 40 + Math.floor(bot.rnd() * 80);
     }
     const dx = bot.target.x - me.state.px, dz = bot.target.z - me.state.pz;
@@ -56,7 +56,7 @@ function driveBots(room, bots, t) {
 function pct(sorted, p) { return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]; }
 
 function benchCohort(n, ticks) {
-  const room = new AuthRoom(INKFALL);
+  const room = new AuthRoom(AUTHORITY_TEST_ARENA);
   const bots = [];
   for (let i = 0; i < n; i++) bots.push({ id: room.add(() => {}, `B${i}`), rnd: rng(9001 + i * 131), target: null, retargetIn: 0, fireIn: 0 });
   const times = [];
@@ -71,7 +71,7 @@ function benchCohort(n, ticks) {
     for (const p of room.players.values()) {
       const s = p.state;
       if (!Number.isFinite(s.px) || !Number.isFinite(s.py) || !Number.isFinite(s.pz)) bad++;
-      else if (Math.abs(s.px) > INKFALL.half + 2 || Math.abs(s.pz) > INKFALL.half + 2 || s.py < INKFALL.killY - 5) bad++;
+      else if (Math.abs(s.px) > AUTHORITY_TEST_ARENA.half + 2 || Math.abs(s.pz) > AUTHORITY_TEST_ARENA.half + 2 || s.py < AUTHORITY_TEST_ARENA.killY - 5) bad++;
     }
   }
   times.sort((a, b) => a - b);
@@ -98,7 +98,7 @@ for (const n of [8, 16, 32, 64]) {
 
 console.log(`\n── SOAK (${soakMin} min sim @ 32p) ──`);
 const soakTicks = 20 * 60 * soakMin;
-const room = new AuthRoom(INKFALL);
+const room = new AuthRoom(AUTHORITY_TEST_ARENA);
 const bots = [];
 for (let i = 0; i < 32; i++) bots.push({ id: room.add(() => {}, `S${i}`), rnd: rng(4200 + i * 97), target: null, retargetIn: 0, fireIn: 0 });
 const mem0 = process.memoryUsage().heapUsed;

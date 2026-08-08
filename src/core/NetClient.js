@@ -15,6 +15,7 @@ export class NetClient {
     this.selfId = null;
     this.matchStart = null;
     this.matchDurationMs = null;
+    this.mapId = null;
     this.roster = []; // [{id, name, kills, score}], includes self
     this._reconnectDelay = RECONNECT_BASE_MS;
     this._name = 'Recruit';
@@ -64,8 +65,9 @@ export class NetClient {
       if (msg.type === 'welcome') this.selfId = msg.id;
       this.matchStart = msg.matchStart;
       this.matchDurationMs = msg.matchDurationMs;
+      this.mapId = msg.mapId || this.mapId;
       this.roster = msg.players || [];
-      this.onState?.(this.matchStart, this.matchDurationMs, this.roster);
+      this.onState?.(this.matchStart, this.matchDurationMs, this.roster, this.mapId);
     } else if (msg.type === 'kill_feed') {
       this.onKillFeed?.(msg.name);
     } else if (msg.type === 'joined') {

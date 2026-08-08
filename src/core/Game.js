@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { World, nextMapId } from '../world/World.js';
+import { World } from '../world/World.js';
 import { Player } from '../player/Player.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
 import { BotManager } from '../entities/BotManager.js';
@@ -52,6 +52,7 @@ import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharac
 import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
+import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -104,7 +105,9 @@ export class Game {
       setTimeout(resolve, 5000);
     });
 
-    this.world        = new World();
+    const requestedMapId = new URLSearchParams(window.location.search).get('map');
+    this._initialMapId = getImportedMap(requestedMapId).id;
+    this.world        = new World(this._initialMapId);
 
     // IBL — makes every MeshStandardMaterial look physically accurate
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -168,7 +171,9 @@ export class Game {
     this.net       = new NetClient(import.meta.env.VITE_WS_URL || '');
     this._netSlots = new Map(); // net player id -> Bot instance representing them
     this._netDriven = false;    // true for the duration of a match started while net was connected
-    this.net.onState = (matchStart, durationMs, roster) => this._onNetState(matchStart, durationMs, roster);
+    this.net.onState = (matchStart, durationMs, roster, mapId) => this._onNetState(
+      matchStart, durationMs, roster, mapId,
+    );
     this.net.onKillFeed = (name) => {
       if (this._isDM && this.state === 'playing') this.hud.addKillFeed(`${name} eliminated a target`);
     };
@@ -281,13 +286,14 @@ export class Game {
 
     setBoot(12, 'INITIALIZING ARENA', 'Renderer online');
     await delay(120);
-    setBoot(30, 'STREAMING DAYTIME ROOK', 'Loading map geometry');
+    const bootMap = getImportedMap(this.world.currentMapId || this._initialMapId);
+    setBoot(30, `STREAMING ${bootMap.name.toUpperCase()}`, 'Loading imported map geometry');
     await Promise.allSettled([Promise.resolve(this.world.ready), delay(350)]);
     setBoot(68, 'PREPARING COMBAT', 'Building navigation and collision');
     await Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]);
     setBoot(92, 'SYNCING LOADOUT', 'Soldier rig and weapon models ready');
     await minimumDisplay;
-    setBoot(100, 'DEPLOYMENT READY', 'Entering Rook Sector');
+    setBoot(100, 'DEPLOYMENT READY', `Entering ${bootMap.region}`);
     await delay(260);
 
     screen.classList.add('fade-out');
@@ -301,11 +307,14 @@ export class Game {
   async _runMapIntro() {
     const el = document.getElementById('map-loading');
     if (el) {
+      const definition = getImportedMap(this.world.currentMapId);
+      const name = el.querySelector('.ml-name');
+      if (name) name.textContent = definition.name.toUpperCase();
       const region  = document.getElementById('ml-region');
       const mode    = document.getElementById('ml-mode');
       const players = document.getElementById('ml-players');
       const tip     = document.getElementById('ml-tip');
-      if (region)  region.textContent  = 'Rook Sector';
+      if (region)  region.textContent  = definition.region;
       if (mode)    mode.textContent     = 'Loading map…';
       if (players) players.textContent  = 'Spectating';
       if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
@@ -319,7 +328,7 @@ export class Game {
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
     } catch (error) {
-      console.error('[map] official Daytime Rook failed to load', error);
+      console.error('[map] imported map failed to load', error);
       const mode = document.getElementById('ml-mode');
       if (mode) mode.textContent = 'Map load failed';
       return;
@@ -650,7 +659,7 @@ export class Game {
     this.hud.hideWaveBonus();   // only survival shows it
     this.nameplates.clear();
     this.waveBanner?.classList?.add('hidden');
-    this._showMapLoading(modeId);
+    this._showMapLoading(modeId, this.world.currentMapId);
 
     if (this._isDM) {
       this._activeManager = this.botManager;
@@ -805,7 +814,7 @@ export class Game {
   // adopt the shared server state as soon as it arrives: snap the countdown
   // to the real match time and swap the roster to real players. Better a
   // one-time timer jump than a whole match on a private clock.
-  _onNetState(matchStart, durationMs, roster) {
+  _onNetState(matchStart, durationMs, roster, mapId) {
     if (!this._isDM || this.state !== 'playing') return;
     if (!this._netDriven) {
       this._netDriven = true;
@@ -819,7 +828,28 @@ export class Game {
     }
     const remaining = durationMs / 1000 - (Date.now() - matchStart) / 1000;
     this._modeTimer = THREE.MathUtils.clamp(remaining, 0, durationMs / 1000);
+    if (mapId && mapId !== this.world.currentMapId) this._onAuthoritativeMap(mapId, {
+      start: matchStart,
+      durationMs,
+    });
     this._applyNetRoster(roster);
+  }
+
+  _onAuthoritativeMap(mapId, match = {}, initial = false) {
+    if (!mapId) return;
+    if (Number.isFinite(match.start) && Number.isFinite(match.durationMs)) {
+      const remaining = match.durationMs / 1000 - (Date.now() - match.start) / 1000;
+      this._modeTimer = THREE.MathUtils.clamp(remaining, 0, match.durationMs / 1000);
+    }
+    if (mapId === this.world.currentMapId) return;
+    this._pendingMapId = mapId;
+    if (initial) {
+      this._activateMap(mapId).catch((error) => console.error('[map] authoritative map load failed', error));
+    } else if (this.state === 'playing') {
+      // The server has advanced the shared round. Preserve the finished map
+      // behind the results screen; _restart loads the new one after countdown.
+      this._showLeaderboard();
+    }
   }
 
   // Reconcile which existing bot slots represent real connected players vs
@@ -1000,9 +1030,10 @@ export class Game {
   // so zombies/bots/timers keep running — you can't freeze a multiplayer match.
   // ev.io-style map loading card: map name / region / mode / players / TIP,
   // shown over the fly-through for a beat as the match starts, then fades.
-  _showMapLoading(modeId) {
+  _showMapLoading(modeId, mapId = this.world.currentMapId) {
     const el = document.getElementById('map-loading');
     if (!el) return;
+    const map = getImportedMap(mapId);
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
@@ -1015,11 +1046,15 @@ export class Game {
       deathmatch: 'Deathmatch', teamslayer: 'Team Slayer', ctf: 'Capture the Flag',
       koth: 'King of the Hill', survival: 'Firefight',
     };
-    const def = this.world.mapDef;
-    const nameEl = document.querySelector('#map-loading .ml-name');
-    if (nameEl && def) nameEl.textContent = def.name.toUpperCase();
+    const name = el.querySelector('.ml-name');
+    if (name) name.replaceChildren(...map.name.split(/\s+/).flatMap((part, index) => {
+      const nodes = [];
+      if (index) nodes.push(document.createElement('br'));
+      nodes.push(document.createTextNode(part.toUpperCase()));
+      return nodes;
+    }));
     const region = document.getElementById('ml-region');
-    if (region && def) region.textContent = def.region;
+    if (region) region.textContent = map.region;
     const mode = document.getElementById('ml-mode');
     if (mode) mode.textContent = modeNames[modeId] || 'Deathmatch';
     const players = document.getElementById('ml-players');
@@ -1079,34 +1114,38 @@ export class Game {
     this.menu.showMain();
   }
 
-  /**
-   * Advance the map rotation. Called when a match ENDS, so the next one is
-   * somewhere else.
-   *
-   * Everything that cached a position from the outgoing arena has to be
-   * re-seated here — the menu preview stands on a pedestal whose coordinates
-   * are per-map, and the pickup system is rebuilt against new geometry by
-   * _startGame. Anything reading world.colliders / world.spawnPoints does so
-   * live and needs nothing.
-   */
-  async _rotateMap() {
-    // One map in the rotation means there is nothing to rotate TO. Reloading it
-    // anyway would tear the arena down and re-decode 5.7MB of binary between
-    // every match to arrive back where it started.
-    const next = nextMapId(this.world.mapId);
-    if (next === this.world.mapId) return this.world.mapDef;
-    const def = await this.world.loadMap(next);
-    this.previewCharacter?.position.copy(this.world.previewPedestalPos);
-    return def;
+  async _activateMap(mapId) {
+    if (!mapId || mapId === this.world.currentMapId) {
+      this._pendingMapId = null;
+      return this.world.currentMap;
+    }
+    this.pickupSystem?.dispose();
+    this.pickupSystem = null;
+    this._showMapLoading(this._mode?.id || 'deathmatch', mapId);
+    const map = await this.world.loadMap(mapId);
+    this._configureMapCamera(map);
+    this.previewCharacter.position.copy(this.world.previewPedestalPos);
+    if (this.state === 'playing') {
+      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+    }
+    this._pendingMapId = null;
+    return map;
   }
 
   async _restart() {
     this._saveStats();
     this.hud.hideLeaderboard();
     this.menu.hideGameOver();
-    // Awaited: one map in the rotation decodes an official binary, and starting
-    // the match before it lands drops the player into an empty scene.
-    await this._rotateMap();
+    const authoritativeMapId = this._pendingMapId
+      || this._authNet?.client?.mapId
+      || this.net?.mapId;
+    const nextMapId = authoritativeMapId
+      || nextImportedMapId(this.world.currentMapId);
+    try {
+      await this._activateMap(nextMapId);
+    } catch (error) {
+      console.error('[map] rotation failed; retaining current imported map', error);
+    }
     this._startGame(
       this.player.name,
       this.selectedSkin.id,

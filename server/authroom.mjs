@@ -23,7 +23,7 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
-import { ROOK } from './rookarena.mjs';
+import { IMPORTED_ARENAS } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
 export const TICK_MS = 1000 / TICK_HZ;
@@ -94,7 +94,21 @@ function rayVsBoxes(world, ox, oy, oz, dx, dy, dz, maxT) {
 let _pid = 1;
 
 export class AuthRoom {
-  constructor(arena = ROOK) {
+  constructor(arena = IMPORTED_ARENAS) {
+    this.arenas = Array.isArray(arena) ? arena : [arena];
+    if (!this.arenas.length) throw new Error('AuthRoom requires at least one imported arena');
+    this._arenaIndex = 0;
+    this.arena = this.arenas[0];
+    this._setSimArena(this.arena);
+    this.tick = 0;
+    this.players = new Map();   // id -> player
+    this.events = [];           // per-tick outgoing events (kills, hits, spawns)
+    this.smokes = [];           // active smoke volumes {x,y,z,r,until}
+    this.matchStart = Date.now();
+    this.matchDurationMs = 8 * 60 * 1000;
+  }
+
+  _setSimArena(arena) {
     this.arena = arena;
     this.simWorld = {
       half: arena.half, killY: arena.killY,
@@ -103,12 +117,58 @@ export class AuthRoom {
       gravLifts: arena.gravLifts, teleporters: arena.teleporters,
       raycast: arena.raycast,
     };
-    this.tick = 0;
-    this.players = new Map();   // id -> player
-    this.events = [];           // per-tick outgoing events (kills, hits, spawns)
-    this.smokes = [];           // active smoke volumes {x,y,z,r,until}
-    this.matchStart = Date.now();
-    this.matchDurationMs = 8 * 60 * 1000;
+  }
+
+  _arenaPayload() {
+    return {
+      id: this.arena.id,
+      name: this.arena.name,
+      region: this.arena.region,
+      half: this.arena.half,
+      noBaseFloor: !!this.arena.noBaseFloor,
+      platforms: this.arena.platforms,
+      boxes: this.arena.boxes,
+      spawns: this.arena.spawns,
+    };
+  }
+
+  _rotateMatch(now = Date.now()) {
+    if (now - this.matchStart < this.matchDurationMs) return false;
+    this.matchStart = now;
+    this._arenaIndex = (this._arenaIndex + 1) % this.arenas.length;
+    this._setSimArena(this.arenas[this._arenaIndex]);
+    this.smokes.length = 0;
+
+    let spawnIndex = 0;
+    for (const player of this.players.values()) {
+      const spawn = this._spawn(spawnIndex++);
+      player.state = createState(spawn[0], spawn[1], spawn[2]);
+      player.queue.length = 0;
+      player.history.length = 0;
+      player.health = START_HEALTH;
+      player.shield = player.maxShield;
+      player.alive = true;
+      player.deadUntil = 0;
+      player.kills = 0;
+      player.deaths = 0;
+      player.score = 0;
+      player.mag = (WEAPONS[player.wid] || WEAPONS.m4).mag;
+      player.fireCooldown = 0;
+      player.gunBloom = 0;
+      player._animVX = player._animVZ = 0;
+      player._lastSprint = false;
+      player._lastAim = false;
+      player._firingTicks = 0;
+      player.blindUntil = 0;
+      player.abilities = {
+        flash: ABILITIES.flash.charges,
+        smoke: ABILITIES.smoke.charges,
+        impulse: ABILITIES.impulse.charges,
+      };
+      player.abilityCD = 0;
+    }
+    this.events.push({ e: 'map', id: this.arena.id, name: this.arena.name });
+    return true;
   }
 
   // Add a HUMAN-controlled player (a real socket).
@@ -141,10 +201,9 @@ export class AuthRoom {
     this.events.push({ e: 'spawn', id, name, x: spawn[0], y: spawn[1], z: spawn[2] });
     p.send({
       t: 'welcome', you: id, tick: this.tick,
-      arena: { name: this.arena.name, half: this.arena.half,
-               noBaseFloor: !!this.arena.noBaseFloor,
-               platforms: this.arena.platforms, boxes: this.arena.boxes,
-               spawns: this.arena.spawns },
+      arena: this._arenaPayload(),
+      matchStart: this.matchStart,
+      matchDurationMs: this.matchDurationMs,
       players: this._roster(),
     });
     return id;
@@ -154,8 +213,8 @@ export class AuthRoom {
     if (this.players.delete(id)) this.events.push({ e: 'leave', id });
   }
 
-  _spawn() {
-    const s = this.arena.spawns[(_pid) % this.arena.spawns.length];
+  _spawn(index = _pid) {
+    const s = this.arena.spawns[index % this.arena.spawns.length];
     return [s[0], s[1], s[2]];
   }
 
@@ -325,6 +384,7 @@ export class AuthRoom {
   update() {
     this.tick++;
     this.events.length = 0;
+    const rotated = this._rotateMatch();
 
     // expire finished smoke volumes
     if (this.smokes.length) this.smokes = this.smokes.filter((s) => this.tick < s.until);
@@ -442,6 +502,11 @@ export class AuthRoom {
     for (const p of this.players.values()) {
       p.send({
         t: 'snapshot', tick: now, ack: p.ackTick,
+        mapId: this.arena.id,
+        mapName: this.arena.name,
+        matchStart: this.matchStart,
+        matchDurationMs: this.matchDurationMs,
+        arena: rotated ? this._arenaPayload() : undefined,
         you: { x: p.state.px, y: p.state.py, z: p.state.pz,
                vx: p.state.vx, vy: p.state.vy, vz: p.state.vz,
                eye: p.state.eye,

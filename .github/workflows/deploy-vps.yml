@@ -80,9 +80,9 @@ jobs:
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             src/sim/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/sim/"
-          /usr/bin/rsync -az \
+          /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
-            src/world/EvMapLoader.js "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/world/EvMapLoader.js"
+            src/world/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/world/"
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             package.json package-lock.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"

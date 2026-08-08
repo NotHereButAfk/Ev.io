@@ -17,7 +17,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AuthRoom } from '../server/authroom.mjs';
-import { INKFALL } from '../src/sim/arenas.js';
+import { AUTHORITY_TEST_ARENA } from './fixtures/authorityArena.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(root, 'tests', 'arena');
@@ -25,7 +25,7 @@ mkdirSync(outDir, { recursive: true });
 
 const SIM_TICKS = 20 * 90;              // 90 seconds per run
 const GRID = 40;                        // occupancy grid resolution
-const cell = (INKFALL.half * 2) / GRID;
+const cell = (AUTHORITY_TEST_ARENA.half * 2) / GRID;
 
 // Deterministic per-bot RNG so runs are reproducible.
 function rng(seed) {
@@ -39,7 +39,7 @@ function makeBot(id, seed) {
   return { id, rnd: rng(seed + id * 7919), target: null, retargetIn: 0, fireIn: 0 };
 }
 function pickTarget(bot) {
-  const c = INKFALL.callouts[Math.floor(bot.rnd() * INKFALL.callouts.length)];
+  const c = AUTHORITY_TEST_ARENA.callouts[Math.floor(bot.rnd() * AUTHORITY_TEST_ARENA.callouts.length)];
   bot.target = c; bot.retargetIn = 40 + Math.floor(bot.rnd() * 80);
 }
 
@@ -55,10 +55,10 @@ function botInput(bot, me, others) {
 }
 
 function runCohort(n) {
-  const room = new AuthRoom(INKFALL);
+  const room = new AuthRoom(AUTHORITY_TEST_ARENA);
   const bots = [];
   const occ = new Int32Array(GRID * GRID);
-  const callVisits = Object.fromEntries(INKFALL.callouts.map((c) => [c.name, 0]));
+  const callVisits = Object.fromEntries(AUTHORITY_TEST_ARENA.callouts.map((c) => [c.name, 0]));
   let kills = 0, deaths = 0, respawns = 0;
   const routeTimes = [];        // {from,to,ticks}
   const lastCallout = new Map();
@@ -108,12 +108,12 @@ function runCohort(n) {
     // instrument this tick
     for (const p of room.players.values()) {
       if (!p.alive) continue;
-      const gx = Math.floor((p.state.px + INKFALL.half) / cell);
-      const gz = Math.floor((p.state.pz + INKFALL.half) / cell);
+      const gx = Math.floor((p.state.px + AUTHORITY_TEST_ARENA.half) / cell);
+      const gz = Math.floor((p.state.pz + AUTHORITY_TEST_ARENA.half) / cell);
       if (gx >= 0 && gx < GRID && gz >= 0 && gz < GRID) occ[gz * GRID + gx]++;
       // nearest callout → route timing
       let near = null, nd = 1e9;
-      for (const c of INKFALL.callouts) {
+      for (const c of AUTHORITY_TEST_ARENA.callouts) {
         const d = Math.hypot(c.x - p.state.px, c.z - p.state.pz);
         if (d < nd) { nd = d; near = c; }
       }
@@ -167,7 +167,7 @@ function runCohort(n) {
   };
 }
 
-const report = { arena: INKFALL.name, generated: new Date().toISOString(), cohorts: {} };
+const report = { arena: AUTHORITY_TEST_ARENA.name, generated: new Date().toISOString(), cohorts: {} };
 for (const n of [2, 4, 8]) {
   const r = runCohort(n);
   report.cohorts[n] = r;
