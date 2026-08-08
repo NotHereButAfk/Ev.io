@@ -14,7 +14,12 @@
 import { applyWalkCycle, groundPerCycle } from '../src/player/Locomotion.js';
 import { applyRifleCarry } from '../src/player/RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry, ACTION_TIME } from '../src/player/Actions.js';
-import { createHumanActionPose, sampleHumanActionPose } from '../src/player/HumanActionMotion.js';
+import {
+  createHumanActionPose,
+  createHumanDeathPose,
+  sampleHumanActionPose,
+  sampleHumanDeathPose,
+} from '../src/player/HumanActionMotion.js';
 
 const JOINTS = ['legL', 'legR', 'kneeL', 'kneeR', 'ankleL', 'ankleR',
                 'armL', 'armR', 'elbowL', 'elbowR'];
@@ -107,6 +112,39 @@ for (const [name, input, what] of [
     limit: 1,
     ok: neutral,
     what: 'no end-of-action pose pop',
+  });
+}
+
+// A human elimination bends the skeleton itself. It must be continuous,
+// mirrored by fall side, deterministic across sampling rates, and remain in
+// the final crumpled pose rather than snapping back to neutral.
+{
+  const sampleAt = (p, side = 1) => Object.values(sampleHumanDeathPose(p, side));
+  let peak = 0, worstStep = 0;
+  let previous = sampleAt(0);
+  for (let i = 1; i <= 120; i++) {
+    const values = sampleAt(i / 120);
+    peak = Math.max(peak, ...values.map(Math.abs));
+    worstStep = Math.max(worstStep, ...values.map((v, j) => Math.abs(v - previous[j])));
+    previous = values;
+  }
+  record('human death crumple', peak, 0.65, 'hips, spine, head, arms and legs collapse');
+  const continuous = worstStep < 0.08;
+  if (!continuous) failures++;
+  results.push({
+    name: 'human death — continuous', moved: continuous ? 1 : 0, limit: 1, ok: continuous,
+    what: `largest 1/120-step delta ${worstStep.toFixed(3)}rad`,
+  });
+  const left = sampleHumanDeathPose(1, -1);
+  const right = sampleHumanDeathPose(1, 1);
+  const centralZ = ['hipsZ', 'spineZ', 'chestZ', 'headZ', 'rLegZ', 'lLegZ'];
+  const mirrored = centralZ.every((key) => Math.abs(left[key] + right[key]) < 1e-12)
+    && Math.abs(left.rArmZ + right.lArmZ) < 1e-12
+    && Math.abs(left.lArmZ + right.rArmZ) < 1e-12;
+  if (!mirrored) failures++;
+  results.push({
+    name: 'human death — mirrored sides', moved: mirrored ? 1 : 0, limit: 1, ok: mirrored,
+    what: 'left/right falls are exact mirrors',
   });
 }
 

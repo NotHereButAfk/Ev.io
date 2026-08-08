@@ -42,6 +42,7 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "nanoid": "^3.3.17",
     "playwright": "^1.61.0",
     "vite": "^8.0.16"
   }

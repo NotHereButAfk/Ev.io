@@ -19,6 +19,17 @@ export function createHumanActionPose() {
   };
 }
 
+export function createHumanDeathPose() {
+  return {
+    hipsX: 0, hipsZ: 0, spineX: 0, spineZ: 0, chestX: 0, chestZ: 0,
+    headX: 0, headZ: 0,
+    rArmX: 0, rArmZ: 0, rForeX: 0,
+    lArmX: 0, lArmZ: 0, lForeX: 0,
+    rLegX: 0, rLegZ: 0, rCalfX: 0,
+    lLegX: 0, lLegZ: 0, lCalfX: 0,
+  };
+}
+
 function clear(out) {
   for (const key of Object.keys(out)) out[key] = 0;
   return out;
@@ -119,5 +130,40 @@ export function sampleHumanActionPose(input = {}, out = createHumanActionPose())
     addPose(out, TMP);
   }
 
+  return out;
+}
+
+/**
+ * Absolute skeletal death pose. Sampling from progress instead of accumulating
+ * frame deltas makes the same fall land on the same body shape at every refresh
+ * rate. `side` mirrors the asymmetry so repeated eliminations do not look cloned.
+ */
+export function sampleHumanDeathPose(progress = 0, side = 1, out = createHumanDeathPose()) {
+  const p = smooth(progress);
+  const s = side < 0 ? -1 : 1;
+  const impact = Math.sin(Math.min(1, progress / 0.62) * Math.PI) * (1 - p * 0.28);
+
+  out.hipsX = 0.20 * p;
+  out.hipsZ = 0.22 * s * p;
+  out.spineX = 0.52 * p + 0.10 * impact;
+  out.spineZ = 0.34 * s * p;
+  out.chestX = 0.26 * p;
+  out.chestZ = 0.25 * s * p;
+  out.headX = -0.22 * p;
+  out.headZ = -0.30 * s * p;
+
+  out.rArmX = -0.42 * p;
+  out.rArmZ = (0.34 - 0.18 * s) * p;
+  out.rForeX = 0.55 * p;
+  out.lArmX = -0.34 * p;
+  out.lArmZ = (-0.34 - 0.18 * s) * p;
+  out.lForeX = 0.42 * p;
+
+  out.rLegX = (-0.26 - 0.12 * s) * p;
+  out.rLegZ = 0.12 * s * p;
+  out.rCalfX = 0.72 * p;
+  out.lLegX = (-0.26 + 0.12 * s) * p;
+  out.lLegZ = -0.12 * s * p;
+  out.lCalfX = 0.50 * p;
   return out;
 }

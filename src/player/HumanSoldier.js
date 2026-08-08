@@ -12,7 +12,12 @@ import {
   targetHumanTimeScale,
 } from './HumanLocomotion.js';
 import { ACTION_TIME } from './Actions.js';
-import { createHumanActionPose, sampleHumanActionPose } from './HumanActionMotion.js';
+import {
+  createHumanActionPose,
+  createHumanDeathPose,
+  sampleHumanActionPose,
+  sampleHumanDeathPose,
+} from './HumanActionMotion.js';
 import { applyHumanRifleCarry } from './HumanRifleCarry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -317,6 +322,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _targetWeaponAim = 0, _weaponAim = 0;
   const _actionLeft = { swap: 0, throw: 0 };
   const _actionPose = createHumanActionPose();
+  const _deathPose = createHumanDeathPose();
+  let _deathP = 0;
+  let _deathSide = 1;
 
   const setLocomotion = (
     speed, grounded = true, sprinting = false, strafe = 0, dirF = 1, dirR = 0
@@ -390,6 +398,11 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     } else if (kind === 'flinch') {
       triggerHit(0.7, 0.8);
     }
+  };
+  const setDeathState = (progress = 0, side = 1) => {
+    _deathP = _clamp(progress, 0, 1);
+    _deathSide = side < 0 ? -1 : 1;
+    if (_heldWeapon) _heldWeapon.visible = _deathP < 0.48;
   };
 
   // Stance offsets applied after mixer.update overwrites bones (per armor type).
@@ -734,6 +747,24 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
         pitch: _sAimPitch,
       });
     }
+
+    // Death is a whole-skeleton crumple, not a rigid root rotation. Apply it
+    // last so it cleanly takes ownership from locomotion, aim, and rifle IK.
+    if (_deathP > 0) {
+      sampleHumanDeathPose(_deathP, _deathSide, _deathPose);
+      applyActionEuler(B.hips,  _deathPose.hipsX,  0, _deathPose.hipsZ);
+      applyActionEuler(B.spine, _deathPose.spineX, 0, _deathPose.spineZ);
+      applyActionEuler(B.s1,    _deathPose.chestX, 0, _deathPose.chestZ);
+      applyActionEuler(B.head,  _deathPose.headX,  0, _deathPose.headZ);
+      applyActionEuler(B.rArm,  _deathPose.rArmX,  0, _deathPose.rArmZ);
+      applyActionEuler(B.rFore, _deathPose.rForeX, 0, 0);
+      applyActionEuler(B.lArm,  _deathPose.lArmX,  0, _deathPose.lArmZ);
+      applyActionEuler(B.lFore, _deathPose.lForeX, 0, 0);
+      applyActionEuler(B.rLeg,  _deathPose.rLegX,  0, _deathPose.rLegZ);
+      applyActionEuler(B.rCalf, _deathPose.rCalfX, 0, 0);
+      applyActionEuler(B.lLeg,  _deathPose.lLegX,  0, _deathPose.lLegZ);
+      applyActionEuler(B.lCalf, _deathPose.lCalfX, 0, 0);
+    }
   };
 
   // ── Third-person weapon: firearms live in body space and drive a two-arm IK
@@ -782,6 +813,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     triggerHit,      // (dx, dy)     — damage flinch from a hit direction
     triggerJump,     // ()           — enters airborne state; setLocomotion(_,true,_) lands
     triggerTeleport, // ()           — plays the blink-arrival reform (crouch → recover)
+    setDeathState,   // (0..1, side)  — absolute full-skeleton death crumple
     attachWeapon,    // (weaponGroup, isMelee) — hold a weapon in the right hand
     armorTick,
     bodyMats,
@@ -940,6 +972,13 @@ function _applyArmorLook(bodyMats, visorMats, look) {
     m.roughness = Math.min(1, look.roughness + 0.1);
     m.metalness = Math.min(1, look.metalness + 0.15); // shinier so the bevels read
     m.envMapIntensity = 1.1;
+    // A tiny material-space fill keeps the rear silhouette readable when the
+    // arena's key light is entirely in front of the player. This is not a glow:
+    // it only lifts crushed blacks enough to separate arms, torso, and legs.
+    if (m.emissive) {
+      m.emissive.copy(_tintC).multiplyScalar(0.10);
+      m.emissiveIntensity = 0.22;
+    }
     m.needsUpdate = true;
   }
   for (const m of visorMats) {
@@ -1008,17 +1047,21 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
   const finishMetalness = armorSkin?.metalness ?? 0.66;
   const plate = new THREE.MeshStandardMaterial({
     color: new THREE.Color(plateColor).multiplyScalar(0.92),
+    emissive: new THREE.Color(plateColor).multiplyScalar(0.10),
+    emissiveIntensity: 0.24,
     roughness: finishRoughness * 0.85, metalness: finishMetalness, envMapIntensity: 1.1,
   });
   plate.userData.armorRole = 'plate';
   const readableUnder = new THREE.Color(underColor).lerp(new THREE.Color(0x303844), 0.28);
   const dark = new THREE.MeshStandardMaterial({
     color: readableUnder.clone().multiplyScalar(0.72),
+    emissive: readableUnder.clone().multiplyScalar(0.07), emissiveIntensity: 0.18,
     roughness: 0.42, metalness: 0.82,
   });
   dark.userData.armorRole = 'dark';
   const trim = new THREE.MeshStandardMaterial({
     color: new THREE.Color(plateColor).lerp(new THREE.Color(0xe8edf2), 0.58),
+    emissive: new THREE.Color(plateColor).multiplyScalar(0.06), emissiveIntensity: 0.16,
     roughness: 0.24, metalness: 0.95, envMapIntensity: 1.25,
   });
   trim.userData.armorRole = 'trim';
@@ -1225,18 +1268,22 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'Spine2', geo: box(0.17, 0.022, 0.026), mat: trim, x: 0, y: 1.425, z: -0.125 },
       // Layered pauldrons (shoulder bone ~1.429): a rounded cap, a polished trim
       // lip, and a status beacon on the outer face.
-      { bone: 'LeftShoulder',  geo: box(0.112, 0.09, 0.135), mat: plate, x: -0.155, y: 1.43, z: 0.01 },
-      { bone: 'RightShoulder', geo: box(0.112, 0.09, 0.135), mat: plate, x:  0.155, y: 1.43, z: 0.01 },
-      { bone: 'LeftShoulder',  geo: box(0.102, 0.022, 0.12), mat: trim,  x: -0.155, y: 1.47, z: 0.01 },
-      { bone: 'RightShoulder', geo: box(0.102, 0.022, 0.12), mat: trim,  x:  0.155, y: 1.47, z: 0.01 },
-      { bone: 'LeftShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: -0.185, y: 1.475, z: -0.02,
+      { bone: 'LeftShoulder',  geo: taper(0.16, 0.125, 0.115, 0.17, 0.13, -0.012), mat: plate, x: -0.185, y: 1.43, z: 0.01 },
+      { bone: 'RightShoulder', geo: taper(0.16, 0.125, 0.115, 0.17, 0.13,  0.012), mat: plate, x:  0.185, y: 1.43, z: 0.01 },
+      { bone: 'LeftShoulder',  geo: box(0.132, 0.024, 0.145), mat: trim,  x: -0.185, y: 1.485, z: 0.01 },
+      { bone: 'RightShoulder', geo: box(0.132, 0.024, 0.145), mat: trim,  x:  0.185, y: 1.485, z: 0.01 },
+      { bone: 'LeftShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: -0.225, y: 1.48, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
-      { bone: 'RightShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: 0.185, y: 1.475, z: -0.02,
+      { bone: 'RightShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: 0.225, y: 1.48, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2, phase: Math.PI } },
       { bone: 'Spine', geo: box(0.33, 0.09, 0.23), mat: dark, x: 0, y: 1.04, z: -0.01 },     // belt (Spine ~1.075)
       { bone: 'Spine', geo: box(0.35, 0.03, 0.25), mat: trim, x: 0, y: 1.085, z: -0.01 },    // belt trim lip
       { bone: 'Spine', geo: box(0.085, 0.10, 0.10), mat: plate, x: -0.135, y: 1.00, z: -0.025 },
       { bone: 'Spine', geo: box(0.085, 0.10, 0.10), mat: plate, x:  0.135, y: 1.00, z: -0.025 },
+      // Split hip guards widen the silhouette without filling the flexible
+      // groin/hip joints; each rides its own thigh through crouches and jumps.
+      { bone: 'LeftUpLeg',  geo: taper(0.105, 0.075, 0.22, 0.085, 0.065, -0.008), mat: plate, x: -0.18, y: 0.94, z: 0.00 },
+      { bone: 'RightUpLeg', geo: taper(0.105, 0.075, 0.22, 0.085, 0.065,  0.008), mat: plate, x:  0.18, y: 0.94, z: 0.00 },
 
       // Segmented limb armour keeps the black flex joints visible while giving
       // the forearms, thighs, knees, shins, and boots the same authored rhythm.
@@ -1359,10 +1406,16 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
         m.emissiveIntensity = armorSkin.emissiveIntensity ?? 0.9;
       }
       if (role === 'plate' || role === 'trim') {
+        m.emissive?.copy?.(plate).multiplyScalar(role === 'plate' ? 0.10 : 0.06);
         m.roughness = armorSkin.roughness ?? m.roughness;
         m.metalness = armorSkin.metalness ?? m.metalness;
       }
       m.needsUpdate = true;
     }
+  }
+  for (const m of mats) {
+    m.emissive?.copy?.(tint).multiplyScalar(0.10);
+    m.emissiveIntensity = 0.22;
+    m.needsUpdate = true;
   }
 }

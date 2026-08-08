@@ -135,6 +135,13 @@ export class Avatar {
       this._deathT += dt;
       const p = THREE.MathUtils.clamp(this._deathT / 0.72, 0, 1);
       const fall = 1 - Math.pow(1 - p, 3);
+      if (this.isHuman) {
+        const ud = g.userData;
+        ud.setLocomotion?.(0, true, false, 0, 1, 0);
+        ud.setDeathState?.(fall, this._deathSide);
+        ud.mixer?.update(dt);
+        ud.armorTick?.(dt);
+      }
       g.visible = true;
       g.position.set(
         s.position.x + this._deathSide * fall * 0.16,
@@ -161,6 +168,7 @@ export class Avatar {
       g.userData?.triggerTeleport?.();
     }
     g.visible = true;
+    if (this.isHuman) g.userData?.setDeathState?.(0, this._deathSide);
 
     // Speed: measured from movement when not supplied, so a network snapshot
     // animates identically to a local controller without sending a velocity.
