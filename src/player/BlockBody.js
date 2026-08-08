@@ -48,6 +48,13 @@ const ROLE = { armor: 'bone', dark: 'frame', visor: 'glow' };
 
 const IDENTITY = /^(Chest_Pec|Chest_Sternum|Torso_Side|Abdomen_Plate|Ab_Lame|Hip_Plate|Hip_Rear|Groin_Plate|Thigh_Plate|Thigh_Pod|Belt_Buckle|Helm_Face|Helm_Cheek|Back_Plate|Pack_Main|Visor_Rim)/;
 
+// The Blender source contains an optional tactical accessory pass. On the
+// shipping arena chassis those pieces turned the rear view into a rectangular
+// backpack and added small fins/spikes that fought the clean, connected plate
+// language of the map. Keep the structural back plate and forearm guards; omit
+// only the detachable garnish when assembling the shared runtime mesh.
+const OMIT_ARENA_PART = /^(Pack_|Antenna$|Crest_Fin|Forearm_Fin|Elbow_Spike)/;
+
 function roleFor(part) {
   const base = ROLE[part.m] || 'bone';
   return (base === 'bone' && IDENTITY.test(part.n)) ? 'armor' : base;
@@ -91,18 +98,26 @@ function heroBlockGeometry() {
   const buf = (k) => (bufs[k] ||= newBuffer());
 
   for (const part of PARTS) {
-    const b = buf(roleFor(part));
-    const bone = BONE_INDEX.get(part.b);
-    if (bone === undefined) throw new Error(`heroParts: unknown bone ${part.b}`);
-    const base = b.pos.length / 3;
-    for (let i = 0; i < 8; i++) {
-      b.pos.push(part.v[i * 3], part.v[i * 3 + 1], part.v[i * 3 + 2]);
-      b.skinIndex.push(bone, 0, 0, 0);
-      b.skinWeight.push(1, 0, 0, 0);
-    }
-    for (const [a, c, d, e] of FACES) {
-      b.idx.push(base + a, base + c, base + d);
-      b.idx.push(base + a, base + d, base + e);
+    if (OMIT_ARENA_PART.test(part.n)) continue;
+    // The source thigh plate protects only the front face. From the gameplay
+    // camera that leaves two long black rectangles where a full arena exosuit
+    // should have a segmented rear shell. Reuse the authored taper on the back
+    // without changing the rig landmarks or the limb's collision footprint.
+    const copies = /^Thigh_Plate\./.test(part.n) ? [0, 0.15] : [0];
+    for (const zOffset of copies) {
+      const b = buf(roleFor(part));
+      const bone = BONE_INDEX.get(part.b);
+      if (bone === undefined) throw new Error(`heroParts: unknown bone ${part.b}`);
+      const base = b.pos.length / 3;
+      for (let i = 0; i < 8; i++) {
+        b.pos.push(part.v[i * 3], part.v[i * 3 + 1], part.v[i * 3 + 2] + zOffset);
+        b.skinIndex.push(bone, 0, 0, 0);
+        b.skinWeight.push(1, 0, 0, 0);
+      }
+      for (const [a, c, d, e] of FACES) {
+        b.idx.push(base + a, base + c, base + d);
+        b.idx.push(base + a, base + d, base + e);
+      }
     }
   }
 

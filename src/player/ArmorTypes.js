@@ -2,8 +2,8 @@ export const ARMOR_TYPES = [
   // ── Low-poly cel-shaded cyborg-terminator models (the primary roster) ──
   {
     id:   'vanguard',
-    name: 'ENDO-800',
-    desc: 'White endoskeleton cyborg — skull face, red optics',
+    name: 'VANGUARD',
+    desc: 'Graphite arena exosuit — segmented shell, cyan optics',
     icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z'
   },
   {
@@ -50,19 +50,21 @@ export function getArmorType(id) {
 }
 
 const LS_KEY = 'sio_armor_type';
-const MODEL_MIGRATION_KEY = 'sio_armor_human_model_v1';
-// Roll the current profile onto the rigged armored soldier once. The cyborg
-// roster remains selectable afterward, but new/default players now use the
-// silhouette and animation system that matches ev.io's character skins.
+const MODEL_MIGRATION_KEY = 'sio_armor_arena_model_v2';
+// The old migration forced every existing profile onto the tactical Mixamo
+// soldier. That body reads as modern military kit in the faceted Rook arena,
+// especially from behind where its vest and pack dominate the silhouette.
+// Move that forced default once onto the connected arena exosuit. Other armor
+// choices remain selectable and are not overwritten after this migration.
 export function loadArmorType() {
   const saved = localStorage.getItem(LS_KEY);
   if (!localStorage.getItem(MODEL_MIGRATION_KEY)) {
     localStorage.setItem(MODEL_MIGRATION_KEY, '1');
-    if (!saved || ['vanguard', 'striker', 'phantom'].includes(saved)) {
-      localStorage.setItem(LS_KEY, 'assault');
-      return 'assault';
+    if (!saved || saved === 'assault') {
+      localStorage.setItem(LS_KEY, 'vanguard');
+      return 'vanguard';
     }
   }
-  return saved || 'assault';
+  return saved || 'vanguard';
 }
 export function saveArmorType(id)     { localStorage.setItem(LS_KEY, id); }

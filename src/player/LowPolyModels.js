@@ -138,8 +138,11 @@ function _addOutlines(group, t = 0.011) {
 // The armour reads MORE violet now than it did when everything was violet,
 // which is the point: a hue needs something neutral next to it to be a hue.
 const PALETTES = {
-  vanguard: { armor: 0x6d3fd2, armor2: 0xe9e7f1, frame: 0x191920, joint: 0x0a0a0e,
-              steel: 0x6c6f7d, bone: 0xcdc9d8, glow: 0xff2f8f, bulk: 1.00 },  // violet
+  // Neutral hard-surface blocks tie the default chassis to Rook's warm concrete
+  // and graphite architecture; cyan is reserved for optics and small status
+  // marks so the body stays readable without looking self-illuminated.
+  vanguard: { armor: 0x6f7679, armor2: 0xb7b9b5, frame: 0x242a2d, joint: 0x101417,
+              steel: 0x555d61, bone: 0x969b99, glow: 0x65c8d4, bulk: 1.00 },  // arena graphite
   striker:  { armor: 0x2478d4, armor2: 0xe4edf5, frame: 0x171b22, joint: 0x090b0f,
               steel: 0x69707d, bone: 0xc7cfd9, glow: 0x2ff0d8, bulk: 0.96 },  // azure
   phantom:  { armor: 0x3d3a4d, armor2: 0xdedbe6, frame: 0x141319, joint: 0x08080b,

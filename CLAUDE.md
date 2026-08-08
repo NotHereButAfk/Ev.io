@@ -68,8 +68,9 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `ArmorSkins.js` now has eight original ev.io-inspired character finishes:
   dark undersuits, segmented plate color blocking, restrained emissive accents,
   and ear/horn/crown/bone helmet themes. Two starter finishes are guest-owned.
-  A one-time migration changes the default from the white cyborg to the rigged
-  human Assault model (cyborgs remain selectable). Guest Inventory access is
+  A superseding migration now changes the default from the tactical human
+  Assault model to the connected VANGUARD arena exosuit (legacy humans remain
+  selectable). Guest Inventory access is
   enabled, and `ArmorPreviewRenderer` now uses the same skinnable rigged model
   as a match rather than the static white Spartan. Run `npm run test:skins`.
 - Forward-facing animation is centralized in `src/player/Facing.js`. The actual
@@ -168,12 +169,12 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   `LowPolyModels.js` owns the palettes/materials and keeps the previous
   segmented body as `buildSegmentedCharacter()` for comparison. 14 draw calls a
   body instead of 178. See AGENTS.md 2g/2h/2i and `npm run test:mesh`.
-  The armour is a **violet champion**: crested helm w/ dark visor + magenta
-  optic, three stacked pauldron lames, sternum emblem, belt, hip skirt (side
-  panels on the pelvis, front tassets on the THIGHS so they swing with a
-  stride instead of being a fence the leg walks through), long black cape,
-  gauntlets and chunky boots. Azure (`striker`) and graphite (`phantom`)
-  variants use the same build.
+  The default VANGUARD uses the map's warm-gray/graphite shell with restrained
+  cyan optics, a compact helmet, connected chest/back plating and full front +
+  rear thigh protection. Optional tactical backpack, antenna, crest fins and
+  limb spikes are omitted at runtime so its silhouette follows Rook's clean
+  hard-surface language. Azure (`striker`) and graphite (`phantom`) variants
+  use the same build.
   `HeroBody.js` (the lofted, graded-weight body) is still built and still gated
   — it is the technique for anything that has to CREASE at a joint, which rigid
   plates cannot do. Reach it via `buildLoftedCharacter()`.

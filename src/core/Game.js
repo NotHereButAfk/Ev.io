@@ -726,7 +726,7 @@ export class Game {
     // then rig its limbs so it can walk/run in third person.
     if (this._playerBody) this.world.scene.remove(this._playerBody);
     this._playerBody = buildPreviewCharacter(
-      this.selectedSkin, armorTypeId || this.selectedArmorType || 'assault', this.selectedArmorSkin
+      this.selectedSkin, armorTypeId || this.selectedArmorType || 'vanguard', this.selectedArmorSkin
     );
     // The human soldier animates via its own skeleton; only the procedural
     // block character needs the limb-pivot rig.

@@ -378,7 +378,7 @@ const BUILDERS = {
   stealth: buildStealth,
 };
 
-export function buildPreviewCharacter(skin, armorTypeId = 'assault', armorSkin = null, opts = {}) {
+export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin = null, opts = {}) {
   // Low-poly cel-shaded models own their whole look (their own toon materials +
   // outlines), so they take precedence over every other path — for the player,
   // bots and previews alike. Rigged by rigCharacterLimbs() via their named limbs.
