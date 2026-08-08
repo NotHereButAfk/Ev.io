@@ -31,7 +31,7 @@ const EPS = 0.01;                                     // soft stance weight, met
 
 const joint = () => ({ rotation: { x: 0, y: 0, z: 0, order: 'XYZ' } });
 const newRig = () => ({ legL: joint(), legR: joint(), kneeL: joint(), kneeR: joint(),
-  ankleL: joint(), ankleR: joint(), _walkT: 0, _moveBlend: 0, _lean: 0 });
+  ankleL: joint(), ankleR: joint(), head: joint(), _walkT: 0, _moveBlend: 0, _lean: 0 });
 
 // A sole corner (or, at 0,0, the ankle joint) in body-local space.
 function sole(cy, cz, thigh, knee, ankle, lean, hipYaw) {
@@ -271,6 +271,33 @@ console.log('\ncallers that pass no direction default to straight ahead');
                Math.abs((a.legL.rotation.y || 0) - (b.legL.rotation.y || 0)) < 1e-12;
   console.log('   omitted direction === explicit forward: %s', same);
   check(same, 'omitting dirF/dirR is not identical to travelling straight ahead');
+}
+
+console.log('\nwhole-body weight transfer');
+{
+  const rig = newRig();
+  const dt = 1 / 60;
+  let peakRoll = 0, peakSway = 0, headError = 0;
+  for (let i = 0; i < 240; i++) {
+    const g = applyWalkCycle(rig, {
+      speed: 6.2, moving: true, run: 0.25, dt, grounded: true, dirF: 1, dirR: 0,
+    });
+    peakRoll = Math.max(peakRoll, Math.abs(g.roll));
+    peakSway = Math.max(peakSway, Math.abs(g.sway));
+    headError = Math.max(headError, Math.abs(rig.head.rotation.z + g.roll * 0.55));
+  }
+  let settled;
+  for (let i = 0; i < 180; i++) {
+    settled = applyWalkCycle(rig, { speed: 0, moving: false, dt, grounded: true });
+  }
+  console.log('   roll %srad, sway %sm, head error %s, idle settles %s/%s',
+    peakRoll.toFixed(3), peakSway.toFixed(3), headError.toFixed(6),
+    settled.roll.toFixed(4), settled.sway.toFixed(4));
+  check(peakRoll > 0.008, 'the armored torso has no left/right weight transfer');
+  check(peakSway > 0.005, 'the armored body never shifts over the loaded foot');
+  check(headError < 1e-9, 'the head does not counter-stabilize the torso roll');
+  check(Math.abs(settled.roll) < 0.001 && Math.abs(settled.sway) < 0.001,
+    'weight transfer does not settle back to idle');
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall gait checks passed');

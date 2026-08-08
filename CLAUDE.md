@@ -91,6 +91,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   Both are parented to the recoil/reload group; the support hand hides for
   melee. This replaces the partly clipped single forearm that could disappear
   below the bottom edge at common FOVs.
+- The VANGUARD follow-up replaces the old 1.64m/1.80m straight viewmodel
+  sleeves with human-scale bent arms: short plated forearms, dark elbow joints
+  and upper sleeves that turn toward their shoulders. The default 78° carry is
+  12cm lower, narrow FOVs lift adaptively, and sprint now lowers/cants the full
+  gun-and-hands rig instead of raising it. Procedural third-person bodies also
+  transfer weight laterally over each planted step while the head
+  counter-stabilizes; local and remote bodies apply the same roll/sway output.
+  `test:viewmodel` gates arm length and 12 FOV/aspect frames; `test:gait` gates
+  the new weight-transfer channels without relaxing the planted-foot checks.
 - Full browser playtest (2026-07-29): the production menu, login, registration
   and reset states render and respond; the game boots, respawns and accepts
   combat/movement actions; both POV hands remain visible; and every movement

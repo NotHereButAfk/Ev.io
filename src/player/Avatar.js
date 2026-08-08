@@ -293,8 +293,13 @@ export class Avatar {
       grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
     });
     this._walkT = gait.phase;
-    g.position.set(s.position.x, s.position.y + gait.bob, s.position.z);
+    g.position.set(
+      s.position.x + Math.cos(yaw) * gait.sway,
+      s.position.y + gait.bob,
+      s.position.z - Math.sin(yaw) * gait.sway,
+    );
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
+    g.rotation.z = gait.roll;
 
     if (this.isMelee) {
       applyMeleeCarry(this.rig, this.weapon, {

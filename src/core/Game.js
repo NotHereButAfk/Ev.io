@@ -1548,8 +1548,14 @@ export class Game {
       grounded: p.onGround, vy: p.velocity.y,
       slide: p.isSliding ? 1 : 0,
     });
+    // Subtle side-to-side weight transfer makes the armored chassis feel
+    // connected through the hips. Apply it in body-local +X so strafing and
+    // turning do not make the visual body drift in an unrelated world axis.
+    this._playerBody.position.x = p.position.x + Math.cos(p.yaw) * gait.sway;
     this._playerBody.position.y = p.position.y + gait.bob;
+    this._playerBody.position.z = p.position.z - Math.sin(p.yaw) * gait.sway;
     this._playerBody.rotation.x = gait.lean;   // already eased, and bob assumes it
+    this._playerBody.rotation.z = gait.roll;
 
     // Arms: hold the weapon in a two-handed grip when armed with a gun, else
     // free-swing. This mirrors Avatar.update() exactly — the body OTHER players

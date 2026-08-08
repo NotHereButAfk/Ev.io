@@ -479,8 +479,17 @@ export function applyWalkCycle(rig, o = {}) {
   // fade the drop out, or the body would sink to keep the raised soles at zero.
   const bob = groundBob(thighL, kneeL, ankleL, thighR, kneeR, ankleR, lean, hipYaw) * (1 - air);
 
+  // A planted gait also transfers weight left↔right. Keep this restrained: it
+  // is enough to stop the hard-surface chassis reading as a rigid mannequin,
+  // without moving the visual body far enough to undo the solved foot plant.
+  // The head counters part of the roll like a real stabilized gaze.
+  const weight = mb * Math.sin(t) * (1 - 0.55 * air) * (1 - slide);
+  const roll = weight * (0.010 + 0.008 * run);
+  const sway = weight * (0.006 + 0.004 * run);
+  if (rig.head) rig.head.rotation.z = -roll * 0.55;
+
   return {
-    bob, lean, phase: t, air,
+    bob, lean, roll, sway, phase: t, air,
     // Rifle lifts as the pelvis drops (i.e. away from the chest, not into it),
     // fading to a breathing idle when standing.
     swing: mb * -(0.028 + 0.022 * run) * Math.cos(t * 2)

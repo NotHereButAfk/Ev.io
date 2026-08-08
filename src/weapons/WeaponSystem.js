@@ -57,7 +57,7 @@ function createTracerMesh() {
 // leaving every shipped model clear of the camera's near plane.
 const VIEWMODEL_Z = -0.78;
 const VIEWMODEL_X = 0.32;
-const VIEWMODEL_Y = -0.22;
+const VIEWMODEL_Y = -0.34;
 const REFERENCE_ASPECT = 16 / 9;
 
 // Preserve the lower-right composition on landscape screens without pushing
@@ -65,6 +65,13 @@ const REFERENCE_ASPECT = 16 / 9;
 // does not drift all the way into the corner.
 function viewmodelAspectScale(aspect) {
   return THREE.MathUtils.clamp((aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT, 0.32, 1.15);
+}
+
+// A narrow FOV magnifies the same world-space offset. Lift the mount only at
+// sub-78° settings so the compact default pose stays low while 60° players do
+// not lose the trigger glove below the frame.
+function viewmodelFovLift(fov) {
+  return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
 export class WeaponSystem {
@@ -260,8 +267,10 @@ export class WeaponSystem {
     };
 
     // Distinct closed-grip poses replace the old negatively-scaled clone. The
-    // sleeves deliberately continue below the camera so every glove has an
-    // unbroken visual connection to the player's body.
+    // sleeve still exits below the camera, but its authored length stays within
+    // a real arm. The previous endpoints were 1.64m / 1.80m from the wrist —
+    // longer than the whole character's shoulder-to-floor distance — which is
+    // why first person showed two black poles attached to otherwise good hands.
     const gripArm = ({ side, position, rotation, elbow, support = false }) => {
       const sign = side === 'left' ? -1 : 1;
       const arm = new THREE.Group();
@@ -312,13 +321,29 @@ export class WeaponSystem {
         0.042,
         this.gloveMat,
       ));
-      arm.add(segment(
-        new THREE.Vector3(0, -0.025, 0.080),
-        new THREE.Vector3(sign * elbow.x, elbow.y, elbow.z),
-        0.041,
-        0.064,
-        this.sleeveMat,
-      ));
+      const wrist = new THREE.Vector3(0, -0.025, 0.080);
+      const sleeveEnd = new THREE.Vector3(sign * elbow.x, elbow.y, elbow.z);
+      // Put a readable elbow in the silhouette. A single wrist→shoulder line
+      // makes even correctly sized geometry look telescopic in perspective.
+      // The bright shell stops at the elbow; the darker upper sleeve turns out
+      // toward the shoulder and disappears into the lower/side frame.
+      const armorEnd = new THREE.Vector3(
+        sign * (support ? 0.18 : 0.12),
+        support ? -0.23 : -0.25,
+        support ? 0.14 : 0.15,
+      );
+      arm.userData.sleeveLength = wrist.distanceTo(sleeveEnd);
+
+      // A short hard-surface forearm shell followed by a dark flexible sleeve.
+      // Splitting the silhouette here matches the third-person exosuit and stops
+      // the entire visible arm reading as one featureless cylinder.
+      arm.add(segment(wrist, armorEnd, 0.043, 0.052, this.armPlateMat));
+      arm.add(segment(armorEnd, sleeveEnd, 0.050, 0.058, this.sleeveMat));
+      const elbowJoint = new THREE.Mesh(
+        new THREE.SphereGeometry(0.056, 10, 7), this.cuffMat,
+      );
+      elbowJoint.position.copy(armorEnd);
+      arm.add(elbowJoint);
 
       arm.add(segment(
         new THREE.Vector3(0, -0.024, 0.072),
@@ -336,7 +361,7 @@ export class WeaponSystem {
       side: 'right',
       position: new THREE.Vector3(0.000, -0.105, 0.185),
       rotation: new THREE.Euler(-0.10, 0.20, -0.10),
-      elbow: new THREE.Vector3(0.15, -1.50, 0.62),
+      elbow: new THREE.Vector3(0.55, -0.55, 0.35),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -345,7 +370,10 @@ export class WeaponSystem {
       side: 'left',
       position: new THREE.Vector3(-0.050, -0.095, -0.175),
       rotation: new THREE.Euler(-0.05, -0.40, 0.08),
-      elbow: new THREE.Vector3(0.18, -1.70, 0.65),
+      // The support shoulder exits toward the lower-left instead of extending
+      // as a near-vertical pole. After the 0.74 viewmodel scale this is a
+      // plausible 0.74m hand-to-shoulder reach, versus the old 1.33m on screen.
+      elbow: new THREE.Vector3(0.65, -0.72, 0.40),
       support: true,
     });
     support.scale.setScalar(0.92);
@@ -1478,20 +1506,29 @@ export class WeaponSystem {
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
     const adsShiftX    = -this.scopeT * baseX;
-    const sprintRaiseY =  this._sprintT * 0.12;
+    // Sprint lowers the complete gun-and-hands rig. The old positive offset
+    // raised it 12cm, contradicting the intended carry and forcing implausibly
+    // long sleeves just to keep them connected to the bottom of the frame.
+    const sprintDrop = THREE.MathUtils.lerp(
+      0.04, 0.14, THREE.MathUtils.clamp((this.camera.fov - 60) / 18, 0, 1),
+    );
+    const sprintDropY  = -this._sprintT * sprintDrop;
     const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const tgtX = baseX + sprintShiftX + adsShiftX
       + (bobH + 0.05 * rBell) * aspectScale;
-    const tgtY = VIEWMODEL_Y + sprintRaiseY + bobV
+    const tgtY = VIEWMODEL_Y + viewmodelFovLift(this.camera.fov) + sprintDropY + bobV
       - 0.07 * rBell - 0.015 * rack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
       this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
-      this._sprintT * -1.0 + 0.42 * rBell, 14, dt);
+      // A compact 32° cant reads as a lowered sprint carry without rotating
+      // the support shoulder into the middle of the screen. The old 57° roll
+      // was what made even a human-length sleeve appear to end in mid-air.
+      this._sprintT * -0.55 + 0.42 * rBell, 14, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
