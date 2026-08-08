@@ -69,9 +69,9 @@ const HEAD_SQUASH = new THREE.Vector3(0.82, 0.6, 0.86);
 // scale. This is what makes the loadout's armor cards each preview a different
 // "model" instead of the same green Chief four times.
 export const ARMOR_LOOKS = {
-  assault: { // slate tactical plate with orange energy glow (default)
-    body: 0x596775, visor: 0xffa229,
-    roughness: 0.42, metalness: 0.5, scale: 1.00,
+  assault: { // bright silver exosuit with cyan energy glow (default)
+    body: 0xb9c4cf, visor: 0x38ddff,
+    roughness: 0.34, metalness: 0.70, scale: 1.00,
   },
   recon: {   // sleek light-blue scout exo
     body: 0x2f6fae, visor: 0x36f0ff,
@@ -1076,15 +1076,15 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
     side: THREE.DoubleSide,
   });
   cape.userData.armorRole = 'dark';
-  // Dark tactical helmet shell — a near-black gunmetal that matches the dark
-  // plating instead of a bright white dome. Carries only a whisper of the
-  // variant hue so recon/heavy/stealth still read subtly different, but no
-  // armour (least of all the white/silver assault) shows a big white egg.
+  // Compact plate-coloured helmet shell over a recessed dark faceplate. The
+  // shell joins the outer armor language while its small proportions avoid the
+  // oversized round dome that made the previous body look toy-like.
   const helmetMat = new THREE.MeshStandardMaterial({
-    color: readableUnder.clone().multiplyScalar(0.78).lerp(new THREE.Color(0x202733), 0.35),
-    roughness: 0.4, metalness: 0.72, envMapIntensity: 1.0,
+    color: new THREE.Color(plateColor).multiplyScalar(0.88),
+    emissive: new THREE.Color(plateColor).multiplyScalar(0.06), emissiveIntensity: 0.16,
+    roughness: finishRoughness * 0.92, metalness: finishMetalness, envMapIntensity: 1.15,
   });
-  helmetMat.userData.armorRole = 'dark';
+  helmetMat.userData.armorRole = 'plate';
   // Dark glossy visor glass — a near-black reflective faceplate (Halo/Titanfall
   // style) so the face reads as a real visor, not a bright oval.
   const visorMat = new THREE.MeshStandardMaterial({
@@ -1268,10 +1268,10 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'Spine2', geo: box(0.17, 0.022, 0.026), mat: trim, x: 0, y: 1.425, z: -0.125 },
       // Layered pauldrons (shoulder bone ~1.429): a rounded cap, a polished trim
       // lip, and a status beacon on the outer face.
-      { bone: 'LeftShoulder',  geo: taper(0.16, 0.125, 0.115, 0.17, 0.13, -0.012), mat: plate, x: -0.185, y: 1.43, z: 0.01 },
-      { bone: 'RightShoulder', geo: taper(0.16, 0.125, 0.115, 0.17, 0.13,  0.012), mat: plate, x:  0.185, y: 1.43, z: 0.01 },
-      { bone: 'LeftShoulder',  geo: box(0.132, 0.024, 0.145), mat: trim,  x: -0.185, y: 1.485, z: 0.01 },
-      { bone: 'RightShoulder', geo: box(0.132, 0.024, 0.145), mat: trim,  x:  0.185, y: 1.485, z: 0.01 },
+      { bone: 'LeftShoulder',  geo: taper(0.19, 0.14, 0.125, 0.18, 0.14, -0.014), mat: plate, x: -0.19, y: 1.43, z: 0.01 },
+      { bone: 'RightShoulder', geo: taper(0.19, 0.14, 0.125, 0.18, 0.14,  0.014), mat: plate, x:  0.19, y: 1.43, z: 0.01 },
+      { bone: 'LeftShoulder',  geo: box(0.15, 0.024, 0.15), mat: trim,  x: -0.19, y: 1.49, z: 0.01 },
+      { bone: 'RightShoulder', geo: box(0.15, 0.024, 0.15), mat: trim,  x:  0.19, y: 1.49, z: 0.01 },
       { bone: 'LeftShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: -0.225, y: 1.48, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
       { bone: 'RightShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: 0.225, y: 1.48, z: -0.02,
@@ -1293,12 +1293,16 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightArm', geo: box(0.06, 0.025, 0.022), mat: accent, x:  0.265, y: 1.445, z: -0.064 },
       { bone: 'LeftUpLeg',  geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x: -0.105, y: 0.82, z: -0.045 },
       { bone: 'RightUpLeg', geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x:  0.105, y: 0.82, z: -0.045 },
+      { bone: 'LeftUpLeg',  geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x: -0.105, y: 0.80, z: 0.072 },
+      { bone: 'RightUpLeg', geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x:  0.105, y: 0.80, z: 0.072 },
       { bone: 'LeftUpLeg',  geo: box(0.035, 0.20, 0.022), mat: accent, x: -0.105, y: 0.83, z: -0.108 },
       { bone: 'RightUpLeg', geo: box(0.035, 0.20, 0.022), mat: accent, x:  0.105, y: 0.83, z: -0.108 },
       { bone: 'LeftLeg',  geo: box(0.14, 0.105, 0.115), mat: trim, x: -0.10, y: 0.56, z: -0.055 },
       { bone: 'RightLeg', geo: box(0.14, 0.105, 0.115), mat: trim, x:  0.10, y: 0.56, z: -0.055 },
       { bone: 'LeftLeg',  geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x: -0.10, y: 0.35, z: -0.045 },
       { bone: 'RightLeg', geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x:  0.10, y: 0.35, z: -0.045 },
+      { bone: 'LeftLeg',  geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x: -0.10, y: 0.34, z: 0.062 },
+      { bone: 'RightLeg', geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x:  0.10, y: 0.34, z: 0.062 },
       { bone: 'LeftLeg',  geo: box(0.032, 0.245, 0.022), mat: accent, x: -0.10, y: 0.35, z: -0.108 },
       { bone: 'RightLeg', geo: box(0.032, 0.245, 0.022), mat: accent, x:  0.10, y: 0.35, z: -0.108 },
       { bone: 'LeftFoot',  geo: box(0.15, 0.105, 0.23), mat: dark, x: -0.10, y: 0.09, z: -0.03 },
@@ -1307,9 +1311,10 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightFoot', geo: box(0.115, 0.035, 0.17), mat: plate, x:  0.10, y: 0.145, z: -0.055 },
       // Compact, layered power pack: the waist and arms remain readable from
       // behind, and the selected plate colour now carries into the rear view.
-      { bone: 'Spine2', geo: box(0.18, 0.20, 0.085), mat: dark, x: 0, y: 1.27, z: 0.105 },
-      { bone: 'Spine2', geo: box(0.025, 0.17, 0.025), mat: plate, x: -0.068, y: 1.27, z: 0.158 },
-      { bone: 'Spine2', geo: box(0.025, 0.17, 0.025), mat: plate, x:  0.068, y: 1.27, z: 0.158 },
+      { bone: 'Spine2', geo: box(0.24, 0.30, 0.085), mat: plate, x: 0, y: 1.27, z: 0.105 },
+      { bone: 'Spine2', geo: taper(0.115, 0.09, 0.255, 0.045, 0.035, -0.008), mat: plate, x: -0.067, y: 1.28, z: 0.158 },
+      { bone: 'Spine2', geo: taper(0.115, 0.09, 0.255, 0.045, 0.035,  0.008), mat: plate, x:  0.067, y: 1.28, z: 0.158 },
+      { bone: 'Spine2', geo: box(0.038, 0.235, 0.022), mat: dark, x: 0, y: 1.27, z: 0.185 },
       { bone: 'Spine2', geo: box(0.12, 0.025, 0.025), mat: trim, x: 0, y: 1.325, z: 0.160 },
       { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x: -0.04, y: 1.36, z: 0.168,
         anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2 } },
@@ -1380,7 +1385,15 @@ export function tintHumanSoldier(group, skin, armorSkin = null) {
   if (hex == null) return;
   const tint = new THREE.Color(hex);
   for (const m of mats) {
-    if (m.map) {
+    if (armorSkin) {
+      // The source GLB is a tactical soldier. Once an armor finish is equipped,
+      // its fabric/albedo would show pockets and camouflage through the suit and
+      // make the character read as an army model. Keep the normal detail but
+      // turn the source surface into the finish's clean graphite flex layer;
+      // the procedural hard plates remain the visible outer shell.
+      m.map = null;
+      m.color.copy(new THREE.Color(armorSkin.secondary)).lerp(new THREE.Color(0x4b5766), 0.42);
+    } else if (m.map) {
       // Brighten toward the skin colour so light skins (white armour) read bright,
       // while keeping the texture detail (values can exceed 1 to lift the GLB grey).
       m.color.setRGB(0.45 + 0.7 * tint.r, 0.45 + 0.7 * tint.g, 0.45 + 0.7 * tint.b);

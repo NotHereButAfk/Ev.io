@@ -10,8 +10,10 @@ export const RARITY_SHIELD = { common: 20, epic: 60, legendary: 80, mythic: 100 
 export const ARMOR_SKINS = [
   {
     id: 'cobalt_circuit', name: 'Cobalt Circuit', rarity: 'common', starter: true,
-    primary: 0x3b82d0, secondary: 0x0c1420, emissive: 0x45e6ff,
-    emissiveIntensity: 0.75, roughness: 0.44, metalness: 0.58, price: 0, shield: 0,
+    // Bright segmented shell over a graphite flex suit. The previous saturated
+    // blue-on-black finish crushed the model into one dark military silhouette.
+    primary: 0xb9c4cf, secondary: 0x101721, emissive: 0x38ddff,
+    emissiveIntensity: 0.88, roughness: 0.34, metalness: 0.70, price: 0, shield: 0,
   },
   {
     id: 'crimson_guard', name: 'Crimson Guard', rarity: 'common', starter: true,

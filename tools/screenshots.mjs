@@ -15,6 +15,7 @@
 //     and has to be re-applied after every interaction.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'fs';
+import { TPS_DEFAULT_DISTANCE } from '../src/player/ThirdPersonCamera.js';
 
 const URL = process.env.KYX_URL || 'http://127.0.0.1:5994/';
 const OUT = 'docs/screenshots';
@@ -69,7 +70,9 @@ await pose(`g.player.position.set(0, 0, 22); g.player.yaw = Math.PI; g.player.pi
 await page.waitForTimeout(1200);
 await shot('first-person');
 
-await pose(`g.player._camDist = 3.4;`);
+// Document the actual first third-person zoom notch. A stale 3.4m override made
+// the player look much smaller here than during normal gameplay.
+await pose(`g.player._camDist = ${TPS_DEFAULT_DISTANCE};`);
 await page.waitForTimeout(1200);
 await shot('third-person');
 

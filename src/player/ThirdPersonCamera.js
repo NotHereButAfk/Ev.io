@@ -1,4 +1,6 @@
-export const TPS_DEFAULT_DISTANCE = 2.15;
+// Keep the local body large enough to read during combat without changing its
+// physical stature (which must stay aligned with the capsule, eyes, and feet).
+export const TPS_DEFAULT_DISTANCE = 1.95;
 export const TPS_MAX_DISTANCE = 5.5;
 export const TPS_ZOOM_STEP = 0.7;
 export const TPS_WALL_CLEARANCE = 0.55;
