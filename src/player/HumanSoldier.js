@@ -1256,12 +1256,12 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       // collar deck, and a polished sternum ridge with the glowing emitter set in.
       // Broad dark carrier plus separate angular plates: this gives the torso
       // the layered EV-style exosuit read without copying a proprietary mesh.
-      { bone: 'Spine2', geo: taper(0.37, 0.29, 0.34, 0.13, 0.105), mat: dark, x: 0, y: 1.28, z: -0.012 },
-      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095, -0.01), mat: plate, x: -0.085, y: 1.365, z: -0.082, quat: chestLeft },
-      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095,  0.01), mat: plate, x:  0.085, y: 1.365, z: -0.082, quat: chestRight },
-      { bone: 'Spine2', geo: taper(0.11, 0.075, 0.235, 0.07, 0.08), mat: plate, x: 0, y: 1.245, z: -0.105 },
-      { bone: 'Spine1', geo: taper(0.18, 0.22, 0.085, 0.075, 0.09), mat: plate, x: 0, y: 1.105, z: -0.075 },
-      { bone: 'Spine2', geo: box(0.032, 0.155, 0.022), mat: accent, x: 0, y: 1.285, z: -0.15,
+      { bone: 'Spine2', geo: taper(0.37, 0.29, 0.34, 0.13, 0.105), mat: dark, x: 0, y: 1.28, z: -0.135 },
+      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095, -0.01), mat: plate, x: -0.085, y: 1.365, z: -0.225, quat: chestLeft },
+      { bone: 'Spine2', geo: taper(0.155, 0.125, 0.16, 0.085, 0.095,  0.01), mat: plate, x:  0.085, y: 1.365, z: -0.225, quat: chestRight },
+      { bone: 'Spine2', geo: taper(0.11, 0.075, 0.235, 0.07, 0.08), mat: plate, x: 0, y: 1.245, z: -0.225 },
+      { bone: 'Spine1', geo: taper(0.18, 0.22, 0.085, 0.075, 0.09), mat: plate, x: 0, y: 1.105, z: -0.19 },
+      { bone: 'Spine2', geo: box(0.032, 0.155, 0.022), mat: accent, x: 0, y: 1.285, z: -0.28,
         anim: { type: 'pulse', freq: 3.2, min: 0.5, max: 1.7 } },
       { bone: 'Spine2', geo: cyl(0.034, 0.026), mat: trim, x: -0.10, y: 1.34, z: -0.14, quat: faceDisc },
       { bone: 'Spine2', geo: cyl(0.034, 0.026), mat: trim, x:  0.10, y: 1.34, z: -0.14, quat: faceDisc },
@@ -1272,6 +1272,8 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightShoulder', geo: taper(0.19, 0.14, 0.125, 0.18, 0.14,  0.014), mat: plate, x:  0.19, y: 1.43, z: 0.01 },
       { bone: 'LeftShoulder',  geo: box(0.15, 0.024, 0.15), mat: trim,  x: -0.19, y: 1.49, z: 0.01 },
       { bone: 'RightShoulder', geo: box(0.15, 0.024, 0.15), mat: trim,  x:  0.19, y: 1.49, z: 0.01 },
+      { bone: 'LeftShoulder',  geo: taper(0.145, 0.115, 0.09, 0.075, 0.06), mat: plate, x: -0.19, y: 1.43, z: 0.115 },
+      { bone: 'RightShoulder', geo: taper(0.145, 0.115, 0.09, 0.075, 0.06), mat: plate, x:  0.19, y: 1.43, z: 0.115 },
       { bone: 'LeftShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: -0.225, y: 1.48, z: -0.02,
         anim: { type: 'blink', freq: 4, on: 1.9, off: 0.2 } },            // shoulder beacons (alternating)
       { bone: 'RightShoulder', geo: box(0.035, 0.035, 0.035), mat: accent, x: 0.225, y: 1.48, z: -0.02,
@@ -1291,18 +1293,18 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightArm', geo: box(0.135, 0.105, 0.105), mat: plate, x:  0.265, y: 1.445, z: 0.00 },
       { bone: 'LeftArm',  geo: box(0.06, 0.025, 0.022), mat: accent, x: -0.265, y: 1.445, z: -0.064 },
       { bone: 'RightArm', geo: box(0.06, 0.025, 0.022), mat: accent, x:  0.265, y: 1.445, z: -0.064 },
-      { bone: 'LeftUpLeg',  geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x: -0.105, y: 0.82, z: -0.045 },
-      { bone: 'RightUpLeg', geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x:  0.105, y: 0.82, z: -0.045 },
-      { bone: 'LeftUpLeg',  geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x: -0.105, y: 0.80, z: 0.072 },
-      { bone: 'RightUpLeg', geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x:  0.105, y: 0.80, z: 0.072 },
+      { bone: 'LeftUpLeg',  geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x: -0.105, y: 0.82, z: -0.13 },
+      { bone: 'RightUpLeg', geo: taper(0.14, 0.105, 0.285, 0.115, 0.09), mat: plate, x:  0.105, y: 0.82, z: -0.13 },
+      { bone: 'LeftUpLeg',  geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x: -0.105, y: 0.80, z: 0.13 },
+      { bone: 'RightUpLeg', geo: taper(0.11, 0.085, 0.24, 0.07, 0.06), mat: plate, x:  0.105, y: 0.80, z: 0.13 },
       { bone: 'LeftUpLeg',  geo: box(0.035, 0.20, 0.022), mat: accent, x: -0.105, y: 0.83, z: -0.108 },
       { bone: 'RightUpLeg', geo: box(0.035, 0.20, 0.022), mat: accent, x:  0.105, y: 0.83, z: -0.108 },
       { bone: 'LeftLeg',  geo: box(0.14, 0.105, 0.115), mat: trim, x: -0.10, y: 0.56, z: -0.055 },
       { bone: 'RightLeg', geo: box(0.14, 0.105, 0.115), mat: trim, x:  0.10, y: 0.56, z: -0.055 },
-      { bone: 'LeftLeg',  geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x: -0.10, y: 0.35, z: -0.045 },
-      { bone: 'RightLeg', geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x:  0.10, y: 0.35, z: -0.045 },
-      { bone: 'LeftLeg',  geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x: -0.10, y: 0.34, z: 0.062 },
-      { bone: 'RightLeg', geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x:  0.10, y: 0.34, z: 0.062 },
+      { bone: 'LeftLeg',  geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x: -0.10, y: 0.35, z: -0.125 },
+      { bone: 'RightLeg', geo: taper(0.13, 0.095, 0.31, 0.11, 0.085), mat: plate, x:  0.10, y: 0.35, z: -0.125 },
+      { bone: 'LeftLeg',  geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x: -0.10, y: 0.34, z: 0.115 },
+      { bone: 'RightLeg', geo: taper(0.10, 0.075, 0.25, 0.065, 0.055), mat: plate, x:  0.10, y: 0.34, z: 0.115 },
       { bone: 'LeftLeg',  geo: box(0.032, 0.245, 0.022), mat: accent, x: -0.10, y: 0.35, z: -0.108 },
       { bone: 'RightLeg', geo: box(0.032, 0.245, 0.022), mat: accent, x:  0.10, y: 0.35, z: -0.108 },
       { bone: 'LeftFoot',  geo: box(0.15, 0.105, 0.23), mat: dark, x: -0.10, y: 0.09, z: -0.03 },
@@ -1311,19 +1313,19 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
       { bone: 'RightFoot', geo: box(0.115, 0.035, 0.17), mat: plate, x:  0.10, y: 0.145, z: -0.055 },
       // Compact, layered power pack: the waist and arms remain readable from
       // behind, and the selected plate colour now carries into the rear view.
-      { bone: 'Spine2', geo: box(0.24, 0.30, 0.085), mat: plate, x: 0, y: 1.27, z: 0.105 },
-      { bone: 'Spine2', geo: taper(0.115, 0.09, 0.255, 0.045, 0.035, -0.008), mat: plate, x: -0.067, y: 1.28, z: 0.158 },
-      { bone: 'Spine2', geo: taper(0.115, 0.09, 0.255, 0.045, 0.035,  0.008), mat: plate, x:  0.067, y: 1.28, z: 0.158 },
-      { bone: 'Spine2', geo: box(0.038, 0.235, 0.022), mat: dark, x: 0, y: 1.27, z: 0.185 },
-      { bone: 'Spine2', geo: box(0.12, 0.025, 0.025), mat: trim, x: 0, y: 1.325, z: 0.160 },
-      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x: -0.04, y: 1.36, z: 0.168,
+      { bone: 'Spine2', geo: box(0.24, 0.29, 0.09), mat: dark, x: 0, y: 1.28, z: 0.255 },
+      { bone: 'Spine2', geo: taper(0.105, 0.08, 0.255, 0.055, 0.045, -0.008), mat: plate, x: -0.082, y: 1.29, z: 0.325 },
+      { bone: 'Spine2', geo: taper(0.105, 0.08, 0.255, 0.055, 0.045,  0.008), mat: plate, x:  0.082, y: 1.29, z: 0.325 },
+      { bone: 'Spine2', geo: box(0.042, 0.25, 0.024), mat: dark, x: 0, y: 1.28, z: 0.36 },
+      { bone: 'Spine2', geo: box(0.15, 0.025, 0.025), mat: trim, x: 0, y: 1.335, z: 0.36 },
+      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x: -0.04, y: 1.38, z: 0.375,
         anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2 } },
-      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x:  0.04, y: 1.36, z: 0.168,
+      { bone: 'Spine2', geo: box(0.04, 0.025, 0.018), mat: accent, x:  0.04, y: 1.38, z: 0.375,
         anim: { type: 'pulse', freq: 1.4, min: 0.3, max: 1.2, phase: Math.PI * 0.15 } },
     ];
   }
 
-  specs = [...helmet, ...specs]; // every soldier wears the helmet
+  specs = [...helmet, ...specs];
 
   const animated = [];
   const armorMaterials = new Set([plate, dark, trim, accent, cape, helmetMat, visorMat]);
