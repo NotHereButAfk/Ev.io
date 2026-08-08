@@ -35,6 +35,13 @@ const MIME = {
   '.woff': 'font/woff', '.woff2': 'font/woff2',
 };
 
+const CLEAN_HTML_ROUTES = new Map([
+  ['/login', '/login.html'],
+  ['/register', '/register.html'],
+  ['/privacy', '/privacy.html'],
+  ['/terms', '/terms.html'],
+]);
+
 function staticHandler(root) {
   const base = resolve(root);
   return (req, res) => {
@@ -47,6 +54,7 @@ function staticHandler(root) {
     catch { res.writeHead(400); res.end('Bad request'); return; }
     if (pathname.includes('\0')) { res.writeHead(400); res.end('Bad request'); return; }
     if (pathname === '/') pathname = '/index.html';
+    else pathname = CLEAN_HTML_ROUTES.get(pathname) || pathname;
 
     const relative = normalize(pathname.replace(/^[/\\]+/, ''));
     const file = resolve(join(base, relative));

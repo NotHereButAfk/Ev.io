@@ -20,6 +20,12 @@ try {
   await check('sets the HTML content type', home.headers.get('content-type')?.startsWith('text/html'));
   await check('does not cache HTML indefinitely', home.headers.get('cache-control') === 'no-cache');
 
+  for (const route of ['/login', '/register', '/privacy', '/terms']) {
+    const page = await fetch(`http://127.0.0.1:${PORT}${route}`);
+    const pageHtml = await page.text();
+    await check(`serves clean HTML route ${route}`, page.status === 200 && /<!doctype html>/i.test(pageHtml));
+  }
+
   const missing = await fetch(`http://127.0.0.1:${PORT}/not-a-real-file`);
   await check('returns 404 for missing files', missing.status === 404);
 
