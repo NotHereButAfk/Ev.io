@@ -49,7 +49,7 @@
 
     <!-- ===================== TOP NAV (ev.io-style) ===================== -->
     <div id="top-nav" class="hidden">
-      <div class="nav-brand">KYX<span>.IO</span></div>
+      <div class="nav-brand" aria-label="KYX.IO">kyx.io</div>
       <nav class="nav-items">
         <!-- PUBLIC GAME — game-mode picker dropdown -->
         <div class="nav-dd-wrap">
@@ -61,6 +61,18 @@
                 <div class="mode-opt-name">DEATHMATCH</div>
                 <div class="mode-opt-sub">FFA &bull; 8 Players &bull; 8 Minutes</div>
               </div>
+            </button>
+            <button class="mode-option" data-mode="teamslayer">
+              <span class="mode-opt-icon">&#9876;</span>
+              <div class="mode-opt-body"><div class="mode-opt-name">TEAM DEATHMATCH</div><div class="mode-opt-sub">Two teams compete for the score limit</div></div>
+            </button>
+            <button class="mode-option" data-mode="ctf">
+              <span class="mode-opt-icon">&#9873;</span>
+              <div class="mode-opt-body"><div class="mode-opt-name">CAPTURE THE FLAG</div><div class="mode-opt-sub">Steal and return the enemy flag</div></div>
+            </button>
+            <button class="mode-option" data-mode="koth">
+              <span class="mode-opt-icon">&#9670;</span>
+              <div class="mode-opt-body"><div class="mode-opt-name">KING OF THE HILL</div><div class="mode-opt-sub">Control the arena objective</div></div>
             </button>
             <button class="mode-option" data-mode="survival">
               <span class="mode-opt-icon">&#129503;</span>
@@ -78,6 +90,10 @@
         <div class="nav-dd-wrap">
           <button class="nav-item nav-dd-btn" data-dd="profile">PROFILE &#9660;</button>
           <div class="nav-dd profile-dropdown hidden" id="dd-profile">
+            <button class="profile-menu-item" data-panel="abilities">
+              <span class="pm-icon">&#9889;</span>
+              <div class="pm-body"><div class="pm-name">ABILITIES</div><div class="pm-sub">Movement and tactical powers</div></div>
+            </button>
             <button class="profile-menu-item" data-panel="loadout">
               <span class="pm-icon">&#9776;</span>
               <div class="pm-body"><div class="pm-name">INVENTORY</div><div class="pm-sub">Weapons, skins &amp; character</div></div>
@@ -178,6 +194,31 @@
       <div class="spectate-hint">[ SPECTATE ]</div>
     </div>
 
+    <!-- ===================== PANEL: ABILITIES ===================== -->
+    <div id="panel-abilities" class="nav-panel nav-panel-wide hidden">
+      <button class="panel-x" data-close-panel aria-label="Close abilities">[X]</button>
+      <div class="ev-page-title">ABILITIES</div>
+      <p class="ev-page-copy">Choose the tactical kit you take into every public match.</p>
+      <div class="ability-page-grid">
+        <article class="ability-page-card selected">
+          <span class="ability-page-key">Q</span>
+          <div><strong>TELEPORT</strong><p>Blink forward through open space to break sightlines.</p></div>
+        </article>
+        <article class="ability-page-card">
+          <span class="ability-page-key">F</span>
+          <div><strong>FLASH GRENADE</strong><p>Blind opponents caught inside the detonation cone.</p></div>
+        </article>
+        <article class="ability-page-card">
+          <span class="ability-page-key">E</span>
+          <div><strong>SMOKE GRENADE</strong><p>Block long lanes with a temporary smoke volume.</p></div>
+        </article>
+        <article class="ability-page-card">
+          <span class="ability-page-key">G</span>
+          <div><strong>IMPULSE</strong><p>Knock nearby combatants away from the impact point.</p></div>
+        </article>
+      </div>
+    </div>
+
     <!-- ===================== PANEL: LOADOUT (ev.io-style) ===================== -->
     <div id="panel-loadout" class="nav-panel nav-panel-inv hidden">
       <button id="inv-close-btn" class="inv-close-btn" title="Close">[X]</button>
@@ -213,6 +254,17 @@
 
     <!-- ===================== PANEL: SETTINGS ===================== -->
     <div id="panel-settings" class="nav-panel hidden">
+
+      <div class="settings-title-row">
+        <h2>GAME SETTINGS</h2>
+        <button class="panel-x settings-x" data-close-panel aria-label="Close settings">[X]</button>
+      </div>
+      <div class="settings-actions">
+        <button type="button" id="settings-export-btn" class="settings-utility">EXPORT SETTINGS</button>
+        <button type="button" id="settings-import-btn" class="settings-utility cyan">IMPORT SETTINGS</button>
+        <button type="button" id="settings-defaults-btn" class="settings-utility amber">RESTORE DEFAULTS</button>
+        <input id="settings-import-file" type="file" accept="application/json,.json" hidden />
+      </div>
 
       <div class="settings-section">CONTROLS</div>
 

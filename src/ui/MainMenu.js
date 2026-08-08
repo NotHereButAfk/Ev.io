@@ -8,7 +8,7 @@ import { Shop } from '../core/Shop.js';
 import { Armory } from '../core/Armory.js';
 import { describePerk } from '../core/RarityPerks.js';
 import { BattlePass, BP_TIERS } from '../core/BattlePass.js';
-import { GameSettings, CROSSHAIR_COLORS } from '../core/GameSettings.js';
+import { GameSettings, DEFAULTS, CROSSHAIR_COLORS } from '../core/GameSettings.js';
 import { GAME_MODES } from '../core/GameModes.js';
 import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
@@ -165,6 +165,43 @@ export class MenuUI {
         }
         this._togglePanel(btn.dataset.panel);
       });
+    });
+
+    document.querySelectorAll('[data-close-panel]').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this._closeAllPanels();
+      });
+    });
+
+    const importFile = document.getElementById('settings-import-file');
+    document.getElementById('settings-export-btn')?.addEventListener('click', () => {
+      const settings = Object.fromEntries(Object.keys(DEFAULTS).map((key) => [key, GameSettings.get(key)]));
+      const url = URL.createObjectURL(new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'kyx-settings.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('settings-import-btn')?.addEventListener('click', () => importFile?.click());
+    importFile?.addEventListener('change', async () => {
+      const file = importFile.files?.[0];
+      if (!file) return;
+      try {
+        const incoming = JSON.parse(await file.text());
+        for (const key of Object.keys(DEFAULTS)) {
+          if (Object.prototype.hasOwnProperty.call(incoming, key)) GameSettings.set(key, incoming[key]);
+        }
+        this._loadSettings();
+      } catch {
+        document.getElementById('settings-save-btn').textContent = 'INVALID SETTINGS FILE';
+      }
+      importFile.value = '';
+    });
+    document.getElementById('settings-defaults-btn')?.addEventListener('click', () => {
+      for (const [key, value] of Object.entries(DEFAULTS)) GameSettings.set(key, value);
+      this._loadSettings();
     });
 
     // Cosmetic wallet button inside the CRYPTO dropdown.
