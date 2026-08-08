@@ -4869,6 +4869,26 @@ html, body { margin: 0; }
 .auth-page .login-input { border-radius: 0; padding: 9px 11px; }
 .auth-page .login-submit { align-self: flex-start; margin-top: 15px; padding: 9px 12px; border-radius: 0; }
 .auth-page .login-alt { display: none; }
+.password-meter {
+  width: 100%; height: 4px; margin-top: 8px; overflow: hidden;
+  background: #262b31;
+}
+.password-meter span { display: block; width: 0; height: 100%; background: #e64646; transition: width 180ms ease, background-color 180ms ease; }
+#reg-strength-bar[data-score="2"] { background: #d99435; }
+#reg-strength-bar[data-score="3"] { background: #8dbb3f; }
+#reg-strength-bar[data-score="4"] { background: #39b96b; }
+#reg-match[data-match="true"] { color: #62c986; }
+#reg-match[data-match="false"] { color: #c88787; }
+.auth-consent {
+  display: flex; align-items: flex-start; gap: 9px; margin-top: 17px;
+  color: #aeb7c0; font-size: 14px; line-height: 1.35; cursor: pointer;
+}
+.auth-consent input { width: 15px; height: 15px; margin: 2px 0 0; accent-color: #1a9fe0; }
+.auth-consent a { color: #62bceb; }
+.legal-main { max-width: 780px; padding: 22px 70px 60px; }
+.legal-copy { padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.16); color: #b9c1c9; font-size: 17px; line-height: 1.55; }
+.legal-copy h2 { margin: 28px 0 4px; color: #edf2f5; font-size: 22px; font-weight: 600; }
+.legal-copy p { margin: 8px 0; }
 
 .feedback-text {
   width: 100%; min-height: 160px; resize: vertical; padding: 12px;
@@ -4895,6 +4915,7 @@ html, body { margin: 0; }
   .auth-page .login-topbar { padding: 18px 20px; }
   .auth-page .login-brand { font-size: 28px; }
   .auth-page .login-main { padding: 22px 20px 50px; }
+  .legal-main { padding: 22px 20px 50px; }
   .auth-page .login-tabs .auth-tab { font-size: 15px; padding: 10px 9px; }
 }
 

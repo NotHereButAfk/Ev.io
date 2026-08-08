@@ -9,6 +9,8 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const index = read('index.html');
 const login = read('login.html');
 const register = read('register.html');
+const privacy = read('privacy.html');
+const terms = read('terms.html');
 const menu = read('src/ui/MainMenu.js');
 const hud = read('src/ui/HUD.js');
 const game = read('src/core/Game.js');
@@ -34,9 +36,15 @@ for (const side of ['login', 'rankings', 'feedback', 'more']) {
 requireMatch(login, /href=["']\/register["']/, 'login to register navigation');
 requireMatch(login, /id=["']login-btn["']/, 'login submit control');
 requireMatch(login, /id=["']guest-btn["']/, 'login guest control');
+requireMatch(login, /id=["']reset-err["']/, 'honest reset feedback');
 requireMatch(register, /href=["']\/login["']/, 'register to login navigation');
 requireMatch(register, /id=["']reg-btn["']/, 'register submit control');
 requireMatch(register, /id=["']guest-btn["']/, 'register guest control');
+for (const control of ['reg-email', 'reg-strength', 'reg-match', 'reg-privacy', 'reg-terms']) {
+  requireMatch(register, new RegExp(`id=["']${control}["']`), `register parity control: ${control}`);
+}
+requireMatch(privacy, /Privacy policy/i, 'privacy page');
+requireMatch(terms, /Terms of use/i, 'terms page');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {

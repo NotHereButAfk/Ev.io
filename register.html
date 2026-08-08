@@ -29,17 +29,31 @@
       </div>
 
       <div class="login-forms">
-        <div class="auth-form">
+        <form id="register-form" class="auth-form" novalidate>
+          <label class="login-label" for="reg-email">Email address <span class="req">*</span></label>
+          <input id="reg-email" class="login-input" type="email" autocomplete="email" autofocus required />
+          <div class="login-hint">Used to identify this browser-local account. KYX does not send email yet.</div>
           <label class="login-label" for="reg-name">Username <span class="req">*</span></label>
-          <input id="reg-name" class="login-input" autocomplete="username" autofocus />
+          <input id="reg-name" class="login-input" autocomplete="username" required />
           <div class="login-hint">Letters, numbers and underscores. 2+ characters.</div>
           <label class="login-label" for="reg-pass">Password <span class="req">*</span></label>
-          <input id="reg-pass" class="login-input" type="password" autocomplete="new-password" />
+          <input id="reg-pass" class="login-input" type="password" autocomplete="new-password" required />
+          <div class="password-meter" aria-hidden="true"><span id="reg-strength-bar"></span></div>
+          <div id="reg-strength" class="login-hint" aria-live="polite">Password strength: enter at least 8 characters.</div>
           <label class="login-label" for="reg-pass2">Confirm password <span class="req">*</span></label>
-          <input id="reg-pass2" class="login-input" type="password" autocomplete="new-password" />
+          <input id="reg-pass2" class="login-input" type="password" autocomplete="new-password" required />
+          <div id="reg-match" class="login-hint" aria-live="polite">Passwords must match.</div>
+          <label class="auth-consent" for="reg-privacy">
+            <input id="reg-privacy" type="checkbox" required />
+            <span>I have read and agree to the <a href="/privacy.html" target="_blank" rel="noopener">privacy policy</a>. <span class="req">*</span></span>
+          </label>
+          <label class="auth-consent" for="reg-terms">
+            <input id="reg-terms" type="checkbox" required />
+            <span>I agree to the <a href="/terms.html" target="_blank" rel="noopener">terms of use</a>. <span class="req">*</span></span>
+          </label>
           <div id="reg-err" class="auth-error hidden"></div>
-          <button id="reg-btn" class="login-submit"><span class="login-ico">&#8677;</span> Create new account</button>
-        </div>
+          <button id="reg-btn" class="login-submit" type="submit"><span class="login-ico">&#8677;</span> Create new account</button>
+        </form>
       </div>
 
       <div class="login-alt">

@@ -39,10 +39,11 @@
         </div>
 
         <div id="form-reset" class="auth-form hidden">
-          <label class="login-label" for="reset-name">Username or email <span class="req">*</span></label>
-          <input id="reset-name" class="login-input" />
-          <div class="login-hint">Password reset isn't available in this build — create a new account or play as guest.</div>
-          <button id="reset-btn" class="login-submit"><span class="login-ico">&#9993;</span> Email new password</button>
+          <label class="login-label" for="reset-name">Username or email address <span class="req">*</span></label>
+          <input id="reset-name" class="login-input" autocomplete="username" />
+          <div class="login-hint">Password reset instructions would be sent to your registered email address. Email delivery is not enabled in this browser-local build.</div>
+          <div id="reset-err" class="auth-error hidden"></div>
+          <button id="reset-btn" class="login-submit"><span class="login-ico">&#9993;</span> Submit</button>
         </div>
       </div>
 

@@ -25,7 +25,7 @@ document.getElementById('guest-btn')?.addEventListener('click', () => {
 });
 
 document.getElementById('reset-btn')?.addEventListener('click', () => {
-  err('login-err', 'Password reset is unavailable — create a new account or play as guest.');
+  err('reset-err', 'Email delivery is not enabled. Your account remains stored only in this browser.');
 });
 
 // ?reset=1 opens the reset panel directly (from the "Reset your password" tab).

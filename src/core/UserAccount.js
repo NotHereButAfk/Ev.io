@@ -66,8 +66,11 @@ export const UserAccount = {
 
   async login(username, password) {
     if (!username) return { ok: false, err: 'Enter a username' };
-    const key = username.toLowerCase();
     const db = _load();
+    const lookup = username.trim().toLowerCase();
+    const key = db.accounts[lookup]
+      ? lookup
+      : Object.keys(db.accounts).find((candidate) => db.accounts[candidate]?.email === lookup);
     const acc = db.accounts[key];
     if (!acc) return { ok: false, err: 'Account not found' };
 
@@ -98,14 +101,19 @@ export const UserAccount = {
     return { ok: true };
   },
 
-  async register(username, password) {
+  async register(username, password, email = '') {
     const u = (username || '').trim();
+    const normalizedEmail = (email || '').trim().toLowerCase();
     if (u.length < 2)               return { ok: false, err: 'Username must be 2+ characters' };
     if (u.length > 24)              return { ok: false, err: 'Username must be 24 characters or fewer' };
     if (!/^[a-zA-Z0-9_]+$/.test(u)) return { ok: false, err: 'Letters, numbers and _ only' };
     if (!password || password.length < 8) return { ok: false, err: 'Password must be 8+ characters' };
+    if (normalizedEmail && !/^\S+@\S+\.\S+$/.test(normalizedEmail)) return { ok: false, err: 'Enter a valid email address' };
     const db = _load();
     if (db.accounts[u.toLowerCase()]) return { ok: false, err: 'Username already taken' };
+    if (normalizedEmail && Object.values(db.accounts).some((account) => account?.email === normalizedEmail)) {
+      return { ok: false, err: 'Email already registered' };
+    }
     let passwordFields;
     try {
       passwordFields = await _passwordRecord(password);
@@ -114,6 +122,7 @@ export const UserAccount = {
     }
     db.accounts[u.toLowerCase()] = {
       displayName: u,
+      ...(normalizedEmail ? { email: normalizedEmail } : {}),
       ...passwordFields,
       created: Date.now(),
       stats: { kills: 0, deaths: 0, score: 0, games: 0 },

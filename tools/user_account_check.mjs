@@ -23,16 +23,22 @@ const db = () => JSON.parse(localStorage.getItem('sio_accounts') || '{"accounts"
 const weak = await UserAccount.register('Pilot', 'short');
 assert(!weak.ok, 'new registrations accepted a weak password');
 
-const created = await UserAccount.register('Pilot', 'correct horse battery staple');
+const created = await UserAccount.register('Pilot', 'correct horse battery staple', 'Pilot@Example.com');
 assert(created.ok, `registration failed: ${created.err}`);
 const stored = db().accounts.pilot;
 assert(stored.password === undefined, 'registration stored a plaintext password');
 assert(typeof stored.passwordHash === 'string' && stored.passwordHash.length > 20, 'password hash missing');
 assert(typeof stored.passwordSalt === 'string' && stored.passwordSalt.length > 10, 'password salt missing');
+assert(stored.email === 'pilot@example.com', 'normalized email missing');
+
+const duplicateEmail = await UserAccount.register('Wingman', 'another secure password', 'pilot@example.com');
+assert(!duplicateEmail.ok, 'duplicate email accepted');
 
 UserAccount.logout();
 assert(!(await UserAccount.login('Pilot', 'wrong password')).ok, 'wrong password logged in');
 assert((await UserAccount.login('Pilot', 'correct horse battery staple')).ok, 'valid hash login failed');
+UserAccount.logout();
+assert((await UserAccount.login('pilot@example.com', 'correct horse battery staple')).ok, 'email login failed');
 
 localStorage.setItem('sio_accounts', JSON.stringify({
   accounts: {
