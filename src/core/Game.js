@@ -293,11 +293,6 @@ export class Game {
     const phase = document.getElementById('boot-phase');
     const detail = document.getElementById('boot-detail');
     const percent = document.getElementById('boot-percent');
-    const previewMap = getImportedMap(this.world.currentMapId);
-    const bootName = document.getElementById('boot-map-name');
-    const bootRegion = document.getElementById('boot-map-region');
-    if (bootName) bootName.textContent = previewMap.name.toUpperCase();
-    if (bootRegion) bootRegion.textContent = previewMap.region || 'US East (Atlanta)';
     const setBoot = (value, title, copy) => {
       if (bar) bar.style.width = `${value}%`;
       if (phase) phase.textContent = title;
