@@ -59,7 +59,19 @@ jobs:
           # secret contains a parseable private key before attempting SSH.
           /usr/bin/ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             || { echo "VPS_SECRET is not a valid SSH private key"; exit 1; }
-          /usr/bin/ssh-keyscan -p 22 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scan_file="$(/usr/bin/mktemp)"
+          scan_ok=0
+          for attempt in 1 2 3 4 5; do
+            if /usr/bin/ssh-keyscan -T 10 -p 22 -H "$DEPLOY_HOST" > "$scan_file" 2>/dev/null; then
+              /usr/bin/cat "$scan_file" >> ~/.ssh/known_hosts
+              scan_ok=1
+              break
+            fi
+            echo "SSH host-key scan attempt $attempt failed; retrying..."
+            /usr/bin/sleep 2
+          done
+          /usr/bin/rm -f "$scan_file"
+          test "$scan_ok" -eq 1 || { echo "Could not read the VPS SSH host key after 5 attempts"; exit 1; }
 
       - name: Deploy game and authoritative server
         env:
