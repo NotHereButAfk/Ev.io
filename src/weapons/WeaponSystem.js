@@ -64,11 +64,51 @@ const VIEWMODEL_Y = -0.285;
 const VIEWMODEL_SCALE = 0.96;
 const REFERENCE_ASPECT = 16 / 9;
 
+// First-person hand targets in each weapon model's local coordinate system.
+// Procedural and authored weapons share the same forward convention (-Z), but
+// their pistol grips do not share a depth. A single hand transform therefore
+// made short weapons miss the palm and made rifles appear to float in front of
+// it. These targets describe the centre of the physical grip/handguard; the
+// rig converts them to wrist-group transforms below.
+const DEFAULT_HAND_POSE = {
+  trigger: [0.012, -0.086, 0.19],
+  support: [-0.012, 0.022, -0.22],
+  supportVisible: true,
+};
+const VIEWMODEL_HAND_POSES = {
+  sidearm:       { trigger: [0.010, -0.108, 0.105], supportVisible: false },
+  magnum:        { trigger: [0.010, -0.112, 0.105], supportVisible: false },
+  uzi:           { trigger: [0.010, -0.060, 0.040], support: [-0.010, 0.020, -0.105] },
+  levershotgun:  { trigger: [0.010, -0.088, 0.140], support: [-0.012, 0.016, -0.255] },
+  m4:            { trigger: [0.012, -0.092, 0.200], support: [-0.012, 0.026, -0.235] },
+  m16:           { trigger: [0.012, -0.088, 0.200], support: [-0.012, 0.020, -0.270] },
+  rifle:         { trigger: [0.012, -0.100, 0.150], support: [-0.012, 0.018, -0.225] },
+  lmg:           { trigger: [0.012, -0.114, 0.220], support: [-0.012, 0.012, -0.280] },
+  rpg:           { trigger: [0.012, -0.082, 0.060], support: [-0.012, 0.010, -0.255] },
+  boltsniper:    { trigger: [0.012, -0.082, 0.200], support: [-0.012, 0.016, -0.285] },
+  battlerifle:   { trigger: [0.012, -0.090, 0.190], support: [-0.012, 0.020, -0.245] },
+  needler:       { trigger: [0.012, -0.090, 0.145], support: [-0.012, 0.018, -0.185] },
+  plasmarifle:   { trigger: [0.012, -0.086, 0.155], support: [-0.012, 0.018, -0.205] },
+  dmr:           { trigger: [0.012, -0.082, 0.220], support: [-0.012, 0.020, -0.260] },
+  fuelrod:       { trigger: [0.012, -0.095, 0.110], support: [-0.012, 0.015, -0.235] },
+  concussion:    { trigger: [0.012, -0.090, 0.120], support: [-0.012, 0.018, -0.215] },
+  energyshotgun: { trigger: [0.012, -0.092, 0.175], support: [-0.012, 0.018, -0.245] },
+  sword:         { trigger: [0.010, -0.105, 0.105], supportVisible: false },
+  knife:         { trigger: [0.010, -0.105, 0.105], supportVisible: false },
+  ghammer:       { trigger: [0.010, -0.120, 0.180], support: [-0.010, -0.015, -0.035] },
+};
+
 // Preserve the lower-right composition on landscape screens without pushing
 // both gloves out of portrait/mobile view. Capped on ultrawide so the weapon
 // does not drift all the way into the corner.
 function viewmodelAspectScale(aspect) {
   return THREE.MathUtils.clamp((aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT, 0.32, 1.15);
+}
+
+function viewmodelReloadScale(aspect) {
+  if (aspect < 1) return 0.38;
+  if (aspect < 1.5) return 0.22;
+  return 0.30;
 }
 
 // A narrow FOV magnifies the same world-space offset. Lift the mount only at
@@ -253,7 +293,7 @@ export class WeaponSystem {
       color: 0x2d3540, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.6,
     });
     this.gloveMat = new THREE.MeshStandardMaterial({
-      color: 0x242a33, roughness: 0.52, metalness: 0.12, envMapIntensity: 1.0,
+      color: 0x353e4a, roughness: 0.58, metalness: 0.08, envMapIntensity: 1.0,
     });
     this.cuffMat = new THREE.MeshStandardMaterial({
       color: 0x0c0e12, roughness: 0.6, metalness: 0.08,
@@ -293,11 +333,13 @@ export class WeaponSystem {
       arm.add(hand);
 
       const palm = box(0.086, 0.058, 0.094, this.gloveMat);
+      palm.name = 'viewmodel_palm';
       palm.position.set(0, -0.006, -0.034);
       palm.rotation.x = support ? -0.08 : 0.10;
       hand.add(palm);
 
       const handPlate = box(0.070, 0.012, 0.060, this.armPlateMat);
+      handPlate.name = 'viewmodel_hand_plate';
       handPlate.position.set(0, 0.026, -0.020);
       handPlate.rotation.x = palm.rotation.x;
       hand.add(handPlate);
@@ -305,9 +347,21 @@ export class WeaponSystem {
       // A single closed finger curl reads as a hand wrapped around the grip.
       // Four separate capsules looked like detached claws at gameplay scale.
       const fingerCurl = box(0.082, 0.044, 0.064, this.gloveMat);
+      fingerCurl.name = 'viewmodel_finger_curl';
       fingerCurl.position.set(0, -0.032, -0.060);
       fingerCurl.rotation.x = support ? 0.32 : 0.52;
       hand.add(fingerCurl);
+
+      // Two shallow knuckle ribs keep the closed silhouette readable under the
+      // deliberately muted map lighting without turning the glove into a set
+      // of detached capsule fingers.
+      for (const x of [-0.021, 0.021]) {
+        const knuckle = box(0.027, 0.010, 0.033, this.armPlateMat);
+        knuckle.name = 'viewmodel_knuckle';
+        knuckle.position.set(x, 0.032, -0.044);
+        knuckle.rotation.x = palm.rotation.x;
+        hand.add(knuckle);
+      }
 
       const thumb = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.012, 0.032, 3, 7),
@@ -331,9 +385,9 @@ export class WeaponSystem {
       // The bright shell stops at the elbow; the darker upper sleeve turns out
       // toward the shoulder and disappears into the lower/side frame.
       const armorEnd = new THREE.Vector3(
-        sign * (support ? 0.18 : 0.10),
-        support ? -0.23 : -0.17,
-        support ? 0.14 : 0.13,
+        sign * (support ? 0.10 : 0.08),
+        support ? -0.15 : -0.14,
+        support ? 0.02 : 0.03,
       );
       arm.userData.sleeveLength = wrist.distanceTo(sleeveEnd);
 
@@ -348,6 +402,9 @@ export class WeaponSystem {
         8,
       );
       forearm.name = 'viewmodel_forearm';
+      // The support side only needs a closed glove and cuff at the handguard.
+      // Even a short forearm becomes a bright diagonal tube at viewmodel FOV.
+      forearm.visible = !support;
       arm.add(forearm);
       const upperSleeve = segment(
         armorEnd, sleeveEnd,
@@ -387,7 +444,7 @@ export class WeaponSystem {
       rotation: new THREE.Euler(-0.08, 0.16, -0.08),
       // Compact lower-right exit: ev.io keeps the glove attached to the pistol
       // grip and lets a dark, thick sleeve leave frame without a long arm tube.
-      elbow: new THREE.Vector3(0.34, -0.48, 0.24),
+      elbow: new THREE.Vector3(0.25, -0.42, 0.02),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -406,6 +463,40 @@ export class WeaponSystem {
     support.visible = false;
     this.kickGroup.add(support);
     this.supportArmGroup = support;
+    this._applyViewmodelHandPose();
+  }
+
+  _applyViewmodelHandPose() {
+    if (!this.armGroup || !this.supportArmGroup) return;
+    const def = this.currentDef;
+    const authored = VIEWMODEL_HAND_POSES[def?.id] || {};
+    const pose = { ...DEFAULT_HAND_POSE, ...authored };
+    const portrait = this.camera.aspect < 1;
+
+    // gripArm's palm centre is offset (0,-.006,-.034) from its group origin.
+    // Convert the desired physical contact point back to that group origin.
+    const trigger = pose.trigger;
+    this.armGroup.position.set(
+      trigger[0],
+      trigger[1] + 0.006,
+      trigger[2] + 0.034,
+    );
+    this.armGroup.scale.set(
+      portrait ? 0.72 : 0.90,
+      portrait ? 1 : 0.90,
+      portrait ? 0.72 : 0.90,
+    );
+
+    const support = pose.support;
+    this.supportArmGroup.position.set(support[0], support[1] + 0.006, support[2] + 0.034);
+    this.supportArmGroup.scale.set(
+      portrait ? 0.60 : 0.72,
+      portrait ? 0.76 : 0.72,
+      portrait ? 0.60 : 0.72,
+    );
+    this.supportArmGroup.visible = pose.supportVisible !== false && def?.kind !== 'melee';
+    this.armGroup.userData.gripTarget = trigger.slice();
+    this.supportArmGroup.userData.gripTarget = support.slice();
   }
 
   /**
@@ -428,7 +519,12 @@ export class WeaponSystem {
   setArmAppearance({ plate, sleeve, glove, accent }) {
     this.armPlateMat.color.setHex(plate).multiplyScalar(0.34);
     this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.30);
-    this.gloveMat.color.setHex(glove).multiplyScalar(0.78);
+    this.gloveMat.color.setHex(glove).multiplyScalar(0.90);
+    // Near-black cosmetics need to remain legible against the map's charcoal
+    // floors. Preserve the hue but maintain enough value to read the grip.
+    const gloveHsl = {};
+    this.gloveMat.color.getHSL(gloveHsl);
+    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.16, gloveHsl.l));
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
     this.cuffMat.emissiveIntensity = 0.05;
@@ -544,10 +640,10 @@ export class WeaponSystem {
     }
     const cur = this.loadout[index];
     if (cur) this.models.get(cur.id).group.visible = true;
-    // The live reference presents one dominant trigger-side arm. Keeping the
-    // second full first-person limb made the view read as two detached tubes;
-    // the weapon model itself supplies the support-side visual mass.
-    if (this.supportArmGroup) this.supportArmGroup.visible = false;
+    // Seat the hands against this weapon's own grip and handguard. The support
+    // rig only renders its glove and cuff; its forearm and upper sleeve remain
+    // hidden, avoiding the old pair of full-screen arm tubes.
+    this._applyViewmodelHandPose();
     // Kick off the raise animation — the new gun eases up from lowered.
     this._raiseT = 0;
   }
@@ -1314,19 +1410,9 @@ export class WeaponSystem {
 
   update(dt, input, world, botManager, player) {
     this.fireTimer = advanceFireCooldown(this.fireTimer, dt);
-    // Keep the trigger glove framed on narrow phones without pulling it away
-    // from the pistol grip on desktop aspect ratios.
-    if (this.armGroup) {
-      const portrait = this.camera.aspect < 1;
-      const reloading = !!this.currentState?.isReloading;
-      const portraitReload = portrait && reloading;
-      this.armGroup.position.x = portraitReload ? -0.120 : (portrait ? 0.010 : 0.000);
-      this.armGroup.position.y = reloading
-        ? (portrait ? 0.160 : 0.050)
-        : (portrait ? 0.050 : -0.105);
-      this.armGroup.scale.set(portrait ? 0.72 : 0.90, portrait ? 1 : 0.90, portrait ? 0.72 : 0.90);
-      this.supportArmGroup?.scale.set(portrait ? 0.60 : 0.72, portrait ? 0.76 : 0.72, portrait ? 0.60 : 0.72);
-    }
+    // Re-evaluate after aspect/reload state changes so both palms remain fixed
+    // to the weapon rather than drifting independently during animation.
+    this._applyViewmodelHandPose();
 
     for (const [code, index] of this.keyMap) {
       if (input.consumeJustPressed(code)) this.switchTo(index);
@@ -1476,6 +1562,7 @@ export class WeaponSystem {
       // then snap it back to ready. The whole viewmodel moves as one rigid
       // object, so authored weapon geometry never needs weapon-specific bones.
       if (st.isReloading) {
+        const reloadFrameScale = viewmodelReloadScale(this.camera.aspect);
         const p = THREE.MathUtils.clamp(
           1 - st.reloadTimer / Math.max(0.01, def.reloadTime), 0, 1
         );
@@ -1486,14 +1573,14 @@ export class WeaponSystem {
         const seat = Math.sin(
           THREE.MathUtils.clamp((p - 0.36) / 0.30, 0, 1) * Math.PI
         );
-        this.kickGroup.position.x += hold * 0.075;
+        this.kickGroup.position.x += hold * 0.075 * reloadFrameScale;
         // The mount below already lowers for reload. Keep this local hand beat
         // compact so the magazine hand remains visible at 60-degree FOV.
-        this.kickGroup.position.y -= hold * 0.08 + seat * 0.015;
-        this.kickGroup.position.z += hold * 0.055;
-        this.kickGroup.rotation.x += hold * 0.30 + seat * 0.07;
-        this.kickGroup.rotation.y += hold * 0.16;
-        this.kickGroup.rotation.z -= hold * 0.52 + seat * 0.08;
+        this.kickGroup.position.y -= (hold * 0.08 + seat * 0.015) * reloadFrameScale;
+        this.kickGroup.position.z += hold * 0.055 * reloadFrameScale;
+        this.kickGroup.rotation.x += (hold * 0.30 + seat * 0.07) * reloadFrameScale;
+        this.kickGroup.rotation.y += hold * 0.16 * reloadFrameScale;
+        this.kickGroup.rotation.z -= (hold * 0.52 + seat * 0.08) * reloadFrameScale;
       }
     }
 
@@ -1532,6 +1619,9 @@ export class WeaponSystem {
       ? THREE.MathUtils.clamp(1 - st.reloadTimer / rTime, 0, 1) : 0;
     const rBell = reloadP > 0 ? Math.sin(Math.PI * reloadP) : 0;
     const rack  = reloadP > 0 ? Math.exp(-Math.pow((reloadP - 0.62) / 0.055, 2)) : 0;
+    const reloadFrameScale = viewmodelReloadScale(this.camera.aspect);
+    const framedBell = rBell * reloadFrameScale;
+    const framedRack = rack * reloadFrameScale;
 
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
@@ -1549,18 +1639,18 @@ export class WeaponSystem {
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const tgtX = baseX + sprintShiftX + adsShiftX
-      + (bobH + 0.05 * rBell) * aspectScale;
+      + (bobH + 0.05 * framedBell) * aspectScale;
     const tgtY = VIEWMODEL_Y + viewmodelFovLift(this.camera.fov) + sprintDropY + bobV
-      - 0.07 * rBell - 0.015 * rack - landPulse * 0.055;
+      - 0.07 * framedBell - 0.015 * framedRack - landPulse * 0.055;
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      this._sprintT * 0.22 + 0.50 * rBell + 0.14 * rack + landPulse * 0.12, 14, dt);
+      this._sprintT * 0.22 + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
-      this._sprintT * -0.55 + 0.42 * rBell, 14, dt);
+      this._sprintT * -0.55 + 0.42 * framedBell, 14, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);

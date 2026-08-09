@@ -213,7 +213,7 @@ function viewportArea(root) {
 function meshViewportArea(root) {
   let area = 0;
   root.traverse((object) => {
-    if (object.isMesh) area += viewportArea(object);
+    if (object.isMesh && object.visible) area += viewportArea(object);
   });
   return Math.min(1, area);
 }
@@ -336,9 +336,10 @@ for (const def of WEAPONS) {
   );
 }
 
-// The reference first-person silhouette has one dominant trigger-side hand.
-// Exercise that hand across every viewport, FOV and high-motion state; the
-// authored support limb remains hidden instead of forming a second long tube.
+// The reference first-person silhouette has one dominant trigger-side hand and
+// a compact support glove seated under a rifle's handguard. Exercise both
+// across every viewport, FOV and high-motion state; the support upper sleeve
+// remains hidden instead of forming a second long tube.
 activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
 for (const stateName of ['idle', 'sprint', 'reload']) {
@@ -357,7 +358,10 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
           reloadState.reloadTimer = system.currentDef.reloadTime * 0.5 + dt;
         }
       });
-      for (const [side, glove] of [['trigger', system.armGroup]]) {
+      for (const [side, glove] of [
+        ['trigger', system.armGroup],
+        ['support', system.supportArmGroup],
+      ]) {
         const grip = glove.getObjectByName('viewmodel_grip') || glove;
         const ratio = gloveRatio(grip);
         const label = `${stateName}/${viewport.label}/${fov}/${side}`;
@@ -366,7 +370,9 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // at least 34% remains on landscape and 15% on portrait. The lower
         // EV-style framing intentionally lets the sleeve continue through the
         // bottom edge while the closed grip itself stays readable.
-        const minimum = viewport.aspect < 1 ? 0.15 : 0.34;
+        const minimum = side === 'support'
+          ? (viewport.aspect < 1 ? 0.08 : 0.18)
+          : (viewport.aspect < 1 ? 0.15 : 0.34);
         assert(
           ratio >= minimum,
           `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible (${JSON.stringify(lastGloveBounds)})`,
@@ -374,7 +380,9 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // Sum of per-mesh projected boxes intentionally over-estimates the
         // curved/tapered cylinders; 36% keeps the real arm pixels compact while
         // allowing a sleeve to cross the frame edge during the sprint carry.
-        const maxArea = viewport.aspect < 1 ? 0.56 : 0.40;
+        const maxArea = side === 'support'
+          ? (viewport.aspect < 1 ? 0.30 : 0.18)
+          : (viewport.aspect < 1 ? 0.56 : 0.40);
         const armArea = meshViewportArea(glove);
         assert(
           armArea <= maxArea,
@@ -396,10 +404,13 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   reloadState.isReloading = false;
 }
 
+assert(system.supportArmGroup.visible, 'rifle support hand is not visible');
 assert(
-  system.supportArmGroup.visible === false,
-  'support hand must not grow a second full-screen arm',
+  system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === false,
+  'support hand grew a second full-screen upper arm',
 );
+activate(WEAPONS.find((def) => def.id === 'sidearm'));
+assert(!system.supportArmGroup.visible, 'one-handed sidearm renders a stray support hand');
 
 function advanceSeconds(seconds, fps, beforeFrame = null) {
   let remaining = seconds;
