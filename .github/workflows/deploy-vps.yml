@@ -70,7 +70,7 @@ jobs:
         run: |
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
-            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/dist' '$DEPLOY_PATH/server' '$DEPLOY_PATH/src/sim' '$DEPLOY_PATH/src/world' '$DEPLOY_PATH/src/entities'"
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/dist' '$DEPLOY_PATH/server' '$DEPLOY_PATH/src/sim' '$DEPLOY_PATH/src/world' '$DEPLOY_PATH/src/entities' '$DEPLOY_PATH/src/weapons'"
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/dist/"
@@ -86,6 +86,9 @@ jobs:
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             src/entities/BotCombat.js "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/entities/BotCombat.js"
+          /usr/bin/rsync -az \
+            -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
+            src/weapons/weaponDefs.js "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/weapons/weaponDefs.js"
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             package.json package-lock.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
