@@ -53,6 +53,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:gui'); return { ok: r.ok && /gui contract passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-POP', phase: 'match', name: 'Bots occupy player slots in every roster path',
     fn: () => { const r = run('npm run test:population'); return { ok: r.ok && /player population passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-SPEC', phase: 'camera', name: 'Spectator camera continuously roams the complete arena',
+    fn: () => { const r = run('npm run test:spectator'); return { ok: r.ok && /spectator camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-TPS', phase: 'camera', name: 'Third-person camera frames the complete player model',
     fn: () => { const r = run('npm run test:tps-camera'); return { ok: r.ok && /third-person camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',

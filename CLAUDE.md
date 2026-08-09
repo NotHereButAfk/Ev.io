@@ -424,6 +424,17 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   white while preserving later user colour choices. Population markup no
   longer exposes `8//8 PLAYERS PLAYERS` to accessibility readers.
 
+## Latest Codex handoff - authoritative bots and spectator tour (2026-08-08)
+- The production authoritative server maintains eight server-owned participants.
+  Humans replace bots when joining and vacated seats backfill on leave. Bots
+  move, aim, and fire through the same MoveSim, LOS, and hitscan path as socket
+  players, and welcome rosters populate the HUD before the first snapshot.
+- The menu spectator now builds a safe dolly lane at every authored spawn,
+  moves smoothly along each centripetal Catmull-Rom curve, then cuts to the next
+  arena area. This covers the map without crossing Rook's distant walls or its
+  enormous decorative fog geometry. `test:population` and `test:spectator`
+  gate both changes.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a

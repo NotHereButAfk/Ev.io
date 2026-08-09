@@ -204,9 +204,15 @@ export class Game {
       { p: new THREE.Vector3(-15,  7,  36), t: new THREE.Vector3(-38, 20, -14) },
       { p: new THREE.Vector3(  0, 25,  50), t: new THREE.Vector3( 15, 15, -10) },
     ];
+    this._camRoutes = [this._camWpts];
+    this._camRouteIndex = 0;
     this._camSeg     = 0;
     this._camSegTime = 0;
     this._CAM_SEG_DUR = 7.0; // seconds per transition
+    this._camTravelTime = 0;
+    this._camPos = new THREE.Vector3();
+    this._camLook = new THREE.Vector3();
+    this._rebuildSpectatorCurves();
 
     this.selectedSkin      = getSkin('spartan');
     this.selectedArmorType = loadArmorType();
@@ -344,28 +350,62 @@ export class Game {
   }
 
   _configureMapCamera(map) {
-    if (map.spectatorWaypoints?.length >= 2) {
-      this._camWpts = map.spectatorWaypoints;
-      this._camSeg = 0;
-      this._camSegTime = 0;
+    if (map.spectatorRoutes?.length) {
+      this._camRoutes = map.spectatorRoutes.filter((route) => route.length >= 4);
+      this._camRouteIndex = 0;
+      this._camWpts = this._camRoutes[0];
+      this._camTravelTime = 0;
+      this._rebuildSpectatorCurves();
+      this.menuCamera.far = 600;
+      this.menuCamera.updateProjectionMatrix();
       return;
     }
-    const { bounds } = map;
+    // Use the authored playable bounds. Imported maps also contain enormous
+    // decorative sky/fog meshes and off-map collision shells; including those
+    // would push the camera kilometres away from the actual arena.
+    const bounds = map.bounds;
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
-    const pad = Math.max(55, Math.min(size.x, size.z) * 0.23);
-    const height = Math.max(46, bounds.max.y + 12);
-    const target = new THREE.Vector3(center.x, 13, center.z);
+    const pad = Math.max(18, Math.min(size.x, size.z) * 0.08);
+    const height = Math.max(30, bounds.max.y + 18);
+    // Every control point must clear the tallest rendered mesh. Lowering this
+    // as a ratio of total height put the camera underneath tall map towers.
+    const lowHeight = Math.max(24, bounds.max.y + 10);
+    const tx = Math.max(12, size.x * 0.18);
+    const tz = Math.max(12, size.z * 0.18);
+    const targetY = THREE.MathUtils.clamp(12, bounds.min.y + 6, bounds.max.y - 5);
+    // Imported EV maps used to override this with three points packed into a
+    // two-metre lane. These perimeter points cover every side of the arena and
+    // stay above authored geometry, so the spectator really tours the map.
     this._camWpts = [
-      { p: new THREE.Vector3(center.x, height, bounds.max.z + pad), t: target.clone() },
-      { p: new THREE.Vector3(bounds.max.x + pad, height * 0.82, center.z), t: target.clone() },
-      { p: new THREE.Vector3(center.x, height, bounds.min.z - pad), t: target.clone() },
-      { p: new THREE.Vector3(bounds.min.x - pad, height * 0.86, center.z), t: target.clone() },
+      { p: new THREE.Vector3(center.x - tx, height, bounds.max.z + pad), t: new THREE.Vector3(center.x - tx, targetY, center.z + tz) },
+      { p: new THREE.Vector3(bounds.max.x + pad, lowHeight, center.z + tz), t: new THREE.Vector3(center.x + tx, targetY, center.z + tz) },
+      { p: new THREE.Vector3(bounds.max.x + pad, height, center.z - tz), t: new THREE.Vector3(center.x + tx, targetY, center.z - tz) },
+      { p: new THREE.Vector3(center.x + tx, lowHeight, bounds.min.z - pad), t: new THREE.Vector3(center.x + tx, targetY, center.z - tz) },
+      { p: new THREE.Vector3(center.x - tx, height, bounds.min.z - pad), t: new THREE.Vector3(center.x - tx, targetY, center.z - tz) },
+      { p: new THREE.Vector3(bounds.min.x - pad, lowHeight, center.z - tz), t: new THREE.Vector3(center.x - tx, targetY, center.z - tz) },
+      { p: new THREE.Vector3(bounds.min.x - pad, height, center.z + tz), t: new THREE.Vector3(center.x - tx, targetY, center.z + tz) },
+      { p: new THREE.Vector3(center.x, lowHeight, bounds.max.z + pad), t: new THREE.Vector3(center.x, targetY, center.z) },
     ];
+    this._camRoutes = [this._camWpts];
+    this._camRouteIndex = 0;
     this._camSeg = 0;
     this._camSegTime = 0;
+    this._camTravelTime = 0;
+    this._rebuildSpectatorCurves();
     this.menuCamera.far = Math.max(600, Math.max(size.x, size.z) * 4);
     this.menuCamera.updateProjectionMatrix();
+  }
+
+  _rebuildSpectatorCurves() {
+    const closed = this._camRoutes?.length === 1;
+    this._camPath = new THREE.CatmullRomCurve3(
+      this._camWpts.map((w) => w.p.clone()), closed, 'centripetal', 0.5,
+    );
+    this._camLookPath = new THREE.CatmullRomCurve3(
+      this._camWpts.map((w) => w.t.clone()), closed, 'centripetal', 0.5,
+    );
+    this._camCycleDuration = closed ? Math.max(54, this._camPath.getLength() / 6.5) : 7;
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -1724,20 +1764,22 @@ export class Game {
       this.botManager.update(dt, dummyPlayer, this.menuCamera, () => {}, this.world, false);
     }
 
-    // Cinematic spectator fly-through
-    this._camSegTime += dt;
-    if (this._camSegTime >= this._CAM_SEG_DUR) {
-      this._camSegTime -= this._CAM_SEG_DUR;
-      this._camSeg = (this._camSeg + 1) % this._camWpts.length;
+    // Continuous map-wide spectator fly-through. getPointAt is arc-length
+    // sampled, keeping travel speed stable even when waypoint spacing varies.
+    this._camTravelTime += dt;
+    if (this._camTravelTime >= this._camCycleDuration) {
+      this._camTravelTime %= this._camCycleDuration;
+      if (this._camRoutes.length > 1) {
+        this._camRouteIndex = (this._camRouteIndex + 1) % this._camRoutes.length;
+        this._camWpts = this._camRoutes[this._camRouteIndex];
+        this._rebuildSpectatorCurves();
+      }
     }
-    const from = this._camWpts[this._camSeg];
-    const to   = this._camWpts[(this._camSeg + 1) % this._camWpts.length];
-    const t    = this._camSegTime / this._CAM_SEG_DUR;
-    const e    = t * t * (3 - 2 * t); // smoothstep
-
-    this.menuCamera.position.lerpVectors(from.p, to.p, e);
-    const lookTarget = new THREE.Vector3().lerpVectors(from.t, to.t, e);
-    this.menuCamera.lookAt(lookTarget);
+    const u = this._camTravelTime / this._camCycleDuration;
+    this._camPath.getPointAt(u, this._camPos);
+    this._camLookPath.getPointAt(u, this._camLook);
+    this.menuCamera.position.copy(this._camPos);
+    this.menuCamera.lookAt(this._camLook);
   }
 
   _loop() {

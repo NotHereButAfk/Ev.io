@@ -94,7 +94,7 @@ function rayVsBoxes(world, ox, oy, oz, dx, dy, dz, maxT) {
 let _pid = 1;
 
 export class AuthRoom {
-  constructor(arena = IMPORTED_ARENAS) {
+  constructor(arena = IMPORTED_ARENAS, { targetPopulation = 0 } = {}) {
     this.arenas = Array.isArray(arena) ? arena : [arena];
     if (!this.arenas.length) throw new Error('AuthRoom requires at least one imported arena');
     this._arenaIndex = 0;
@@ -106,6 +106,10 @@ export class AuthRoom {
     this.smokes = [];           // active smoke volumes {x,y,z,r,until}
     this.matchStart = Date.now();
     this.matchDurationMs = 8 * 60 * 1000;
+    const requestedPopulation = Number.isFinite(targetPopulation) ? targetPopulation | 0 : 0;
+    this.targetPopulation = clamp(requestedPopulation, 0, 8);
+    this._botSerial = 0;
+    this._fillBotSlots();
   }
 
   _setSimArena(arena) {
@@ -172,12 +176,28 @@ export class AuthRoom {
   }
 
   // Add a HUMAN-controlled player (a real socket).
-  add(send, name) { return this._add(send, name, false); }
+  add(send, name) {
+    // A real player always gets a seat. Remove one server bot first when the
+    // target-sized room is full, then backfill only after that human leaves.
+    if (this.targetPopulation && this.players.size >= this.targetPopulation) {
+      const bot = Array.from(this.players.values()).find((p) => p.isBot);
+      if (bot) this._remove(bot.id, false);
+      else { send({ t: 'kick', reason: 'match full' }); return null; }
+    }
+    return this._add(send, name, false);
+  }
 
   // Add a clearly-labelled BOT for gameplay/load/stability testing. isBot
   // rides the roster + every snapshot so no client can ever be shown a bot as
   // a human (Phase 11: no fake-human surfaces).
   addBot(name) { return this._add(() => {}, name, true); }
+
+  _fillBotSlots() {
+    while (this.players.size < this.targetPopulation) {
+      this._botSerial++;
+      this.addBot(`BOT ${String(this._botSerial).padStart(2, '0')}`);
+    }
+  }
 
   _add(send, name, isBot) {
     const id = _pid++;
@@ -191,6 +211,7 @@ export class AuthRoom {
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
       wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
+      _botReloadUntil: 0,
       history: [],               // [{tick, x,y,z}]
       lastFireSeq: 0, lastFireRequestTick: -Infinity,
       abilities: { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
@@ -209,8 +230,68 @@ export class AuthRoom {
     return id;
   }
 
-  remove(id) {
+  remove(id) { this._remove(id, true); }
+
+  _remove(id, refill) {
     if (this.players.delete(id)) this.events.push({ e: 'leave', id });
+    if (refill) this._fillBotSlots();
+  }
+
+  _driveBot(p) {
+    let target = null;
+    let bestD2 = Infinity;
+    for (const other of this.players.values()) {
+      if (other === p || !other.alive) continue;
+      const dx = other.state.px - p.state.px;
+      const dz = other.state.pz - p.state.pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD2) { bestD2 = d2; target = other; }
+    }
+
+    const seq = ++p.lastInputSeq;
+    if (!target) return { seq, inp: makeInput({ yaw: p._lastYaw ?? 0 }), wid: p.wid, aiming: false };
+
+    const dx = target.state.px - p.state.px;
+    const dz = target.state.pz - p.state.pz;
+    const distance = Math.sqrt(bestD2);
+    const yaw = Math.atan2(-dx, -dz);
+    const pitch = Math.atan2(
+      (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y),
+      Math.max(0.001, distance),
+    );
+    const phase = ((this.tick + p.id * 17) % 160) / 160;
+    const strafe = phase < 0.5 ? 1 : -1;
+    const inp = makeInput({
+      mx: distance < 32 ? strafe : 0,
+      mz: distance > 13 ? 1 : distance < 7 ? -1 : 0,
+      yaw, pitch,
+      sprint: distance > 22,
+      jumpJust: (this.tick + p.id * 29) % 173 === 0,
+    });
+
+    if (p.mag <= 0) {
+      if (!p._botReloadUntil) p._botReloadUntil = this.tick + Math.ceil(WEAPONS.m4.reload * TICK_HZ);
+      if (this.tick >= p._botReloadUntil) {
+        p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;
+        p._botReloadUntil = 0;
+      }
+    }
+
+    // Bots use the exact same authoritative fire request and hitscan path as a
+    // socket player. Geometry LOS is checked before they pull the trigger.
+    if (distance < 105 && p.fireCooldown <= 0 && p.mag > 0) {
+      const cp = Math.cos(pitch);
+      const rayDistance = rayVsBoxes(
+        this.simWorld,
+        p.state.px, p.state.py + HEAD_Y, p.state.pz,
+        -Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp,
+        distance,
+      );
+      if (rayDistance >= distance - 0.6) {
+        this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw, pitch });
+      }
+    }
+    return { seq, inp, wid: p.wid, aiming: distance < 55 };
   }
 
   _spawn(index = _pid) {
@@ -412,6 +493,7 @@ export class AuthRoom {
           p._animVX = p._animVZ = 0;
           p._lastAim = false;
           p._firingTicks = 0;
+          p._botReloadUntil = 0;
           p.gunBloom = 0;
           p.blindUntil = 0;
           p.abilities = { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
@@ -423,7 +505,7 @@ export class AuthRoom {
       }
 
       // consume the next queued input (or coast with zero-move if starved)
-      let cmd = p.queue.shift();
+      let cmd = p.isBot ? this._driveBot(p) : p.queue.shift();
       if (!cmd) {
         cmd = { seq: p.lastInputSeq, inp: makeInput({ yaw: p._lastYaw ?? 0 }) };
       }

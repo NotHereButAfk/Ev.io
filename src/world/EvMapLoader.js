@@ -590,6 +590,7 @@ export function buildEvMapScene(parsed, textures = []) {
     bounds.max.y = Math.max(60, bounds.max.y + 30);
   }
   const spectatorWaypoints = [];
+  const spectatorRoutes = [];
   if (spawnPoints.length) {
     // Keep the menu camera in one authored-safe lane. Sweeping between distant
     // spawns would interpolate straight through Rook's walls and overhangs.
@@ -605,6 +606,22 @@ export function buildEvMapScene(parsed, textures = []) {
       { p: eye.clone().addScaledVector(right, 1.7), t: target.clone() },
       { p: eye.clone().addScaledVector(right, -1.7), t: target.clone() },
     );
+    // Every spawn is an authored-safe viewpoint. Short local dolly lanes let
+    // the spectator tour the map without interpolating through walls between
+    // distant spawns.
+    for (const spawn of spawnPoints) {
+      const spawnYaw = spawn.spawnYaw ?? Math.PI;
+      const laneForward = new THREE.Vector3(-Math.sin(spawnYaw), 0, -Math.cos(spawnYaw));
+      const laneRight = new THREE.Vector3(-laneForward.z, 0, laneForward.x);
+      const laneEye = spawn.clone().add(new THREE.Vector3(0, 1.85, 0));
+      const laneTarget = spawn.clone().addScaledVector(laneForward, 18).add(new THREE.Vector3(0, 2.8, 0));
+      spectatorRoutes.push([
+        { p: laneEye.clone().addScaledVector(laneRight, -1.1), t: laneTarget.clone() },
+        { p: laneEye.clone().addScaledVector(laneForward, 1.5), t: laneTarget.clone().addScaledVector(laneRight, 0.7) },
+        { p: laneEye.clone().addScaledVector(laneForward, 3.2), t: laneTarget.clone() },
+        { p: laneEye.clone().addScaledVector(laneForward, 4.6).addScaledVector(laneRight, 1.1), t: laneTarget.clone().addScaledVector(laneRight, -0.7) },
+      ]);
+    }
   }
   return {
     root,
@@ -615,6 +632,7 @@ export function buildEvMapScene(parsed, textures = []) {
     bounds,
     collisionBounds,
     spectatorWaypoints,
+    spectatorRoutes,
     parsed,
   };
 }

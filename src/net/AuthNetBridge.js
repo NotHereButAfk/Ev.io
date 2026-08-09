@@ -78,7 +78,7 @@ export class AuthNetBridge {
       game.botManager?.clear?.();
       game.serverSim?.stop?.();
       game._netDriven = true;
-      game.hud?.setServerPop?.(1, 8);
+      game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
       game._onAuthoritativeMap?.(arena?.id, match, true);
     };
     this.client.onMapChange = (mapId, match) => {

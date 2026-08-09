@@ -61,6 +61,10 @@ export class AuthClient {
     switch (m.t) {
       case 'welcome':
         this.you = m.you;
+        this.roster = (m.players || []).map((pl) => ({
+          id: pl.id, name: pl.name, isBot: !!pl.isBot,
+          kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
+        }));
         this.arena = m.arena;
         this.mapId = m.arena?.id || null;
         this.matchStart = m.matchStart ?? null;

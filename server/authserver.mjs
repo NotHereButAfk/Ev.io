@@ -107,13 +107,13 @@ function sanitizeName(n) {
   return c || 'Recruit';
 }
 
-export function makeAuthServer({ server, port, staticRoot } = {}) {
+export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 } = {}) {
   const handler = staticRoot
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
   const http = server || createServer(handler);
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MSG_BYTES });
-  const room = new AuthRoom();
+  const room = new AuthRoom(undefined, { targetPopulation });
 
   wss.on('connection', (ws, req) => {
     if (!originOk(req.headers.origin)) { ws.close(1008, 'origin'); return; }
@@ -149,6 +149,7 @@ export function makeAuthServer({ server, port, staticRoot } = {}) {
         case 'hello':
           if (conn.id != null) return;                   // duplicate session on live socket
           conn.id = room.add(send, sanitizeName(msg.name));
+          if (conn.id == null) ws.close(1013, 'match full');
           break;
         case 'input':
           if (conn.id != null) room.onInput(conn.id, msg);
@@ -201,5 +202,6 @@ export function makeAuthServer({ server, port, staticRoot } = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const here = fileURLToPath(new URL('.', import.meta.url));
   const staticRoot = process.env.STATIC_ROOT || resolve(here, '../dist');
-  makeAuthServer({ port: process.env.PORT || 8788, staticRoot });
+  const targetPopulation = Number.parseInt(process.env.MATCH_PLAYERS || '8', 10);
+  makeAuthServer({ port: process.env.PORT || 8788, staticRoot, targetPopulation });
 }
