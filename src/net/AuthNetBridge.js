@@ -26,6 +26,7 @@ import {
   scheduleNextShot,
   wantsTriggerShot,
 } from '../weapons/FireControl.js';
+import { countAuthoritativePlayers } from '../core/Population.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -214,7 +215,10 @@ export class AuthNetBridge {
 
     // ── render remote players ──
     this._syncRemotes(dt);
-    this.game.hud?.setServerPop?.(this.client.remotes.size + 1, 8);
+    // Count the authoritative roster, not only currently interpolated remote
+    // meshes. Bots are full match participants and remain counted while dead,
+    // respawning, or waiting for their first render buffer.
+    this.game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
     this._drainEvents();
   }
 

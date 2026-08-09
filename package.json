@@ -28,6 +28,7 @@
     "test:tps-camera": "node tools/third_person_camera_check.mjs",
     "test:account": "node tools/user_account_check.mjs",
     "test:bots": "node tools/bot_combat_check.mjs",
+    "test:population": "node tools/population_check.mjs",
     "test:skins": "node tools/character_skin_check.mjs",
     "test:evmap": "node tools/evmap_check.mjs"
   },

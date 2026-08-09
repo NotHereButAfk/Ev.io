@@ -6,6 +6,8 @@
 // a bot is removed to make room; when one leaves, a bot fills the empty slot.
 // Total combatants therefore stay pinned at MAX_PLAYERS at all times.
 
+import { countLocalMatchPlayers } from './Population.js';
+
 const MIN_JOIN_GAP = 9;    // seconds between roster changes (min)
 const MAX_JOIN_GAP = 26;   // seconds between roster changes (max)
 
@@ -52,9 +54,10 @@ export class ServerSim {
     return this.botManager.bots.filter((b) => b.isHumanSlot).length;
   }
 
-  // Players online = you + simulated remote players.
+  // Every occupied combat slot is a player. Bots stay honestly labelled as
+  // bots elsewhere, but still count toward the match population.
   get playersOnline() {
-    return 1 + this._humanSlots;
+    return countLocalMatchPlayers(this.botManager.bots);
   }
 
   update(dt) {

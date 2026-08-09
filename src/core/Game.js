@@ -53,6 +53,7 @@ import { preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
+import { countLocalMatchPlayers } from './Population.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -882,7 +883,12 @@ export class Game {
       bot._netKills = p.kills;
       bot._netScore = p.score;
     }
-    this.hud.setServerPop(1 + others.length, MAX_PLAYERS);
+    // Real connections replace local AI slots; they do not make the remaining
+    // bots stop being players. The occupied eight-player match stays full.
+    this.hud.setServerPop(
+      Math.min(MAX_PLAYERS, countLocalMatchPlayers(this.botManager.bots)),
+      MAX_PLAYERS,
+    );
   }
 
   // Format seconds as HH:MM:SS (survival best-time display).

@@ -401,6 +401,15 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   only; the release certificate still correctly leaves G-legal for a human
   security/privacy/legal review.
 
+## Latest Codex handoff — bot population contract (2026-08-08)
+- Bots now occupy player slots everywhere population is reported. Offline and
+  legacy-relay deathmatches display the local player plus every spawned bot;
+  authoritative matches use the full snapshot roster, including `isBot`
+  entries, instead of counting only remote meshes with interpolation buffers.
+- Bots remain honestly labelled as bots; this only fixes participation and
+  population semantics. `npm run test:population` gates local 8/8 and mixed
+  authoritative human/bot rosters, and the gate is part of `npm run certify`.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a
