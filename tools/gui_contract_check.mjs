@@ -51,6 +51,12 @@ requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
   requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
 }
+for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner', 'ml-progress']) {
+  requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
+}
+requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
+  'arena loading left information rail');
+requireMatch(css, /@keyframes ml-spin/, 'arena loading activity indicator');
 requireMatch(game, /Promise\.allSettled\(\[Promise\.resolve\(this\.world\.ready\)/, 'loading waits for map');
 requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
 requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');

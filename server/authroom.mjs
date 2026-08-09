@@ -4,14 +4,14 @@
 // client agree tick-for-tick. Owns every gameplay truth: position (validated
 // against the sim, never trusted from the client), health/shield, damage,
 // death, respawn, match timer, score, and the kill feed. Hitscan is
-// lag-compensated by rewinding target positions to the shooter's acked tick.
+// lag-compensated by rewinding target positions to the snapshot the shooter saw.
 //
 // Wire protocol (JSON messages):
 //   client → server:
 //     {t:'hello', name}                         join
 //     {t:'input', seq, tick, mx,mz,yaw,pitch,   one command per client tick
 //                 sprint,crouch,jump,crouchDown,tele}
-//     {t:'fire', seq, wid, yaw, pitch}          fire request (server hitscans)
+//     {t:'fire', seq, wid, yaw, pitch, viewTick} fire request (server hitscans)
 //     {t:'reload', wid}                         reload request (server owns ammo)
 //     {t:'ability', seq, kind, yaw, pitch}      throwable request
 //     {t:'pong', id}                            heartbeat reply
@@ -251,7 +251,7 @@ export class AuthRoom {
       _swingStart: 0, _swingUntil: 0,
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       _botReloadUntil: 0,
-      history: [],               // [{tick, x,y,z}]
+      history: [],               // [{tick, x,y,z,eye,crouch,slide}]
       lastFireSeq: 0, lastFireRequestTick: -Infinity,
       abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                    impulse: ABILITIES.impulse.charges },
@@ -395,9 +395,12 @@ export class AuthRoom {
     // Hold a "firing" flag for ~0.4s so other clients can shoulder this
     // player's rifle and show the recoil, not just hear about the hit.
     p._firingTicks = 8;
+    const oldestTick = Math.max(0, this.tick - HISTORY_TICKS + 1);
+    const proposedViewTick = Number.isFinite(msg.viewTick) ? Math.trunc(msg.viewTick) : this.tick;
     p.fireReq = { wid: requestedWid,
                   yaw: Number.isFinite(msg.yaw) ? msg.yaw : 0,
-                  pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
+                  pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0,
+                  viewTick: Math.max(oldestTick, Math.min(this.tick, proposedViewTick)) };
   }
 
   onReload(id, msg) {
@@ -451,9 +454,11 @@ export class AuthRoom {
                      pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
   }
 
-  _hitscan(shooter, w, yaw, pitch, aiming = false) {
-    // Rewind targets to the shooter's acked tick (lag compensation).
-    const rewind = shooter.ackTick;
+  _hitscan(shooter, w, yaw, pitch, aiming = false, rewindTick = this.tick) {
+    // Rewind targets to the authoritative snapshot the shooter last saw.
+    // `ackTick` is deliberately not used here: it acknowledges input sequence
+    // numbers and has a different clock from world snapshots.
+    const rewind = Math.max(0, Math.min(this.tick, Math.trunc(rewindTick)));
     const ox = shooter.state.px, oy = shooter.state.py + HEAD_Y, oz = shooter.state.pz;
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
     const dx = -Math.sin(yaw) * cp, dy = sp, dz = -Math.cos(yaw) * cp;
@@ -464,15 +469,16 @@ export class AuthRoom {
       const spread = baseSpread * (aiming ? (w.zoomSpreadMod ?? 0.45) : 1);
       const a = (this._rand(shooter.id * 131 + this.tick * 7 + pellet) - 0.5) * spread;
       const b = (this._rand(shooter.id * 977 + this.tick * 13 + pellet) - 0.5) * spread;
-      const rx = dx + a, ry = dy + b, rz = dz;
+      const spreadLength = Math.max(1e-6, Math.hypot(dx + a, dy + b, dz));
+      const rx = (dx + a) / spreadLength, ry = (dy + b) / spreadLength, rz = dz / spreadLength;
       let best = null, bestT = w.range;
       for (const t of this.players.values()) {
         if (t === shooter || !t.alive) continue;
         const pos = this._rewound(t, rewind);
-        const headY = Math.max(0.8, (t.state.eye || 1.7) - 0.15);
+        const headY = Math.max(0.8, (pos.eye || 1.7) - 0.15);
         const hit = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + headY, pos.z, HEAD_R, bestT);
         if (hit && hit.t < bestT) { best = { t, head: true, t2: hit.t }; bestT = hit.t; continue; }
-        const lowered = !!(t.state.crouch || t.state.slide);
+        const lowered = !!(pos.crouch || pos.slide);
         const bodyY = lowered ? 0.58 : 0.9;
         const bodyR = lowered ? 0.42 : BODY_R;
         const body = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + bodyY, pos.z, bodyR, bestT);
@@ -707,7 +713,7 @@ export class AuthRoom {
         p._swingUntil = this.tick + Math.max(1, Math.ceil(w.rate * TICK_HZ));
       }
       p.mag = ammo.mag;
-      this._hitscan(p, w, req.yaw, req.pitch, p._lastAim);
+      this._hitscan(p, w, req.yaw, req.pitch, p._lastAim, req.viewTick);
       if (w.kind !== 'melee' && ammo.mag <= 0) this._startReload(p, req.wid);
       if (w.spreadMax != null) {
         p.gunBloom = Math.min(w.spreadMax, (p.gunBloom || 0) + (w.bloomShot || 0));
@@ -786,7 +792,10 @@ export class AuthRoom {
   }
 
   _record(p) {
-    p.history.push({ tick: this.tick, x: p.state.px, y: p.state.py, z: p.state.pz });
+    p.history.push({
+      tick: this.tick, x: p.state.px, y: p.state.py, z: p.state.pz,
+      eye: p.state.eye, crouch: !!p.state.crouch, slide: !!p.state.slide,
+    });
     if (p.history.length > HISTORY_TICKS) p.history.shift();
   }
   _rewound(p, tick) {

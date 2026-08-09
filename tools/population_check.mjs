@@ -41,6 +41,13 @@ assert.equal(welcome.players.filter((p) => p.isBot).length, 3);
 const client = new AuthClient('unused');
 client._recv(JSON.stringify(welcome));
 assert.equal(client.roster.length, 4, 'the client must expose welcome population before the first snapshot');
+let firePayload = null;
+client.connected = true;
+client.lastServerTick = 77;
+client.ws = { send: (payload) => { firePayload = JSON.parse(payload); } };
+client.sendFire('m4', 0.5, -0.1);
+assert.equal(firePayload.viewTick, 77,
+  'fire requests must identify the authoritative snapshot the shooter saw');
 
 const before = [...room.players.values()].filter((p) => p.isBot)
   .map((p) => [p.id, p.state.px, p.state.pz]);

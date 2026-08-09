@@ -811,9 +811,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     hand.getWorldScale(_ws);
     const inv = 1 / Math.max(1e-6, _ws.x);
     // Grip pose relative to the palm (world-unit offsets, tuned on the Vanguard rig).
-    weaponGroup.position.set(0.02, 0.06, 0.02).multiplyScalar(inv);
-    weaponGroup.rotation.set(Math.PI * 0.5, 0, Math.PI * 0.5);
-    weaponGroup.scale.setScalar(1.15 * inv);
+    const isKnife = weaponGroup.userData.weaponId === 'knife';
+    weaponGroup.position
+      .set(isKnife ? 0.006 : 0.02, isKnife ? 0.018 : 0.06, isKnife ? -0.012 : 0.02)
+      .multiplyScalar(inv);
+    weaponGroup.rotation.set(Math.PI * 0.5, isKnife ? -0.12 : 0, Math.PI * 0.5);
+    weaponGroup.scale.setScalar((isKnife ? 1.05 : 1.15) * inv);
     hand.add(weaponGroup);
     _heldWeapon = weaponGroup;
   };

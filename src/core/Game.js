@@ -219,6 +219,8 @@ export class Game {
     this._camTravelTime = 0;
     this._camPos = new THREE.Vector3();
     this._camLook = new THREE.Vector3();
+    this._camPreviousPos = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
+    this._camStallTime = 0;
     this._rebuildSpectatorCurves();
 
     this.selectedSkin      = getSkin('spartan');
@@ -338,7 +340,12 @@ export class Game {
 
   _configureMapCamera(map) {
     if (map.spectatorRoutes?.length) {
-      this._camRoutes = map.spectatorRoutes.filter((route) => route.length >= 4);
+      this._camRoutes = map.spectatorRoutes
+        .map((route) => route.filter((waypoint, index) => (
+          index === 0 || waypoint.p.distanceToSquared(route[index - 1].p) > 0.25
+        )))
+        .filter((route) => route.length >= 4);
+      if (!this._camRoutes.length) return this._configureMapCamera({ ...map, spectatorRoutes: null });
       this._camRouteIndex = 0;
       this._camWpts = this._camRoutes[0];
       this._camTravelTime = 0;
@@ -392,7 +399,11 @@ export class Game {
     this._camLookPath = new THREE.CatmullRomCurve3(
       this._camWpts.map((w) => w.t.clone()), closed, 'centripetal', 0.5,
     );
-    this._camCycleDuration = closed ? Math.max(54, this._camPath.getLength() / 6.5) : 7;
+    const pathLength = this._camPath.getLength();
+    this._camCycleDuration = closed
+      ? THREE.MathUtils.clamp(pathLength / 14, 12, 28)
+      : THREE.MathUtils.clamp(pathLength / 12, 5.5, 11);
+    this._camStallTime = 0;
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -1091,6 +1102,8 @@ export class Game {
     if (!el) return;
     const name = el.querySelector('.ml-name');
     if (name) name.textContent = 'JOINING MATCH';
+    const building = document.getElementById('ml-building');
+    if (building) building.textContent = 'Connecting to arena...';
     const region = document.getElementById('ml-region');
     if (region) region.textContent = 'kryx.live';
     const mode = document.getElementById('ml-mode');
@@ -1115,6 +1128,8 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const map = getImportedMap(mapId);
+    const building = document.getElementById('ml-building');
+    if (building) building.textContent = 'Building map...';
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
@@ -1913,6 +1928,15 @@ export class Game {
     const u = this._camTravelTime / this._camCycleDuration;
     this._camPath.getPointAt(u, this._camPos);
     this._camLookPath.getPointAt(u, this._camLook);
+    const movedSq = this._camPos.distanceToSquared(this._camPreviousPos);
+    this._camStallTime = movedSq < 0.0004 ? this._camStallTime + dt : 0;
+    if (this._camStallTime > 0.45) {
+      this._camTravelTime = (this._camTravelTime + this._camCycleDuration * 0.06) % this._camCycleDuration;
+      this._camStallTime = 0;
+      this._camPath.getPointAt(this._camTravelTime / this._camCycleDuration, this._camPos);
+      this._camLookPath.getPointAt(this._camTravelTime / this._camCycleDuration, this._camLook);
+    }
+    this._camPreviousPos.copy(this._camPos);
     this.menuCamera.position.copy(this._camPos);
     this.menuCamera.lookAt(this._camLook);
   }

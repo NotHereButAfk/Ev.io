@@ -2440,6 +2440,8 @@ export function buildWeaponModel(weaponDef, opts = {}) {
   // Fall back to procedural
   const builder = BUILDERS[weaponDef.id] ?? buildEnergyWeapon;
   const { group, muzzle } = builder(weaponDef.color, weaponDef);
+  group.userData.weaponId = weaponDef.id;
+  group.userData.weaponKind = weaponDef.kind;
   group.traverse((obj) => {
     if (obj.isMesh) obj.castShadow = true;
   });

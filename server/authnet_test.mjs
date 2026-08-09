@@ -284,6 +284,36 @@ for (let i = 0; i < 200; i++) duelRoom.update();
 ok('bots: autonomous aim and fire can finish a human kill', duelHuman.deaths >= 1,
    `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
 
+// Moving-target lag compensation must use the snapshot clock, not the input
+// sequence clock. At tick 40 the target has crossed three metres sideways, but
+// the shooter is aiming at the position shown in snapshot tick 32.
+const rewindRoom = new AuthRoom(duelArena);
+const rewindShooterId = rewindRoom.add(() => {}, 'Rewind Shooter');
+const rewindTargetId = rewindRoom.add(() => {}, 'Moving Target');
+const rewindShooter = rewindRoom.players.get(rewindShooterId);
+const rewindTarget = rewindRoom.players.get(rewindTargetId);
+rewindRoom.tick = 40;
+Object.assign(rewindShooter.state, { px: 0, py: 0, pz: 0 });
+Object.assign(rewindTarget.state, { px: 3, py: 0, pz: -10, eye: 1.7, crouch: 0, slide: 0 });
+rewindTarget.invulnerableUntil = 0;
+rewindTarget.history = [
+  { tick: 32, x: 0, y: 0, z: -10, eye: 1.7, crouch: false, slide: false },
+  { tick: 40, x: 3, y: 0, z: -10, eye: 1.7, crouch: false, slide: false },
+];
+const rewindProbeWeapon = { pellets: 1, spread: 0, range: 100, dmg: 20, hs: 1 };
+rewindRoom._hitscan(rewindShooter, rewindProbeWeapon, 0, 0, true, 40);
+const currentTickHealth = rewindTarget.health;
+rewindRoom._hitscan(rewindShooter, rewindProbeWeapon, 0, 0, true, 32);
+ok('hitscan: moving target is hit at the snapshot position the shooter saw',
+   currentTickHealth === 100 && rewindTarget.health === 80,
+   `health ${currentTickHealth}→${rewindTarget.health}`);
+rewindRoom.onFire(rewindShooterId, { seq: 1, wid: 'm4', yaw: 0, pitch: 0, viewTick: -99999 });
+const clampedOldTick = rewindShooter.fireReq?.viewTick;
+rewindRoom.onFire(rewindShooterId, { seq: 2, wid: 'm4', yaw: 0, pitch: 0, viewTick: 99999 });
+ok('hitscan: forged rewind ticks are clamped to the one-second history window',
+   clampedOldTick === 21 && rewindShooter.fireReq?.viewTick === 40,
+   `clamped=${clampedOldTick}..${rewindShooter.fireReq?.viewTick}`);
+
 const fragRoom = new AuthRoom(duelArena);
 const throwerId = fragRoom.add(() => {}, 'Thrower');
 const fragTargetId = fragRoom.add(() => {}, 'Frag Target');

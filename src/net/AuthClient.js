@@ -61,6 +61,10 @@ export class AuthClient {
     this.connected = false;
     this.seq = 0;
     this.fireSeq = 0;
+    // Last authoritative world tick actually rendered by this client. Fire
+    // requests carry it so the server rewinds moving targets to what the
+    // shooter saw, rather than confusing an input sequence with a world tick.
+    this.lastServerTick = 0;
     this.pending = [];                      // unacked {seq, inp}
     this.sim = null;                        // predicted local state
     this.sprinting = false;                 // exact predicted MoveSim presentation
@@ -133,6 +137,7 @@ export class AuthClient {
 
   _reconcile(snap) {
     if (!this.sim) return;
+    if (Number.isFinite(snap.tick)) this.lastServerTick = snap.tick;
     const previousMapId = this.mapId;
     this.mapId = snap.mapId || this.mapId;
     this.matchStart = snap.matchStart ?? this.matchStart;
@@ -267,7 +272,10 @@ export class AuthClient {
   sendFire(wid, yaw, pitch) {
     if (!this.connected) return;
     this.fireSeq++;
-    this.ws.send(JSON.stringify({ t: 'fire', seq: this.fireSeq, wid, yaw, pitch }));
+    this.ws.send(JSON.stringify({
+      t: 'fire', seq: this.fireSeq, wid, yaw, pitch,
+      viewTick: this.lastServerTick,
+    }));
   }
 
   sendReload(wid) {

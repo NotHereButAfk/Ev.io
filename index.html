@@ -563,13 +563,17 @@
 
     <!-- ===================== MAP LOADING SCREEN (ev.io style) ===================== -->
     <div id="map-loading" class="hidden">
+      <div class="ml-building" id="ml-building">Building map...</div>
       <div class="ml-panel">
+        <div class="ml-brand">KYX // ARENA LINK</div>
         <div class="ml-name">DAYTIME<br/>ROOK</div>
         <div class="ml-region" id="ml-region">Rook Sector</div>
         <div class="ml-mode" id="ml-mode">Deathmatch</div>
         <div class="ml-players" id="ml-players">8 players</div>
         <div class="ml-tip" id="ml-tip">TIP: press Q to blink-teleport forward</div>
       </div>
+      <div class="ml-progress" aria-hidden="true"><span></span></div>
+      <div class="ml-spinner" aria-label="Loading arena"></div>
     </div>
 
     <!-- ===================== PAUSE MENU ===================== -->

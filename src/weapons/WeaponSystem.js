@@ -93,8 +93,8 @@ const VIEWMODEL_HAND_POSES = {
   fuelrod:       { trigger: [0.012, -0.095, 0.110], support: [-0.012, 0.015, -0.235] },
   concussion:    { trigger: [0.012, -0.090, 0.120], support: [-0.012, 0.018, -0.215] },
   energyshotgun: { trigger: [0.012, -0.092, 0.175], support: [-0.012, 0.018, -0.245] },
-  sword:         { trigger: [0.010, -0.105, 0.105], supportVisible: false },
-  knife:         { trigger: [0.010, -0.105, 0.105], supportVisible: false },
+  sword:         { trigger: [0.000, -0.020, 0.160], supportVisible: false },
+  knife:         { trigger: [0.000, -0.020, 0.120], supportVisible: false },
   ghammer:       { trigger: [0.010, -0.120, 0.180], support: [-0.010, -0.015, -0.035] },
 };
 
@@ -1520,7 +1520,16 @@ export class WeaponSystem {
     if (def.kind === 'melee' && this.swingPhase < 1) {
       this.swingPhase = Math.min(1, this.swingPhase + dt / def.fireRate);
       const ph = this.swingPhase;
-      if (ph < 0.22) {
+      if (def.id === 'knife') {
+        const strike = ph < 0.34 ? ph / 0.34 : 1 - (ph - 0.34) / 0.66;
+        const e = THREE.MathUtils.smoothstep(THREE.MathUtils.clamp(strike, 0, 1), 0, 1);
+        this.kickGroup.rotation.set(-0.10 + e * 0.28, -0.28 + e * 0.62, 0.10 - e * 0.42);
+        this.kickGroup.position.set(
+          this.kickPos.x - e * 0.035,
+          this.kickPos.y + e * 0.025,
+          this.kickPos.z - e * 0.20,
+        );
+      } else if (ph < 0.22) {
         // windup: raise blade up and back
         const w = ph / 0.22;
         this.kickGroup.rotation.y = -0.7 - w * 0.5;
@@ -1545,7 +1554,8 @@ export class WeaponSystem {
         this.kickGroup.position.z = -0.18 + e * 0.18;
       }
     } else if (def.kind === 'melee') {
-      this.kickGroup.rotation.y = -0.7;
+      if (def.id === 'knife') this.kickGroup.rotation.set(-0.10, -0.28, 0.10);
+      else this.kickGroup.rotation.y = -0.7;
     }
 
     // idle breathing / weapon settle — fades out during sprint. Its own smooth

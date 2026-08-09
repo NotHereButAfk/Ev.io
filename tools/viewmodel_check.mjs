@@ -513,6 +513,12 @@ assert(Math.abs(system.kickGroup.rotation.z) > 0.1, 'reload did not exercise gun
 system.switchTo(1);
 tick(1);
 assert(Math.abs(system.kickGroup.rotation.z) < 1e-12, 'gun reload roll leaked into melee carry');
+activate(WEAPONS.find((def) => def.id === 'knife'));
+const knifeGrip = system.armGroup.userData.gripTarget;
+assert(Math.abs(knifeGrip[1] + 0.020) < 1e-9 && Math.abs(knifeGrip[2] - 0.120) < 1e-9,
+  'knife glove must close around the authored handle centre');
+assert(Math.abs(system.kickGroup.rotation.y + 0.28) < 1e-9,
+  'knife must use its compact forward guard instead of the long sword pose');
 activate(WEAPONS.find((def) => def.id === 'boltsniper'));
 
 // Feed the same physical look velocity at each refresh rate. Full ADS should
