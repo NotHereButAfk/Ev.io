@@ -51,17 +51,24 @@ requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
   requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
 }
-for (const bootClass of ['boot-building', 'boot-map-panel', 'boot-map-name', 'boot-map-spinner', 'boot-map-progress']) {
+for (const bootClass of ['boot-building', 'boot-map-panel', 'boot-map-name', 'boot-map-spinner', 'boot-map-ad']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${bootClass}`), `initial map loading composition: ${bootClass}`);
 }
 requireMatch(css, /\.boot-map-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
   'initial loading left information rail');
-for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner', 'ml-progress']) {
+for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner', 'ml-ad']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
 }
 requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
   'arena loading left information rail');
 requireMatch(css, /@keyframes ml-spin/, 'arena loading activity indicator');
+requireMatch(css, /\.ml-panel[^}]*padding:\s*20vh\s+29px\s+0/s, 'arena loading upper-left information position');
+requireMatch(css, /\.ml-tip[^}]*bottom:\s*19vh/s, 'arena loading tip position');
+requireMatch(css, /\.ml-ad,\s*\.boot-map-ad[^}]*width:\s*min\(720px,\s*56\.25vw\)[^}]*height:\s*90px/s,
+  'EV-proportioned loading ad slot');
+if (/boot-map-brand|ml-brand|boot-map-progress|ml-progress/.test(index)) {
+  failures.push('loading screen has no extra branding or progress stripe');
+}
 requireMatch(game, /Promise\.allSettled\(\[Promise\.resolve\(this\.world\.ready\)/, 'loading waits for map');
 requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
 requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');

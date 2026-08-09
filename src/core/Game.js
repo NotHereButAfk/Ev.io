@@ -296,12 +296,7 @@ export class Game {
     const previewMap = getImportedMap(this.world.currentMapId);
     const bootName = document.getElementById('boot-map-name');
     const bootRegion = document.getElementById('boot-map-region');
-    if (bootName) bootName.replaceChildren(...previewMap.name.split(/\s+/).flatMap((part, index) => {
-      const nodes = [];
-      if (index) nodes.push(document.createElement('br'));
-      nodes.push(document.createTextNode(part));
-      return nodes;
-    }));
+    if (bootName) bootName.textContent = previewMap.name.toUpperCase();
     if (bootRegion) bootRegion.textContent = previewMap.region || 'US East (Atlanta)';
     const setBoot = (value, title, copy) => {
       if (bar) bar.style.width = `${value}%`;
@@ -1153,12 +1148,7 @@ export class Game {
       koth: 'King of the Hill', survival: 'Firefight',
     };
     const name = el.querySelector('.ml-name');
-    if (name) name.replaceChildren(...map.name.split(/\s+/).flatMap((part, index) => {
-      const nodes = [];
-      if (index) nodes.push(document.createElement('br'));
-      nodes.push(document.createTextNode(part.toUpperCase()));
-      return nodes;
-    }));
+    if (name) name.textContent = map.name.toUpperCase();
     const region = document.getElementById('ml-region');
     if (region) region.textContent = map.region;
     const mode = document.getElementById('ml-mode');
