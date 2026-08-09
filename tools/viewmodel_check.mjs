@@ -336,9 +336,9 @@ for (const def of WEAPONS) {
   );
 }
 
-// Hands use one shared rig, so exercise that rig once across every viewport,
-// FOV and high-motion state. Landscape has room to keep a larger readable
-// glove; portrait allows a partial but unmistakable hand during mid-reload.
+// The reference first-person silhouette has one dominant trigger-side hand.
+// Exercise that hand across every viewport, FOV and high-motion state; the
+// authored support limb remains hidden instead of forming a second long tube.
 activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
 for (const stateName of ['idle', 'sprint', 'reload']) {
@@ -357,10 +357,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
           reloadState.reloadTimer = system.currentDef.reloadTime * 0.5 + dt;
         }
       });
-      for (const [side, glove] of [
-        ['trigger', system.armGroup],
-        ['support', system.supportArmGroup],
-      ]) {
+      for (const [side, glove] of [['trigger', system.armGroup]]) {
         const grip = glove.getObjectByName('viewmodel_grip') || glove;
         const ratio = gloveRatio(grip);
         const label = `${stateName}/${viewport.label}/${fov}/${side}`;
@@ -385,7 +382,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // after the 110° sprint cant rotates the shoulder into view. Normal
         // gameplay FOVs still require an unbroken exit; the extreme wide-FOV
         // sprint relies on the closed, dark shoulder-side cap instead.
-        if (!(stateName === 'sprint' && fov >= 100)) {
+        if (side === 'trigger' && !(stateName === 'sprint' && fov >= 100)) {
           assert(
             reachesViewportEdge(glove),
             `${label} sleeve terminates inside the viewport (${JSON.stringify(lastEdgeBounds)})`,
@@ -396,6 +393,11 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   }
   reloadState.isReloading = false;
 }
+
+assert(
+  system.supportArmGroup.visible === false,
+  'support hand must not grow a second full-screen arm',
+);
 
 function advanceSeconds(seconds, fps, beforeFrame = null) {
   let remaining = seconds;

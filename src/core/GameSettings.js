@@ -11,7 +11,7 @@ export const DEFAULTS = {
   reduceMotion:  false,   // damp screen shake / bob / recoil camera / flashes
   reduceFlashes: false,   // cap full-screen flashes (photosensitivity safe)
   crosshairStyle:'cross', // 'cross' | 'dot' | 'circle' — shape, not just colour
-  crosshairColor:'cyan',  // 'cyan' | 'green' | 'white' | 'magenta' | 'yellow'
+  crosshairColor:'white', // ev.io-like neutral default; other accessible colours remain selectable
   colorblind:    'none',  // 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia'
   hudScale:      1.0,     // 0.8–1.4 — scales the whole HUD
   highContrast:  false,   // stronger panel/text contrast + outlines
@@ -28,7 +28,17 @@ export const GameSettings = {
   _d: null,
 
   load() {
-    try { this._d = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(_KEY) || '{}') }; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(_KEY) || '{}');
+      // Cyan was the old implicit default. Migrate it once to the measured
+      // neutral reference while preserving every later explicit colour choice.
+      if (!saved.playerScreenV2) {
+        if (!saved.crosshairColor || saved.crosshairColor === 'cyan') saved.crosshairColor = 'white';
+        saved.playerScreenV2 = true;
+        localStorage.setItem(_KEY, JSON.stringify(saved));
+      }
+      this._d = { ...DEFAULTS, ...saved };
+    }
     catch { this._d = { ...DEFAULTS }; }
     return this;
   },

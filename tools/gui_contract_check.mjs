@@ -14,6 +14,7 @@ const terms = read('terms.html');
 const menu = read('src/ui/MainMenu.js');
 const hud = read('src/ui/HUD.js');
 const game = read('src/core/Game.js');
+const settings = read('src/core/GameSettings.js');
 const css = read('src/style.css');
 
 const failures = [];
@@ -58,6 +59,9 @@ requireMatch(hud, /--xhair-size/, 'dynamic crosshair spread');
 requireMatch(hud, /classList\.toggle\(['"]ads/, 'ADS crosshair state');
 requireMatch(css, /#hud #crosshair[^}]*--xhair-size/s, 'crosshair style contract');
 requireMatch(css, /\.auth-page \.login-submit[^}]*align-self:\s*flex-start/s, 'EV-style compact auth action');
+requireMatch(settings, /crosshairColor:\s*['"]white['"]/, 'neutral player-screen crosshair default');
+requireMatch(index, /id=["']server-pop["']>\s*<span id=["']server-pop-count/, 'clean player population markup');
+requireMatch(css, /EV\.IO FIRST-PERSON PLAYER SCREEN/, 'measured player-screen sizing layer');
 
 if (failures.length) {
   console.error(`gui contract failed (${failures.length}): ${failures.join(', ')}`);

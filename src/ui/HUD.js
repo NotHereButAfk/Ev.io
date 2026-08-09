@@ -198,8 +198,8 @@ export class HUD {
       const aiming = Math.max(0, Math.min(1, weaponInfo.aiming || 0));
       // EV.IO-style readable cone: sustained hip fire opens the four bars;
       // ADS closes them into the optic without moving the centre dot.
-      const gap = (3 + bloom * 9) * (1 - aiming * 0.78);
-      this.crosshair.style.setProperty('--xhair-size', `${10 + gap * 2}px`);
+      const gap = (4 + bloom * 8) * (1 - aiming * 0.78);
+      this.crosshair.style.setProperty('--xhair-size', `${12 + gap * 2}px`);
       this.crosshair.style.setProperty('--xhair-opacity', `${1 - aiming * 0.42}`);
       this.crosshair.classList.toggle('ads', aiming > 0.72);
     }

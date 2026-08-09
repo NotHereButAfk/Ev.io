@@ -410,6 +410,20 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   population semantics. `npm run test:population` gates local 8/8 and mixed
   authoritative human/bot rosters, and the gate is part of `npm run certify`.
 
+## Latest Codex handoff — live first-person/player-screen comparison (2026-08-08)
+- A live Edge match was captured at 1050×962 for both ev.io and KYX. The
+  measured reference uses a large lower-right rifle, one dominant trigger-side
+  arm, a white open-centre crosshair, a roughly one-third-width lower-left
+  player-status block, and large isolated lower-right ammunition.
+- `WeaponSystem` now raises/enlarges the shared viewmodel safely, hides the
+  second full support-arm silhouette, uses a darker six-sided trigger arm, and
+  reduces the cyan cuff emission. The RPG action still clears the camera by
+  6.2cm in `test:viewmodel`; all 20 weapons clear every supported state.
+- The final HUD layer scales the bars, ability keys, ammunition and match line
+  to the live reference. The default crosshair migrates once from cyan to
+  white while preserving later user colour choices. Population markup no
+  longer exposes `8//8 PLAYERS PLAYERS` to accessibility readers.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a

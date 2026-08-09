@@ -415,7 +415,7 @@ export class MenuUI {
       const pick = (sel, attr) => document.querySelector(sel + ' .quality-btn.active')?.dataset[attr];
       const on = (sel) => pick(sel, 'on') === 'on';
       GameSettings.set('crosshairStyle', pick('#xhair-shape-btns', 'xh') || 'cross');
-      GameSettings.set('crosshairColor', pick('#xhair-color-btns', 'xc') || 'cyan');
+      GameSettings.set('crosshairColor', pick('#xhair-color-btns', 'xc') || 'white');
       GameSettings.set('colorblind',     pick('#cblind-btns', 'cb') || 'none');
       GameSettings.set('hudScale',       parseInt(document.getElementById('set-hudscale').value) / 100);
       GameSettings.set('reduceMotion',   on('#reduce-motion-btns'));

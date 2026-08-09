@@ -43,7 +43,7 @@ const AUTO = [
     fn: () => { const r = run('npm run test:human-carry'); return { ok: r.ok && /human rifle carry passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-ZDEATH', phase: '—', name: 'Zombie death crumple is refresh-rate independent',
     fn: () => { const r = run('npm run test:zombie-death'); return { ok: r.ok && /zombie death crumple passed/.test(r.out), detail: tail(r.out) }; } },
-  { id: 'G-VIEW', phase: '—', name: 'Viewmodels clear the near plane and keep both gloves framed',
+  { id: 'G-VIEW', phase: '—', name: 'Viewmodels clear the near plane and keep the player arm framed',
     fn: () => { const r = run('npm run test:viewmodel'); return { ok: r.ok && /viewmodel passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-GUN', phase: '—', name: 'Gun cadence, trigger, ADS and Auto Rifle effects match the contract',
     fn: () => { const r = run('npm run test:gunfeel'); return { ok: r.ok && /gunfeel passed/.test(r.out), detail: tail(r.out) }; } },

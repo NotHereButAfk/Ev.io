@@ -56,8 +56,9 @@ function createTracerMesh() {
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
 const VIEWMODEL_Z = -0.78;
-const VIEWMODEL_X = 0.32;
-const VIEWMODEL_Y = -0.34;
+const VIEWMODEL_X = 0.35;
+const VIEWMODEL_Y = -0.22;
+const VIEWMODEL_SCALE = 0.96;
 const REFERENCE_ASPECT = 16 / 9;
 
 // Preserve the lower-right composition on landscape screens without pushing
@@ -181,13 +182,14 @@ export class WeaponSystem {
 
   _buildViewmodels() {
     this.weaponMount = new THREE.Object3D();
-    // Tucked lower-right and scaled down so the gun frames the corner of the
-    // screen instead of blocking a third of the view (ev.io-style proportion).
-    // The complete weapon + two-hand rig shares this deeper mount. Moving the
-    // model alone would clear the stock but detach both palms from their grips.
+    // The reference rifle owns the lower-right quadrant: its receiver reaches
+    // the right edge and its sight sits around the lower third. The old 0.74
+    // scale made our authored rifle look like a narrow prop at arm's length.
+    // The weapon and visible trigger-side arm share this deeper mount. Moving
+    // the model alone would clear the stock but detach the hand from its grip.
     this.weaponMount.position.set(
       VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
-    this.weaponMount.scale.setScalar(0.74);
+    this.weaponMount.scale.setScalar(VIEWMODEL_SCALE);
     this.camera.add(this.weaponMount);
 
     // Dedicated viewmodel key light — a short-range light parented to the camera
@@ -255,7 +257,7 @@ export class WeaponSystem {
       new THREE.BoxGeometry(w, h, d), material,
     );
     const up = new THREE.Vector3(0, 1, 0);
-    const segment = (a, b, startRadius, endRadius, material, sides = 12) => {
+    const segment = (a, b, startRadius, endRadius, material, sides = 6) => {
       const direction = b.clone().sub(a);
       const mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(endRadius, startRadius, direction.length(), sides),
@@ -337,12 +339,21 @@ export class WeaponSystem {
       // A short hard-surface forearm shell followed by a dark flexible sleeve.
       // Splitting the silhouette here matches the third-person exosuit and stops
       // the entire visible arm reading as one featureless cylinder.
-      arm.add(segment(wrist, armorEnd, 0.043, 0.052, this.armPlateMat));
-      arm.add(segment(armorEnd, sleeveEnd, 0.050, 0.058, this.sleeveMat));
+      const forearm = segment(wrist, armorEnd, 0.043, 0.052, this.armPlateMat);
+      forearm.name = 'viewmodel_forearm';
+      arm.add(forearm);
+      const upperSleeve = segment(armorEnd, sleeveEnd, 0.050, 0.058, this.sleeveMat);
+      upperSleeve.name = 'viewmodel_upper_sleeve';
+      // Preserve the authored support rig for future poses without drawing its
+      // upper sleeve into the current one-arm first-person silhouette.
+      upperSleeve.visible = !support;
+      arm.add(upperSleeve);
       const elbowJoint = new THREE.Mesh(
         new THREE.SphereGeometry(0.056, 10, 7), this.cuffMat,
       );
+      elbowJoint.name = 'viewmodel_elbow';
       elbowJoint.position.copy(armorEnd);
+      elbowJoint.visible = !support;
       arm.add(elbowJoint);
 
       arm.add(segment(
@@ -376,7 +387,8 @@ export class WeaponSystem {
       elbow: new THREE.Vector3(0.65, -0.72, 0.40),
       support: true,
     });
-    support.scale.setScalar(0.92);
+    support.scale.setScalar(0.72);
+    support.visible = false;
     this.kickGroup.add(support);
     this.supportArmGroup = support;
   }
@@ -399,12 +411,12 @@ export class WeaponSystem {
 
   /** Apply the exact equipped character palette to the first-person gauntlet. */
   setArmAppearance({ plate, sleeve, glove, accent }) {
-    this.armPlateMat.color.setHex(plate).multiplyScalar(0.52);
-    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.68);
+    this.armPlateMat.color.setHex(plate).multiplyScalar(0.38);
+    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.55);
     this.gloveMat.color.setHex(glove).multiplyScalar(0.78);
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
-    this.cuffMat.emissiveIntensity = 0.18;
+    this.cuffMat.emissiveIntensity = 0.05;
   }
 
   /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
@@ -517,7 +529,10 @@ export class WeaponSystem {
     }
     const cur = this.loadout[index];
     if (cur) this.models.get(cur.id).group.visible = true;
-    if (this.supportArmGroup) this.supportArmGroup.visible = cur?.kind !== 'melee';
+    // The live reference presents one dominant trigger-side arm. Keeping the
+    // second full first-person limb made the view read as two detached tubes;
+    // the weapon model itself supplies the support-side visual mass.
+    if (this.supportArmGroup) this.supportArmGroup.visible = false;
     // Kick off the raise animation — the new gun eases up from lowered.
     this._raiseT = 0;
   }
@@ -1293,8 +1308,8 @@ export class WeaponSystem {
       this.armGroup.position.y = reloading
         ? (portrait ? 0.160 : 0.050)
         : (portrait ? 0.050 : -0.105);
-      this.armGroup.scale.set(portrait ? 0.72 : 1, 1, portrait ? 0.72 : 1);
-      this.supportArmGroup?.scale.set(portrait ? 0.66 : 0.92, 0.92, portrait ? 0.66 : 0.92);
+      this.armGroup.scale.set(portrait ? 0.72 : 0.82, portrait ? 1 : 0.82, portrait ? 0.72 : 0.82);
+      this.supportArmGroup?.scale.set(portrait ? 0.60 : 0.72, portrait ? 0.76 : 0.72, portrait ? 0.60 : 0.72);
     }
 
     for (const [code, index] of this.keyMap) {

@@ -6366,3 +6366,58 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   #top-nav .nav-item, #top-nav .nav-dd-btn { padding: 0 8px !important; font-size: 14px !important; }
   .ability-page-grid { grid-template-columns: 1fr; }
 }
+
+/* ========================================================================== */
+/* EV.IO FIRST-PERSON PLAYER SCREEN — measured from the live 1050×962 frame. */
+/* ========================================================================== */
+
+/* The reference crosshair is a hard white four-stroke reticle with an open
+   centre. Remove the cyan centre lamp while retaining dot/circle accessibility
+   modes and every selectable colour. */
+:root { --xhair-color: #ffffff; }
+:root[data-xhair="cross"] #hud #crosshair::after { display: none !important; }
+#hud #crosshair span { box-shadow: 0 1px 1px rgba(0,0,0,.95) !important; }
+#hud #crosshair span:nth-child(1),
+#hud #crosshair span:nth-child(2) { height: 7px; }
+#hud #crosshair span:nth-child(3),
+#hud #crosshair span:nth-child(4) { width: 7px; }
+
+/* ev.io devotes about one third of the frame width to its lower-left player
+   instruments. KYX's previous 206px cluster was visibly undersized. */
+#hud #health-wrap,
+#hud #shield-wrap,
+#hud #stamina-wrap {
+  width: min(340px, calc(100vw - 52px));
+  height: 19px;
+}
+#hud .hud-icon { width: 23px !important; min-width: 23px !important; }
+#hud .hud-icon::after { font-size: 11px !important; }
+#hud .bar-bg { height: 6px !important; }
+#hud #health-text,
+#hud #shield-text,
+#hud #stamina-text { width: 32px !important; font-size: 15px !important; }
+
+#hud #grenade-wrap { height: 39px; }
+#hud .grenade-slot { min-width: 55px; height: 37px; }
+#hud .ability-indicator {
+  left: 155px !important;
+  width: 49px !important;
+  height: 40px !important;
+}
+
+#hud #weapon-wrap { min-width: 172px; }
+#hud #weapon-name { font-size: 11px !important; }
+#hud #ammo-text { font-size: 36px !important; line-height: 36px; }
+
+#hud #score-wrap { font-size: 11px !important; gap: 16px !important; }
+#hud #server-pop::after { font-size: 11px; }
+#hud #score-wrap span,
+#hud #server-pop span { font-size: 13px !important; }
+
+@media (max-width: 700px) {
+  #hud #health-wrap,
+  #hud #shield-wrap,
+  #hud #stamina-wrap { width: min(245px, calc(100vw - 28px)); }
+  #hud .ability-indicator { left: 143px !important; }
+  #hud #ammo-text { font-size: 29px !important; line-height: 30px; }
+}
