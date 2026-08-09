@@ -463,6 +463,28 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   neutral animation state after respawn, and all 60 authoritative dead ticks.
   Full `npm run certify` is 22/22 and server authority/abuse is 34/34.
 
+## Latest Codex handoff - stamina, grenades, death fall, and lethal bots (2026-08-09)
+- Authoritative sprint stamina is now copied from the predicted server state
+  into the Player object consumed by the HUD. The same presentation bridge
+  synchronizes authoritative frag/smoke charges, so the bars and inventory no
+  longer remain at stale local defaults.
+- The throwable input contract now matches the HUD: G throws frag and F throws
+  smoke. Frag exists on the authoritative server with charges, cooldown, fuse,
+  LOS-gated radial falloff, self-damage, explosion events, and map-rotation
+  cleanup. Offline self-damage routes through Game's real damage/death flow.
+- Local FPS camera, local TPS body, remote Avatar, and Bot all share one 0.72s
+  ease-out death fall before the three-second respawn. The respawn card enters
+  after the initial camera collapse instead of hiding the fall immediately.
+- Bots remain free-for-all combatants, but one third apply a bounded human
+  target bias so the player is not ignored behind closer bot clusters. Local
+  aim scatter is measured in world-space and substantially tighter; server
+  bots refresh the firing ray after movement so strafing cannot make every
+  shot use a stale angle. Authority tests require an autonomous bot to finish
+  a human kill.
+- Browser playtest verified stamina 100->98 while sprinting, frag inventory
+  2->1 on G, and an active bot death/respawn loop. `npm run certify` is 24/24;
+  server authority/abuse is 37/37.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a

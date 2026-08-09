@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import {
   BOT_TACTICS,
   advanceBurst,
+  botAimErrorMeters,
+  combatTargetScore,
   chooseCombatSteering,
 } from '../src/entities/BotCombat.js';
 import { BotManager } from '../src/entities/BotManager.js';
@@ -54,6 +56,11 @@ assert.equal(pauseBurst.burstPause, true);
 assert.ok(pauseBurst.delayScale > continueBurst.delayScale);
 console.log('ok   ranged fire uses short bursts with a readable pause');
 
+assert.ok(botAimErrorMeters(20, 1.15) < 0.8, '20m bot scatter is still too inaccurate');
+assert.ok(botAimErrorMeters(40, 1.15) < 1.25, '40m bot scatter is still too inaccurate');
+assert.ok(botAimErrorMeters(20, 0.8) > 0.4, 'bots became perfect aim-locks');
+console.log('ok   bot aim is lethal but retains real world-space scatter');
+
 const player = {
   position: new THREE.Vector3(100, 0, 0),
   health: 100,
@@ -85,5 +92,23 @@ assert.equal(nearBot.observedTarget, otherBot, 'bot should engage the nearer opp
 assert.equal(otherBot.health, 90, 'bot-vs-bot damage should reach the selected opponent');
 assert.equal(player.health, 100, 'bots must not all focus the human player');
 console.log('ok   bots select and damage nearby opponents instead of forming a 7v1');
+
+assert.ok(
+  combatTargetScore({ distance: 12, isHuman: true, botId: 3 })
+    < combatTargetScore({ distance: 8, isHuman: false, botId: 3 }),
+  'designated pressure bot should prefer a visible human within the pressure bias',
+);
+const pressureBot = makeFakeBot(0);
+pressureBot.id = 3;
+pressureBot.shouldFire = true;
+const pressureRival = makeFakeBot(8);
+player.position.set(12, 0, 0);
+player.health = 100;
+const pressureManager = new BotManager(null, null);
+pressureManager.bots = [pressureBot, pressureRival];
+pressureManager.update(0.1, player, null, (damage) => { player.health -= damage; }, null);
+assert.equal(pressureBot.observedTarget, player, 'pressure bot ignored the human target');
+assert.equal(player.health, 90, 'pressure bot could not damage/kill the human player');
+console.log('ok   designated bots actively pressure and damage the human player');
 
 console.log('\nall bot combat checks passed');

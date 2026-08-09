@@ -30,7 +30,7 @@ export class AuthClient {
     this.simWorld = null;
     this.remotes = new Map();               // id -> {name, buf:[{t,x,y,z,yaw,crouch}]}
     this.self = { health: 100, shield: 0, alive: true, mag: 30, kills: 0, deaths: 0, score: 0,
-                  blind: false, blindTicks: 0, abilities: { flash: 2, smoke: 2, impulse: 2 }, abilityCD: 0 };
+                  blind: false, blindTicks: 0, abilities: { frag: 2, flash: 2, smoke: 2, impulse: 2 }, abilityCD: 0 };
     this.smokes = [];                       // active smoke volumes from the server
     this.abilitySeq = 0;
     this.events = [];                       // drained by the game each frame
@@ -208,7 +208,7 @@ export class AuthClient {
     this.ws.send(JSON.stringify({ t: 'fire', seq: this.fireSeq, wid, yaw, pitch }));
   }
 
-  // Request a throwable ability (flash / smoke / impulse). The server owns
+  // Request a throwable ability (frag / flash / smoke / impulse). The server owns
   // charges, cooldown, and the effect — this is only a request.
   sendAbility(kind, yaw, pitch) {
     if (!this.connected) return;

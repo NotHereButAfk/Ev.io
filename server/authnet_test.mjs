@@ -9,6 +9,7 @@
 
 import { WebSocket } from 'ws';
 import { makeAuthServer } from './authserver.mjs';
+import { AuthRoom } from './authroom.mjs';
 
 const PORT = 8799;
 const { close, room } = makeAuthServer({ port: PORT });
@@ -263,6 +264,41 @@ b.ws.send(JSON.stringify({ t: 'hello', name: 'FakeHuman', isBot: false }));
 await sleep(120);
 ok('bots: client cannot forge/clear the bot flag via protocol',
    b.last().players.find((p) => p.name === 'TrainingDummy')?.isBot === true);
+
+// Headless, obstacle-free combat proofs keep the two user-visible regressions
+// deterministic: bots must actually finish a kill, and frag requests must
+// spend a charge, respect their fuse, then apply server-owned radial damage.
+const duelArena = {
+  id: 'combat-proof', name: 'Combat Proof', region: 'test', half: 100,
+  killY: -25, noBaseFloor: false, platforms: [], boxes: [],
+  gravLifts: [], teleporters: [], spawns: [[0, 0, 0], [0, 0, -10]],
+};
+const duelRoom = new AuthRoom(duelArena);
+const duelHumanId = duelRoom.add(() => {}, 'Duel Human');
+const duelBotId = duelRoom.addBot('Duel Bot');
+const duelHuman = duelRoom.players.get(duelHumanId);
+const duelBot = duelRoom.players.get(duelBotId);
+duelHuman.state.px = 0; duelHuman.state.pz = -10;
+duelBot.state.px = 0; duelBot.state.pz = 0;
+for (let i = 0; i < 200; i++) duelRoom.update();
+ok('bots: autonomous aim and fire can finish a human kill', duelHuman.deaths >= 1,
+   `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
+
+const fragRoom = new AuthRoom(duelArena);
+const throwerId = fragRoom.add(() => {}, 'Thrower');
+const fragTargetId = fragRoom.add(() => {}, 'Frag Target');
+const thrower = fragRoom.players.get(throwerId);
+const fragTarget = fragRoom.players.get(fragTargetId);
+thrower.state.px = 0; thrower.state.pz = 0;
+fragTarget.state.px = 0; fragTarget.state.pz = -24;
+fragRoom.onAbility(throwerId, { seq: 1, kind: 'frag', yaw: 0, pitch: 0 });
+fragRoom.update();
+const fragChargeAfterThrow = thrower.abilities.frag;
+for (let i = 0; i < 52; i++) fragRoom.update();
+ok('frag: authoritative request spends exactly one charge', fragChargeAfterThrow === 1,
+   `charges=${fragChargeAfterThrow}`);
+ok('frag: fuse resolves into server-owned radial damage', fragTarget.health < 100,
+   `health=${fragTarget.health}`);
 
 // reconnect + duplicate session
 const dup = client(); await open(dup);

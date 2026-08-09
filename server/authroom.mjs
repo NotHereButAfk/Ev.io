@@ -23,6 +23,7 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
+import { combatTargetScore } from '../src/entities/BotCombat.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
@@ -61,6 +62,7 @@ const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 //   smoke:   a vision volume that blocks hitscan for its lifetime
 //   impulse: radial knockback velocity (clamped so it can't launch to infinity)
 const ABILITIES = {
+  frag:    { cd: 1.5, charges: 2, throwRange: 24, radius: 5, damage: 80, fuseSec: 2.5 },
   flash:   { cd: 1.5, charges: 2, throwRange: 24, radius: 8,  blindSec: 2.2 },
   smoke:   { cd: 1.5, charges: 2, throwRange: 22, radius: 5,  lifeSec: 8 },
   impulse: { cd: 2.0, charges: 2, throwRange: 18, radius: 6,  power: 11 },
@@ -104,6 +106,7 @@ export class AuthRoom {
     this.players = new Map();   // id -> player
     this.events = [];           // per-tick outgoing events (kills, hits, spawns)
     this.smokes = [];           // active smoke volumes {x,y,z,r,until}
+    this.frags = [];            // pending authoritative detonations
     this.matchStart = Date.now();
     this.matchDurationMs = 8 * 60 * 1000;
     const requestedPopulation = Number.isFinite(targetPopulation) ? targetPopulation | 0 : 0;
@@ -142,6 +145,7 @@ export class AuthRoom {
     this._arenaIndex = (this._arenaIndex + 1) % this.arenas.length;
     this._setSimArena(this.arenas[this._arenaIndex]);
     this.smokes.length = 0;
+    this.frags.length = 0;
 
     let spawnIndex = 0;
     for (const player of this.players.values()) {
@@ -165,7 +169,7 @@ export class AuthRoom {
       player._firingTicks = 0;
       player.blindUntil = 0;
       player.abilities = {
-        flash: ABILITIES.flash.charges,
+        frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges,
         smoke: ABILITIES.smoke.charges,
         impulse: ABILITIES.impulse.charges,
       };
@@ -214,7 +218,7 @@ export class AuthRoom {
       _botReloadUntil: 0,
       history: [],               // [{tick, x,y,z}]
       lastFireSeq: 0, lastFireRequestTick: -Infinity,
-      abilities: { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
+      abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                    impulse: ABILITIES.impulse.charges },
       abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
     };
@@ -239,13 +243,16 @@ export class AuthRoom {
 
   _driveBot(p) {
     let target = null;
-    let bestD2 = Infinity;
+    let bestScore = Infinity;
     for (const other of this.players.values()) {
       if (other === p || !other.alive) continue;
       const dx = other.state.px - p.state.px;
       const dz = other.state.pz - p.state.pz;
       const d2 = dx * dx + dz * dz;
-      if (d2 < bestD2) { bestD2 = d2; target = other; }
+      const score = combatTargetScore({
+        distance: Math.sqrt(d2), isHuman: !other.isBot, botId: p.id,
+      });
+      if (score < bestScore) { bestScore = score; target = other; }
     }
 
     const seq = ++p.lastInputSeq;
@@ -253,7 +260,7 @@ export class AuthRoom {
 
     const dx = target.state.px - p.state.px;
     const dz = target.state.pz - p.state.pz;
-    const distance = Math.sqrt(bestD2);
+    const distance = Math.hypot(dx, dz);
     const yaw = Math.atan2(-dx, -dz);
     const pitch = Math.atan2(
       (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y),
@@ -289,6 +296,10 @@ export class AuthRoom {
       );
       if (rayDistance >= distance - 0.6) {
         this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw, pitch });
+        // Movement is integrated before fire requests resolve. Remember the
+        // chosen target so the authoritative shot can refresh its ray from the
+        // bot's post-movement position instead of firing along a stale angle.
+        if (p.fireReq) p.fireReq.botTargetId = target.id;
       }
     }
     return { seq, inp, wid: p.wid, aiming: distance < 55 };
@@ -412,8 +423,10 @@ export class AuthRoom {
       target._firingTicks = 0;
       target.deadUntil = this.tick + RESPAWN_TICKS;
       target.deaths++;
-      shooter.kills++;
-      shooter.score += head ? 150 : 100;
+      if (target !== shooter) {
+        shooter.kills++;
+        shooter.score += head ? 150 : 100;
+      }
       this.events.push({ e: 'kill', id: target.id, by: shooter.id, byName: shooter.name,
                          victimName: target.name, head, wid: shooter.wid });
     }
@@ -429,7 +442,10 @@ export class AuthRoom {
     const dist = Math.min(hitT, A.throwRange);
     const bx = ox + dx * dist, by = Math.max(0, oy + dy * dist), bz = oz + dz * dist;
 
-    if (kind === 'smoke') {
+    if (kind === 'frag') {
+      this.frags.push({ by: p.id, x: bx, y: by, z: bz,
+                        until: this.tick + Math.round(A.fuseSec * TICK_HZ) });
+    } else if (kind === 'smoke') {
       this.smokes.push({ x: bx, y: by, z: bz, r: A.radius, until: this.tick + Math.round(A.lifeSec * TICK_HZ) });
     } else if (kind === 'flash') {
       for (const t of this.players.values()) {
@@ -461,6 +477,30 @@ export class AuthRoom {
     this.events.push({ e: 'ability', kind, by: p.id, x: bx, y: by, z: bz, r: A.radius });
   }
 
+  _explodeFrag(frag) {
+    const shooter = this.players.get(frag.by);
+    if (!shooter) return;
+    const A = ABILITIES.frag;
+    for (const target of this.players.values()) {
+      if (!target.alive) continue;
+      const tx = target.state.px - frag.x;
+      const ty = (target.state.py + 0.9) - frag.y;
+      const tz = target.state.pz - frag.z;
+      const distance = Math.hypot(tx, ty, tz);
+      if (distance > A.radius) continue;
+      const length = distance || 1e-6;
+      const blocked = rayVsBoxes(
+        this.simWorld, frag.x, frag.y, frag.z,
+        tx / length, ty / length, tz / length, length,
+      ) < length - 0.1;
+      if (blocked) continue;
+      const falloff = 1 - 0.9 * clamp(distance / A.radius, 0, 1);
+      this._damage(target, shooter, A.damage * falloff, false);
+    }
+    this.events.push({ e: 'explosion', kind: 'frag', by: shooter.id,
+                       x: frag.x, y: frag.y, z: frag.z, r: A.radius });
+  }
+
   // advance one authoritative tick
   update() {
     this.tick++;
@@ -469,6 +509,11 @@ export class AuthRoom {
 
     // expire finished smoke volumes
     if (this.smokes.length) this.smokes = this.smokes.filter((s) => this.tick < s.until);
+    if (this.frags.length) {
+      const due = this.frags.filter((frag) => this.tick >= frag.until);
+      this.frags = this.frags.filter((frag) => this.tick < frag.until);
+      for (const frag of due) this._explodeFrag(frag);
+    }
 
     for (const p of this.players.values()) {
       const equipped = WEAPONS[p.wid] || WEAPONS.m4;
@@ -496,7 +541,7 @@ export class AuthRoom {
           p._botReloadUntil = 0;
           p.gunBloom = 0;
           p.blindUntil = 0;
-          p.abilities = { flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
+          p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
           this.events.push({ e: 'respawn', id: p.id, x: s[0], y: s[1], z: s[2] });
         }
@@ -543,6 +588,18 @@ export class AuthRoom {
       const req = p.fireReq; p.fireReq = null;
       if (p.fireCooldown > 0 || p.mag <= 0) continue;   // authority: rate + ammo
       const w = WEAPONS[req.wid] || WEAPONS.m4;
+      if (p.isBot && req.botTargetId != null) {
+        const target = this.players.get(req.botTargetId);
+        if (target?.alive) {
+          const tx = target.state.px - p.state.px;
+          const tz = target.state.pz - p.state.pz;
+          req.yaw = Math.atan2(-tx, -tz);
+          req.pitch = Math.atan2(
+            (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y),
+            Math.max(0.001, Math.hypot(tx, tz)),
+          );
+        }
+      }
       p.wid = req.wid;
       p.fireCooldown = Math.max(-w.rate, p.fireCooldown) + w.rate;
       p.mag--;

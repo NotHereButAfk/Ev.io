@@ -1,4 +1,5 @@
 import { Bot } from './Bot.js';
+import { combatTargetScore } from './BotCombat.js';
 
 // Gamertag pool for simulated remote players and named bots, so the kill feed
 // and server roster read like a live lobby instead of "Bot-7".
@@ -99,8 +100,12 @@ export class BotManager {
           for (const candidate of candidates) {
             // A small stickiness bonus prevents target-flipping every scan when
             // two opponents cross at nearly the same distance.
-            const sticky = candidate === current ? -9 : 0;
-            const score = candidate.position.distanceTo(bot.position) + sticky;
+            const score = combatTargetScore({
+              distance: candidate.position.distanceTo(bot.position),
+              isHuman: candidate === player,
+              botId: bot.id,
+              sticky: candidate === current,
+            });
             if (score < bestScore) {
               best = candidate;
               bestScore = score;

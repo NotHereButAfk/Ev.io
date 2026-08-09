@@ -54,6 +54,8 @@ import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../w
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 import { countLocalMatchPlayers } from './Population.js';
+import { consumeThrowable } from './GameplayInput.js';
+import { deathCameraPose, deathFallProgress } from '../player/DeathAnimation.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -154,6 +156,10 @@ export class Game {
     this._isDM           = false;
     this._playerDowned   = false;
     this._respawnRemaining = 0;
+    this._deathAnimT = 0;
+    this._deathSide = 1;
+    this._deathCameraBasePos = new THREE.Vector3();
+    this._deathCameraBaseRot = new THREE.Euler();
     this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
     this.mobileControls = this.input.isMobile
@@ -498,6 +504,12 @@ export class Game {
         }
       }
     };
+    this.grenadeSystem.onSelfDamage = (damage, point) => {
+      // In an authoritative match the server applies grenade damage. Running
+      // the local copy too would double-hit and let a client decide its death.
+      if (this._authNet?.ready) return;
+      this._onPlayerDamaged(damage, point);
+    };
 
     this.weaponSystem.onHitBot = (enemy, dmg, point, meta) => {
       const dealt = Math.min(enemy.health, dmg);
@@ -691,6 +703,7 @@ export class Game {
     this._pendingCoins = 0;
     this._playerDowned = false;
     this._respawnRemaining = 0;
+    this._resetDeathAnimation();
 
     // Mode-specific setup
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
@@ -1086,7 +1099,7 @@ export class Game {
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
-      'TIP: F throws a frag grenade, E throws smoke',
+      'TIP: G throws a frag grenade, F throws smoke',
       'TIP: headshots deal bonus damage — aim high',
       'TIP: grav-lifts by the plaza launch you onto the rooftops',
       'TIP: rarer skins earn more coins per kill',
@@ -1247,6 +1260,7 @@ export class Game {
 
     // Deathmatch: infinite lives, but death remains visible for three seconds
     // inside the live match rather than masquerading as a pause-menu state.
+    this._beginDeathAnimation();
     if (this._isDM) {
       this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
       clearTimeout(this._respawnTimer);
@@ -1283,6 +1297,7 @@ export class Game {
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
     this._respawnRemaining = 0;
+    this._resetDeathAnimation();
     this.hud.hideRespawn();
     this.hud.addKillFeed('RESPAWNED');
   }
@@ -1293,6 +1308,7 @@ export class Game {
     this.deaths = self?.deaths ?? (this.deaths + 1);
     this.matchStats.currentStreak = 0;
     this._respawnRemaining = RESPAWN_DELAY;
+    this._beginDeathAnimation();
     this.hud.showRespawn(this._respawnRemaining);
     this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
     this.weaponSystem.resetMotionState();
@@ -1301,11 +1317,43 @@ export class Game {
   _onAuthoritativeRespawn(self) {
     this.deaths = self?.deaths ?? this.deaths;
     this._respawnRemaining = 0;
+    this._resetDeathAnimation();
     this.player.velocity.set(0, 0, 0);
     this.player.isSprinting = false;
     this.weaponSystem.resetMotionState();
     this.hud.hideRespawn();
     this.hud.addKillFeed('RESPAWNED');
+  }
+
+  _beginDeathAnimation() {
+    this._deathAnimT = 0;
+    this._deathSide *= -1;
+    this._deathCameraBasePos.copy(this.player.camera.position);
+    this._deathCameraBaseRot.copy(this.player.camera.rotation);
+  }
+
+  _resetDeathAnimation() {
+    this._deathAnimT = 0;
+    this.player.camera.rotation.z = 0;
+    if (this._playerBody) {
+      this._playerBody.rotation.x = 0;
+      this._playerBody.rotation.z = 0;
+      this._playerBody.userData?.setDeathState?.(0, this._deathSide);
+    }
+  }
+
+  _applyDeathCamera(dt) {
+    this._deathAnimT += dt;
+    if (this.player._camDist > 0) return;
+    const pose = deathCameraPose(this._deathAnimT, this._deathSide);
+    this.player.camera.position.copy(this._deathCameraBasePos);
+    this.player.camera.position.y -= pose.drop;
+    this.player.camera.rotation.set(
+      this._deathCameraBaseRot.x + pose.pitch,
+      this._deathCameraBaseRot.y,
+      pose.roll,
+      'YXZ',
+    );
   }
 
   _endGame(title, subtitle = '') {
@@ -1420,6 +1468,7 @@ export class Game {
         this._respawnPlayer();
         dead = false;
       }
+      if (dead) this._applyDeathCamera(dt);
     }
     this.player.camera.updateMatrixWorld(true);
 
@@ -1455,19 +1504,23 @@ export class Game {
     this._activeManager.update(dt, this.player, this.player.camera, (dmg, from) => this._onPlayerDamaged(dmg, from), this.world);
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
-    // grenade input  F = frag  E = smoke
-    if (!menuOpen && !dead && this.input.consumeJustPressed('KeyF')) {
-      const had = this.grenadeSystem.frags;
-      this.grenadeSystem.throwFrag(this.player.camera);
-      // Only animate a throw that actually happened — out of grenades, the
-      // arm shouldn't wind up and lob nothing.
-      if (this.grenadeSystem.frags < had) this._throwAnim();
-      this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
-    }
-    if (!menuOpen && !dead && this.input.consumeJustPressed('KeyE')) {
-      const had = this.grenadeSystem.smokes;
-      this.grenadeSystem.throwSmoke(this.player.camera);
-      if (this.grenadeSystem.smokes < had) this._throwAnim();
+    // The same G/F contract shown by the HUD. Online, the local projectile is
+    // presentation; authoritative charges and damage live on the server.
+    const throwable = !menuOpen && !dead ? consumeThrowable(this.input) : null;
+    if (throwable) {
+      const auth = this._authNet?.ready ? this._authNet.client : null;
+      const serverCharges = auth?.self?.abilities?.[throwable];
+      const canThrow = !auth || ((serverCharges ?? 0) > 0 && (auth.self.abilityCD ?? 0) <= 0);
+      if (canThrow) {
+        const field = throwable === 'frag' ? 'frags' : 'smokes';
+        const had = this.grenadeSystem[field];
+        if (throwable === 'frag') this.grenadeSystem.throwFrag(this.player.camera);
+        else this.grenadeSystem.throwSmoke(this.player.camera);
+        if (this.grenadeSystem[field] < had) {
+          this._throwAnim();
+          auth?.sendAbility(throwable, this.player.yaw, this.player.pitch);
+        }
+      }
       this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
     this.grenadeSystem.update(dt, this.player);
@@ -1545,6 +1598,26 @@ export class Game {
   // when moving, gentle breathing sway when standing still.
   _animatePlayerBody(dt) {
     const p = this.player;
+    const ud = this._playerBody?.userData;
+    if (p.isDead && !this._playerDowned) {
+      const fall = deathFallProgress(this._deathAnimT);
+      if (ud?.isHuman) {
+        ud.setLocomotion?.(0, true, false, 0, 1, 0);
+        ud.setDeathState?.(fall, this._deathSide);
+        ud.mixer?.update(dt);
+        ud.armorTick?.(dt);
+      }
+      this._playerBody.position.set(
+        p.position.x + this._deathSide * fall * 0.16,
+        p.position.y - fall * 0.48,
+        p.position.z,
+      );
+      this._playerBody.rotation.x = 0;
+      this._playerBody.rotation.z = this._deathSide * fall * 1.28;
+      return;
+    }
+    ud?.setDeathState?.(0, this._deathSide);
+    this._playerBody.rotation.z = 0;
     // Drive gait from post-collision displacement. Requested velocity can stay
     // non-zero while collision resolution pins the body against a wall.
     if (!this._tpsAnimPrev) {
@@ -1572,7 +1645,6 @@ export class Game {
     const speed = this._tpsAnimSpeed;
 
     // Real human soldier: drive its skeletal Idle/Walk/Run clips.
-    const ud = this._playerBody?.userData;
     if (ud?.isHuman) {
       // Strafe input in the body's local frame — feeds the lean layer.
       const yaw = p.yaw;

@@ -7,6 +7,7 @@ import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 import { cameraYawToBodyYaw } from './Facing.js';
+import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // One character body, driven entirely by a state struct.
@@ -133,8 +134,8 @@ export class Avatar {
       if (!this._dying) { g.visible = false; return; }
 
       this._deathT += dt;
-      const p = THREE.MathUtils.clamp(this._deathT / 0.72, 0, 1);
-      const fall = 1 - Math.pow(1 - p, 3);
+      const p = THREE.MathUtils.clamp(this._deathT / DEATH_FALL_DURATION, 0, 1);
+      const fall = deathFallProgress(this._deathT);
       if (this.isHuman) {
         const ud = g.userData;
         ud.setLocomotion?.(0, true, false, 0, 1, 0);

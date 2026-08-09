@@ -19,6 +19,7 @@ export class GrenadeSystem {
     this.explosions  = [];
 
     this.onExplode = null; // (point, radius, damage) => void
+    this.onSelfDamage = null; // (damage, point) => void; Game owns death flow
   }
 
   throwFrag(camera) {
@@ -186,7 +187,9 @@ export class GrenadeSystem {
       const d = player.position.distanceTo(point);
       if (d <= FRAG_RADIUS) {
         const f = THREE.MathUtils.lerp(1, 0.1, THREE.MathUtils.clamp(d / FRAG_RADIUS, 0, 1));
-        player.takeDamage(FRAG_DMG * f);
+        const damage = FRAG_DMG * f;
+        if (this.onSelfDamage) this.onSelfDamage(damage, point);
+        else player.takeDamage(damage);
       }
     }
   }

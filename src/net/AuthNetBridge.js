@@ -29,6 +29,7 @@ import {
 import { countAuthoritativePlayers } from '../core/Population.js';
 import { isNameplateOccluded } from '../ui/NameplateOcclusion.js';
 import { sprintRequested } from '../core/GameplayInput.js';
+import { applyAuthoritativeResources } from './AuthoritativePresentation.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -175,6 +176,9 @@ export class AuthNetBridge {
     p.isSprinting = alive && !!c.sprinting;
     p._eyeHeight = c.sim.eye;
     p.health = c.self.health;
+    // Movement prediction and the HUD now consume the same authoritative
+    // stamina/inventory snapshot, so sprint drain and grenade counts agree.
+    applyAuthoritativeResources(p, c, this.game.grenadeSystem);
     if (p._camDist > 0) {
       setThirdPersonDesired(
         this._tpsDesired, p.position, p.yaw, p.pitch, p._camDist,

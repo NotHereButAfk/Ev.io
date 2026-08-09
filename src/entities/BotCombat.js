@@ -3,12 +3,25 @@
 // ev.io footage; they are not claimed as ev.io's internal AI constants.
 
 export const BOT_TACTICS = Object.freeze({
-  detectRadius: 32,
+  detectRadius: 42,
   memoryDuration: 5.5,
   rangedRetreatDistance: 5.0,
   rangedOrbitDistance: 13.0,
   meleeAttackDistance: 2.2,
 });
+
+// Keep the arena a free-for-all while ensuring the human is not ignored behind
+// a permanent cluster of closer bots. Roughly one third apply human pressure.
+export function combatTargetScore({ distance, isHuman = false, botId = 0, sticky = false }) {
+  const humanPressure = isHuman && Math.abs(botId | 0) % 3 === 0 ? -11 : 0;
+  return distance + (sticky ? -9 : 0) + humanPressure;
+}
+
+// World-space miss radius used by the real ray shot. Keeping this pure makes
+// aim quality measurable instead of silently regressing into wild spray.
+export function botAimErrorMeters(distance, skill = 1) {
+  return (0.32 + 0.018 * Math.max(0, distance)) * skill;
+}
 
 /**
  * Return forward/strafe weights in a target-relative frame.

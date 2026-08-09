@@ -6,7 +6,8 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_TACTICS, advanceBurst, chooseCombatSteering } from './BotCombat.js';
+import { BOT_TACTICS, advanceBurst, botAimErrorMeters, chooseCombatSteering } from './BotCombat.js';
+import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
@@ -35,10 +36,8 @@ const PROVOKE_DURATION = BOT_TACTICS.memoryDuration;
 // can't turn into a perfect marksman at point-blank, which a fixed angular cone
 // does (a 3° cone at 5m physically cannot miss a torso).
 // Cover and player strafing still matter because these remain real ray shots.
-const AIM_ERR_BASE  = 0.62;    // metres of scatter at zero range
-const AIM_ERR_PER_M = 0.036;   // extra metres of scatter per metre of distance
-const AIM_SKILL_MIN = 0.85;    // per-bot multiplier — lower is a better shot
-const AIM_SKILL_MAX = 1.45;
+const AIM_SKILL_MIN = 0.80;    // per-bot multiplier — lower is a better shot
+const AIM_SKILL_MAX = 1.15;
 const REACTION_MIN  = 0.18;    // seconds between acquiring a target and firing
 const REACTION_MAX  = 0.52;
 // Player hitboxes, relative to their feet: a torso sphere and a head.
@@ -372,7 +371,7 @@ export class Bot {
     // is the whole point: cover blocks it, distance widens the cone's footprint,
     // and strafing makes it miss — none of which a probability roll can express.
     // Scatter radius in metres at the target, converted to an angle.
-    const spread = (AIM_ERR_BASE + AIM_ERR_PER_M * dist) * this._aimSkill / Math.max(1, dist);
+    const spread = botAimErrorMeters(dist, this._aimSkill) / Math.max(1, dist);
     _tmpA.set(-this._shootDir.z, 0, this._shootDir.x);              // horizontal ⊥
     if (_tmpA.lengthSq() < 1e-6) _tmpA.set(1, 0, 0);
     _tmpA.normalize();
@@ -421,8 +420,8 @@ export class Bot {
     // ── death animation ──────────────────────────────────────────────────────
     if (this._dying) {
       this._deathT += dt;
-      const p = Math.min(1, this._deathT / 0.72);
-      const eased = p * p;
+      const p = Math.min(1, this._deathT / DEATH_FALL_DURATION);
+      const eased = deathFallProgress(this._deathT);
       // Legs buckle first (knees give out) and the arms go limp, then the body
       // topples sideways and sinks — a crumple, not a rigid plank tipping over.
       if (this._rig) {
