@@ -300,6 +300,33 @@ ok('frag: authoritative request spends exactly one charge', fragChargeAfterThrow
 ok('frag: fuse resolves into server-owned radial damage', fragTarget.health < 100,
    `health=${fragTarget.health}`);
 
+const reloadRoom = new AuthRoom(duelArena);
+const reloadId = reloadRoom.add(() => {}, 'Reload Probe');
+const reloadPlayer = reloadRoom.players.get(reloadId);
+reloadPlayer.invulnerableUntil = 0;
+reloadPlayer.ammo.m4.mag = 3;
+reloadPlayer.ammo.m4.reserve = 10;
+reloadPlayer.mag = 3;
+reloadRoom.onReload(reloadId, { wid: 'm4' });
+const reloadStarted = reloadPlayer.reloadUntil > reloadRoom.tick;
+for (let i = 0; i < Math.ceil(1.8 * 20); i++) reloadRoom.update();
+ok('reload: server owns timing and transfers reserve into the magazine',
+   reloadStarted && reloadPlayer.mag === 13 && reloadPlayer.ammo.m4.reserve === 0,
+   `mag=${reloadPlayer.mag}, reserve=${reloadPlayer.ammo.m4.reserve}`);
+
+const protectedRoom = new AuthRoom(duelArena);
+const protectorId = protectedRoom.add(() => {}, 'Shooter');
+const protectedId = protectedRoom.add(() => {}, 'Fresh Spawn');
+const protector = protectedRoom.players.get(protectorId);
+const freshSpawn = protectedRoom.players.get(protectedId);
+protectedRoom._damage(freshSpawn, protector, 100, false);
+const protectedHealth = freshSpawn.health;
+for (let i = 0; i < 31; i++) protectedRoom.update();
+protectedRoom._damage(freshSpawn, protector, 25, false);
+ok('spawn protection: fresh players cannot be damaged for 1.5 seconds',
+   protectedHealth === 100 && freshSpawn.health === 75,
+   `health ${protectedHealth}→${freshSpawn.health}`);
+
 // reconnect + duplicate session
 const dup = client(); await open(dup);
 dup.hello('Alice2'); dup.hello('Alice2');   // second hello on same socket

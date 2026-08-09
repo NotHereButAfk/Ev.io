@@ -282,7 +282,9 @@ export class Game {
 
   // ── Connect sequence ─────────────────────────────────────────────────────────
 
-  // ev.io-style boot flow: pulsating logo → map-loading card (map name) → GUI.
+  // Boot only reports work that is actually known locally. The authoritative
+  // arena is not known until the match server welcomes us, so naming the
+  // current preview map here can lie about the map the player will join.
   async _runConnectSequence() {
     const screen = document.getElementById('connect-screen');
     const bar = document.getElementById('boot-progress');
@@ -300,14 +302,13 @@ export class Game {
 
     setBoot(12, 'INITIALIZING ARENA', 'Renderer online');
     await delay(120);
-    const bootMap = getImportedMap(this.world.currentMapId || this._initialMapId);
-    setBoot(30, `STREAMING ${bootMap.name.toUpperCase()}`, 'Loading imported map geometry');
+    setBoot(30, 'STREAMING ARENA', 'Loading environment geometry');
     await Promise.allSettled([Promise.resolve(this.world.ready), delay(350)]);
     setBoot(68, 'PREPARING COMBAT', 'Building navigation and collision');
     await Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]);
     setBoot(92, 'SYNCING LOADOUT', 'Soldier rig and weapon models ready');
     await minimumDisplay;
-    setBoot(100, 'DEPLOYMENT READY', `Entering ${bootMap.region}`);
+    setBoot(100, 'DEPLOYMENT READY', 'Opening game interface');
     await delay(260);
 
     screen.classList.add('fade-out');
@@ -316,42 +317,16 @@ export class Game {
     this._runMapIntro();
   }
 
-  // Show the Daytime Rook loading card over the fly-through,
-  // then reveal the main menu GUI.
+  // Finish the preview world before revealing the menu. Do not show the match
+  // loading card here: this is only the website boot, not a server map change.
   async _runMapIntro() {
-    const el = document.getElementById('map-loading');
-    if (el) {
-      const definition = getImportedMap(this.world.currentMapId);
-      const name = el.querySelector('.ml-name');
-      if (name) name.textContent = definition.name.toUpperCase();
-      const region  = document.getElementById('ml-region');
-      const mode    = document.getElementById('ml-mode');
-      const players = document.getElementById('ml-players');
-      const tip     = document.getElementById('ml-tip');
-      if (region)  region.textContent  = definition.region;
-      if (mode)    mode.textContent     = 'Loading map…';
-      if (players) players.textContent  = 'Spectating';
-      if (tip)     tip.textContent      = 'TIP: press PLAY to drop into the match';
-      el.classList.remove('hidden', 'ml-fade');
-    }
-
     try {
       const map = await this.world.ready;
-      const mode = document.getElementById('ml-mode');
-      if (mode) mode.textContent = 'Map ready';
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
     } catch (error) {
       console.error('[map] imported map failed to load', error);
-      const mode = document.getElementById('ml-mode');
-      if (mode) mode.textContent = 'Map load failed';
       return;
-    }
-
-    if (el) {
-      clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
-      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 650);
-      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 1200);
     }
     this._initAuth();
   }
@@ -716,7 +691,10 @@ export class Game {
     this.hud.hideWaveBonus();   // only survival shows it
     this.nameplates.clear();
     this.waveBanner?.classList?.add('hidden');
-    this._showMapLoading(modeId, this.world.currentMapId);
+    // The preview already shows this loaded map. A loading card is reserved
+    // for a real authoritative map transition, where the server-provided map
+    // id is known and cannot disagree with the card.
+    this._hideMapLoading();
 
     if (this._isDM) {
       this._activeManager = this.botManager;
@@ -1258,10 +1236,11 @@ export class Game {
       return;
     }
 
-    // Deathmatch: infinite lives, but death remains visible for three seconds
-    // inside the live match rather than masquerading as a pause-menu state.
+    // Deathmatch: the fall and countdown remain visible while the full nav GUI
+    // opens over the live match. Respawn continues automatically behind it.
     this._beginDeathAnimation();
     if (this._isDM) {
+      if (!this._menuOpen) this._openMenu();
       this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
       clearTimeout(this._respawnTimer);
       this._respawnRemaining = RESPAWN_DELAY;
@@ -1309,6 +1288,7 @@ export class Game {
     this.matchStats.currentStreak = 0;
     this._respawnRemaining = RESPAWN_DELAY;
     this._beginDeathAnimation();
+    if (!this._menuOpen) this._openMenu();
     this.hud.showRespawn(this._respawnRemaining);
     this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
     this.weaponSystem.resetMotionState();
@@ -1446,10 +1426,11 @@ export class Game {
     // Dead players are frozen where they fell until the respawn timer fires —
     // clicking back in early shouldn't let a corpse run around and shoot.
     let dead = this.player.isDead && !this._playerDowned;
-    if (!menuOpen && this._authNet && this._authNet.ready) {
-      // Keep receiving authoritative snapshots while locally dead; otherwise
-      // the server's respawn can never clear the client's dead state.
-      this._authNet.update(dt, this.input);
+    if (this._authNet && this._authNet.ready) {
+      // Menus are presentation only. Keep receiving server snapshots behind
+      // them so the world and automatic respawn continue, but send neutral
+      // controls while the full navigation GUI owns the mouse and keyboard.
+      this._authNet.update(dt, this.input, !menuOpen && !dead);
     } else if (!menuOpen && !dead) {
       if (!this.world.usesMeshCollision && (this._moveSimOn ?? (this._moveSimOn = moveSimEnabled()))) {
         if (!this.moveBridge) this.moveBridge = new MoveBridge(this.player, this.world);

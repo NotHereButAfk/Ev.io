@@ -215,6 +215,16 @@ export class GrenadeSystem {
     this.smokeClouds.push({ meshes, t: 0, life: 9 });
   }
 
+  // Server events use the same effects without applying a second copy of
+  // client-side damage. These also make remote throws visible.
+  showAuthoritativeExplosion(point) {
+    this._fragExplode(point, null);
+  }
+
+  showAuthoritativeSmoke(point) {
+    this._smokeExplode(point);
+  }
+
   getHudInfo() {
     return { frags: this.frags, smokes: this.smokes };
   }

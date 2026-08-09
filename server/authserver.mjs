@@ -14,7 +14,7 @@
 import { createServer } from 'http';
 import { createReadStream, statSync } from 'fs';
 import { extname, join, normalize, resolve, sep } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
 
@@ -157,6 +157,9 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
         case 'fire':
           if (conn.id != null) room.onFire(conn.id, msg);
           break;
+        case 'reload':
+          if (conn.id != null) room.onReload(conn.id, msg);
+          break;
         case 'ability':
           if (conn.id != null) room.onAbility(conn.id, msg);
           break;
@@ -199,7 +202,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
 }
 
 // standalone entry
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const here = fileURLToPath(new URL('.', import.meta.url));
   const staticRoot = process.env.STATIC_ROOT || resolve(here, '../dist');
   const targetPopulation = Number.parseInt(process.env.MATCH_PLAYERS || '8', 10);

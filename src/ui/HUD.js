@@ -29,6 +29,7 @@ export class HUD {
     this.killConfirmTitle = document.getElementById('kill-confirm-title');
     this.killConfirmScore = document.getElementById('kill-confirm-score');
     this.damageFlash = document.getElementById('damage-flash');
+    this.blindOverlay = document.getElementById('blind-overlay');
     this.killfeed    = document.getElementById('killfeed');
     this.modeInfo    = document.getElementById('mode-info');
     this.dmTimer        = document.getElementById('dm-timer');
@@ -306,6 +307,15 @@ export class HUD {
     this.damageFlash.classList.add('show');
     clearTimeout(this._damageTimeout);
     this._damageTimeout = setTimeout(() => this.damageFlash.classList.remove('show'), 600);
+  }
+
+  updateBlind(secondsLeft) {
+    if (!this.blindOverlay) return;
+    const active = secondsLeft > 0;
+    this.blindOverlay.classList.toggle('active', active);
+    this.blindOverlay.style.opacity = active
+      ? String(Math.max(0.18, Math.min(1, secondsLeft / 0.7)))
+      : '0';
   }
 
   // Mid-match player join/leave toast — slides in from left, fades after 3s.

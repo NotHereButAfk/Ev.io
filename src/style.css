@@ -403,6 +403,19 @@ html, body {
   transition: opacity 0.6s ease-out;
 }
 
+#blind-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  opacity: 0;
+  background: #fff;
+  mix-blend-mode: screen;
+  transition: opacity 0.12s linear;
+}
+#blind-overlay.active { filter: brightness(1.08); }
+:root[data-reduce-flashes="1"] #blind-overlay { opacity: 0.22 !important; }
+
 /* ── Directional damage indicator ───────────────────────────────────────────
    An arc that points at whatever just shot you, pinned around the crosshair.
    Each hit spawns its own arc so multiple attackers read as separate arrows. */

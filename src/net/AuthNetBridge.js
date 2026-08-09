@@ -67,6 +67,8 @@ export class AuthNetBridge {
     this._acc = 0;
     this._fireCd = 0;
     this._prevFireDown = false;
+    this._prevReloadDown = false;
+    this._autoReloadRequested = false;
     this._tpsDesired = new THREE.Vector3();
     this._tpsOffset = new THREE.Vector3();
     this._tpsRaycaster = new THREE.Raycaster();
@@ -123,7 +125,7 @@ export class AuthNetBridge {
     return r;
   }
 
-  update(dt, input) {
+  update(dt, input, controlsEnabled = true) {
     const p = this.player, c = this.client;
     if (!c.sim) return;                 // not welcomed yet
 
@@ -131,37 +133,40 @@ export class AuthNetBridge {
     if (this._wasAlive && !alive) this.game._onAuthoritativeDeath?.(c.self);
     if (!this._wasAlive && alive) this.game._onAuthoritativeRespawn?.(c.self);
     this._wasAlive = alive;
+    const canControl = alive && controlsEnabled;
 
     // ── look (client-owned), same math as the legacy controller ──
-    const sign = p.invertY ? 1 : -1;
-    p.yaw -= input.mouseDX * MOUSE_SENS * p.sensitivityMult;
-    p.pitch += sign * input.mouseDY * MOUSE_SENS * p.sensitivityMult;
-    p.pitch = THREE.MathUtils.clamp(p.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+    if (canControl) {
+      const sign = p.invertY ? 1 : -1;
+      p.yaw -= input.mouseDX * MOUSE_SENS * p.sensitivityMult;
+      p.pitch += sign * input.mouseDY * MOUSE_SENS * p.sensitivityMult;
+      p.pitch = THREE.MathUtils.clamp(p.pitch, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
+    }
 
     // Match the legacy controller: the wheel enters/leaves third-person and
     // WeaponSystem sees _camDist immediately, so it cannot also swap weapons.
-    if (input.wheelDelta !== 0) {
+    if (canControl && input.wheelDelta !== 0) {
       p._camDist = nextThirdPersonDistance(p._camDist, input.wheelDelta);
     }
 
     // edges collected per frame, consumed on the next tick
-    if (input.consumeJustPressed('Space')) this._edges.jump = true;
-    if (input.consumeJustPressed('ControlLeft') || input.consumeJustPressed('KeyC')) this._edges.crouch = true;
-    if (input.consumeJustPressed('KeyQ')) this._edges.tele = true;
+    if (canControl && input.consumeJustPressed('Space')) this._edges.jump = true;
+    if (canControl && (input.consumeJustPressed('ControlLeft') || input.consumeJustPressed('KeyC'))) this._edges.crouch = true;
+    if (canControl && input.consumeJustPressed('KeyQ')) this._edges.tele = true;
 
     // ── fixed-tick input send + prediction ──
     this._acc += Math.min(dt, 0.1);
     const def = this.game.weaponSystem?.currentDef;
     while (this._acc >= DT) {
       this._acc -= DT;
-      const mz = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
-      const mx = (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0);
+      const mz = canControl ? (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0) : 0;
+      const mx = canControl ? (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0) : 0;
       if (alive) c.sendInput({
         mx, mz, yaw: p.yaw, pitch: p.pitch,
-        sprint: sprintRequested(input, mz),
-        crouch: input.isDown('ControlLeft') || input.isDown('KeyC'),
+        sprint: canControl && sprintRequested(input, mz),
+        crouch: canControl && (input.isDown('ControlLeft') || input.isDown('KeyC')),
         jumpJust: this._edges.jump, crouchJust: this._edges.crouch, teleJust: this._edges.tele,
-        wid: def?.id || 'm4', aiming: !!input.rightMouseDown,
+        wid: def?.id || 'm4', aiming: canControl && !!input.rightMouseDown,
       });
       this._edges.jump = this._edges.crouch = this._edges.tele = false;
     }
@@ -179,6 +184,22 @@ export class AuthNetBridge {
     // Movement prediction and the HUD now consume the same authoritative
     // stamina/inventory snapshot, so sprint drain and grenade counts agree.
     applyAuthoritativeResources(p, c, this.game.grenadeSystem);
+    this.game.kills = c.self.kills ?? this.game.kills;
+    this.game.deaths = c.self.deaths ?? this.game.deaths;
+    this.game.score = c.self.score ?? this.game.score;
+    const weaponState = this.game.weaponSystem?.currentState;
+    if (weaponState && def?.kind !== 'melee') {
+      weaponState.magAmmo = c.self.mag ?? weaponState.magAmmo;
+      weaponState.reserveAmmo = c.self.reserve ?? weaponState.reserveAmmo;
+      if (c.self.reloading) {
+        weaponState.isReloading = true;
+        weaponState.reloadTimer = (c.self.reloadTicks || 0) / 20;
+      } else if (!this._prevReloadDown) {
+        weaponState.isReloading = false;
+        weaponState.reloadTimer = 0;
+      }
+    }
+    this.game.hud?.updateBlind?.((c.self.blindTicks || 0) / 20);
     if (p._camDist > 0) {
       setThirdPersonDesired(
         this._tpsDesired, p.position, p.yaw, p.pitch, p._camDist,
@@ -219,14 +240,23 @@ export class AuthNetBridge {
 
     // ── fire (server-authoritative hit; client just requests) ──
     this._fireCd = advanceFireCooldown(this._fireCd, dt);
-    const wantsShot = alive && def && def.kind !== 'melee'
+    const reloadDown = canControl && input.isDown('KeyR');
+    if (reloadDown && !this._prevReloadDown && def?.kind !== 'melee') c.sendReload(def.id);
+    if (c.self.mag <= 0 && !c.self.reloading && !this._autoReloadRequested && def?.kind !== 'melee') {
+      c.sendReload(def.id);
+      this._autoReloadRequested = true;
+    }
+    if (c.self.mag > 0 || c.self.reloading) this._autoReloadRequested = false;
+    this._prevReloadDown = reloadDown;
+
+    const wantsShot = canControl && def
       && wantsTriggerShot(def.automatic, input.mouseDown, this._prevFireDown);
     if (wantsShot && this._fireCd <= 0) {
       c.sendFire(def.id, p.yaw, p.pitch);
       this._fireCd = scheduleNextShot(this._fireCd, def.fireRate);
     }
     if (!input.mouseDown && this._fireCd < 0) this._fireCd = 0;
-    this._prevFireDown = !!input.mouseDown;
+    this._prevFireDown = canControl && !!input.mouseDown;
 
     // ── render remote players ──
     this._syncRemotes(dt);
@@ -271,6 +301,7 @@ export class AuthNetBridge {
         sprint: r.sprint, grounded: r.grounded, vy: r.vy || 0,
         crouch: r.crouch, sliding: r.sliding,
         aiming: r.aiming, firing: r.firing, alive: r.alive,
+        reload: r.reload || 0, swing: r.swing == null ? 1 : r.swing,
       });
       // nameplate
       this._nameTarget.set(r.x, r.y + NAMEPLATE_Y, r.z);
@@ -306,6 +337,12 @@ export class AuthNetBridge {
         }
         const tag = e.head ? ' 🎯' : '';
         this.game.hud?.addKillFeed?.(`${e.byName} eliminated ${e.victimName}${tag}`);
+      }
+      else if (e.e === 'ability' && e.kind === 'smoke') {
+        this.game.grenadeSystem?.showAuthoritativeSmoke?.(new THREE.Vector3(e.x, e.y, e.z));
+      }
+      else if (e.e === 'explosion' && e.kind === 'frag') {
+        this.game.grenadeSystem?.showAuthoritativeExplosion?.(new THREE.Vector3(e.x, e.y, e.z));
       }
     }
   }

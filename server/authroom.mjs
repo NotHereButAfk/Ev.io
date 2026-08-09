@@ -12,6 +12,8 @@
 //     {t:'input', seq, tick, mx,mz,yaw,pitch,   one command per client tick
 //                 sprint,crouch,jump,crouchDown,tele}
 //     {t:'fire', seq, wid, yaw, pitch}          fire request (server hitscans)
+//     {t:'reload', wid}                         reload request (server owns ammo)
+//     {t:'ability', seq, kind, yaw, pitch}      throwable request
 //     {t:'pong', id}                            heartbeat reply
 //   server → client:
 //     {t:'welcome', you, tick, arena, players}  post-join
@@ -23,37 +25,41 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
-import { combatTargetScore } from '../src/entities/BotCombat.js';
+import { botAimErrorMeters, combatTargetScore } from '../src/entities/BotCombat.js';
+import { WEAPONS as CLIENT_WEAPONS } from '../src/weapons/weaponDefs.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
 export const TICK_MS = 1000 / TICK_HZ;
 
 const RESPAWN_TICKS = TICK_HZ * 3;          // 3s
+const SPAWN_PROTECTION_TICKS = Math.ceil(TICK_HZ * 1.5);
 const MAX_INPUT_QUEUE = 8;                  // drop floods; catch-up caps here
 const INPUT_LEAD_TICKS = 6;                 // how far ahead of server tick we allow
 const HISTORY_TICKS = 20;                   // 1s of position history for lag-comp
 const START_HEALTH = 100, START_SHIELD = 0;
 
-// Minimal server-side weapon table (authority only needs combat numbers).
-const WEAPONS = {
-  m4:          { dmg: 10, rate: 0.12, spreadMin: 0, spreadMax: 0.02,
-                 bloomShot: 0.0025, bloomRecovery: 0.008, zoomSpreadMod: 0,
-                 pellets: 1, range: 150, hs: 1, reload: 1.8, mag: 50 },
-  magnum:      { dmg: 38, rate: 0.28, spread: 0.003, pellets: 1, range: 120, hs: 2.2, reload: 1.2, mag: 8  },
-  battlerifle: { dmg: 22, rate: 0.45, spread: 0.008, pellets: 3, range: 170, hs: 1.8, reload: 2.0, mag: 36 },
-  energyshotgun:{dmg: 12, rate: 0.65, spread: 0.095, pellets: 10,range: 28,  hs: 1,   reload: 1.8, mag: 8  },
-  plasmarifle: { dmg: 13, rate: 0.08, spread: 0.015, pellets: 1, range: 90,  hs: 1,   reload: 1.6, mag: 40 },
-};
-// The authoritative combat subset above is intentionally small, but remote
-// presentation still needs to show every shipped held model (including melee).
-// Input may choose only one of these known IDs; arbitrary asset names never
-// reach snapshots or model lookup.
-const PRESENTATION_WEAPONS = new Set([
-  'sidearm', 'uzi', 'levershotgun', 'm4', 'm16', 'rifle', 'lmg', 'rpg',
-  'boltsniper', 'knife', 'sword', 'magnum', 'battlerifle', 'needler',
-  'plasmarifle', 'dmr', 'fuelrod', 'concussion', 'energyshotgun', 'ghammer',
-]);
+// Derive authority from the same catalog used by the client. The old
+// five-entry table silently converted every other shipped weapon into an M4.
+const WEAPONS = Object.fromEntries(CLIENT_WEAPONS.map((weapon) => [weapon.id, {
+  kind: weapon.kind,
+  dmg: weapon.damage,
+  rate: weapon.fireRate,
+  spread: weapon.spread,
+  spreadMin: weapon.spreadMin,
+  spreadMax: weapon.spreadMax,
+  bloomShot: weapon.spreadBloomPerShot,
+  bloomRecovery: weapon.spreadRecovery,
+  zoomSpreadMod: weapon.zoomSpreadMod,
+  pellets: weapon.pellets || 1,
+  range: weapon.range,
+  hs: weapon.headshotMultiplier || 1,
+  reload: weapon.reloadTime || 0,
+  mag: weapon.magSize || 0,
+  reserve: weapon.reserveMax || 0,
+  arc: weapon.arc || 0,
+}]));
+const PRESENTATION_WEAPONS = new Set(Object.keys(WEAPONS));
 const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 
 // Server-authoritative throwable abilities (Phase 10). The server owns charges,
@@ -161,6 +167,11 @@ export class AuthRoom {
       player.deaths = 0;
       player.score = 0;
       player.mag = (WEAPONS[player.wid] || WEAPONS.m4).mag;
+      player.ammo = { [player.wid]: { mag: player.mag, reserve: (WEAPONS[player.wid] || WEAPONS.m4).reserve } };
+      player.reloadUntil = 0;
+      player.reloadWid = null;
+      player.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
+      player._swingStart = player._swingUntil = 0;
       player.fireCooldown = 0;
       player.gunBloom = 0;
       player._animVX = player._animVZ = 0;
@@ -214,6 +225,10 @@ export class AuthRoom {
       health: START_HEALTH, shield: START_SHIELD, maxShield: START_SHIELD,
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
       wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
+      ammo: { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } },
+      reloadUntil: 0, reloadWid: null,
+      invulnerableUntil: this.tick + SPAWN_PROTECTION_TICKS,
+      _swingStart: 0, _swingUntil: 0,
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       _botReloadUntil: 0,
       history: [],               // [{tick, x,y,z}]
@@ -245,7 +260,7 @@ export class AuthRoom {
     let target = null;
     let bestScore = Infinity;
     for (const other of this.players.values()) {
-      if (other === p || !other.alive) continue;
+      if (other === p || !other.alive || this.tick < (other.invulnerableUntil || 0)) continue;
       const dx = other.state.px - p.state.px;
       const dz = other.state.pz - p.state.pz;
       const d2 = dx * dx + dz * dz;
@@ -275,18 +290,19 @@ export class AuthRoom {
       sprint: distance > 22,
       jumpJust: (this.tick + p.id * 29) % 173 === 0,
     });
+    if (p._botTargetId !== target.id) {
+      p._botTargetId = target.id;
+      p._botTargetSince = this.tick;
+    }
 
     if (p.mag <= 0) {
-      if (!p._botReloadUntil) p._botReloadUntil = this.tick + Math.ceil(WEAPONS.m4.reload * TICK_HZ);
-      if (this.tick >= p._botReloadUntil) {
-        p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;
-        p._botReloadUntil = 0;
-      }
+      this._startReload(p, p.wid);
     }
 
     // Bots use the exact same authoritative fire request and hitscan path as a
     // socket player. Geometry LOS is checked before they pull the trigger.
-    if (distance < 105 && p.fireCooldown <= 0 && p.mag > 0) {
+    const reacted = this.tick - (p._botTargetSince || 0) >= 5;
+    if (reacted && distance < 105 && p.fireCooldown <= 0 && p.reloadUntil <= this.tick && p.mag > 0) {
       const cp = Math.cos(pitch);
       const rayDistance = rayVsBoxes(
         this.simWorld,
@@ -339,7 +355,8 @@ export class AuthRoom {
     if (!p || !p.alive) return;
     if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;   // replay/dup
     p.lastFireSeq = msg.seq;
-    const requestedWid = WEAPONS[msg.wid] ? msg.wid : 'm4';
+    const requestedWid = WEAPONS[msg.wid] ? msg.wid : null;
+    if (!requestedWid) return;
     const requestedWeapon = WEAPONS[requestedWid];
     // Carry fractional tick debt only inside one continuous burst. Otherwise a
     // long idle period could bank negative cooldown and double-tap the first
@@ -353,6 +370,44 @@ export class AuthRoom {
     p.fireReq = { wid: requestedWid,
                   yaw: Number.isFinite(msg.yaw) ? msg.yaw : 0,
                   pitch: Number.isFinite(msg.pitch) ? msg.pitch : 0 };
+  }
+
+  onReload(id, msg) {
+    const p = this.players.get(id);
+    if (!p || !p.alive) return;
+    const wid = WEAPONS[msg.wid] ? msg.wid : p.wid;
+    if (wid !== p.wid) return;
+    this._startReload(p, wid);
+  }
+
+  _weaponState(p, wid = p.wid) {
+    const weapon = WEAPONS[wid] || WEAPONS.m4;
+    p.ammo ||= {};
+    p.ammo[wid] ||= { mag: weapon.mag, reserve: weapon.reserve };
+    return p.ammo[wid];
+  }
+
+  _startReload(p, wid = p.wid) {
+    const weapon = WEAPONS[wid];
+    if (!weapon || weapon.kind === 'melee' || weapon.mag <= 0) return false;
+    const ammo = this._weaponState(p, wid);
+    if (p.reloadUntil > this.tick || ammo.mag >= weapon.mag || ammo.reserve <= 0) return false;
+    p.reloadWid = wid;
+    p.reloadUntil = this.tick + Math.max(1, Math.ceil(weapon.reload * TICK_HZ));
+    return true;
+  }
+
+  _finishReload(p) {
+    if (!p.reloadWid || p.reloadUntil > this.tick) return;
+    const wid = p.reloadWid;
+    const weapon = WEAPONS[wid];
+    const ammo = this._weaponState(p, wid);
+    const amount = Math.min(weapon.mag - ammo.mag, ammo.reserve);
+    ammo.mag += amount;
+    ammo.reserve -= amount;
+    p.reloadWid = null;
+    p.reloadUntil = 0;
+    if (p.wid === wid) p.mag = ammo.mag;
   }
 
   // Ability request (replay-guarded). Charges + cooldown + effects are ALL
@@ -386,9 +441,13 @@ export class AuthRoom {
       for (const t of this.players.values()) {
         if (t === shooter || !t.alive) continue;
         const pos = this._rewound(t, rewind);
-        const hit = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + HEAD_Y, pos.z, HEAD_R, bestT);
+        const headY = Math.max(0.8, (t.state.eye || 1.7) - 0.15);
+        const hit = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + headY, pos.z, HEAD_R, bestT);
         if (hit && hit.t < bestT) { best = { t, head: true, t2: hit.t }; bestT = hit.t; continue; }
-        const body = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + 0.9, pos.z, BODY_R, bestT);
+        const lowered = !!(t.state.crouch || t.state.slide);
+        const bodyY = lowered ? 0.58 : 0.9;
+        const bodyR = lowered ? 0.42 : BODY_R;
+        const body = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + bodyY, pos.z, bodyR, bestT);
         if (body && body.t < bestT) { best = { t, head: false, t2: body.t }; bestT = body.t; }
       }
       // smoke occlusion: if the ray to the hit passes through an active smoke
@@ -409,7 +468,7 @@ export class AuthRoom {
   }
 
   _damage(target, shooter, dmg, head) {
-    if (!target.alive) return;
+    if (!target.alive || this.tick < (target.invulnerableUntil || 0)) return;
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
@@ -517,6 +576,7 @@ export class AuthRoom {
 
     for (const p of this.players.values()) {
       const equipped = WEAPONS[p.wid] || WEAPONS.m4;
+      this._finishReload(p);
       p.fireCooldown = Math.max(
         -(equipped.rate || 0.12),
         p.fireCooldown - 1 / TICK_HZ,
@@ -533,11 +593,15 @@ export class AuthRoom {
           p.state = createState(s[0], s[1], s[2]);
           p.health = START_HEALTH; p.shield = p.maxShield;
           p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;
+          p.ammo = { [p.wid]: { mag: p.mag, reserve: (WEAPONS[p.wid] || WEAPONS.m4).reserve } };
+          p.reloadUntil = 0; p.reloadWid = null;
+          p.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
           p.alive = true; p.queue.length = 0;
           p._lastSprint = false;
           p._animVX = p._animVZ = 0;
           p._lastAim = false;
           p._firingTicks = 0;
+          p._swingStart = p._swingUntil = 0;
           p._botReloadUntil = 0;
           p.gunBloom = 0;
           p.blindUntil = 0;
@@ -562,6 +626,7 @@ export class AuthRoom {
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
       p.wid = cmd.wid || p.wid;
+      p.mag = this._weaponState(p, p.wid).mag;
       p._lastAim = !!cmd.aiming;
       // Public animation velocity is resolved displacement, not requested
       // velocity, so a player pinned against a wall does not run in place.
@@ -586,24 +651,36 @@ export class AuthRoom {
     for (const p of this.players.values()) {
       if (!p.fireReq || !p.alive) { p.fireReq = null; continue; }
       const req = p.fireReq; p.fireReq = null;
-      if (p.fireCooldown > 0 || p.mag <= 0) continue;   // authority: rate + ammo
+      if (req.wid !== p.wid || p.fireCooldown > 0 || p.reloadUntil > this.tick) continue;
       const w = WEAPONS[req.wid] || WEAPONS.m4;
+      const ammo = this._weaponState(p, req.wid);
+      if (w.kind !== 'melee' && ammo.mag <= 0) { this._startReload(p, req.wid); continue; }
       if (p.isBot && req.botTargetId != null) {
         const target = this.players.get(req.botTargetId);
         if (target?.alive) {
           const tx = target.state.px - p.state.px;
           const tz = target.state.pz - p.state.pz;
-          req.yaw = Math.atan2(-tx, -tz);
+          const distance = Math.max(0.001, Math.hypot(tx, tz));
+          const error = botAimErrorMeters(distance, 1);
+          const yawJitter = (this._rand(p.id * 811 + this.tick * 17) * 2 - 1) * error / distance;
+          const pitchJitter = (this._rand(p.id * 619 + this.tick * 23) * 2 - 1) * error / distance;
+          req.yaw = Math.atan2(-tx, -tz) + yawJitter;
           req.pitch = Math.atan2(
             (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y),
-            Math.max(0.001, Math.hypot(tx, tz)),
-          );
+            distance,
+          ) + pitchJitter;
         }
       }
       p.wid = req.wid;
       p.fireCooldown = Math.max(-w.rate, p.fireCooldown) + w.rate;
-      p.mag--;
+      if (w.kind !== 'melee') ammo.mag--;
+      else {
+        p._swingStart = this.tick;
+        p._swingUntil = this.tick + Math.max(1, Math.ceil(w.rate * TICK_HZ));
+      }
+      p.mag = ammo.mag;
       this._hitscan(p, w, req.yaw, req.pitch, p._lastAim);
+      if (w.kind !== 'melee' && ammo.mag <= 0) this._startReload(p, req.wid);
       if (w.spreadMax != null) {
         p.gunBloom = Math.min(w.spreadMax, (p.gunBloom || 0) + (w.bloomShot || 0));
       }
@@ -624,6 +701,9 @@ export class AuthRoom {
     const now = this.tick;
     const publicList = [];
     for (const p of this.players.values()) {
+      const reloadDuration = Math.max(1, Math.ceil((WEAPONS[p.wid]?.reload || 0) * TICK_HZ));
+      const reloadTicks = p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0;
+      const swingDuration = Math.max(1, p._swingUntil - p._swingStart);
       publicList.push({
         id: p.id, name: p.name, isBot: p.isBot,
         x: p.state.px, y: p.state.py, z: p.state.pz,
@@ -633,12 +713,16 @@ export class AuthRoom {
         slide: p.state.slide, sprint: !!p._lastSprint, wid: p.wid,
         aiming: !!p._lastAim,
         firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
+        reload: reloadTicks > 0 ? 1 - reloadTicks / reloadDuration : 0,
+        swing: p._swingUntil > now ? clamp((now - p._swingStart) / swingDuration, 0, 1) : 1,
         health: p.health, shield: p.shield,
         kills: p.kills, deaths: p.deaths, score: p.score,
       });
     }
     const smokeList = this.smokes.map((s) => ({ x: s.x, y: s.y, z: s.z, r: s.r }));
     for (const p of this.players.values()) {
+      const ammo = this._weaponState(p, p.wid);
+      p.mag = ammo.mag;
       p.send({
         t: 'snapshot', tick: now, ack: p.ackTick,
         mapId: this.arena.id,
@@ -658,7 +742,12 @@ export class AuthRoom {
                safeX: p.state.safeX, safeY: p.state.safeY, safeZ: p.state.safeZ,
                sprint: !!p._lastSprint,
                health: p.health, shield: p.shield, alive: p.alive,
-               mag: p.mag, kills: p.kills, deaths: p.deaths, score: p.score,
+               mag: p.mag, reserve: ammo.reserve,
+               reloading: p.reloadWid === p.wid && p.reloadUntil > now,
+               reloadTicks: p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0,
+               reloadDuration: Math.ceil((WEAPONS[p.wid]?.reload || 0) * TICK_HZ),
+               spawnProtected: now < (p.invulnerableUntil || 0),
+               kills: p.kills, deaths: p.deaths, score: p.score,
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),
                abilities: p.abilities, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,

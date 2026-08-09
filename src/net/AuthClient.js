@@ -29,7 +29,9 @@ export class AuthClient {
     this.sprinting = false;                 // exact predicted MoveSim presentation
     this.simWorld = null;
     this.remotes = new Map();               // id -> {name, buf:[{t,x,y,z,yaw,crouch}]}
-    this.self = { health: 100, shield: 0, alive: true, mag: 30, kills: 0, deaths: 0, score: 0,
+    this.self = { health: 100, shield: 0, alive: true, mag: 30, reserve: 0,
+                  reloading: false, reloadTicks: 0, reloadDuration: 0,
+                  kills: 0, deaths: 0, score: 0,
                   blind: false, blindTicks: 0, abilities: { frag: 2, flash: 2, smoke: 2, impulse: 2 }, abilityCD: 0 };
     this.smokes = [];                       // active smoke volumes from the server
     this.abilitySeq = 0;
@@ -119,7 +121,11 @@ export class AuthClient {
     // authoritative self
     const y = snap.you;
     this.self = { health: y.health, shield: y.shield, alive: y.alive,
-                  mag: y.mag, kills: y.kills, deaths: y.deaths, score: y.score,
+                  mag: y.mag, reserve: y.reserve ?? this.self.reserve,
+                  reloading: !!y.reloading, reloadTicks: y.reloadTicks ?? 0,
+                  reloadDuration: y.reloadDuration ?? 0,
+                  spawnProtected: !!y.spawnProtected,
+                  kills: y.kills, deaths: y.deaths, score: y.score,
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
                   abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
@@ -165,6 +171,7 @@ export class AuthClient {
                    grounded: pl.onGround !== false, crouch: pl.crouch, slide: !!pl.slide,
                    sprint: !!pl.sprint, wid: pl.wid || 'm4', aiming: !!pl.aiming,
                    firing: !!pl.firing,
+                   reload: pl.reload || 0, swing: pl.swing == null ? 1 : pl.swing,
                    alive: pl.alive, health: pl.health,
                    kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0 });
       if (r.buf.length > 20) r.buf.shift();
@@ -208,6 +215,11 @@ export class AuthClient {
     this.ws.send(JSON.stringify({ t: 'fire', seq: this.fireSeq, wid, yaw, pitch }));
   }
 
+  sendReload(wid) {
+    if (!this.connected) return;
+    this.ws.send(JSON.stringify({ t: 'reload', wid }));
+  }
+
   // Request a throwable ability (frag / flash / smoke / impulse). The server owns
   // charges, cooldown, and the effect — this is only a request.
   sendAbility(kind, yaw, pitch) {
@@ -244,6 +256,9 @@ export class AuthClient {
         vz: a.vz + (b.vz - a.vz) * f,
         grounded: b.grounded, crouch: b.crouch, sliding: b.slide,
         sprint: b.sprint, wid: b.wid, aiming: b.aiming, firing: !!b.firing,
+        reload: (a.reload || 0) + ((b.reload || 0) - (a.reload || 0)) * f,
+        swing: (a.swing == null ? 1 : a.swing)
+          + ((b.swing == null ? 1 : b.swing) - (a.swing == null ? 1 : a.swing)) * f,
       });
     }
     return out;
