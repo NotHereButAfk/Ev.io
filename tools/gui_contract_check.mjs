@@ -51,6 +51,11 @@ requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
   requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
 }
+for (const bootClass of ['boot-building', 'boot-map-panel', 'boot-map-name', 'boot-map-spinner', 'boot-map-progress']) {
+  requireMatch(index, new RegExp(`class=["'][^"']*${bootClass}`), `initial map loading composition: ${bootClass}`);
+}
+requireMatch(css, /\.boot-map-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
+  'initial loading left information rail');
 for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner', 'ml-progress']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
 }

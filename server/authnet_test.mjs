@@ -280,8 +280,15 @@ const duelHuman = duelRoom.players.get(duelHumanId);
 const duelBot = duelRoom.players.get(duelBotId);
 duelHuman.state.px = 0; duelHuman.state.pz = -10;
 duelBot.state.px = 0; duelBot.state.pz = 0;
+duelHuman.invulnerableUntil = 0;
+duelBot.invulnerableUntil = 0;
+for (let i = 0; i < 100; i++) duelRoom.update();
+ok('bots: an unprovoked human remains neutral and takes no damage',
+   duelHuman.health === 100 && duelHuman.deaths === 0,
+   `health=${duelHuman.health}, deaths=${duelHuman.deaths}`);
+duelRoom._damage(duelBot, duelHuman, 1, false);
 for (let i = 0; i < 200; i++) duelRoom.update();
-ok('bots: autonomous aim and fire can finish a human kill', duelHuman.deaths >= 1,
+ok('bots: a provoked bot can retaliate and finish a human kill', duelHuman.deaths >= 1,
    `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
 
 // Moving-target lag compensation must use the snapshot clock, not the input

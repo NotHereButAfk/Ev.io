@@ -124,6 +124,7 @@ export class Bot {
     this._muzzleFlash = null;
     this._weaponBaseZ = 0;
     this._provoked     = false;
+    this._provokedByPlayer = false;
     this._provokeTimer = 0;
     this._losT         = Math.random() * 0.12;
     this._losCache     = false;
@@ -241,12 +242,16 @@ export class Bot {
 
   get isDead() { return !this.alive; }
 
-  takeDamage(amount) {
+  takeDamage(amount, attacker = null) {
     if (!this.alive) return false;
     // Damage immediately refreshes combat memory even if the attacker fired
     // from outside the normal vision cone/range.
     if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
     this._provoked = true;
+    // A missing attacker is the local player weapon/grenade path. Bot-v-bot
+    // damage passes the attacking bot explicitly and must not make this bot
+    // hostile toward the human later.
+    if (!attacker) this._provokedByPlayer = true;
     this._provokeTimer = PROVOKE_DURATION;
     this.health = Math.max(0, this.health - amount);
     this.flashTimer = 0.12;
@@ -301,6 +306,7 @@ export class Bot {
     this._stuckT = 0;
     this._lastSeenValid = false;
     this._provoked = false;
+    this._provokedByPlayer = false;
     this._provokeTimer = 0;
     this._losCache = false;
     this._decisionT = 0;
@@ -503,10 +509,8 @@ export class Bot {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
     // ── Awareness ──────────────────────────────────────────────────────────────
-    // Bots acquire visible opponents on their own, remember the last place they
-    // saw them, and pursue that point for a short time after line-of-sight is
-    // broken. They never fire through cover: only a fresh LOS cache permits a
-    // shot.
+    // A bot only retaliates after takeDamage() provokes it. Visibility refreshes
+    // combat memory after that point, but merely walking into view is neutral.
     const inRange = !player.isDead && distToPlayer < DETECT_RADIUS;
     this._losT -= dt;
     if (inRange) {
@@ -518,10 +522,14 @@ export class Bot {
       this._losCache = false;
     }
     const hasVisual = inRange && this._losCache;
-    if (hasVisual) {
-      if (!this._provoked) {
-        this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
-      }
+    const canEngageTarget = !!player?.isBot || this._provokedByPlayer;
+    if (player.isDead) {
+      this._provoked = false;
+      this._provokedByPlayer = false;
+      this._provokeTimer = 0;
+      this._lastSeenValid = false;
+    } else if (hasVisual && canEngageTarget) {
+      if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
       this._provoked = true;
       this._provokeTimer = PROVOKE_DURATION;
       this._lastSeenPos.copy(player.position);
@@ -530,14 +538,12 @@ export class Bot {
       this._provokeTimer -= dt;
       if (this._provokeTimer <= 0) {
         this._provoked = false;
+        this._provokedByPlayer = false;
         this._lastSeenValid = false;
       }
-    } else if (player.isDead) {
-      this._provoked = false;
-      this._lastSeenValid = false;
     }
     if (this._reactT > 0) this._reactT -= dt;
-    const engaged = this._provoked && !player.isDead && (hasVisual || this._lastSeenValid);
+    const engaged = canEngageTarget && this._provoked && !player.isDead && (hasVisual || this._lastSeenValid);
 
     let moveTarget = null;
     let gaitDirF = 0;

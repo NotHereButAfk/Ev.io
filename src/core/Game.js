@@ -293,6 +293,16 @@ export class Game {
     const phase = document.getElementById('boot-phase');
     const detail = document.getElementById('boot-detail');
     const percent = document.getElementById('boot-percent');
+    const previewMap = getImportedMap(this.world.currentMapId);
+    const bootName = document.getElementById('boot-map-name');
+    const bootRegion = document.getElementById('boot-map-region');
+    if (bootName) bootName.replaceChildren(...previewMap.name.split(/\s+/).flatMap((part, index) => {
+      const nodes = [];
+      if (index) nodes.push(document.createElement('br'));
+      nodes.push(document.createTextNode(part));
+      return nodes;
+    }));
+    if (bootRegion) bootRegion.textContent = previewMap.region || 'US East (Atlanta)';
     const setBoot = (value, title, copy) => {
       if (bar) bar.style.width = `${value}%`;
       if (phase) phase.textContent = title;
@@ -300,7 +310,7 @@ export class Game {
       if (percent) percent.textContent = `${value}%`;
     };
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const minimumDisplay = delay(1050);
+    const minimumDisplay = delay(2600);
 
     setBoot(12, 'INITIALIZING ARENA', 'Renderer online');
     await delay(120);
@@ -1121,7 +1131,7 @@ export class Game {
   _finishServerJoining() {
     const elapsed = performance.now() - (this._serverJoinShownAt || 0);
     clearTimeout(this._serverJoinTimer);
-    this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), Math.max(0, 650 - elapsed));
+    this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), Math.max(0, 1800 - elapsed));
   }
 
   _showMapLoading(modeId, mapId = this.world.currentMapId) {

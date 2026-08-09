@@ -32,16 +32,23 @@
   <div id="app">
     <canvas id="game-canvas"></canvas>
 
-    <!-- ===================== BOOT SCREEN (pulsating logo) ===================== -->
+    <!-- ===================== BOOT / MAP BUILD SCREEN ===================== -->
     <div id="connect-screen" class="overlay">
-      <div class="connect-panel">
-        <h1 class="logo boot-logo">KYX<span>.IO</span></h1>
-        <p class="tagline boot-tagline">The Halo of Web3</p>
-        <div class="boot-load" aria-live="polite">
-          <div class="boot-phase" id="boot-phase">INITIALIZING ARENA</div>
-          <div class="boot-track"><div id="boot-progress"></div></div>
-          <div class="boot-meta"><span id="boot-detail">Renderer online</span><span id="boot-percent">0%</span></div>
-        </div>
+      <div class="boot-building">Building map...</div>
+      <div class="boot-map-panel">
+        <div class="boot-map-brand">KYX // ARENA LINK</div>
+        <div class="boot-map-name" id="boot-map-name">DAYTIME<br/>ROOK</div>
+        <div class="boot-map-region" id="boot-map-region">Rook Sector</div>
+        <div class="boot-map-mode">Deathmatch</div>
+        <div class="boot-map-players">8 players</div>
+        <div class="boot-map-tip">TIP: sprint with SHIFT</div>
+      </div>
+      <div class="boot-map-progress"><div id="boot-progress"></div></div>
+      <div class="boot-map-spinner" aria-label="Building map"></div>
+      <div class="boot-status" aria-live="polite">
+        <span id="boot-phase">INITIALIZING ARENA</span>
+        <span id="boot-detail">Renderer online</span>
+        <span id="boot-percent">0%</span>
       </div>
     </div>
 

@@ -93,11 +93,6 @@ assert.equal(otherBot.health, 90, 'bot-vs-bot damage should reach the selected o
 assert.equal(player.health, 100, 'bots must not all focus the human player');
 console.log('ok   bots select and damage nearby opponents instead of forming a 7v1');
 
-assert.ok(
-  combatTargetScore({ distance: 12, isHuman: true, botId: 3 })
-    < combatTargetScore({ distance: 8, isHuman: false, botId: 3 }),
-  'designated pressure bot should prefer a visible human within the pressure bias',
-);
 const pressureBot = makeFakeBot(0);
 pressureBot.id = 3;
 pressureBot.shouldFire = true;
@@ -107,8 +102,14 @@ player.health = 100;
 const pressureManager = new BotManager(null, null);
 pressureManager.bots = [pressureBot, pressureRival];
 pressureManager.update(0.1, player, null, (damage) => { player.health -= damage; }, null);
-assert.equal(pressureBot.observedTarget, player, 'pressure bot ignored the human target');
-assert.equal(player.health, 90, 'pressure bot could not damage/kill the human player');
-console.log('ok   designated bots actively pressure and damage the human player');
+assert.equal(pressureBot.observedTarget, pressureRival, 'unprovoked bot selected the neutral human');
+assert.equal(player.health, 100, 'unprovoked bot damaged the neutral human');
+pressureBot._provokedByPlayer = true;
+pressureBot._targetEntity = null;
+pressureBot._targetScanT = 0;
+pressureManager.update(0.1, player, null, (damage) => { player.health -= damage; }, null);
+assert.equal(pressureBot.observedTarget, player, 'provoked bot did not retaliate against the human');
+assert.equal(player.health, 90, 'provoked bot could not damage the human');
+console.log('ok   bots leave humans neutral until attacked, then retaliate');
 
 console.log('\nall bot combat checks passed');

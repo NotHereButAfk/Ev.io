@@ -247,11 +247,13 @@ forward is **+Z** → add `π` to their yaw. A weapon's muzzle is its own local
 `rotation.order = 'YXZ'` so lean and death-topple happen about the body's axes,
 not the world's.
 
-**5. Bots actively play the free-for-all.** The owner superseded the earlier
-passive-until-shot rule on 2026-07-29 after reviewing ev.io gameplay.
-`BotManager` must select from the human and other living bots—never turn the
-lobby into a 7v1. `Bot.js` may acquire on sight, orbit/retreat/rush, jump and
-pursue a last-seen point, but it must not fire without current line of sight.
+**5. Bots fight bots freely, but humans are neutral until they attack.** The
+owner restored the passive-until-shot human rule on 2026-08-09 after live
+playtesting. `BotManager` may acquire other living bots on sight, but must
+exclude the human until that specific bot has taken human damage. Bot-on-bot
+damage must not provoke hostility toward the human, and death/respawn clears
+old aggression. Once provoked, `Bot.js` may orbit/retreat/rush, jump and pursue
+a last-seen point, but it must not fire without current line of sight.
 `AIM_ERR_BASE` / `AIM_ERR_PER_M` remain the difficulty dial; do not replace
 physical scatter with perfect aim or a damage dice roll. Run `npm run
 test:bots` after changing combat behavior.

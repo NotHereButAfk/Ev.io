@@ -93,7 +93,8 @@ export class BotManager {
         if (!currentValid || bot._targetScanT <= 0) {
           const candidates = [player, ...this.bots].filter((candidate) =>
             candidate && candidate !== bot && candidate.position &&
-            !candidate.isDead && candidate.alive !== false
+            !candidate.isDead && candidate.alive !== false &&
+            (candidate !== player || bot._provokedByPlayer)
           );
           let best = null;
           let bestScore = Infinity;
@@ -129,7 +130,7 @@ export class BotManager {
           }
         : (damage) => {
             if (!target?.alive) return;
-            const killed = target.takeDamage(damage);
+            const killed = target.takeDamage(damage, bot);
             target._targetEntity = bot;
             target._targetScanT = 0.9;
             if (killed) {
