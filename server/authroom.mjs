@@ -101,6 +101,26 @@ function rayVsBoxes(world, ox, oy, oz, dx, dy, dz, maxT) {
 
 let _pid = 1;
 
+// Select from the safest authored tier relative to every living combatant.
+// Vertical separation is deliberately discounted: a bot one floor above is
+// still a dangerous spawn neighbour in an arena shooter.
+export function chooseSafeSpawn(spawns, occupants = [], seed = 0) {
+  if (!spawns?.length) return [0, 0, 0];
+  if (!occupants.length) return [...spawns[Math.abs(seed) % spawns.length]];
+  const scored = spawns.map((spawn, index) => {
+    let nearest = Infinity;
+    for (const occupant of occupants) {
+      const dx = spawn[0] - occupant[0];
+      const dy = spawn[1] - occupant[1];
+      const dz = spawn[2] - occupant[2];
+      nearest = Math.min(nearest, dx * dx + dz * dz + dy * dy * 0.2);
+    }
+    return { spawn, index, nearest };
+  }).sort((a, b) => b.nearest - a.nearest || a.index - b.index);
+  const tierSize = Math.max(1, Math.ceil(scored.length / 3));
+  return [...scored[Math.abs(seed) % tierSize].spawn];
+}
+
 export class AuthRoom {
   constructor(arena = IMPORTED_ARENAS, { targetPopulation = 0 } = {}) {
     this.arenas = Array.isArray(arena) ? arena : [arena];
@@ -155,7 +175,7 @@ export class AuthRoom {
 
     let spawnIndex = 0;
     for (const player of this.players.values()) {
-      const spawn = this._spawn(spawnIndex++);
+      const spawn = this._spawn(spawnIndex++, null, false);
       player.state = createState(spawn[0], spawn[1], spawn[2]);
       player.queue.length = 0;
       player.history.length = 0;
@@ -216,7 +236,7 @@ export class AuthRoom {
 
   _add(send, name, isBot) {
     const id = _pid++;
-    const spawn = this._spawn();
+    const spawn = this._spawn(id, id, true);
     const p = {
       id, send, name, isBot: !!isBot,
       state: createState(spawn[0], spawn[1], spawn[2]),
@@ -321,9 +341,17 @@ export class AuthRoom {
     return { seq, inp, wid: p.wid, aiming: distance < 55 };
   }
 
-  _spawn(index = _pid) {
-    const s = this.arena.spawns[index % this.arena.spawns.length];
-    return [s[0], s[1], s[2]];
+  _spawn(index = _pid, excludeId = null, safe = true) {
+    if (!safe) {
+      const s = this.arena.spawns[Math.abs(index) % this.arena.spawns.length];
+      return [s[0], s[1], s[2]];
+    }
+    const occupants = [];
+    for (const player of this.players.values()) {
+      if (!player.alive || player.id === excludeId) continue;
+      occupants.push([player.state.px, player.state.py, player.state.pz]);
+    }
+    return chooseSafeSpawn(this.arena.spawns, occupants, index);
   }
 
   // Validated input: the client proposes intent; the server owns the sim.
@@ -589,7 +617,7 @@ export class AuthRoom {
 
       if (!p.alive) {
         if (this.tick >= p.deadUntil) {
-          const s = this._spawn();
+          const s = this._spawn(p.id, p.id, true);
           p.state = createState(s[0], s[1], s[2]);
           p.health = START_HEALTH; p.shield = p.maxShield;
           p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;

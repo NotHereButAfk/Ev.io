@@ -14,7 +14,44 @@
 
 import { createState, step, makeInput, isSprinting, DT } from '../sim/MoveSim.js';
 
-const INTERP_DELAY = 2 * DT * 1000;         // render remotes 2 ticks behind (ms)
+const INTERP_DELAY = 3 * DT * 1000;         // absorb ordinary 20Hz packet jitter
+const MAX_EXTRAPOLATION = 75;                // never predict a remote far into the future
+const TELEPORT_DISTANCE_SQ = 16;             // do not tween respawns/teleports through walls
+
+const lerp = (a, b, f) => a + (b - a) * f;
+const lerpYaw = (a, b, f) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * f;
+
+// Pure presentation helper so irregular packet delivery can be regression tested.
+// Samples are stamped in authoritative server time, not browser arrival time.
+export function interpolateRemoteSample(buf, renderT) {
+  if (!buf?.length) return null;
+  let a = buf[0], b = buf[buf.length - 1], f = 1;
+  if (renderT <= buf[0].t) {
+    a = b = buf[0];
+  } else if (renderT >= b.t) {
+    const ahead = Math.min(MAX_EXTRAPOLATION, renderT - b.t) / 1000;
+    return { ...b, x: b.x + b.vx * ahead, y: b.y + b.vy * ahead, z: b.z + b.vz * ahead };
+  } else {
+    for (let i = 0; i < buf.length - 1; i++) {
+      if (buf[i].t <= renderT && buf[i + 1].t >= renderT) {
+        a = buf[i]; b = buf[i + 1];
+        f = (renderT - a.t) / Math.max(1, b.t - a.t);
+        break;
+      }
+    }
+  }
+  return {
+    ...b,
+    x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f), z: lerp(a.z, b.z, f),
+    yaw: lerpYaw(a.yaw, b.yaw, f),
+    pitch: lerp(a.pitch || 0, b.pitch || 0, f),
+    vx: lerp(a.vx || 0, b.vx || 0, f),
+    vy: lerp(a.vy || 0, b.vy || 0, f),
+    vz: lerp(a.vz || 0, b.vz || 0, f),
+    reload: lerp(a.reload || 0, b.reload || 0, f),
+    swing: lerp(a.swing == null ? 1 : a.swing, b.swing == null ? 1 : b.swing, f),
+  };
+}
 
 export class AuthClient {
   constructor(url, { name = 'Recruit' } = {}) {
@@ -43,7 +80,9 @@ export class AuthClient {
     this.matchDurationMs = null;
     this.onWelcome = null;
     this.onMapChange = null;
+    this.onSnapshot = null;
     this.postStep = null;
+    this._serverClockOffset = null;
     this._acc = 0;
   }
 
@@ -160,13 +199,28 @@ export class AuthClient {
     for (const c of this.pending) this._predict(c.inp);
 
     // remote interpolation buffers
-    const t = performance.now();
+    const arrivalT = performance.now();
+    const serverT = (snap.tick || 0) * DT * 1000;
+    const clockCandidate = arrivalT - serverT;
+    if (this._serverClockOffset == null) this._serverClockOffset = clockCandidate;
+    else if (clockCandidate < this._serverClockOffset) {
+      this._serverClockOffset = lerp(this._serverClockOffset, clockCandidate, 0.12);
+    } else {
+      this._serverClockOffset = lerp(this._serverClockOffset, clockCandidate, 0.005);
+    }
     for (const pl of snap.players) {
       if (pl.id === this.you) continue;
       let r = this.remotes.get(pl.id);
-      if (!r) { r = { name: pl.name, buf: [] }; this.remotes.set(pl.id, r); }
+      if (!r) { r = { name: pl.name, isBot: !!pl.isBot, buf: [] }; this.remotes.set(pl.id, r); }
       r.name = pl.name;
-      r.buf.push({ t, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch || 0,
+      r.isBot = !!pl.isBot;
+      const previous = r.buf[r.buf.length - 1];
+      const jumped = previous && (
+        previous.alive !== pl.alive
+        || ((previous.x - pl.x) ** 2 + (previous.y - pl.y) ** 2 + (previous.z - pl.z) ** 2) > TELEPORT_DISTANCE_SQ
+      );
+      if (jumped) r.buf.length = 0;
+      r.buf.push({ t: serverT, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch || 0,
                    vx: pl.vx || 0, vy: pl.vy || 0, vz: pl.vz || 0,
                    grounded: pl.onGround !== false, crouch: pl.crouch, slide: !!pl.slide,
                    sprint: !!pl.sprint, wid: pl.wid || 'm4', aiming: !!pl.aiming,
@@ -174,13 +228,14 @@ export class AuthClient {
                    reload: pl.reload || 0, swing: pl.swing == null ? 1 : pl.swing,
                    alive: pl.alive, health: pl.health,
                    kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0 });
-      if (r.buf.length > 20) r.buf.shift();
+      if (r.buf.length > 30) r.buf.shift();
     }
     // reap gone players
     const present = new Set(snap.players.map((p) => p.id));
     for (const id of [...this.remotes.keys()]) if (!present.has(id)) this.remotes.delete(id);
 
     if (snap.events?.length) this.events.push(...snap.events);
+    this.onSnapshot?.(snap);
   }
 
   _predict(inp) {
@@ -233,32 +288,24 @@ export class AuthClient {
 
   // Interpolated remote players at render time.
   remoteStates() {
-    const renderT = performance.now() - INTERP_DELAY;
+    const renderT = performance.now() - (this._serverClockOffset || 0) - INTERP_DELAY;
     const out = [];
     for (const [id, r] of this.remotes) {
       const buf = r.buf;
       if (buf.length === 0) continue;
-      let a = buf[0], b = buf[buf.length - 1];
-      for (let i = 0; i < buf.length - 1; i++) {
-        if (buf[i].t <= renderT && buf[i + 1].t >= renderT) { a = buf[i]; b = buf[i + 1]; break; }
-      }
-      const span = (b.t - a.t) || 1;
-      const f = Math.max(0, Math.min(1, (renderT - a.t) / span));
+      const state = interpolateRemoteSample(buf, renderT);
+      if (!state) continue;
       out.push({
-        id, name: r.name, alive: b.alive, health: b.health,
-        x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f,
+        id, name: r.name, isBot: r.isBot, alive: state.alive, health: state.health,
+        x: state.x, y: state.y, z: state.z,
         // Shortest-way-round on yaw, or an avatar spins the long way through
         // the whole circle every time someone crosses ±π.
-        yaw: a.yaw + (((b.yaw - a.yaw + Math.PI) % (Math.PI * 2)) - Math.PI) * f,
-        pitch: (a.pitch || 0) + ((b.pitch || 0) - (a.pitch || 0)) * f,
-        vx: a.vx + (b.vx - a.vx) * f,
-        vy: a.vy + (b.vy - a.vy) * f,
-        vz: a.vz + (b.vz - a.vz) * f,
-        grounded: b.grounded, crouch: b.crouch, sliding: b.slide,
-        sprint: b.sprint, wid: b.wid, aiming: b.aiming, firing: !!b.firing,
-        reload: (a.reload || 0) + ((b.reload || 0) - (a.reload || 0)) * f,
-        swing: (a.swing == null ? 1 : a.swing)
-          + ((b.swing == null ? 1 : b.swing) - (a.swing == null ? 1 : a.swing)) * f,
+        yaw: state.yaw,
+        pitch: state.pitch,
+        vx: state.vx, vy: state.vy, vz: state.vz,
+        grounded: state.grounded, crouch: state.crouch, sliding: state.slide,
+        sprint: state.sprint, wid: state.wid, aiming: state.aiming, firing: !!state.firing,
+        reload: state.reload, swing: state.swing,
       });
     }
     return out;

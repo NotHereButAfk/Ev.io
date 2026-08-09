@@ -77,10 +77,14 @@ export class AuthNetBridge {
     this._nameTarget = new THREE.Vector3();
     this._edges = { jump: false, crouch: false, tele: false };
     this._wasAlive = true;
+    this.ready = false;
+    this._welcomed = false;
+    this._starting = false;
+    this._mapReady = Promise.resolve();
     this._nameLayer = this._makeNameLayer();
     this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
     this.client.onWelcome = (arena, match) => {
-      this.ready = true;
+      this._welcomed = true;
       // Authoritative matches must have one ownership model. Local AI used to
       // keep fighting underneath the real server snapshots, causing phantom
       // damage, fake population counts, and two incompatible scoreboards.
@@ -88,7 +92,16 @@ export class AuthNetBridge {
       game.serverSim?.stop?.();
       game._netDriven = true;
       game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
-      game._onAuthoritativeMap?.(arena?.id, match, true);
+      this._mapReady = Promise.resolve(game._onAuthoritativeMap?.(arena?.id, match, true));
+    };
+    this.client.onSnapshot = () => {
+      if (!this._welcomed || this.ready || this._starting) return;
+      this._starting = true;
+      this._mapReady.catch((error) => console.error('[map] authoritative map load failed', error))
+        .finally(() => {
+          this.ready = true;
+          game._finishServerJoining?.();
+        });
     };
     this.client.onMapChange = (mapId, match) => {
       game._onAuthoritativeMap?.(mapId, match, false);
@@ -104,7 +117,7 @@ export class AuthNetBridge {
     return el;
   }
 
-  _remoteAvatar(id) {
+  _remoteAvatar(id, isBot = false) {
     let r = this.remotes.get(id);
     if (r) return r;
     // The SAME Avatar the local third-person body uses — same model, same walk
@@ -118,9 +131,23 @@ export class AuthNetBridge {
       allowHuman: true,
     });
     const nameEl = document.createElement('div');
-    nameEl.style.cssText = 'position:absolute;transform:translate(-50%,-100%);font:700 12px monospace;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap';
+    nameEl.className = 'nameplate';
+    const nameRow = document.createElement('div');
+    nameRow.className = 'np-name';
+    const botBadge = document.createElement('span');
+    botBadge.className = 'np-bot';
+    botBadge.textContent = 'BOT';
+    botBadge.hidden = !isBot;
+    const nameText = document.createElement('span');
+    const bar = document.createElement('div');
+    bar.className = 'np-bar';
+    const healthFg = document.createElement('div');
+    healthFg.className = 'np-bar-fg';
+    nameRow.append(botBadge, nameText);
+    bar.appendChild(healthFg);
+    nameEl.append(nameRow, bar);
     this._nameLayer.appendChild(nameEl);
-    r = { avatar, nameEl, pos: new THREE.Vector3() };
+    r = { avatar, nameEl, nameText, botBadge, healthFg, pos: new THREE.Vector3() };
     this.remotes.set(id, r);
     return r;
   }
@@ -291,7 +318,7 @@ export class AuthNetBridge {
     const v = new THREE.Vector3();
     for (const r of this.client.remoteStates()) {
       seen.add(r.id);
-      const a = this._remoteAvatar(r.id);
+      const a = this._remoteAvatar(r.id, r.isBot);
       a.pos.set(r.x, r.y, r.z);
       a.avatar.setWeapon(r.wid || 'm4');
       // Derive cadence from rendered interpolation displacement, so a stalled
@@ -303,17 +330,24 @@ export class AuthNetBridge {
         aiming: r.aiming, firing: r.firing, alive: r.alive,
         reload: r.reload || 0, swing: r.swing == null ? 1 : r.swing,
       });
+      // Keep semantic plate state current even while it is off-screen or
+      // occluded, so the first visible frame never flashes an empty bar/name.
+      a.nameText.textContent = r.name;
+      a.botBadge.hidden = !r.isBot;
+      a.healthFg.style.width = `${THREE.MathUtils.clamp(r.health || 0, 0, 100)}%`;
       // nameplate
       this._nameTarget.set(r.x, r.y + NAMEPLATE_Y, r.z);
       const occluded = isNameplateOccluded(
         this.game.world, this._nameOrigin, this._nameTarget, this._nameRaycaster,
       );
       v.copy(this._nameTarget).project(cam);
-      if (v.z < 1 && r.alive && !occluded) {
+      const distance = this._nameOrigin.distanceTo(this._nameTarget);
+      if (v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
+          && distance <= 90 && r.alive && !occluded) {
         a.nameEl.style.display = 'block';
         a.nameEl.style.left = `${(v.x * 0.5 + 0.5) * w}px`;
         a.nameEl.style.top = `${(-v.y * 0.5 + 0.5) * h}px`;
-        a.nameEl.textContent = `${r.name}  ${Math.max(0, Math.round(r.health))}`;
+        a.nameEl.style.transform = `translate(-50%,-100%) scale(${THREE.MathUtils.clamp(1.15 - distance / 180, 0.72, 1)})`;
       } else { a.nameEl.style.display = 'none'; }
     }
     for (const [id, a] of this.remotes) {

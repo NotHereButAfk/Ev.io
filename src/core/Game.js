@@ -305,7 +305,12 @@ export class Game {
     setBoot(30, 'STREAMING ARENA', 'Loading environment geometry');
     await Promise.allSettled([Promise.resolve(this.world.ready), delay(350)]);
     setBoot(68, 'PREPARING COMBAT', 'Building navigation and collision');
-    await Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]);
+    // Optional CDN art continues loading in the background. A slow model host
+    // must never trap the player on the boot screen for five seconds.
+    await Promise.race([
+      Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]),
+      delay(1400),
+    ]);
     setBoot(92, 'SYNCING LOADOUT', 'Soldier rig and weapon models ready');
     await minimumDisplay;
     setBoot(100, 'DEPLOYMENT READY', 'Opening game interface');
@@ -683,6 +688,7 @@ export class Game {
     // Mode-specific setup
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
     this._isSurvival = modeId === 'survival';
+    const expectsAuth = this._isDM && !!authNetTarget();
 
     this.hud.hideDMTimer();
     this.hud.hideDowned();
@@ -700,19 +706,28 @@ export class Game {
       this._activeManager = this.botManager;
       this.zombieManager.clear();
       this.dmManager.reset();
-      // Fill the 8-slot server: you + (MAX_PLAYERS - 1) bots. Either the real
-      // 24/7 relay (net) or the local ServerSim then flags some of those
-      // bot slots as remote players as they come and go.
-      this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
       this._netSlots.clear();
-      this._netDriven = this.net.connected;
-      if (this._netDriven) {
+      if (expectsAuth) {
+        // Never run a second local roster underneath authoritative snapshots.
+        // That duplicate roster caused bots to pop, attack during join, then
+        // disappear as soon as the server welcome arrived.
+        this.botManager.clear();
+        this.serverSim.stop();
+        this._netDriven = true;
+        this._modeTimer = 480;
+        if (!this._authNet?.ready) this._showServerJoining(modeId);
+      } else {
+        this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
+        this.player.respawn(this.world.safeSpawnPoint(this.botManager.bots));
+        this._netDriven = this.net.connected;
+      }
+      if (!expectsAuth && this._netDriven) {
         this.net.sendHello(name);
         this._modeTimer = (this.net.matchStart != null)
           ? THREE.MathUtils.clamp(this.net.matchDurationMs / 1000 - (Date.now() - this.net.matchStart) / 1000, 0, this.net.matchDurationMs / 1000)
           : 480;
         this._applyNetRoster(this.net.roster);
-      } else {
+      } else if (!expectsAuth) {
         this._modeTimer = 480; // 8 minutes
         this.serverSim.start(false, 1);
       }
@@ -871,20 +886,21 @@ export class Game {
   }
 
   _onAuthoritativeMap(mapId, match = {}, initial = false) {
-    if (!mapId) return;
+    if (!mapId) return Promise.resolve(null);
     if (Number.isFinite(match.start) && Number.isFinite(match.durationMs)) {
       const remaining = match.durationMs / 1000 - (Date.now() - match.start) / 1000;
       this._modeTimer = THREE.MathUtils.clamp(remaining, 0, match.durationMs / 1000);
     }
-    if (mapId === this.world.currentMapId) return;
+    if (mapId === this.world.currentMapId) return Promise.resolve(this.world.currentMap);
     this._pendingMapId = mapId;
     if (initial) {
-      this._activateMap(mapId).catch((error) => console.error('[map] authoritative map load failed', error));
+      return this._activateMap(mapId);
     } else if (this.state === 'playing') {
       // The server has advanced the shared round. Preserve the finished map
       // behind the results screen; _restart loads the new one after countdown.
       this._showLeaderboard();
     }
+    return Promise.resolve(this.world.currentMap);
   }
 
   // Reconcile which existing bot slots represent real connected players vs
@@ -1070,6 +1086,31 @@ export class Game {
   // so zombies/bots/timers keep running — you can't freeze a multiplayer match.
   // ev.io-style map loading card: map name / region / mode / players / TIP,
   // shown over the fly-through for a beat as the match starts, then fades.
+  _showServerJoining(modeId) {
+    const el = document.getElementById('map-loading');
+    if (!el) return;
+    const name = el.querySelector('.ml-name');
+    if (name) name.textContent = 'JOINING MATCH';
+    const region = document.getElementById('ml-region');
+    if (region) region.textContent = 'kryx.live';
+    const mode = document.getElementById('ml-mode');
+    if (mode) mode.textContent = modeId === 'teamslayer' ? 'Team Slayer' : 'Deathmatch';
+    const players = document.getElementById('ml-players');
+    if (players) players.textContent = 'Syncing players...';
+    const tip = document.getElementById('ml-tip');
+    if (tip) tip.textContent = 'Connecting to the authoritative arena';
+    clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    clearTimeout(this._serverJoinTimer);
+    this._serverJoinShownAt = performance.now();
+    el.classList.remove('hidden', 'ml-fade');
+  }
+
+  _finishServerJoining() {
+    const elapsed = performance.now() - (this._serverJoinShownAt || 0);
+    clearTimeout(this._serverJoinTimer);
+    this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), Math.max(0, 650 - elapsed));
+  }
+
   _showMapLoading(modeId, mapId = this.world.currentMapId) {
     const el = document.getElementById('map-loading');
     if (!el) return;
@@ -1110,6 +1151,7 @@ export class Game {
 
   _hideMapLoading() {
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    clearTimeout(this._serverJoinTimer);
     document.getElementById('map-loading')?.classList.add('hidden');
   }
 

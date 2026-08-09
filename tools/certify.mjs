@@ -61,6 +61,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:spectator'); return { ok: r.ok && /spectator camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-NAME', phase: 'HUD', name: 'Player labels respect map line of sight',
     fn: () => { const r = run('npm run test:nameplates'); return { ok: r.ok && /nameplate occlusion passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-NET-PRESENT', phase: 'HUD/net', name: 'Remote motion, health bars, and safe joins',
+    fn: () => { const r = run('npm run test:net-presentation'); return { ok: r.ok && /net presentation passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-TPS', phase: 'camera', name: 'Third-person camera frames the complete player model',
     fn: () => { const r = run('npm run test:tps-camera'); return { ok: r.ok && /third-person camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',
