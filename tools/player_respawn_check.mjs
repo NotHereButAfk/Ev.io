@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { Player } from '../src/player/Player.js';
+import { sprintRequested } from '../src/core/GameplayInput.js';
 
 const fail = (message) => {
   console.error(`FAIL: ${message}`);
@@ -13,6 +14,12 @@ const check = (condition, message) => {
   if (!condition) fail(message);
 };
 const isZeroVector = (vector) => vector.x === 0 && vector.y === 0 && vector.z === 0;
+
+const desktopInput = (held) => ({ isMobile: false, isDown: (code) => held === code });
+check(sprintRequested(desktopInput('ShiftLeft'), 1), 'left Shift does not request sprint');
+check(sprintRequested(desktopInput('ShiftRight'), 1), 'right Shift does not request sprint');
+check(sprintRequested(desktopInput('ShiftLeft'), 0), 'held Shift intent was lost before movement gating');
+check(sprintRequested({ isMobile: true, isDown: () => false }, 1), 'mobile forward input does not request sprint');
 
 function dirtyMovementState(player, seed) {
   player.health = 0;

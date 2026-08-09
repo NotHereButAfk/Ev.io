@@ -684,6 +684,17 @@
         <div id="downed-countdown" class="downed-countdown"></div>
       </div>
 
+      <!-- Deathmatch death state: the live match remains visible while input
+           is frozen and the authoritative respawn timer runs. -->
+      <div id="respawn-overlay" class="hidden" role="status" aria-live="polite">
+        <div class="respawn-vignette"></div>
+        <div class="respawn-card">
+          <div class="respawn-title">ELIMINATED</div>
+          <div class="respawn-sub">RESPAWNING IN</div>
+          <div id="respawn-countdown">3</div>
+        </div>
+      </div>
+
       <!-- Survival: wave incoming banner (auto-hides) -->
       <div id="wave-banner" class="hidden"></div>
 

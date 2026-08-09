@@ -5,6 +5,7 @@ import {
   setThirdPersonDesired,
   findThirdPersonObstruction,
 } from './ThirdPersonCamera.js';
+import { sprintRequested } from '../core/GameplayInput.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
@@ -196,7 +197,7 @@ export class Player {
 
     const moving = moveX !== 0 || moveZ !== 0;
     // On mobile the joystick sets ShiftLeft virtually; also auto-sprint any forward motion
-    const wantSprint = input.isDown('ShiftLeft') || (input.isMobile && moveZ > 0);
+    const wantSprint = sprintRequested(input, moveZ);
     this.isSprinting = moving && wantSprint && moveZ > 0 && this.stamina > 2 && !this.isSliding && !this.isCrouching;
 
     // smooth sprint blend for camera roll

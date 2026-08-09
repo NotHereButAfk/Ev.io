@@ -153,6 +153,7 @@ export class Game {
     this._isSurvival     = false;
     this._isDM           = false;
     this._playerDowned   = false;
+    this._respawnRemaining = 0;
     this._pendingCoins   = 0;   // fractional coin accumulator for survival
     this.input        = new InputManager(canvas);
     this.mobileControls = this.input.isMobile
@@ -689,6 +690,7 @@ export class Game {
     this._statsSaved   = false;
     this._pendingCoins = 0;
     this._playerDowned = false;
+    this._respawnRemaining = 0;
 
     // Mode-specific setup
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
@@ -696,6 +698,7 @@ export class Game {
 
     this.hud.hideDMTimer();
     this.hud.hideDowned();
+    this.hud.hideRespawn();
     this.hud.hideModeHUD();
     this.hud.hideWaveBonus();   // only survival shows it
     this.nameplates.clear();
@@ -1151,12 +1154,14 @@ export class Game {
     this.hud.hideModeHUD();
     this.hud.hideDMTimer();
     this.hud.hideDowned();
+    this.hud.hideRespawn();
     this.input.exitPointerLock();
     this.botManager.clear();
     this.zombieManager.clear();
     this.pickupSystem?.dispose();
     this.pickupSystem = null;
     this._playerDowned = false;
+    this._respawnRemaining = 0;
     this.menu.showMain();
   }
 
@@ -1240,14 +1245,14 @@ export class Game {
       return;
     }
 
-    // Deathmatch: infinite lives. Dying opens the menu and starts a 3s timer;
-    // the respawn then happens on its own whether or not the menu is still up,
-    // and clicking the canvas drops you straight back in (see _resume).
+    // Deathmatch: infinite lives, but death remains visible for three seconds
+    // inside the live match rather than masquerading as a pause-menu state.
     if (this._isDM) {
-      if (!this._menuOpen) this._openMenu();
       this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
       clearTimeout(this._respawnTimer);
-      this._respawnTimer = setTimeout(() => this._respawnPlayer(), RESPAWN_DELAY * 1000);
+      this._respawnRemaining = RESPAWN_DELAY;
+      this.hud.showRespawn(this._respawnRemaining);
+      this.weaponSystem.resetMotionState();
       return;
     }
 
@@ -1277,6 +1282,29 @@ export class Game {
     this.weaponSystem.resetMotionState();
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
+    this._respawnRemaining = 0;
+    this.hud.hideRespawn();
+    this.hud.addKillFeed('RESPAWNED');
+  }
+
+  // The authoritative room owns the actual respawn tick. These callbacks only
+  // drive presentation and input lock across the dead/alive transition.
+  _onAuthoritativeDeath(self) {
+    this.deaths = self?.deaths ?? (this.deaths + 1);
+    this.matchStats.currentStreak = 0;
+    this._respawnRemaining = RESPAWN_DELAY;
+    this.hud.showRespawn(this._respawnRemaining);
+    this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
+    this.weaponSystem.resetMotionState();
+  }
+
+  _onAuthoritativeRespawn(self) {
+    this.deaths = self?.deaths ?? this.deaths;
+    this._respawnRemaining = 0;
+    this.player.velocity.set(0, 0, 0);
+    this.player.isSprinting = false;
+    this.weaponSystem.resetMotionState();
+    this.hud.hideRespawn();
     this.hud.addKillFeed('RESPAWNED');
   }
 
@@ -1291,6 +1319,7 @@ export class Game {
     this.hud.hide();
     this.hud.hideDMTimer();
     this.hud.hideDowned();
+    this.hud.hideRespawn();
     this.menu.showGameOver(
       { kills: this.kills, score: this.score, time: Math.floor(this.playTime) },
       subtitle ? `${title} — ${subtitle}` : title
@@ -1368,7 +1397,7 @@ export class Game {
     }
     // Dead players are frozen where they fell until the respawn timer fires —
     // clicking back in early shouldn't let a corpse run around and shoot.
-    const dead = this.player.isDead && !this._playerDowned;
+    let dead = this.player.isDead && !this._playerDowned;
     if (!menuOpen && this._authNet && this._authNet.ready) {
       // Keep receiving authoritative snapshots while locally dead; otherwise
       // the server's respawn can never clear the client's dead state.
@@ -1379,6 +1408,17 @@ export class Game {
         this.moveBridge.update(dt, this.input, this.world);
       } else {
         this.player.update(dt, this.input, this.world);
+      }
+    }
+    // A server snapshot can change alive/dead during AuthNetBridge.update(),
+    // so the render and combat gates below must use the refreshed state.
+    dead = this.player.isDead && !this._playerDowned;
+    if (dead) {
+      this._respawnRemaining = Math.max(0, this._respawnRemaining - dt);
+      this.hud.showRespawn(this._respawnRemaining);
+      if (!(this._authNet && this._authNet.ready) && this._isDM && this._respawnRemaining <= 0) {
+        this._respawnPlayer();
+        dead = false;
       }
     }
     this.player.camera.updateMatrixWorld(true);
@@ -1404,7 +1444,7 @@ export class Game {
       this._syncTpsWeapon();
       this._animatePlayerBody(dt);
     }
-    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS;
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS && !dead;
 
     // While the menu is open, downed, or dead-and-awaiting-respawn, block
     // weapon/grenade input — the match still runs.

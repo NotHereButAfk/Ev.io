@@ -123,6 +123,15 @@ room.update();
 ok('respawn: transient firing/sprint/aim presentation is cleared',
    resetPlayer.alive && resetPlayer._firingTicks === 0
    && !resetPlayer._lastSprint && !resetPlayer._lastAim);
+
+resetPlayer.alive = false;
+resetPlayer.health = 0;
+resetPlayer.deadUntil = room.tick + 60; // 3 seconds at the authoritative 20 Hz tick
+for (let i = 0; i < 59; i++) room.update();
+const heldDeadForFullDelay = !resetPlayer.alive && resetPlayer.health === 0;
+room.update();
+ok('respawn: player remains dead for the full authoritative three seconds',
+   heldDeadForFullDelay && resetPlayer.alive && resetPlayer.health > 0);
 room.remove(resetId);
 
 const a = client(); await open(a); a.hello('Alice');

@@ -2846,6 +2846,40 @@ html, body {
 }
 #scope-overlay.active { opacity: 1; }
 
+/* Deathmatch death is a gameplay state, not the pause menu. */
+#respawn-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: var(--font-display, 'Arial Narrow', sans-serif);
+}
+#respawn-overlay.hidden { display: none; }
+.respawn-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 20%, rgba(66, 0, 0, 0.34) 72%, rgba(10, 0, 0, 0.78) 100%),
+    linear-gradient(rgba(35, 0, 0, 0.14), rgba(35, 0, 0, 0.14));
+  animation: respawn-pulse 1.25s ease-in-out infinite alternate;
+}
+.respawn-card {
+  position: relative;
+  min-width: 270px;
+  padding: 18px 34px 15px;
+  border-top: 2px solid #ff493d;
+  border-bottom: 1px solid rgba(255,255,255,0.22);
+  background: linear-gradient(90deg, transparent, rgba(7, 9, 13, 0.86) 14%, rgba(7, 9, 13, 0.86) 86%, transparent);
+  text-align: center;
+  text-shadow: 0 2px 4px #000;
+}
+.respawn-title { color: #ff5a4f; font-size: clamp(30px, 4vw, 50px); font-weight: 900; letter-spacing: 0.16em; }
+.respawn-sub { margin-top: 7px; color: rgba(255,255,255,0.7); font-size: 11px; font-weight: 800; letter-spacing: 0.28em; }
+#respawn-countdown { margin-top: 2px; color: #fff; font-size: 30px; font-weight: 900; letter-spacing: 0.08em; }
+@keyframes respawn-pulse { from { opacity: 0.72; } to { opacity: 1; } }
+
 .scope-ring {
   position: relative;
   width: min(82vh, 82vw);

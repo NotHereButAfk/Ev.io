@@ -447,6 +447,22 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
 - `test:nameplates` covers clear, mesh-blocked, and box-blocked sightlines;
   `test:viewmodel` continues to sweep every weapon/FOV/aspect/action state.
 
+## Latest Codex handoff - sprint, death loop, and scoped ADS (2026-08-08)
+- Desktop sprint intent is now shared by the legacy controller, MoveSim bridge,
+  and authoritative client, and accepts both left and right Shift. Existing
+  deterministic movement still proves the 10.85 m/s sprint contract.
+- Deathmatch death no longer opens the pause menu or silently jumps back into
+  play. A live in-match ELIMINATED overlay freezes movement, weapons, grenades,
+  and the first-person rig for the full three-second respawn window. The same
+  presentation is driven by authoritative alive/dead snapshot transitions;
+  dead clients send neither movement nor fire requests.
+- Fully raised sniper optics hide the complete gun-and-hands viewmodel while
+  the scope overlay owns the sight picture, then restore it after ADS. Ordinary
+  hip fire and iron-sight ADS are unchanged.
+- New/extended gates prove both Shift keys, scope viewmodel clearing/restoring,
+  neutral animation state after respawn, and all 60 authoritative dead ticks.
+  Full `npm run certify` is 22/22 and server authority/abuse is 34/34.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a

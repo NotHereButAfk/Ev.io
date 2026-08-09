@@ -36,6 +36,8 @@ export class HUD {
     this.downedOverlay  = document.getElementById('downed-overlay');
     this.downedBar      = document.getElementById('downed-bar');
     this.downedCountdown = document.getElementById('downed-countdown');
+    this.respawnOverlay  = document.getElementById('respawn-overlay');
+    this.respawnCountdown = document.getElementById('respawn-countdown');
     this.waveBanner     = document.getElementById('wave-banner');
     this._teleportFlash    = document.getElementById('teleport-flash');
     this._abilityQ         = document.getElementById('ability-q');
@@ -115,6 +117,14 @@ export class HUD {
     if (this.downedCountdown) this.downedCountdown.textContent = Math.ceil(Math.max(0, secsLeft));
   }
   hideDowned() { this.downedOverlay.classList.add('hidden'); }
+
+  showRespawn(secsLeft) {
+    this.respawnOverlay?.classList.remove('hidden');
+    if (this.respawnCountdown) {
+      this.respawnCountdown.textContent = secsLeft > 0 ? Math.ceil(secsLeft) : 'DEPLOYING';
+    }
+  }
+  hideRespawn() { this.respawnOverlay?.classList.add('hidden'); }
 
   // Survival: wave banner (auto-removes after animation)
   showWaveBanner(text) {

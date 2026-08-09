@@ -11,6 +11,7 @@
 // did (position, velocity, onGround, isCrouching, stamina, teleportCooldown).
 
 import * as THREE from 'three';
+import { sprintRequested } from '../core/GameplayInput.js';
 import { createState, step, makeInput, worldAdapter, hashState, DT } from './MoveSim.js';
 
 const MOUSE_SENSITIVITY = 0.0024;
@@ -89,7 +90,7 @@ export class MoveBridge {
       const inp = makeInput({
         mx, mz,
         yaw: p.yaw, pitch: p.pitch,
-        sprint: input.isDown('ShiftLeft') || (input.isMobile && mz > 0),
+        sprint: sprintRequested(input, mz),
         crouch: input.isDown('ControlLeft') || input.isDown('KeyC'),
         jumpJust: this._edges.jump,
         crouchJust: this._edges.crouch,

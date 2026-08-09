@@ -78,6 +78,12 @@ function viewmodelFovLift(fov) {
   return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
+// The optic overlay owns the sight picture after the scope is raised. Keeping
+// the physical rifle and arms beneath it blocks the target.
+export function shouldHideScopedViewmodel(def, scopeT) {
+  return !!def?.scoped && scopeT > 0.5;
+}
+
 export class WeaponSystem {
   constructor(camera, scene, audio) {
     this.camera = camera;
@@ -601,6 +607,7 @@ export class WeaponSystem {
     this.swayGroup?.rotation.set(0, 0, 0);
     this.kickGroup?.position.set(0, 0, 0);
     this.kickGroup?.rotation.set(0, 0, 0);
+    if (this.kickGroup) this.kickGroup.visible = true;
   }
 
   resetState(baseFov) {
@@ -1394,6 +1401,7 @@ export class WeaponSystem {
     // regular guns shoulder into a centered, lower-FOV sight picture.
     const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
     this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
+    this.kickGroup.visible = !shouldHideScopedViewmodel(def, this.scopeT);
     // Aiming keeps a trace of organic motion, but removes enough viewmodel
     // travel that the physical sight and fixed scope overlay do not disagree.
     const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.08 : 0.24, this.scopeT);

@@ -28,6 +28,7 @@ import {
 } from '../weapons/FireControl.js';
 import { countAuthoritativePlayers } from '../core/Population.js';
 import { isNameplateOccluded } from '../ui/NameplateOcclusion.js';
+import { sprintRequested } from '../core/GameplayInput.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -72,6 +73,7 @@ export class AuthNetBridge {
     this._nameOrigin = new THREE.Vector3();
     this._nameTarget = new THREE.Vector3();
     this._edges = { jump: false, crouch: false, tele: false };
+    this._wasAlive = true;
     this._nameLayer = this._makeNameLayer();
     this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
     this.client.onWelcome = (arena, match) => {
@@ -124,6 +126,11 @@ export class AuthNetBridge {
     const p = this.player, c = this.client;
     if (!c.sim) return;                 // not welcomed yet
 
+    const alive = c.self.alive !== false;
+    if (this._wasAlive && !alive) this.game._onAuthoritativeDeath?.(c.self);
+    if (!this._wasAlive && alive) this.game._onAuthoritativeRespawn?.(c.self);
+    this._wasAlive = alive;
+
     // ── look (client-owned), same math as the legacy controller ──
     const sign = p.invertY ? 1 : -1;
     p.yaw -= input.mouseDX * MOUSE_SENS * p.sensitivityMult;
@@ -148,9 +155,9 @@ export class AuthNetBridge {
       this._acc -= DT;
       const mz = (input.isDown('KeyW') ? 1 : 0) - (input.isDown('KeyS') ? 1 : 0);
       const mx = (input.isDown('KeyD') ? 1 : 0) - (input.isDown('KeyA') ? 1 : 0);
-      c.sendInput({
+      if (alive) c.sendInput({
         mx, mz, yaw: p.yaw, pitch: p.pitch,
-        sprint: input.isDown('ShiftLeft') || (input.isMobile && mz > 0),
+        sprint: sprintRequested(input, mz),
         crouch: input.isDown('ControlLeft') || input.isDown('KeyC'),
         jumpJust: this._edges.jump, crouchJust: this._edges.crouch, teleJust: this._edges.tele,
         wid: def?.id || 'm4', aiming: !!input.rightMouseDown,
@@ -161,11 +168,11 @@ export class AuthNetBridge {
     // ── drive the local player from the predicted sim ──
     const lp = c.localPos();
     if (lp) { p.position.set(lp.x, lp.y, lp.z); }
-    p.velocity.set(c.sim.vx || 0, c.sim.vy || 0, c.sim.vz || 0);
+    p.velocity.set(alive ? (c.sim.vx || 0) : 0, alive ? (c.sim.vy || 0) : 0, alive ? (c.sim.vz || 0) : 0);
     p.onGround = !!c.sim.onGround;
     p.isCrouching = !!c.sim.crouch;
     p.isSliding = !!c.sim.slide;
-    p.isSprinting = !!c.sprinting;
+    p.isSprinting = alive && !!c.sprinting;
     p._eyeHeight = c.sim.eye;
     p.health = c.self.health;
     if (p._camDist > 0) {
@@ -208,7 +215,7 @@ export class AuthNetBridge {
 
     // ── fire (server-authoritative hit; client just requests) ──
     this._fireCd = advanceFireCooldown(this._fireCd, dt);
-    const wantsShot = def && def.kind !== 'melee'
+    const wantsShot = alive && def && def.kind !== 'melee'
       && wantsTriggerShot(def.automatic, input.mouseDown, this._prevFireDown);
     if (wantsShot && this._fireCd <= 0) {
       c.sendFire(def.id, p.yaw, p.pitch);

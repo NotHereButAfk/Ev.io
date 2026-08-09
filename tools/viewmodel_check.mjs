@@ -528,6 +528,10 @@ for (const sample of adsStability) {
   assert(sample.bob < 0.0015, `ADS walk bob is ${sample.bob.toFixed(5)}m at ${sample.fps}Hz`);
   assert(sample.sway < 0.002, `ADS look sway is ${sample.sway.toFixed(5)}rad at ${sample.fps}Hz`);
 }
+assert(!system.kickGroup.visible, 'scoped ADS leaves the gun and arms blocking the optic');
+input.rightMouseDown = false;
+advanceSeconds(0.25, 60);
+assert(system.kickGroup.visible, 'viewmodel did not return after leaving the scope');
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
