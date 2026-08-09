@@ -323,7 +323,13 @@ export function applyWalkCycle(rig, o = {}) {
   // Measured against last frame's lean — it is eased and moves slowly, and
   // using it here keeps the step solve ahead of the pose that consumes it.
   const step = groundPerStep(amp, kAmp, -0.10 + cKnee, cHip, run, rig._lean || 0);
-  rig._walkT += moving ? strideSign * (Math.PI * Math.max(speed, 0.4) / step) * dt : dt * 1.2;
+  // Freeze the ground cycle while airborne. The jump pose owns the legs until
+  // contact; advancing a hidden walk underneath it makes the feet switch phase
+  // during the blend and on the first landing frame.
+  const airborne = o.grounded === false;
+  rig._walkT += moving && !airborne
+    ? strideSign * (Math.PI * Math.max(speed, 0.4) / step) * dt
+    : airborne ? 0 : dt * 1.2;
   const t = rig._walkT;
 
   // Blend between standing and striding, then ASSIGN. The stride must not be

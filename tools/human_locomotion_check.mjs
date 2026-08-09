@@ -7,6 +7,7 @@ import {
   HUMAN_CLIP_SPEED,
   HUMAN_PHASE_ORIGIN,
   HUMAN_STRIDE_WARP,
+  humanMotionTransitionSeconds,
   humanStrideWarpAngle,
   humanTravelPose,
   mapHumanMotionPhase,
@@ -28,6 +29,11 @@ assert(selectHumanMotion(3.7, false, 'run') === 'run', 'run hysteresis failed');
 assert(selectHumanMotion(2.0, true, 'walk') === 'run', 'sprint did not force run');
 assert(selectHumanMotion(0, true, 'run') === 'idle',
   'blocked sprint kept running in place');
+assert(humanMotionTransitionSeconds('run', 'air') <= 0.06,
+  'run clip keeps cycling too long after takeoff');
+assert(humanMotionTransitionSeconds('air', 'run') >= 0.1
+  && humanMotionTransitionSeconds('air', 'run') <= 0.14,
+  'landing-to-run recovery is mistimed');
 
 const walkRate = targetHumanTimeScale('walk', 2.5);
 const runRate = targetHumanTimeScale('run', 6.2);

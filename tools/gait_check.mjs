@@ -137,6 +137,7 @@ console.log('\nairborne pose');
   const rig = newRig();
   const dt = 1 / 60;
   for (let i = 0; i < 120; i++) applyWalkCycle(rig, { speed: 6.2, moving: true, run: 0, dt, grounded: true });
+  const takeoffPhase = rig._walkT;
 
   // Which leg leads is picked at takeoff from the live stride, so read both and
   // track whichever one it chose.
@@ -172,6 +173,8 @@ console.log('\nairborne pose');
     frames.length - 1, last.lKnee.toFixed(2), last.lAnkle.toFixed(2));
 
   check(last.air > 0.9, 'airborne blend never engages');
+  check(Math.abs(rig._walkT - takeoffPhase) < 1e-9,
+    'ground gait phase keeps advancing while airborne');
   check(spread > 0.15, `legs are frozen in mid-air (thigh moves only ${spread.toFixed(3)} rad)`);
   check(tuck < -0.9, `no knee tuck on the way up (deepest ${tuck.toFixed(2)} rad)`);
   check(last.vy < -4, 'test did not reach the falling half of the jump');

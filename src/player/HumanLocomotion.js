@@ -24,6 +24,21 @@ export const HUMAN_STRIDE_WARP = Object.freeze({
   run: 0.64,
 });
 
+// Airborne motion is procedural, layered over the neutral clip. Leaving a
+// 0.34s Run->Idle crossfade active after takeoff visibly cycles the legs for a
+// third of the jump, so air gets a decisive transition. Landing is a little
+// softer to absorb contact before the grounded gait resumes.
+export function humanMotionTransitionSeconds(fromMotion, toMotion) {
+  if (toMotion === 'air') return 0.055;
+  if (fromMotion === 'air') return 0.12;
+  const fades = {
+    idleToWalk: 0.22, walkToRun: 0.28, runToWalk: 0.30,
+    walkToIdle: 0.30, idleToRun: 0.30, runToIdle: 0.34,
+  };
+  const key = `${fromMotion}To${toMotion.charAt(0).toUpperCase()}${toMotion.slice(1)}`;
+  return fades[key] ?? 0.2;
+}
+
 const wrapPhase = (phase) => {
   const wrapped = phase % 1;
   return wrapped < 0 ? wrapped + 1 : wrapped;

@@ -6,6 +6,7 @@ import {
   dampHumanTimeScale,
   humanStrideWarpAngle,
   humanTravelPose,
+  humanMotionTransitionSeconds,
   mapHumanMotionPhase,
   selectHumanMotion,
   targetHumanStrideScale,
@@ -191,14 +192,13 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   // Phase-matched crossfades preserve which foot is planted. Resetting every
   // new clip to frame zero made both feet pop whenever walk/run switched, while
   // Three's warp option briefly sped one clip up and slowed the other down.
-  const FADE = { idleToWalk: 0.22, walkToRun: 0.28, runToWalk: 0.30, walkToIdle: 0.30, idleToRun: 0.30, runToIdle: 0.34 };
   const _fadeKey = (from, to) => {
     if (!from || !to) return 0.2;
     const f = from === actions.idle ? 'idle' : from === actions.walk ? 'walk' : 'run';
     const t = to   === actions.idle ? 'idle' : to   === actions.walk ? 'walk' : 'run';
-    return FADE[`${f}To${t.charAt(0).toUpperCase() + t.slice(1)}`] ?? 0.2;
+    return humanMotionTransitionSeconds(f, t);
   };
-  const setMotion = (name) => {
+  const setMotion = (name, fadeOverride) => {
     const next = actions[name] || actions.idle;
     if (!next || next === current) return;
     const fromName = current === actions.walk ? 'walk'
@@ -214,7 +214,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     next.reset().play();
     if (phase > 0) next.time = phase * next.getClip().duration;
     if (current) {
-      const fade = _fadeKey(current, next);
+      const fade = Number.isFinite(fadeOverride) ? fadeOverride : _fadeKey(current, next);
       current.crossFadeTo(next, fade, false);
     }
     current = next;
@@ -358,21 +358,26 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     // Air state overrides everything — bots normally pass grounded=true, but a
     // player-controlled or scripted character can hop by setting grounded=false.
     if (!grounded) {
+      const takeoffMotion = _locName;
+      const justTookOff = _grounded;
       if (_grounded) _jumpT = 0;   // just left the ground — start the jump clock
       _grounded = false;
       _locName = 'air';
       // Use a NEUTRAL (idle) leg base while airborne so the procedural jump pose
       // reads as a real jump — a push-off, an apex tuck, and a reach for the
       // landing — instead of a slow walk cycle treading the air.
-      setMotion('idle');
+      setMotion('idle', justTookOff
+        ? humanMotionTransitionSeconds(takeoffMotion, 'air') : undefined);
       _targetTimeScale = baseTS;
       _targetStrideScale = 1;
     } else {
+      const justLanded = !_grounded;
       if (!_grounded) { _landT = 0.24; _airT = 0; } // landing bounce
       _grounded = true;
       const name = selectHumanMotion(_reportedSpeed, sprinting, _locName);
       _locName = name;
-      setMotion(name);
+      setMotion(name, justLanded
+        ? humanMotionTransitionSeconds('air', name) : undefined);
       _targetTimeScale = targetHumanTimeScale(name, _reportedSpeed, baseTS)
         * (_reverseGait && name !== 'idle' ? -1 : 1);
       _targetStrideScale = targetHumanStrideScale(
