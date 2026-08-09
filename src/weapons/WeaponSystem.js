@@ -57,7 +57,10 @@ function createTracerMesh() {
 // leaving every shipped model clear of the camera's near plane.
 const VIEWMODEL_Z = -0.78;
 const VIEWMODEL_X = 0.35;
-const VIEWMODEL_Y = -0.22;
+// EV.IO frames the rifle as a lower-right foreground object: the receiver,
+// trigger hand and sleeve continue through the bottom edge instead of exposing
+// a complete dangling forearm beneath the gun.
+const VIEWMODEL_Y = -0.285;
 const VIEWMODEL_SCALE = 0.96;
 const REFERENCE_ASPECT = 16 / 9;
 
@@ -293,20 +296,12 @@ export class WeaponSystem {
       handPlate.rotation.x = palm.rotation.x;
       hand.add(handPlate);
 
-      [-0.027, -0.009, 0.009, 0.027].forEach((xOffset, index) => {
-        const finger = new THREE.Mesh(
-          new THREE.CapsuleGeometry(
-            0.0095,
-            index === 0 || index === 3 ? 0.024 : 0.030,
-            3,
-            7,
-          ),
-          this.gloveMat,
-        );
-        finger.position.set(xOffset, -0.030, -0.055);
-        finger.rotation.x = 0.58;
-        hand.add(finger);
-      });
+      // A single closed finger curl reads as a hand wrapped around the grip.
+      // Four separate capsules looked like detached claws at gameplay scale.
+      const fingerCurl = box(0.082, 0.044, 0.064, this.gloveMat);
+      fingerCurl.position.set(0, -0.032, -0.060);
+      fingerCurl.rotation.x = support ? 0.32 : 0.52;
+      hand.add(fingerCurl);
 
       const thumb = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.012, 0.032, 3, 7),
@@ -330,19 +325,31 @@ export class WeaponSystem {
       // The bright shell stops at the elbow; the darker upper sleeve turns out
       // toward the shoulder and disappears into the lower/side frame.
       const armorEnd = new THREE.Vector3(
-        sign * (support ? 0.18 : 0.12),
-        support ? -0.23 : -0.25,
-        support ? 0.14 : 0.15,
+        sign * (support ? 0.18 : 0.10),
+        support ? -0.23 : -0.17,
+        support ? 0.14 : 0.13,
       );
       arm.userData.sleeveLength = wrist.distanceTo(sleeveEnd);
 
       // A short hard-surface forearm shell followed by a dark flexible sleeve.
       // Splitting the silhouette here matches the third-person exosuit and stops
       // the entire visible arm reading as one featureless cylinder.
-      const forearm = segment(wrist, armorEnd, 0.043, 0.052, this.armPlateMat);
+      const forearm = segment(
+        wrist, armorEnd,
+        support ? 0.043 : 0.052,
+        support ? 0.052 : 0.067,
+        support ? this.armPlateMat : this.gloveMat,
+        8,
+      );
       forearm.name = 'viewmodel_forearm';
       arm.add(forearm);
-      const upperSleeve = segment(armorEnd, sleeveEnd, 0.050, 0.058, this.sleeveMat);
+      const upperSleeve = segment(
+        armorEnd, sleeveEnd,
+        support ? 0.050 : 0.066,
+        support ? 0.058 : 0.084,
+        this.sleeveMat,
+        8,
+      );
       upperSleeve.name = 'viewmodel_upper_sleeve';
       // Preserve the authored support rig for future poses without drawing its
       // upper sleeve into the current one-arm first-person silhouette.
@@ -370,9 +377,11 @@ export class WeaponSystem {
 
     const trigger = gripArm({
       side: 'right',
-      position: new THREE.Vector3(0.000, -0.105, 0.185),
-      rotation: new THREE.Euler(-0.10, 0.20, -0.10),
-      elbow: new THREE.Vector3(0.55, -0.55, 0.35),
+      position: new THREE.Vector3(0.012, -0.102, 0.165),
+      rotation: new THREE.Euler(-0.08, 0.16, -0.08),
+      // Compact lower-right exit: ev.io keeps the glove attached to the pistol
+      // grip and lets a dark, thick sleeve leave frame without a long arm tube.
+      elbow: new THREE.Vector3(0.34, -0.48, 0.24),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -411,8 +420,8 @@ export class WeaponSystem {
 
   /** Apply the exact equipped character palette to the first-person gauntlet. */
   setArmAppearance({ plate, sleeve, glove, accent }) {
-    this.armPlateMat.color.setHex(plate).multiplyScalar(0.38);
-    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.55);
+    this.armPlateMat.color.setHex(plate).multiplyScalar(0.34);
+    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.30);
     this.gloveMat.color.setHex(glove).multiplyScalar(0.78);
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
@@ -1308,7 +1317,7 @@ export class WeaponSystem {
       this.armGroup.position.y = reloading
         ? (portrait ? 0.160 : 0.050)
         : (portrait ? 0.050 : -0.105);
-      this.armGroup.scale.set(portrait ? 0.72 : 0.82, portrait ? 1 : 0.82, portrait ? 0.72 : 0.82);
+      this.armGroup.scale.set(portrait ? 0.72 : 0.90, portrait ? 1 : 0.90, portrait ? 0.72 : 0.90);
       this.supportArmGroup?.scale.set(portrait ? 0.60 : 0.72, portrait ? 0.76 : 0.72, portrait ? 0.60 : 0.72);
     }
 

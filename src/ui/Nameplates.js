@@ -2,6 +2,7 @@
 // opponent, projected to the screen each frame. Replaces the 3D bar on bots so
 // the plate stays crisp and always faces the camera.
 import * as THREE from 'three';
+import { isNameplateOccluded } from './NameplateOcclusion.js';
 
 const MAX_DIST = 90;   // don't show plates for very distant bots
 
@@ -13,9 +14,11 @@ export class Nameplates {
     this._labels = new Map();   // bot -> element
     this._v   = new THREE.Vector3();
     this._cam = new THREE.Vector3();
+    this._target = new THREE.Vector3();
+    this._raycaster = new THREE.Raycaster();
   }
 
-  update(camera, bots) {
+  update(camera, bots, world) {
     if (!camera || !bots) return;
     const w = window.innerWidth, h = window.innerHeight;
     camera.getWorldPosition(this._cam);
@@ -26,14 +29,18 @@ export class Nameplates {
       // Hide the bot's built-in 3D health bar; the DOM plate replaces it.
       if (bot.healthBarGroup) bot.healthBarGroup.visible = false;
 
-      this._v.set(bot.position.x, bot.position.y + 2.15, bot.position.z);
-      const dist = this._cam.distanceTo(this._v);
+      this._target.set(bot.position.x, bot.position.y + 2.15, bot.position.z);
+      const dist = this._cam.distanceTo(this._target);
+      const occluded = isNameplateOccluded(
+        world, this._cam, this._target, this._raycaster,
+      );
+      this._v.copy(this._target);
       this._v.project(camera);
       const onScreen = this._v.z < 1 &&
         this._v.x > -1.05 && this._v.x < 1.05 && this._v.y > -1.05 && this._v.y < 1.05;
       let el = this._labels.get(bot);
 
-      if (!onScreen || dist > MAX_DIST) {
+      if (!onScreen || dist > MAX_DIST || occluded) {
         if (el) el.style.display = 'none';
         if (bot.alive) live.add(bot);
         continue;

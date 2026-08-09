@@ -1439,7 +1439,7 @@ export class Game {
     // Enemy nameplates (name + health bar) over living opponents.
     if (this.botManager?.bots?.length) {
       this.nameplates.container.style.display = '';
-      this.nameplates.update(this.player.camera, this.botManager.bots);
+      this.nameplates.update(this.player.camera, this.botManager.bots, this.world);
     } else {
       this.nameplates.container.style.display = 'none';
     }

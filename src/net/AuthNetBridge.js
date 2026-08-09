@@ -27,6 +27,7 @@ import {
   wantsTriggerShot,
 } from '../weapons/FireControl.js';
 import { countAuthoritativePlayers } from '../core/Population.js';
+import { isNameplateOccluded } from '../ui/NameplateOcclusion.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -67,6 +68,9 @@ export class AuthNetBridge {
     this._tpsDesired = new THREE.Vector3();
     this._tpsOffset = new THREE.Vector3();
     this._tpsRaycaster = new THREE.Raycaster();
+    this._nameRaycaster = new THREE.Raycaster();
+    this._nameOrigin = new THREE.Vector3();
+    this._nameTarget = new THREE.Vector3();
     this._edges = { jump: false, crouch: false, tele: false };
     this._nameLayer = this._makeNameLayer();
     this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
@@ -241,6 +245,7 @@ export class AuthNetBridge {
   _syncRemotes(dt) {
     const seen = new Set();
     const cam = this.player.camera;
+    cam.getWorldPosition(this._nameOrigin);
     const w = window.innerWidth, h = window.innerHeight;
     const v = new THREE.Vector3();
     for (const r of this.client.remoteStates()) {
@@ -257,8 +262,12 @@ export class AuthNetBridge {
         aiming: r.aiming, firing: r.firing, alive: r.alive,
       });
       // nameplate
-      v.set(r.x, r.y + NAMEPLATE_Y, r.z).project(cam);
-      if (v.z < 1 && r.alive) {
+      this._nameTarget.set(r.x, r.y + NAMEPLATE_Y, r.z);
+      const occluded = isNameplateOccluded(
+        this.game.world, this._nameOrigin, this._nameTarget, this._nameRaycaster,
+      );
+      v.copy(this._nameTarget).project(cam);
+      if (v.z < 1 && r.alive && !occluded) {
         a.nameEl.style.display = 'block';
         a.nameEl.style.left = `${(v.x * 0.5 + 0.5) * w}px`;
         a.nameEl.style.top = `${(-v.y * 0.5 + 0.5) * h}px`;

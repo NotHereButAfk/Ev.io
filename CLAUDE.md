@@ -435,6 +435,18 @@ Deployed to **Hostinger** (static site) via a GitHub Action on every push to `ma
   enormous decorative fog geometry. `test:population` and `test:spectator`
   gate both changes.
 
+## Latest Codex handoff - nameplate LOS and EV-style grip (2026-08-08)
+- Local bot and authoritative remote-player DOM labels now share an explicit
+  camera-to-head visibility test against rendered map meshes and box-only
+  collision. Names and health can no longer render through walls.
+- Live ev.io gameplay imagery was rechecked against a fresh KYX browser render.
+  The first-person auto-rifle now uses a closed trigger-hand silhouette, a
+  shorter/thicker dark forearm, and lower framing so gun, glove, and sleeve
+  continue together through the bottom edge instead of showing a detached hand
+  on a bright tube. The support-side full arm stays hidden behind the weapon.
+- `test:nameplates` covers clear, mesh-blocked, and box-blocked sightlines;
+  `test:viewmodel` continues to sweep every weapon/FOV/aspect/action state.
+
 ## Known constraints / notes
 - Can't generate/sculpt realistic character meshes from an image; the player
   model is a themed rigged Vanguard + a procedural Blender `spartan.glb`. For a

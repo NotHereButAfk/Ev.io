@@ -30,6 +30,7 @@ npm run test:facing           # local/network/bot yaw plus soldier.glb forward-a
 npm run test:human-motion     # measured clip speeds, cadence caps, smoothed transitions
 npm run test:human-carry      # real Soldier GLB: both wrists stay on rifle
 npm run test:viewmodel        # all weapons/FOVs/aspects: near-plane + glove framing
+npm run test:nameplates       # local/remote DOM labels respect map line of sight
 npm run test:zombie-death     # absolute death pose matches at 30/60/144Hz
 npm run test:player-respawn   # transient movement/animation state resets
 npm run test:account          # salted local password storage + plaintext migration
