@@ -77,6 +77,15 @@ requireMatch(game, /Promise\.allSettled\(\[Promise\.resolve\(this\.world\.ready\
 requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
 requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
+requireMatch(index, /ability-page-key["']>Q<[\s\S]*?<strong>TELEPORT<\/strong>/,
+  'abilities page advertises Q teleport');
+requireMatch(index, /ability-page-key["']>G<[\s\S]*?<strong>FRAG GRENADE<\/strong>/,
+  'abilities page advertises G frag');
+requireMatch(index, /ability-page-key["']>F<[\s\S]*?<strong>SMOKE GRENADE<\/strong>/,
+  'abilities page advertises F smoke');
+if (/FLASH GRENADE|<span class="ability-page-key">E<\/span>|<strong>IMPULSE<\/strong>/.test(index)) {
+  failures.push('abilities page has no stale unshipped bindings');
+}
 requireMatch(hud, /--xhair-size/, 'dynamic crosshair spread');
 requireMatch(hud, /classList\.toggle\(['"]ads/, 'ADS crosshair state');
 requireMatch(css, /#hud #crosshair[^}]*--xhair-size/s, 'crosshair style contract');
