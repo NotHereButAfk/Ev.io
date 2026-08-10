@@ -26,6 +26,7 @@
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
 import { botAimErrorMeters, combatTargetScore } from '../src/entities/BotCombat.js';
+import { randomBotName } from '../src/entities/BotNames.js';
 import { WEAPONS as CLIENT_WEAPONS } from '../src/weapons/weaponDefs.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
 
@@ -159,6 +160,7 @@ export class AuthRoom {
       name: this.arena.name,
       region: this.arena.region,
       half: this.arena.half,
+      killY: this.arena.killY,
       noBaseFloor: !!this.arena.noBaseFloor,
       platforms: this.arena.platforms,
       boxes: this.arena.boxes,
@@ -173,6 +175,16 @@ export class AuthRoom {
     this._setSimArena(this.arenas[this._arenaIndex]);
     this.smokes.length = 0;
     this.frags.length = 0;
+
+    // A fresh round gets a fresh set of readable bot identities while human
+    // names stay untouched. The same names then flow through snapshots and the
+    // final leaderboard for the whole round.
+    const usedNames = new Set(
+      Array.from(this.players.values()).filter((player) => !player.isBot).map((player) => player.name),
+    );
+    for (const player of this.players.values()) {
+      if (player.isBot) player.name = randomBotName(usedNames);
+    }
 
     let spawnIndex = 0;
     for (const player of this.players.values()) {
@@ -232,7 +244,8 @@ export class AuthRoom {
   _fillBotSlots() {
     while (this.players.size < this.targetPopulation) {
       this._botSerial++;
-      this.addBot(`BOT ${String(this._botSerial).padStart(2, '0')}`);
+      const usedNames = new Set(Array.from(this.players.values()).map((player) => player.name));
+      this.addBot(randomBotName(usedNames));
     }
   }
 
@@ -520,27 +533,34 @@ export class AuthRoom {
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
     this.events.push({ e: 'hit', id: target.id, by: shooter.id, dmg: Math.round(dmg), head });
-    if (target.health <= 0) {
-      target.alive = false;
-      target.health = 0;
-      target._lastSprint = false;
-      target._lastAim = false;
-      target._animVX = target._animVZ = 0;
-      target._firingTicks = 0;
-      target.deadUntil = this.tick + RESPAWN_TICKS;
-      target.deaths++;
-      // Dying and respawning is a clean engagement boundary. No bot should
-      // remember a human's old aggression and spawn-camp their next life.
-      if (!target.isBot) {
-        for (const bot of this.players.values()) bot._provokedHumans?.delete(target.id);
-      }
-      if (target !== shooter) {
-        shooter.kills++;
-        shooter.score += head ? 150 : 100;
-      }
-      this.events.push({ e: 'kill', id: target.id, by: shooter.id, byName: shooter.name,
-                         victimName: target.name, head, wid: shooter.wid });
+    if (target.health <= 0) this._kill(target, shooter, head);
+  }
+
+  _kill(target, shooter = null, head = false, wid = null) {
+    if (!target.alive) return false;
+    target.alive = false;
+    target.health = 0;
+    target._lastSprint = false;
+    target._lastAim = false;
+    target._animVX = target._animVZ = 0;
+    target._firingTicks = 0;
+    target.deadUntil = this.tick + RESPAWN_TICKS;
+    target.deaths++;
+    // Dying and respawning is a clean engagement boundary. No bot should
+    // remember a human's old aggression and spawn-camp their next life.
+    if (!target.isBot) {
+      for (const bot of this.players.values()) bot._provokedHumans?.delete(target.id);
     }
+    if (shooter && target !== shooter) {
+      shooter.kills++;
+      shooter.score += head ? 150 : 100;
+    }
+    this.events.push({
+      e: 'kill', id: target.id, by: shooter?.id ?? null,
+      byName: shooter?.name ?? 'THE VOID', victimName: target.name,
+      head, wid: wid ?? shooter?.wid ?? 'void',
+    });
+    return true;
   }
 
   // Server computes the detonation point (aim ray vs geometry, capped at the
@@ -681,6 +701,15 @@ export class AuthRoom {
       p.wid = cmd.wid || p.wid;
       p.mag = this._weaponState(p, p.wid).mag;
       p._lastAim = !!cmd.aiming;
+      // MoveSim restores the last safe transform when it crosses the kill
+      // plane. Treat that recovery marker as an environmental death instead of
+      // silently teleporting the player and leaving the HUD in an unclear state.
+      if (p.state.recovered) {
+        this._kill(p, null, false, 'void');
+        p.queue.length = 0;
+        this._record(p);
+        continue;
+      }
       // Public animation velocity is resolved displacement, not requested
       // velocity, so a player pinned against a wall does not run in place.
       const dx = p.state.px - previousState.px;

@@ -29,7 +29,7 @@ globalThis.ProgressEvent ??= class ProgressEvent {
   }
 };
 
-const { WeaponSystem } = await import('../src/weapons/WeaponSystem.js');
+const { WeaponSystem, shouldHideAdsViewmodel } = await import('../src/weapons/WeaponSystem.js');
 const { orientWeaponModelForward } = await import('../src/weapons/WeaponModels.js');
 
 const assert = (ok, message) => {
@@ -551,6 +551,22 @@ advanceSeconds(0.25, 60);
 assert(system.kickGroup.visible, 'viewmodel did not return after leaving the scope');
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
+
+// Regular firearms do not have a full-screen scope overlay, but a fully
+// centered receiver previously sat directly over the target. Every firearm
+// must clear the sight picture at full ADS and return without affecting melee.
+for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
+  activate(def);
+  resetMotionState();
+  input.rightMouseDown = true;
+  advanceSeconds(0.5, 60);
+  assert(!system.kickGroup.visible, `${def.id} blocks the target at full ADS`);
+  input.rightMouseDown = false;
+  advanceSeconds(0.35, 60);
+  assert(system.kickGroup.visible, `${def.id} viewmodel did not return after ADS`);
+}
+assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'knife'), 1),
+  'melee viewmodel must not be hidden by firearm ADS rules');
 
 // Landing response is derived from the velocity retained during airtime.
 const landingStrength = (fallSpeed) => {

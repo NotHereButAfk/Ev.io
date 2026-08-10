@@ -56,6 +56,7 @@ import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 import { countLocalMatchPlayers } from './Population.js';
 import { consumeThrowable } from './GameplayInput.js';
 import { deathCameraPose, deathFallProgress } from '../player/DeathAnimation.js';
+import { buildLeaderboardRows, buildMatchRows } from './MatchRows.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -965,35 +966,15 @@ export class Game {
   // players) use their real kills/score from the shared server instead.
   // Survival shows just you (vs. zombies).
   _buildScoreboardRows() {
-    if (this._authNet?.ready) {
-      const client = this._authNet.client;
-      const rows = (client.roster || []).map((entry) => ({
-        name: entry.name,
-        kills: entry.id === client.you ? client.self.kills : entry.kills,
-        score: entry.id === client.you ? client.self.score : entry.score,
-        isYou: entry.id === client.you,
-        isBot: entry.isBot,
-      }));
-      rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
-      return rows;
-    }
-    const rows = [{ name: this.player.name || 'You', kills: this.kills, score: this.score, isYou: true }];
-    if (!this._isSurvival) {
-      for (const bot of (this.botManager?.bots || [])) {
-        const key = bot.displayName || 'Spartan';
-        let kills, score;
-        if (bot._netId != null) {
-          kills = bot._netKills || 0;
-          score = bot._netScore || 0;
-        } else {
-          kills = bot._botKills || 0;
-          score = kills * 100;
-        }
-        rows.push({ name: key, kills, score, isYou: false });
-      }
-    }
-    rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
-    return rows;
+    return buildMatchRows({
+      authClient: this._authNet?.ready ? this._authNet.client : null,
+      playerName: this.player.name,
+      playerKills: this.kills,
+      playerDeaths: this.deaths,
+      playerScore: this.score,
+      bots: this.botManager?.bots || [],
+      isSurvival: this._isSurvival,
+    });
   }
 
   // ── Post-match leaderboard ───────────────────────────────────────────────────
@@ -1005,37 +986,9 @@ export class Game {
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
     if (this._hudCrosshair) this._hudCrosshair.classList.remove('hidden');
 
-    // Build leaderboard: player + all current bots with generated kill stats.
-    const kd = (k, d) => (d > 0 ? (k / d).toFixed(1) : k.toFixed(1));
-    const rows = [{
-      name:    this.player.name,
-      score:   this.score,
-      assists: Math.floor(this.kills * 0.4),
-      kills:   this.kills,
-      deaths:  this.deaths,
-      kd:      kd(this.kills, this.deaths),
-      isYou:   true,
-    }];
-    for (const bot of this.botManager.bots) {
-      let k, d, a, score;
-      if (bot._netId != null) {
-        // Real connected player — use their actual reported stats. Deaths
-        // aren't tracked server-side yet (out of scope for the shared-state
-        // relay), so kd falls back to raw kills the same way the formula
-        // already does for anyone with 0 recorded deaths.
-        k = bot._netKills || 0;
-        d = 0;
-        a = 0;
-        score = bot._netScore || 0;
-      } else {
-        k = bot._botKills || 0;
-        d = bot._botDeaths || 0;
-        a = Math.floor(Math.random() * 6);
-        score = k * 100;
-      }
-      rows.push({ name: bot.displayName, score, assists: a, kills: k, deaths: d, kd: kd(k, d), isYou: false });
-    }
-    rows.sort((a, b) => b.kills - a.kills || b.score - a.score);
+    // AuthNetBridge clears BotManager on welcome, so the results screen must
+    // consume the same complete server roster as the live scoreboard.
+    const rows = buildLeaderboardRows(this._buildScoreboardRows());
     const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
 
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
@@ -1489,6 +1442,13 @@ export class Game {
         this.moveBridge.update(dt, this.input, this.world);
       } else {
         this.player.update(dt, this.input, this.world);
+      }
+    }
+    if (!(this._authNet && this._authNet.ready) && !dead) {
+      const crossedKillPlane = this.player.position.y < (this.world.killY ?? -25);
+      const recoveredByMoveSim = !!this.moveBridge?.recoveredThisFrame;
+      if (crossedKillPlane || recoveredByMoveSim) {
+        this._onPlayerDamaged(this.player.health + this.player.shield + 1);
       }
     }
     // A server snapshot can change alive/dead during AuthNetBridge.update(),

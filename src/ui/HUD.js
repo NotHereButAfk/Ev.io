@@ -406,6 +406,11 @@ export class HUD {
         badge.className = 'lb-you-badge';
         badge.textContent = 'YOU';
         nameTd.appendChild(badge);
+      } else if (row.isBot) {
+        const badge = document.createElement('span');
+        badge.className = 'lb-bot-badge';
+        badge.textContent = 'BOT';
+        nameTd.appendChild(badge);
       }
 
       tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
@@ -452,6 +457,10 @@ export class HUD {
       if (r.isYou) {
         const b = document.createElement('span');
         b.className = 'sb-you-badge'; b.textContent = 'YOU';
+        nameTd.appendChild(b);
+      } else if (r.isBot) {
+        const b = document.createElement('span');
+        b.className = 'sb-bot-badge'; b.textContent = 'BOT';
         nameTd.appendChild(b);
       }
       tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;

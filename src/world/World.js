@@ -35,6 +35,7 @@ export class World {
     this.weaponSpawnPoints = [];
     this.previewPedestalPos = new THREE.Vector3(0, 3, 0);
     this.arenaHalf = 128;
+    this.killY = -25;
     this.usesMeshCollision = true;
     this.currentMapId = null;
     this.currentMap = null;
@@ -100,6 +101,7 @@ export class World {
       Math.abs(map.bounds.min.z), Math.abs(map.bounds.max.z),
     );
     this.arenaHalf = Math.ceil(maxXZ + 4);
+    this.killY = Math.min(-25, (map.collisionBounds?.min?.y ?? map.bounds.min.y) - 10);
     const previewSpawn = this.spawnPoints.find((point) => point.y <= 3.1) || this.spawnPoints[0];
     this.previewPedestalPos.copy(previewSpawn);
 

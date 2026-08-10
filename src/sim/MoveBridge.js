@@ -35,6 +35,7 @@ export class MoveBridge {
     this.acc = 0;
     this._edges = { jump: false, crouch: false, tele: false };
     this._written = new THREE.Vector3().copy(p);
+    this.recoveredThisFrame = false;
   }
 
   currentHash() { return hashState(this.state); }
@@ -52,6 +53,7 @@ export class MoveBridge {
 
   update(dt, input, world) {
     const p = this.player;
+    this.recoveredThisFrame = false;
     if (world !== this.worldRef) {           // map changed — rebuild adapter
       this.worldRef = world;
       this.simWorld = worldAdapter(world);
@@ -100,6 +102,7 @@ export class MoveBridge {
       const before = this.state;
       this.prev = before;
       this.state = step(before, inp, this.simWorld);
+      this.recoveredThisFrame ||= !!this.state.recovered;
       if (this.state.teleCD > before.teleCD) {
         p.onTeleport?.(
           new THREE.Vector3(before.px, before.py, before.pz),

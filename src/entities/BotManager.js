@@ -1,23 +1,9 @@
 import { Bot } from './Bot.js';
 import { combatTargetScore } from './BotCombat.js';
+import { randomBotName } from './BotNames.js';
 
 // Gamertag pool for simulated remote players and named bots, so the kill feed
 // and server roster read like a live lobby instead of "Bot-7".
-const TAGS = [
-  'Vortex', 'NovaStrike', 'Reaper', 'Glitch', 'Zephyr', 'Onyx', 'Pulse', 'Wraith',
-  'Cipher', 'Havoc', 'Specter', 'Riot', 'Surge', 'Talon', 'Echo', 'Frost',
-  'Blaze', 'Venom', 'Phantom', 'Ranger', 'Drift', 'Saint', 'Karma', 'Volt',
-];
-
-function randomTag(used) {
-  for (let i = 0; i < 30; i++) {
-    const t = TAGS[Math.floor(Math.random() * TAGS.length)];
-    const tag = Math.random() < 0.5 ? t : `${t}${Math.floor(Math.random() * 99)}`;
-    if (!used.has(tag)) { used.add(tag); return tag; }
-  }
-  return `Player${Math.floor(Math.random() * 9999)}`;
-}
-
 export class BotManager {
   constructor(world, scene, audio = null) {
     this.world = world;
@@ -48,7 +34,7 @@ export class BotManager {
     bot.health      = bot.maxHealth;
     bot.isHumanSlot = isHumanSlot;
     bot.isBot       = true;   // every combatant here is a bot — labelled as one
-    bot.displayName = randomTag(this._usedTags);
+    bot.displayName = randomBotName(this._usedTags);
     this.scene.add(bot.mesh);
     this.bots.push(bot);
     return bot;

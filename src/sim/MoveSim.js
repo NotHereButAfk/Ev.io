@@ -372,7 +372,7 @@ export function hashState(s) {
 export function worldAdapter(world) {
   return {
     half: world.arenaHalf,
-    killY: -25,
+    killY: world.killY ?? -25,
     platforms: world.platforms,
     boxes: world.colliders.map(({ box }) => ({
       min: [box.min.x, box.min.y, box.min.z],

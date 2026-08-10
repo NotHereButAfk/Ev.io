@@ -4009,6 +4009,12 @@ html, body {
   background: var(--kx-cyan); color: #04121b; font-size: 9px; font-weight: 800;
   letter-spacing: 1px; vertical-align: middle;
 }
+.lb-bot-badge,
+.sb-bot-badge {
+  display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 4px;
+  background: #ffb03a; color: #161007; font-size: 9px; font-weight: 800;
+  letter-spacing: 0.8px; vertical-align: middle;
+}
 .lb-earned {
   text-align: center; margin-top: 16px; padding-top: 14px;
   border-top: 1px solid rgba(120,200,255,0.12);

@@ -6,6 +6,8 @@ import { ServerSim } from '../src/core/ServerSim.js';
 import { AuthRoom } from '../server/authroom.mjs';
 import { ROOK } from '../server/rookarena.mjs';
 import { AuthClient } from '../src/net/AuthClient.js';
+import { buildLeaderboardRows, buildMatchRows } from '../src/core/MatchRows.js';
+import { readFileSync } from 'node:fs';
 
 const bots = Array.from({ length: 7 }, (_, index) => ({
   isHumanSlot: index < 3,
@@ -37,10 +39,32 @@ const humanId = room.add((message) => { if (message.t === 'welcome') welcome = m
 assert.equal(room.players.size, 4, 'a joining human must replace a bot instead of exceeding capacity');
 assert.equal(welcome.players.length, 4, 'the welcome roster must immediately include bots');
 assert.equal(welcome.players.filter((p) => p.isBot).length, 3);
+const serverBotNames = welcome.players.filter((p) => p.isBot).map((p) => p.name);
+assert.equal(new Set(serverBotNames).size, serverBotNames.length,
+  'authoritative bot names must be unique within the match');
+assert.ok(serverBotNames.every((name) => name && !/^BOT \d+$/.test(name)),
+  'authoritative bots must receive readable random names instead of numbered placeholders');
 
 const client = new AuthClient('unused');
 client._recv(JSON.stringify(welcome));
 assert.equal(client.roster.length, 4, 'the client must expose welcome population before the first snapshot');
+client.self = { ...client.self, kills: 2, deaths: 1, score: 250 };
+const finalRows = buildLeaderboardRows(buildMatchRows({
+  authClient: client,
+  bots: [], // authoritative play intentionally clears the local BotManager
+  playerName: 'Human',
+}));
+assert.equal(finalRows.length, 4,
+  'post-match results must keep every authoritative bot after local bots are cleared');
+assert.equal(finalRows.filter((row) => row.isBot).length, 3,
+  'post-match results must identify every authoritative bot');
+assert.equal(finalRows.find((row) => row.isYou)?.deaths, 1,
+  'post-match results must use authoritative deaths and K/D');
+const hudSource = readFileSync(new URL('../src/ui/HUD.js', import.meta.url), 'utf8');
+assert.match(hudSource, /row\.isBot[\s\S]*lb-bot-badge/,
+  'post-match bot rows must be visibly labelled as bots');
+assert.match(hudSource, /r\.isBot[\s\S]*sb-bot-badge/,
+  'live scoreboard bot rows must be visibly labelled as bots');
 let firePayload = null;
 client.connected = true;
 client.lastServerTick = 77;
@@ -67,4 +91,22 @@ room.remove(humanId);
 assert.equal(room.players.size, 4, 'a vacated human slot must be backfilled by a bot');
 assert.equal([...room.players.values()].filter((p) => p.isBot).length, 1);
 
-console.log('player population passed: active bots occupy local, welcome, snapshot, and backfill slots');
+const voidArena = {
+  id: 'void-proof', name: 'Void Proof', region: 'test', half: 20,
+  killY: -2, noBaseFloor: true, platforms: [], boxes: [],
+  gravLifts: [], teleporters: [], spawns: [[0, 0, 0]],
+};
+const voidRoom = new AuthRoom(voidArena);
+const voidId = voidRoom.add(() => {}, 'Faller');
+const faller = voidRoom.players.get(voidId);
+faller.state.py = -3;
+faller.state.vy = -1;
+faller.state.onGround = 0;
+voidRoom.events.length = 0;
+voidRoom.update();
+assert.equal(faller.alive, false, 'crossing the authoritative kill plane must cause a real death');
+assert.equal(faller.deaths, 1, 'a void fall must count on the leaderboard');
+assert.ok(voidRoom.events.some((event) => event.e === 'kill' && event.id === voidId && event.wid === 'void'),
+  'a void fall must emit an understandable environmental kill event');
+
+console.log('player population passed: named bots occupy live/results rosters and void falls count as deaths');

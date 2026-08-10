@@ -115,7 +115,7 @@ export class AuthClient {
         this.matchStart = m.matchStart ?? null;
         this.matchDurationMs = m.matchDurationMs ?? null;
         this.simWorld = {
-          half: m.arena.half, killY: -25,
+          half: m.arena.half, killY: m.arena.killY ?? -25,
           noBaseFloor: !!m.arena.noBaseFloor,
           platforms: m.arena.platforms, boxes: m.arena.boxes,
           gravLifts: [], teleporters: [],
@@ -146,7 +146,7 @@ export class AuthClient {
       this.arena = snap.arena;
       this.simWorld = {
         half: snap.arena.half,
-        killY: -25,
+        killY: snap.arena.killY ?? -25,
         noBaseFloor: !!snap.arena.noBaseFloor,
         platforms: snap.arena.platforms,
         boxes: snap.arena.boxes,
