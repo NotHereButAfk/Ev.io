@@ -109,4 +109,8 @@ assert.equal(faller.deaths, 1, 'a void fall must count on the leaderboard');
 assert.ok(voidRoom.events.some((event) => event.e === 'kill' && event.id === voidId && event.wid === 'void'),
   'a void fall must emit an understandable environmental kill event');
 
+const deployWorkflow = readFileSync(new URL('../.github/workflows/deploy-vps.yml', import.meta.url), 'utf8');
+assert.match(deployWorkflow, /src\/entities\/BotNames\.js/,
+  'the VPS deployment must ship the shared bot-name module imported by the authoritative server');
+
 console.log('player population passed: named bots occupy live/results rosters and void falls count as deaths');

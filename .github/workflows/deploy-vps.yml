@@ -97,7 +97,8 @@ jobs:
             src/world/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/world/"
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
-            src/entities/BotCombat.js "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/entities/BotCombat.js"
+            src/entities/BotCombat.js src/entities/BotNames.js \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/entities/"
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             src/weapons/weaponDefs.js "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/src/weapons/weaponDefs.js"
