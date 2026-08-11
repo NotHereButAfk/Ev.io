@@ -552,19 +552,32 @@ assert(system.kickGroup.visible, 'viewmodel did not return after leaving the sco
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
-// Regular firearms do not have a full-screen scope overlay, but a fully
-// centered receiver previously sat directly over the target. Every firearm
-// must clear the sight picture at full ADS and return without affecting melee.
+// A centered receiver used to sweep across the target during the zoom and was
+// tested only after ADS had already settled. Exercise the complete transition
+// at 240Hz: every firearm must clear on its first held-aim frame, stay clear
+// through full ADS and early scope-out, then return near the hip-fire FOV.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
   input.rightMouseDown = true;
-  advanceSeconds(0.5, 60);
+  advanceSeconds(1 / 240, 240);
+  assert(!system.kickGroup.visible, `${def.id} crosses the target on the first ADS frame`);
+  assert(system.scopeT < 0.5, `${def.id} first-frame ADS probe skipped the transition`);
+  advanceSeconds(0.5 - 1 / 240, 240, () => {
+    assert(!system.kickGroup.visible, `${def.id} reappears during scope-in`);
+  });
   assert(!system.kickGroup.visible, `${def.id} blocks the target at full ADS`);
   input.rightMouseDown = false;
-  advanceSeconds(0.35, 60);
+  advanceSeconds(0.2, 240, () => {
+    if (system.scopeT > 0.08) {
+      assert(!system.kickGroup.visible, `${def.id} flashes over the target during scope-out`);
+    }
+  });
+  advanceSeconds(0.3, 240);
   assert(system.kickGroup.visible, `${def.id} viewmodel did not return after ADS`);
 }
+assert(shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'm4'), 0, true),
+  'held ADS must clear the viewmodel before the first zoom blend step');
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'knife'), 1),
   'melee viewmodel must not be hidden by firearm ADS rules');
 

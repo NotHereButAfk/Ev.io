@@ -118,13 +118,15 @@ function viewmodelFovLift(fov) {
   return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
-// Once a firearm is fully shouldered, the reticle owns the sight picture.
-// Scoped guns clear as the overlay arrives; regular guns clear near the end of
-// their ADS blend so neither the receiver nor the long first-person arms can
-// sit over the target. Melee weapons never enter ADS.
-export function shouldHideAdsViewmodel(def, scopeT) {
+// The reticle owns the sight picture for the complete ADS transition. Hiding
+// only near full zoom let a centered receiver sweep directly across the target
+// while the FOV narrowed—the obstruction players actually notice most. Clear
+// on the first held-aim frame, then keep the rig out until the zoom is almost
+// completely released so it cannot flash back over the target on scope-out.
+// Melee weapons never enter ADS.
+export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   if (!def || def.kind === 'melee') return false;
-  return scopeT > (def.scoped ? 0.5 : 0.82);
+  return aimHeld || scopeT > 0.08;
 }
 
 export class WeaponSystem {
@@ -1490,7 +1492,7 @@ export class WeaponSystem {
     // regular guns shoulder into a centered, lower-FOV sight picture.
     const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
     this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
-    this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT);
+    this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT, wantScope);
     // Aiming keeps a trace of organic motion, but removes enough viewmodel
     // travel that the physical sight and fixed scope overlay do not disagree.
     const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.08 : 0.24, this.scopeT);
