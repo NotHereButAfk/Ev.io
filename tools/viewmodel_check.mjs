@@ -190,6 +190,24 @@ function projectedRatio(root) {
   return projectedRatioForBox(new THREE.Box3().setFromObject(root));
 }
 
+function projectedBounds(root) {
+  root.updateWorldMatrix(true, true);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
+    for (const z of [box.min.z, box.max.z]) {
+      const point = new THREE.Vector3(x, y, z).project(camera);
+      bounds.minX = Math.min(bounds.minX, point.x);
+      bounds.maxX = Math.max(bounds.maxX, point.x);
+      bounds.minY = Math.min(bounds.minY, point.y);
+      bounds.maxY = Math.max(bounds.maxY, point.y);
+    }
+  }
+  return bounds;
+}
+
 function viewportArea(root) {
   root.updateWorldMatrix(true, true);
   const box = new THREE.Box3().setFromObject(root);
@@ -341,6 +359,19 @@ for (const def of WEAPONS) {
 // across every viewport, FOV and high-motion state; the support upper sleeve
 // remains hidden instead of forming a second long tube.
 activate(WEAPONS.find((def) => def.id === 'm4'));
+camera.aspect = 16 / 9;
+player.baseFov = 78;
+camera.fov = 78;
+tick(90);
+const referenceRifleBounds = projectedBounds(system.models.get('m4').group);
+assert(referenceRifleBounds.maxX > 0.75,
+  `EV.IO rifle butt does not own the lower-right quadrant (${JSON.stringify(referenceRifleBounds)})`);
+assert(referenceRifleBounds.minY < -1,
+  `EV.IO rifle butt must exit the bottom edge (${JSON.stringify(referenceRifleBounds)})`);
+assert(referenceRifleBounds.minX > -0.24,
+  `EV.IO rifle crosses too far over the reticle (${JSON.stringify(referenceRifleBounds)})`);
+assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >= 0.11,
+  `EV.IO rifle lacks its shouldered pitch/yaw (${system.weaponMount.rotation.x}, ${system.weaponMount.rotation.y})`);
 let worstGlove = { value: Infinity, label: '' };
 for (const stateName of ['idle', 'sprint', 'reload']) {
   player.isSprinting = stateName === 'sprint';

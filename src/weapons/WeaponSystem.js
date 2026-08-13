@@ -56,12 +56,15 @@ function createTracerMesh() {
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
 const VIEWMODEL_Z = -0.82;
-const VIEWMODEL_X = 0.31;
-// EV.IO frames the rifle as a lower-right foreground object: the receiver,
-// trigger hand and sleeve continue through the bottom edge instead of exposing
-// a complete dangling forearm beneath the gun.
-const VIEWMODEL_Y = -0.305;
-const VIEWMODEL_SCALE = 0.84;
+// EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
+// the bottom of the screen: its butt exits the lower-right corner while the
+// muzzle rises back toward the reticle.  The offset and two-axis cant are one
+// shared transform so the weapon and both gripping hands cannot drift apart.
+const VIEWMODEL_X = 0.42;
+const VIEWMODEL_Y = -0.28;
+const VIEWMODEL_SCALE = 0.76;
+const VIEWMODEL_PITCH = 0.14;
+const VIEWMODEL_YAW = 0.13;
 const REFERENCE_ASPECT = 16 / 9;
 
 // First-person hand targets in each weapon model's local coordinate system.
@@ -175,7 +178,7 @@ export class WeaponSystem {
     this._bobPhase = 0;                       // continuous bob phase (own clock)
     this._mountPos = new THREE.Vector3(
       VIEWMODEL_X * viewmodelAspectScale(camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
-    this._mountRot = new THREE.Vector3(0, 0, 0);
+    this._mountRot = new THREE.Vector3(VIEWMODEL_PITCH, VIEWMODEL_YAW, 0);
     this._raiseT = 1;                         // 0=just switched (lowered) → 1=up
     this._wasGrounded = true;                 // viewmodel landing impulse edge
     this._landT = 0;                          // 0.22s settle after touching down
@@ -407,9 +410,10 @@ export class WeaponSystem {
         8,
       );
       forearm.name = 'viewmodel_forearm';
-      // The support side only needs a closed glove and cuff at the handguard.
-      // Even a short forearm becomes a bright diagonal tube at viewmodel FOV.
-      forearm.visible = !support;
+      // EV.IO visibly braces the handguard with the support forearm.  Keep its
+      // compact forearm shell, while the longer shoulder segment below stays
+      // hidden so it leaves the lower edge without becoming a second pole.
+      forearm.visible = true;
       arm.add(forearm);
       const upperSleeve = segment(
         armorEnd, sleeveEnd,
@@ -701,9 +705,9 @@ export class WeaponSystem {
     this._mountPos.set(
       VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z,
     );
-    this._mountRot.set(0, 0, 0);
+    this._mountRot.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, 0);
     this.weaponMount?.position.copy(this._mountPos);
-    this.weaponMount?.rotation.set(0, 0, 0);
+    this.weaponMount?.rotation.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, 0);
     this.swayGroup?.position.set(0, 0, 0);
     this.swayGroup?.rotation.set(0, 0, 0);
     this.kickGroup?.position.set(0, 0, 0);
@@ -1660,7 +1664,9 @@ export class WeaponSystem {
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      this._sprintT * 0.22 + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12, 14, dt);
+      VIEWMODEL_PITCH + this._sprintT * 0.22 + 0.50 * framedBell
+        + 0.14 * framedRack + landPulse * 0.12, 14, dt);
+    this._mountRot.y = expDamp(this._mountRot.y, VIEWMODEL_YAW, 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
@@ -1670,6 +1676,7 @@ export class WeaponSystem {
     // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
     this.weaponMount.rotation.x = this._mountRot.x;
+    this.weaponMount.rotation.y = this._mountRot.y;
     this.weaponMount.rotation.z = this._mountRot.z;
 
     // muzzle flash decay

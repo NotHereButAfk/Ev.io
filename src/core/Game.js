@@ -157,6 +157,7 @@ export class Game {
     this._isDM           = false;
     this._playerDowned   = false;
     this._respawnRemaining = 0;
+    this._respawnDeadline = 0;
     this._deathAnimT = 0;
     this._deathSide = 1;
     this._deathCameraBasePos = new THREE.Vector3();
@@ -695,6 +696,7 @@ export class Game {
     this._pendingCoins = 0;
     this._playerDowned = false;
     this._respawnRemaining = 0;
+    this._respawnDeadline = 0;
     this._resetDeathAnimation();
 
     // Mode-specific setup
@@ -1158,6 +1160,7 @@ export class Game {
     this.pickupSystem = null;
     this._playerDowned = false;
     this._respawnRemaining = 0;
+    this._respawnDeadline = 0;
     this.menu.showMain();
   }
 
@@ -1241,14 +1244,18 @@ export class Game {
       return;
     }
 
-    // Deathmatch: the fall and countdown remain visible while the full nav GUI
-    // opens over the live match. Respawn continues automatically behind it.
+    // Deathmatch: keep the live match/camera active during the automatic
+    // respawn. Opening the full navigation GUI here made headless and
+    // backgrounded tabs throttle requestAnimationFrame so heavily that a
+    // three-second gameplay countdown could take more than ten wall seconds.
+    // The dedicated respawn overlay is the death UI; the player may still open
+    // the navigation manually with Escape.
     this._beginDeathAnimation();
     if (this._isDM) {
-      if (!this._menuOpen) this._openMenu();
       this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
       clearTimeout(this._respawnTimer);
       this._respawnRemaining = RESPAWN_DELAY;
+      this._respawnDeadline = performance.now() + RESPAWN_DELAY * 1000;
       this.hud.showRespawn(this._respawnRemaining);
       this.weaponSystem.resetMotionState();
       return;
@@ -1281,6 +1288,7 @@ export class Game {
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
     this._respawnRemaining = 0;
+    this._respawnDeadline = 0;
     this._resetDeathAnimation();
     this.hud.hideRespawn();
     this.hud.addKillFeed('RESPAWNED');
@@ -1292,6 +1300,7 @@ export class Game {
     this.deaths = self?.deaths ?? (this.deaths + 1);
     this.matchStats.currentStreak = 0;
     this._respawnRemaining = RESPAWN_DELAY;
+    this._respawnDeadline = 0;
     this._beginDeathAnimation();
     if (!this._menuOpen) this._openMenu();
     this.hud.showRespawn(this._respawnRemaining);
@@ -1302,6 +1311,7 @@ export class Game {
   _onAuthoritativeRespawn(self) {
     this.deaths = self?.deaths ?? this.deaths;
     this._respawnRemaining = 0;
+    this._respawnDeadline = 0;
     this._resetDeathAnimation();
     this.player.velocity.set(0, 0, 0);
     this.player.isSprinting = false;
@@ -1455,7 +1465,14 @@ export class Game {
     // so the render and combat gates below must use the refreshed state.
     dead = this.player.isDead && !this._playerDowned;
     if (dead) {
-      this._respawnRemaining = Math.max(0, this._respawnRemaining - dt);
+      // Death/respawn is a wall-clock contract, not an animation. Browsers can
+      // throttle requestAnimationFrame in a background tab; decrementing by
+      // clamped frame deltas made "3 seconds" take tens of seconds there.
+      if (this._respawnDeadline > 0) {
+        this._respawnRemaining = Math.max(0, (this._respawnDeadline - performance.now()) / 1000);
+      } else {
+        this._respawnRemaining = Math.max(0, this._respawnRemaining - dt);
+      }
       this.hud.showRespawn(this._respawnRemaining);
       if (!(this._authNet && this._authNet.ready) && this._isDM && this._respawnRemaining <= 0) {
         this._respawnPlayer();

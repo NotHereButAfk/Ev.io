@@ -66,7 +66,7 @@ for (let i = 0; i < 10; i++) {
 if (!inGame) { console.error('match never started'); await browser.close(); process.exit(1); }
 console.log('  in match');
 
-await pose(`g.player.position.set(0, 0, 22); g.player.yaw = Math.PI; g.player.pitch = -0.04;`);
+await pose(`g.weaponSystem.setLoadout('m4', 'sword'); g.player.position.set(0, 0, 22); g.player.yaw = Math.PI; g.player.pitch = -0.04;`);
 await page.waitForTimeout(1200);
 await shot('first-person');
 
