@@ -333,6 +333,7 @@ export class Avatar {
       swing: gait.swing,
       kick:  this._kick,
       reload: s.reload || 0, swap: act.swap, flinch: act.flinch, throwP: act.throw,
+      smooth: true,
     });
   }
 

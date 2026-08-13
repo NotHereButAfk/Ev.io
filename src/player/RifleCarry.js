@@ -162,7 +162,7 @@ function slideToReach(T, sx) {
  * @param {THREE.Object3D} weapon  the weapon model parented to the body (or null)
  * @param {number} aim     0 = patrol carry, 1 = shouldered and aiming
  * @param {number} dt      frame delta (seconds) — unused, kept for callers
- * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP }
+ * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP, smooth }
  *   `aimPitch` is where this body is SHOOTING, in radians against the horizon
  *   (positive up) — pass the look pitch, or for a bot the elevation of the ray
  *   it actually fires. Shouldered, the muzzle comes out on exactly that angle.
@@ -237,6 +237,33 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     _pos.y = SHOULDER_Y + dy * cs - dz * sn;
     _pos.z = dy * sn + dz * cs;
     _q.premultiply(_qSwing);
+  }
+
+  // Network snapshots, animation state edges and coarse frame pacing can move
+  // the desired carry by several centimetres in one tick. Smooth the single
+  // source-of-truth weapon pose first, then solve both arms against that exact
+  // displayed pose below. Smoothing arms and gun independently would make the
+  // hands visibly swim off the grip.
+  if (weapon && o.smooth) {
+    const state = weapon.userData.rifleCarrySmoothing ||= {
+      initialized: false,
+      position: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+    };
+    if (!state.initialized || !(dt > 0) || dt > 0.2) {
+      state.position.copy(_pos);
+      state.quaternion.copy(_q);
+      state.initialized = true;
+    } else {
+      // A fast critically-damped-looking response: quick enough for gunplay,
+      // continuous enough that aim/reload/swap edges do not pop the model.
+      const positionAlpha = 1 - Math.exp(-22 * dt);
+      const rotationAlpha = 1 - Math.exp(-26 * dt);
+      state.position.lerp(_pos, positionAlpha);
+      state.quaternion.slerp(_q, rotationAlpha).normalize();
+    }
+    _pos.copy(state.position);
+    _q.copy(state.quaternion);
   }
 
   if (weapon) { weapon.position.copy(_pos); weapon.quaternion.copy(_q); }

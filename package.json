@@ -16,6 +16,7 @@
     "assets": "node tools/asset_pipeline.mjs",
     "certify": "node tools/certify.mjs",
     "test:maps": "node tools/map_rotation_check.mjs",
+    "test:map-lighting": "node tests/map-lighting.test.mjs",
     "test:facing": "node tools/facing_check.mjs",
     "test:human-motion": "node tools/human_locomotion_check.mjs",
     "test:human-carry": "node tools/human_rifle_carry_check.mjs",

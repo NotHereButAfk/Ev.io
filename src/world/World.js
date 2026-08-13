@@ -54,13 +54,24 @@ export class World {
   }
 
   _buildLighting() {
-    this.scene.add(new THREE.HemisphereLight(0xf4fbff, 0x41464d, 1.45));
-    const sun = new THREE.DirectionalLight(0xfff4df, 1.58);
-    sun.position.set(-82, 118, 66);
-    this.scene.add(sun);
-    const rim = new THREE.DirectionalLight(0x8fd7ff, 0.28);
-    rim.position.set(72, 42, -64);
-    this.scene.add(rim);
+    this._hemisphere = new THREE.HemisphereLight();
+    this._sun = new THREE.DirectionalLight();
+    this._sun.position.set(-82, 118, 66);
+    this._rim = new THREE.DirectionalLight();
+    this._rim.position.set(72, 42, -64);
+    this.scene.add(this._hemisphere, this._sun, this._rim);
+  }
+
+  _applyLighting(definition) {
+    const profile = definition.lighting;
+    if (!profile) return;
+    this._hemisphere.color.setHex(profile.sky);
+    this._hemisphere.groundColor.setHex(profile.ground);
+    this._hemisphere.intensity = profile.hemisphereIntensity;
+    this._sun.color.setHex(profile.sun);
+    this._sun.intensity = profile.sunIntensity;
+    this._rim.color.setHex(profile.rim);
+    this._rim.intensity = profile.rimIntensity;
   }
 
   async loadMap(mapId) {
@@ -111,6 +122,7 @@ export class World {
       definition.fogNear,
       definition.fogFar,
     );
+    this._applyLighting(definition);
     this.scene.add(map.root);
     map.root.traverse((object) => {
       if (object.isMesh && object.matrixAutoUpdate) {

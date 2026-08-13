@@ -13,6 +13,15 @@ export const IMPORTED_MAPS = Object.freeze([
     fog: 0xc8d7dc,
     fogNear: 145,
     fogFar: 360,
+    lighting: Object.freeze({
+      sky: 0xf4fbff,
+      ground: 0x41464d,
+      hemisphereIntensity: 1.45,
+      sun: 0xfff0cf,
+      sunIntensity: 1.68,
+      rim: 0x77cfff,
+      rimIntensity: 0.34,
+    }),
   }),
   Object.freeze({
     id: 'winter-graveyard',
@@ -25,6 +34,15 @@ export const IMPORTED_MAPS = Object.freeze([
     fog: 0xd7e0e8,
     fogNear: 105,
     fogFar: 300,
+    lighting: Object.freeze({
+      sky: 0xddeeff,
+      ground: 0x263246,
+      hemisphereIntensity: 1.18,
+      sun: 0xdcecff,
+      sunIntensity: 1.38,
+      rim: 0x8bbcff,
+      rimIntensity: 0.48,
+    }),
   }),
 ]);
 
