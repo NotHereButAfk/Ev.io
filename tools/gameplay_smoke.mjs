@@ -35,6 +35,17 @@ const key = async (code, ms = 180) => {
   await page.keyboard.up(code);
   await page.evaluate(HIDE);
 };
+const inputKey = async (code, keyValue, settleMs = 260) => {
+  await page.evaluate(({ code, keyValue }) => {
+    const g = window.__game || window.game;
+    g.input._onKeyDown({ code, key: keyValue, preventDefault() {} });
+  }, { code, keyValue });
+  await page.waitForTimeout(settleMs);
+  await page.evaluate(({ code, keyValue }) => {
+    const g = window.__game || window.game;
+    g.input._onKeyUp({ code, key: keyValue });
+  }, { code, keyValue });
+};
 
 try {
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -103,21 +114,9 @@ try {
   await page.waitForTimeout(250);
   assert(await game(`return g.weaponSystem.currentState.isReloading;`), 'reload did not start');
 
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit2', key: '2', bubbles: true }));
-  });
-  await page.waitForTimeout(260);
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit2', key: '2', bubbles: true }));
-  });
+  await inputKey('Digit2', '2');
   assert(await game(`return g.weaponSystem.currentDef.kind === 'melee';`), 'weapon swap to melee failed');
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', key: '1', bubbles: true }));
-  });
-  await page.waitForTimeout(260);
-  await page.evaluate(() => {
-    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Digit1', key: '1', bubbles: true }));
-  });
+  await inputKey('Digit1', '1');
   assert(await game(`return g.weaponSystem.currentDef.kind !== 'melee';`), 'weapon swap back to gun failed');
   mark('reload and swap');
 
@@ -127,12 +126,8 @@ try {
   mark('blink');
 
   const grenadesBefore = await game(`return {frags:g.grenadeSystem.frags,smokes:g.grenadeSystem.smokes};`);
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyG', key: 'g', bubbles: true })));
-  await page.waitForTimeout(120);
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyG', key: 'g', bubbles: true })));
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF', key: 'f', bubbles: true })));
-  await page.waitForTimeout(120);
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyF', key: 'f', bubbles: true })));
+  await inputKey('KeyG', 'g', 160);
+  await inputKey('KeyF', 'f', 160);
   const grenadesAfter = await game(`return {frags:g.grenadeSystem.frags,smokes:g.grenadeSystem.smokes};`);
   assert(grenadesAfter.frags === grenadesBefore.frags - 1 && grenadesAfter.smokes === grenadesBefore.smokes - 1,
     `grenade chord failed: ${JSON.stringify(grenadesBefore)} -> ${JSON.stringify(grenadesAfter)}`);
@@ -146,6 +141,10 @@ try {
   assert(await page.evaluate(() => document.getElementById('scoreboard-overlay')?.classList.contains('hidden')), 'scoreboard did not close');
   mark('scoreboard');
 
+  // Kill the player during an active reload. Respawn must not resurrect a
+  // frozen magazine animation or carry partial ammunition into the new life.
+  await inputKey('KeyR', 'r', 160);
+  assert(await game(`return g.weaponSystem.currentState.isReloading;`), 'pre-death reload did not start');
   await game(`g._onPlayerDamaged(g.player.health + g.player.shield + 10); return true;`);
   await page.waitForTimeout(160);
   assert(await game(`return g.player.isDead;`), 'forced lethal damage did not kill player');
@@ -154,7 +153,24 @@ try {
   const afterRespawn = await game(`return {dead:g.player.isDead, state:g.state, menu:g._menuOpen, remaining:g._respawnRemaining, health:g.player.health};`);
   assert(!afterRespawn.dead, `player did not auto-respawn: ${JSON.stringify(afterRespawn)}`);
   assert(await page.evaluate(() => document.getElementById('respawn-overlay')?.classList.contains('hidden')), 'respawn overlay stayed visible');
+  assert(!await game(`return g.weaponSystem.currentState.isReloading;`), 'reload animation survived respawn');
+  assert(await game(`return g.weaponSystem.currentState.magAmmo === g.weaponSystem.currentDef.magSize;`), 'respawn did not refill the equipped weapon');
   mark('death and respawn');
+
+  // Map-boundary abuse: the legacy controller kills at the kill plane while
+  // the opt-in deterministic MoveSim reports a recovery; either path must end
+  // at a finite safe location rather than falling forever.
+  await game(`g.player.position.set(5000, (g.world.killY ?? -25) - 5, 5000); g.player.velocity.set(0,-1,0); return true;`);
+  await page.waitForTimeout(900);
+  const boundary = await game(`return {dead:g.player.isDead,p:[g.player.position.x,g.player.position.y,g.player.position.z],killY:g.world.killY};`);
+  if (boundary.dead) {
+    await page.waitForTimeout(3600);
+    assert(!await game(`return g.player.isDead;`), 'kill-plane death did not respawn');
+  } else {
+    assert(boundary.p.every(Number.isFinite) && boundary.p[1] > boundary.killY,
+      `kill-plane recovery failed: ${JSON.stringify(boundary)}`);
+  }
+  mark('kill plane');
 
   const invalidState = await game(`return {
     position:[g.player.position.x,g.player.position.y,g.player.position.z],

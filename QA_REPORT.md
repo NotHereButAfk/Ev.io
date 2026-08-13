@@ -38,6 +38,18 @@ This report records tests that were actually executed against the running game. 
 **Fix:** Added a smaller camera-space mount with persistent pitch/yaw, lower-right composition, shared hand/weapon transform, and visible compact support forearm. Added reference-framing regression bounds.  
 **Verification:** PASS. All 20 weapons across 12 FOV/aspect frames pass near-plane, glove, ADS, reload, sprint, and refresh-rate checks; the full certificate remains 25/25.
 
+## BUG-003
+
+**Severity:** High  
+**System:** Weapon state / death / respawn  
+**Steps to reproduce:** Fire the Auto Rifle, start reloading, take lethal damage before the reload completes, and wait for automatic respawn.  
+**Expected EV.IO behavior:** A new life starts with the base loadout, full magazine, and no action from the previous life.  
+**Observed behavior in my game:** The viewmodel motion reset, but the weapon state still reported `isReloading=true`; the partial reload survived into the new life.  
+**Root cause:** The respawn path called `resetMotionState()` and rebuilt the loadout HUD, but `setLoadout()` intentionally preserved each weapon's ammo/reload state.  
+**Files changed:** `src/core/Game.js`, `tools/gameplay_smoke.mjs`  
+**Fix:** Treat respawn as a new-life inventory boundary by resetting the base loadout's ammo, reload timers, recoil, switch, and viewmodel state before rebuilding HUD slots.  
+**Verification:** PASS when the death-during-reload browser sequence returns with a full magazine and no active reload. The map-boundary probe also requires either legacy death/respawn or MoveSim recovery to produce a finite safe state.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.

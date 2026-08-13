@@ -1207,6 +1207,10 @@ export class Game {
   // inventory back to the base main gun + melee.
   _resetLoadoutHud() {
     this.weaponSystem.resetLoadout?.();
+    // Respawn is a new-life boundary, not only a HUD refresh. Reset ammo,
+    // reload timers, recoil and switch state after dropping any map pickup so
+    // dying mid-reload cannot resume a hidden partial action in the next life.
+    this.weaponSystem.resetState(this.player.baseFov);
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
   }
 
