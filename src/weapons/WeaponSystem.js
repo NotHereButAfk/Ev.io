@@ -55,13 +55,13 @@ function createTracerMesh() {
 // the worst case), and recoil moves the whole gun back toward the eye. Keeping
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
-const VIEWMODEL_Z = -0.78;
-const VIEWMODEL_X = 0.35;
+const VIEWMODEL_Z = -0.82;
+const VIEWMODEL_X = 0.31;
 // EV.IO frames the rifle as a lower-right foreground object: the receiver,
 // trigger hand and sleeve continue through the bottom edge instead of exposing
 // a complete dangling forearm beneath the gun.
-const VIEWMODEL_Y = -0.285;
-const VIEWMODEL_SCALE = 0.96;
+const VIEWMODEL_Y = -0.305;
+const VIEWMODEL_SCALE = 0.84;
 const REFERENCE_ASPECT = 16 / 9;
 
 // First-person hand targets in each weapon model's local coordinate system.
@@ -236,9 +236,9 @@ export class WeaponSystem {
 
   _buildViewmodels() {
     this.weaponMount = new THREE.Object3D();
-    // The reference rifle owns the lower-right quadrant: its receiver reaches
-    // the right edge and its sight sits around the lower third. The old 0.74
-    // scale made our authored rifle look like a narrow prop at arm's length.
+    // The reference rifle owns the lower-right quadrant but stays slim enough
+    // to leave the arena readable. Keep the stock crossing the lower/right
+    // edge instead of filling that whole quadrant like the previous 0.96 rig.
     // The weapon and visible trigger-side arm share this deeper mount. Moving
     // the model alone would clear the stock but detach the hand from its grip.
     this.weaponMount.position.set(

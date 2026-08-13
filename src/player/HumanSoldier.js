@@ -755,6 +755,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       const landDip = _landT > 0
         ? Math.sin((1 - _landT / 0.24) * Math.PI) * 0.10 : 0;
       applyHumanRifleCarry(group, B, _heldWeapon, {
+        dt,
         aim: _weaponAim,
         reload: _reloadP,
         swap: swapP,

@@ -11,10 +11,10 @@ const REACH = (UP_ARM + FOREARM) * 0.995;
 //
 // Two hand-solved poses, blended by an `aim` weight (0 = relaxed, 1 = engaged):
 //
-//   PATROL  the real-world across-the-body carry: buttstock up in the right
-//           shoulder pocket, rifle laid diagonally over the chest, muzzle
-//           angled down and out to the left. What you see on a patrolling
-//           soldier — the weapon is up and ready but not pointed at anything.
+//   PATROL  ev.io-style combat ready: buttstock tight to the right shoulder,
+//           rifle high across the upper chest, muzzle only slightly lowered.
+//           The old deep across-body carry put the receiver at stomach height
+//           and rolled the weapon much farther than the reference silhouette.
 //   AIM     shouldered and level: stock in the shoulder, barrel straight down
 //           the body's forward axis, support arm extended along the handguard.
 //           What a bot/player snaps to the instant it engages.
@@ -53,8 +53,8 @@ const ARM_SCALE = (UP_ARM + FOREARM) / (0.48 + 0.385);
 const onArm = (x, y, z) => new THREE.Vector3(
   x * ARM_SCALE, SHOULDER_Y + (y - 1.76) * ARM_SCALE, z * ARM_SCALE);
 const PATROL = {
-  wp: onArm(0.058, 1.390, -0.333),
-  wr: new THREE.Euler(-0.679, 0.646, 0.702),
+  wp: onArm(0.175, 1.475, -0.300),
+  wr: new THREE.Euler(-0.160, 0.220, 0.200),
 };
 const AIM = {
   wp: onArm(0.240, 1.538, -0.262),

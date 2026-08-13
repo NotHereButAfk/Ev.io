@@ -20,6 +20,7 @@
     "test:facing": "node tools/facing_check.mjs",
     "test:human-motion": "node tools/human_locomotion_check.mjs",
     "test:human-carry": "node tools/human_rifle_carry_check.mjs",
+    "test:rifle-reference": "node tests/rifle-carry-reference.test.mjs",
     "test:player-respawn": "node tools/player_respawn_check.mjs",
     "test:player-death": "node tools/player_death_check.mjs",
     "test:grenades": "node tools/grenade_contract_check.mjs",

@@ -214,9 +214,9 @@ export class Bot {
         wm.position.set(-0.22, 1.06, -0.24);
         wm.rotation.set(-0.70, 0, 0.22);
       } else {
-        // AR in the soldier's across-the-body patrol carry — stock in the right
-        // shoulder, muzzle angled down-left across the chest. applyRifleCarry()
-        // drives it from here and blends up to a shouldered aim when engaged.
+        // AR in the high combat-ready carry — stock tight to the right shoulder,
+        // receiver at the upper chest, muzzle only slightly lowered.
+        // applyRifleCarry() completes the small lift when the bot engages.
         restRifleTransform(wm);
       }
       this.mesh.add(wm);

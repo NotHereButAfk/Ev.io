@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 
 // Body-local weapon poses. The muzzle is model-local -Z and the soldier faces
-// body-local -Z, so AIM is nearly identity. PATROL lays the rifle diagonally
-// across the chest without driving the stock through the torso.
-const PATROL_POS = new THREE.Vector3(0.068, 1.285, -0.345);
+// body-local -Z, so AIM is nearly identity. PATROL is the high, close
+// combat-ready carry visible in ev.io's official third-person material: stock
+// at the shoulder, receiver at the upper chest, muzzle only slightly lowered.
+const PATROL_POS = new THREE.Vector3(0.175, 1.475, -0.300);
 const PATROL_Q = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-0.679, 0.646, 0.702)
-).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.12, 0, 0.48)));
+  new THREE.Euler(-0.160, 0.220, 0.200)
+);
 const AIM_POS = new THREE.Vector3(0.240, 1.538, -0.262);
 const AIM_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.020, 0, 0));
 
@@ -204,6 +205,28 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
     weapon.position.y = anchor.y + dy * cs - dz * sn;
     weapon.position.z = anchor.z + dy * sn + dz * cs;
     weapon.quaternion.premultiply(Q[5]);
+  }
+
+  // Smooth the one authoritative rifle transform before solving either arm.
+  // The hands are then IK'd to the exact displayed pose, so animation clips,
+  // network snapshots and aim/reload edges cannot make them swim off the gun.
+  // A missing/large dt is a deliberate snap for deterministic probes, spawns
+  // and teleports.
+  const dt = state.dt || 0;
+  const smoothing = weapon.userData.humanRifleCarrySmoothing ||= {
+    initialized: false,
+    position: new THREE.Vector3(),
+    quaternion: new THREE.Quaternion(),
+  };
+  if (!smoothing.initialized || !(dt > 0) || dt > 0.2) {
+    smoothing.position.copy(weapon.position);
+    smoothing.quaternion.copy(weapon.quaternion);
+    smoothing.initialized = true;
+  } else {
+    smoothing.position.lerp(weapon.position, 1 - Math.exp(-24 * dt));
+    smoothing.quaternion.slerp(weapon.quaternion, 1 - Math.exp(-30 * dt)).normalize();
+    weapon.position.copy(smoothing.position);
+    weapon.quaternion.copy(smoothing.quaternion);
   }
 
   const supportLocal = V[15].copy(HUMAN_HANDGUARD_LOCAL);

@@ -1730,10 +1730,10 @@ export class Game {
 
     const isGun = this.weaponSystem.currentDef && this.weaponSystem.currentDef.kind !== 'melee';
     if (isGun) {
-      // A real soldier's carry: relaxed = rifle laid diagonally across the chest
-      // (stock in the right shoulder, muzzle down-left); shooting or aiming down
-      // sights shoulders it level. applyRifleCarry() blends the two and keeps
-      // both hands welded to the grip + handguard through the whole range.
+      // ev.io-style combat ready: relaxed keeps the stock tight to the right
+      // shoulder with the rifle high across the chest; shooting/ADS completes
+      // the small lift to level. applyRifleCarry() keeps both hands welded to
+      // the grip + handguard through the whole range.
       this._tpsAimHold = Math.max(0, (this._tpsAimHold || 0) - dt);
       this._tpsGunKick = Math.max(0, (this._tpsGunKick || 0) - dt * 7);
       const wantAim = (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0;
