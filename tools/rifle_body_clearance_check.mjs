@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Geometry gate for the complete production rifle against the player body.
+// Geometry and hand-contact gate for every production firearm against the
+// player body.
 //
 // A transform-only check can prove that the weapon origin is outside the
 // shoulder while a one-metre mesh still runs through the chest behind it. This
-// probe builds the shipped procedural Auto Rifle, transforms every vertex
-// through the real carry function, and tests the result against conservative
-// torso and shoulder volumes through the complete action sweep.
+// probe builds every shipped procedural firearm, transforms every vertex
+// through the real carry function, tests it against conservative torso and
+// shoulder volumes, and verifies both wrists against their final IK targets
+// through the complete action sweep.
 
 const noop = () => {};
 const gradient = { addColorStop: noop };
@@ -23,9 +25,12 @@ globalThis.document = {
 
 const THREE = await import('three');
 const { buildWeaponModel } = await import('../src/weapons/WeaponModels.js');
-const { getWeapon } = await import('../src/weapons/weaponDefs.js');
-const { applyRifleCarry, restRifleTransform } = await import('../src/player/RifleCarry.js');
+const { WEAPONS } = await import('../src/weapons/weaponDefs.js');
+const {
+  applyRifleCarry, restRifleTransform, GRIP_LOCAL,
+} = await import('../src/player/RifleCarry.js');
 const { SHOULDER_X, SHOULDER_Y } = await import('../src/player/Proportions.js');
+const { buildHeroBody } = await import('../src/player/HeroBody.js');
 
 const TORSO = [
   // y, half-width, half-depth. These sit just inside the visible connected
@@ -88,46 +93,86 @@ const states = [
     [`swap ${swap.toFixed(2)}`, 0.20, { swap }]),
 ];
 
+const firearms = WEAPONS.filter((def) => def.kind !== 'melee');
 let failures = 0;
 let globalTorso = 0;
 let globalShoulder = 0;
-for (const [name, aim, options, freshAttach = false] of states) {
-  const weapon = buildWeaponModel(getWeapon('m4'), { procedural: true }).group;
-  if (freshAttach) restRifleTransform(weapon);
-  else applyRifleCarry(null, weapon, aim, 1 / 60, options);
-  weapon.updateMatrixWorld(true);
+let totalPoses = 0;
+for (const def of firearms) {
+  const body = buildHeroBody('vanguard');
+  const rig = body.userData.rig;
+  const bones = body.userData.bones;
+  let weaponTorso = 0, weaponShoulder = 0;
+  let weaponTrigger = 0, weaponSupport = 0, weaponFailures = 0;
+  for (const [name, aim, options, freshAttach = false] of states) {
+    totalPoses++;
+    const weapon = buildWeaponModel(def, { procedural: true }).group;
+    body.add(weapon);
+    if (freshAttach) restRifleTransform(weapon);
+    else applyRifleCarry(rig, weapon, aim, 1 / 60, options);
+    body.updateMatrixWorld(true);
 
-  let torso = 0, shoulder = 0;
-  const p = new THREE.Vector3();
-  weapon.traverse((mesh) => {
-    const position = mesh.isMesh && mesh.geometry?.attributes?.position;
-    if (!position) return;
-    for (let i = 0; i < position.count; i++) {
-      p.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
-      torso = Math.max(torso, torsoPenetration(p));
-      shoulder = Math.max(shoulder, shoulderPenetration(p));
+    let torso = 0, shoulder = 0;
+    const p = new THREE.Vector3();
+    weapon.traverse((mesh) => {
+      const position = mesh.isMesh && mesh.geometry?.attributes?.position;
+      if (!position) return;
+      for (let i = 0; i < position.count; i++) {
+        p.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+        torso = Math.max(torso, torsoPenetration(p));
+        shoulder = Math.max(shoulder, shoulderPenetration(p));
+      }
+    });
+    globalTorso = Math.max(globalTorso, torso);
+    globalShoulder = Math.max(globalShoulder, shoulder);
+    weaponTorso = Math.max(weaponTorso, torso);
+    weaponShoulder = Math.max(weaponShoulder, shoulder);
+    let triggerError = 0, supportError = 0;
+    if (!freshAttach) {
+      const triggerTarget = GRIP_LOCAL.clone().applyMatrix4(weapon.matrixWorld);
+      const triggerWrist = bones.handR.getWorldPosition(new THREE.Vector3());
+      triggerError = triggerWrist.distanceTo(triggerTarget);
+      const supportTarget = weapon.userData.rifleSupportTarget
+        .clone().applyMatrix4(body.matrixWorld);
+      supportError = bones.handL.getWorldPosition(new THREE.Vector3())
+        .distanceTo(supportTarget);
     }
-  });
-  globalTorso = Math.max(globalTorso, torso);
-  globalShoulder = Math.max(globalShoulder, shoulder);
-  const ok = torso <= MAX_PENETRATION && shoulder <= MAX_PENETRATION;
-  if (!ok) failures++;
+    weaponTrigger = Math.max(weaponTrigger, triggerError);
+    weaponSupport = Math.max(weaponSupport, supportError);
+    const ok = torso <= MAX_PENETRATION && shoulder <= MAX_PENETRATION
+      && triggerError <= MAX_PENETRATION && supportError <= MAX_PENETRATION;
+    if (!ok) {
+      failures++;
+      weaponFailures++;
+      console.log(
+        `FAIL ${def.id.padEnd(15)} ${name.padEnd(14)} `
+        + `torso=${(torso * 100).toFixed(1)}cm shoulder=${(shoulder * 100).toFixed(1)}cm `
+        + `trigger=${(triggerError * 100).toFixed(1)}cm `
+        + `support=${(supportError * 100).toFixed(1)}cm`,
+      );
+    }
+    body.remove(weapon);
+  }
+  const ok = weaponFailures === 0;
   console.log(
-    `${ok ? 'ok  ' : 'FAIL'} ${name.padEnd(14)} `
-    + `torso=${(torso * 100).toFixed(1)}cm shoulder=${(shoulder * 100).toFixed(1)}cm`,
+    `${ok ? 'ok  ' : 'FAIL'} ${def.id.padEnd(15)} ${states.length} poses `
+    + `torso=${(weaponTorso * 100).toFixed(1)}cm `
+    + `shoulder=${(weaponShoulder * 100).toFixed(1)}cm `
+    + `trigger=${(weaponTrigger * 100).toFixed(1)}cm `
+    + `support=${(weaponSupport * 100).toFixed(1)}cm`,
   );
 }
 
 if (failures) {
   console.error(
-    `rifle body clearance failed: ${failures}/${states.length} poses intersect `
+    `firearm body clearance failed: ${failures}/${totalPoses} poses violate clearance/contact `
     + `(worst torso ${(globalTorso * 100).toFixed(1)}cm, `
     + `shoulder ${(globalShoulder * 100).toFixed(1)}cm)`,
   );
   process.exit(1);
 }
 console.log(
-  `rifle body clearance passed: ${states.length} production poses, `
+  `firearm body clearance passed: ${firearms.length} firearms, ${totalPoses} production poses, `
   + `worst torso ${(globalTorso * 100).toFixed(1)}cm, `
   + `shoulder ${(globalShoulder * 100).toFixed(1)}cm`,
 );

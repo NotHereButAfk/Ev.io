@@ -6,7 +6,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Rifle-carry graybox.
 //
-//   ?aim=0..1&walk=<phase>&dbg=1     render the live applyRifleCarry() pose
+//   ?weapon=m4&aim=0..1&walk=<phase>&dbg=1
+//                                     render the live applyRifleCarry() pose
 //   ?sweep=1                          search anchor/muzzle space for a carry
 //                                     that keeps the hands on the gun AND the
 //                                     gun out of the torso, and print the
@@ -29,6 +30,7 @@ const AIM   = n('aim', 0);
 const WALK  = n('walk', 0);      // walk-cycle phase (0 = stand)
 const ANG   = n('ang', -1);      // single camera angle override (radians)
 const MODEL = Q.get('model') || 'vanguard';
+const WEAPON = Q.get('weapon') || 'm4';
 
 const W = 1200, H = 560, NV = ANG >= 0 ? 1 : 3;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -50,7 +52,8 @@ const body = buildLowPolyCharacter(MODEL);
 scene.add(body);
 const rig = rigCharacterLimbs(body);
 
-const { group: wm } = buildWeaponModel(getWeapon('m4'), { procedural: true });
+const weaponDef = getWeapon(WEAPON) || getWeapon('m4');
+const { group: wm } = buildWeaponModel(weaponDef, { procedural: true });
 body.add(wm);
 
 // ── rig constants the poses are solved against ───────────────────────────────
@@ -251,7 +254,8 @@ if (!handW.hand_R && heroBones?.handR)
 if (!handW.hand_L && heroBones?.handL)
   handW.hand_L = heroBones.handL.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv);
 const gripW = GRIP_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
-const hgW   = HANDGUARD_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
+const hgW   = wm.userData.rifleSupportTarget ||
+  HANDGUARD_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
 // Lowest point of either boot, in WORLD space (bob included) — how well the
 // stride keeps the feet on the floor.
 let footLow = Infinity, footHigh = -Infinity;
@@ -291,7 +295,13 @@ if (Q.has('dbg')) {
   dot(gripW, 0x00ff66); dot(hgW, 0x00aaff);
 }
 
-const cam = new THREE.PerspectiveCamera(28, (W / NV) / H, 0.1, 100);
+const weaponSpan = new THREE.Box3().setFromObject(wm)
+  .getSize(new THREE.Vector3()).length();
+// Long launchers/snipers need a wider diagnostic lens in the narrow three-view
+// panels; otherwise a clear gun can look embedded simply because both ends are
+// cropped off. Compact guns retain the closer portrait framing.
+const cam = new THREE.PerspectiveCamera(weaponSpan > 1.25 ? 44 : 28,
+  (W / NV) / H, 0.1, 100);
 const target = new THREE.Vector3(0, 0.95, 0);
 const angles = ANG >= 0 ? [{ a: ANG, e: 0.08 }] : [
   { a: Math.PI,        e: 0.06 },   // model's FRONT (-Z)

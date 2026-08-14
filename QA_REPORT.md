@@ -11,7 +11,7 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
-- Production verification: PASS for full-mesh rifle fix `2fc47af` via deployment run `31791229196` and shoulder-camera follow-up `745984a` via run `31791654237`; cache-busted `kryx.live` entered a match and captured both the first-person rifle and corrected third-person Hero carry.
+- Production verification: PASS for the earlier Auto Rifle mesh fix `2fc47af` via deployment run `31791229196` and shoulder-camera follow-up `745984a` via run `31791654237`. The expanded all-firearm correction below is locally certified and awaiting the deployment recorded in BUG-009.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -158,21 +158,21 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Severity:** High
 
-**System:** Third-person rifle/body intersection
+**System:** Third-person firearm/body intersection and reload hand contact
 
-**Steps to reproduce:** Equip the Auto Rifle on the connected Hero body and inspect the complete weapon mesh at fresh attachment, idle, walk, run, level/up/down aim, flinch, five reload phases, and three swap phases. Check the stock and rear receiver against the torso and shoulder volumes rather than checking only the weapon object's origin.
+**Steps to reproduce:** Equip each of the 17 non-melee firearms on the connected Hero body and inspect the complete weapon mesh at fresh attachment, idle, walk, run, level/up/down aim, flinch, five reload phases, and three swap phases. Check every mesh vertex against the torso/shoulder volumes and both wrist positions against the final displayed grip targets rather than checking only the weapon object's origin.
 
-**Expected behavior:** The stock seats on the visible shoulder surface, the receiver remains in front of the chest, and no weapon surface enters the body during carry or actions. Both wrists must continue to follow the corrected weapon transform.
+**Expected behavior:** Every stock/receiver seats outside the visible shoulder and chest; the trigger hand stays on the grip; the support palm wraps the shooter-facing handguard surface and reaches the magazine during reload; no firearm surface enters the body during carry or actions.
 
-**Observed behavior:** The earlier regression checked only the receiver origin. The shipped Auto Rifle extends 44.5 cm behind that origin, so all 15 sampled carry/action poses still intersected the model: shoulder penetration reached 8.0 cm and reload torso penetration reached 3.1 cm even while the origin and wrist tests passed.
+**Observed behavior:** The earlier regression checked only an empty receiver-origin stand-in. The Auto Rifle extends 44.5 cm behind that origin, so all 15 sampled carry/action poses initially intersected the model: shoulder penetration reached 8.0 cm and reload torso penetration reached 3.1 cm. Expanding the probe to the complete arsenal found 29/272 mesh collisions across the Uzi, M16, rifle, LMG, RPG, bolt sniper, battle rifle, DMR, and fuel rod. A stricter two-wrist pass also found the positive reload roll presented the magazine away from the support hand, leaving it up to 42.7 cm short.
 
-**Root cause:** `tests/rifle-carry-reference.test.mjs` used an empty `Object3D`, and the pose lab deliberately returned no geometric penetration result for the merged Hero `SkinnedMesh`. Neither gate instantiated or sampled the actual production rifle geometry.
+**Root cause:** `tests/rifle-carry-reference.test.mjs` used an empty `Object3D`, and the pose lab deliberately returned no geometric penetration result for the merged Hero `SkinnedMesh`. The carry used fixed M4-sized offsets for firearms whose stock length and receiver width differ substantially. Its support target ran through the handguard centerline, and the reload roll sign moved the magazine to the wrong side of the body.
 
-**Files changed:** `src/player/RifleCarry.js`, `src/player/ThirdPersonCamera.js`, `tools/rifle_body_clearance_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+**Files changed:** `src/player/RifleCarry.js`, `src/player/ThirdPersonCamera.js`, `pose-lab.html`, `tools/rifle_body_clearance_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
 
-**Fix:** Move the complete carry plane 12 cm forward, add a reachable outboard offset that increases for level/downward aim and swaps, apply the same clearance to the fresh-attachment transform, and retarget both arms from the final displayed transform. Move the gameplay camera from 0.38 m to a 0.55 m right-shoulder offset so the separated gun/forearm silhouette remains readable from the normal rear view. Add a release gate that transforms every vertex of the production Auto Rifle through the real carry states and tests it against conservative torso and shoulder volumes.
+**Fix:** Keep the 12 cm complete-mesh carry plane and 0.55 m firing-shoulder camera, then measure each firearm's authored stock-back and half-width once from its real meshes. Add only the extra forward/outboard clearance that geometry requires, preserve an uphill shoulder pocket, and move the support wrist to the shooter-facing handguard surface by the same width compensation. Reverse reload roll so the magazine is presented toward the support hand and use a smooth out-and-back magazine reach. The release gate now builds every production firearm, transforms every vertex through every state, and solves the real Hero wrists from the displayed weapon transform.
 
-**Verification:** PASS. Sixteen production poses now report 0.0 cm torso penetration and no more than 0.7 cm shoulder contact, below the 0.8 cm surface tolerance. Trigger-wrist and support-rail errors remain 0.00 cm laterally. Front, side, rear, run, aim, reload, and swap renders were inspected. Real-browser gameplay smoke passes with walk 6.20 m/s, sprint 10.85 m/s, jump +4.42 m, ammo 50→47, and zero console/request failures. The expanded release certificate passes 26/26 automated gates, including the 64-player soak.
+**Verification:** PASS locally. All 17 firearms pass all 272 production poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact (below the 0.8 cm surface tolerance), at most 0.1 cm trigger-wrist error, and 0.0 cm support-wrist error, including all reload/swap samples. Compact pistol, Auto Rifle, RPG, bolt sniper, and corrected reload renders were inspected from three angles. Real-browser gameplay smoke passes with walk 6.20 m/s, sprint 10.85 m/s, jump +4.42 m, ammo 50→47, and zero console/request failures. The release certificate passes 26/26 automated gates, including the 64-player soak. Production commit/deployment verification follows after publication.
 
 ## Known product gaps, not falsely marked fixed
 

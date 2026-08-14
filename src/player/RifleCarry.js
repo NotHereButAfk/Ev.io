@@ -36,10 +36,15 @@ export const GRIP_LOCAL      = new THREE.Vector3(0, -0.12,  0.10);
 // 27cm back toward the magazine, which made the support hand look detached
 // from the authored target. This point stays forward of the receiver and is
 // reachable through the full carry/action sweep.
-export const HANDGUARD_LOCAL = new THREE.Vector3(0, -0.02, -0.16);
+// The wrist belongs on the shooter-facing side of the handguard, not through
+// its centreline.  That distinction matters once the complete gun is kept
+// clear of the torso: a centreline target on an outboard rifle puts the
+// support shoulder just beyond its reach, while the near-side surface is both
+// reachable and where a real palm actually wraps the weapon.
+export const HANDGUARD_LOCAL = new THREE.Vector3(-0.07, -0.02, -0.16);
 // Where the support hand goes during a reload: under the receiver, on the
 // magazine well, a little behind the handguard it just left.
-const MAG_LOCAL = new THREE.Vector3(0, -0.26, -0.02);
+const MAG_LOCAL = new THREE.Vector3(-0.04, -0.26, -0.02);
 
 // Both were additionally swept against the body's own collision volumes so the
 // rifle rides clear of the chest instead of sinking into it — pose-lab.html
@@ -75,6 +80,48 @@ const AIM = {
 // shoulder surface and keep the receiver in front of the chest.
 const BASE_OUTBOARD = 0.020;
 const BODY_FORWARD_CLEARANCE = 0.120;
+const REFERENCE_STOCK_BACK = 0.445;
+const REFERENCE_HALF_WIDTH = 0.052;
+
+// Each gun shares the same grip coordinate system, but its authored stock and
+// receiver have different dimensions. Measure those dimensions once from the
+// real mesh so long/thick guns receive the additional clearance they need.
+// This avoids another table of values that silently becomes stale when a model
+// changes. Empty test stand-ins intentionally get the M4 reference dimensions.
+const _bounds = new THREE.Box3();
+const _partBounds = new THREE.Box3();
+const _invWeapon = new THREE.Matrix4();
+const _partToWeapon = new THREE.Matrix4();
+function weaponClearance(weapon) {
+  if (!weapon) return { forward: 0, outboard: 0 };
+  // Lightweight action/unit probes pass a transform-only stand-in. They have
+  // no mesh to measure and intentionally use the reference dimensions.
+  if (!weapon.userData || typeof weapon.traverse !== 'function'
+      || typeof weapon.updateWorldMatrix !== 'function')
+    return { forward: 0, outboard: 0 };
+  if (weapon.userData.rifleCarryClearance) return weapon.userData.rifleCarryClearance;
+  weapon.updateWorldMatrix(true, true);
+  _bounds.makeEmpty();
+  _invWeapon.copy(weapon.matrixWorld).invert();
+  weapon.traverse((part) => {
+    if (!part.isMesh || !part.geometry) return;
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    _partToWeapon.multiplyMatrices(_invWeapon, part.matrixWorld);
+    _partBounds.copy(part.geometry.boundingBox).applyMatrix4(_partToWeapon);
+    _bounds.union(_partBounds);
+  });
+  const back = _bounds.isEmpty() ? REFERENCE_STOCK_BACK : _bounds.max.z;
+  const halfWidth = _bounds.isEmpty() ? REFERENCE_HALF_WIDTH
+    : Math.max(Math.abs(_bounds.min.x), Math.abs(_bounds.max.x));
+  const result = {
+    forward: Math.max(0, back - REFERENCE_STOCK_BACK),
+    // Preserve the same body-facing inner edge as the reference rifle.  Half
+    // compensation still let broad launcher receivers consume the shoulder.
+    outboard: Math.max(0, halfWidth - REFERENCE_HALF_WIDTH),
+  };
+  weapon.userData.rifleCarryClearance = result;
+  return result;
+}
 
 // ── where the gun POINTS ─────────────────────────────────────────────────────
 // The AIM pose carries 0.020 rad of its own muzzle droop. `aimPitch` is given
@@ -235,8 +282,11 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // back. Both are rotations about the weapon's own axes, applied before the
   // shoulder swing so they read as the wrists working rather than the torso.
   if (reloadB || swapB) {
+    // Roll the magazine well TOWARD the support hand during reload. The old
+    // positive roll presented it to the body's right side, leaving the left
+    // arm as much as 43 cm short even though the weapon itself looked clear.
     _qAct.setFromEuler(_eAct.set(0.30 * reloadB - 0.70 * swapB, 0,
-                                 0.85 * reloadB + 0.30 * swapB));
+                                -0.85 * reloadB + 0.30 * swapB));
     _q.multiply(_qAct);
     _pos.y -= 0.13 * reloadB + 0.24 * swapB;
     _pos.x -= 0.05 * reloadB;
@@ -260,10 +310,14 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // origin/hand assertion passed. Seat the complete mesh on the FRONT surface
   // of the shoulder pocket. Both hands are solved after this offset, so they
   // move with the rifle instead of being left behind.
-  const aimOutboard = 0.050 * a
-    * (1 - THREE.MathUtils.clamp(aimPitch / 0.65, 0, 1));
-  _pos.x += BASE_OUTBOARD + aimOutboard + 0.040 * swapB;
-  _pos.z -= BODY_FORWARD_CLEARANCE;
+  const geometryClearance = weaponClearance(weapon);
+  // Keep a visible shoulder pocket even while aiming uphill.  Letting this
+  // reach zero pulled the wide launcher/sniper receivers back through the
+  // deltoid at the top of the pitch sweep.
+  const aimOutboard = a * (0.025 + 0.025
+    * (1 - THREE.MathUtils.clamp(aimPitch / 0.65, 0, 1)));
+  _pos.x += BASE_OUTBOARD + geometryClearance.outboard + aimOutboard + 0.055 * swapB;
+  _pos.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
 
   // Network snapshots, animation state edges and coarse frame pacing can move
   // the desired carry by several centimetres in one tick. Smooth the single
@@ -301,13 +355,24 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     // Held at the mag through the middle of the reload rather than sliding
     // continuously, so it reads as two moves — strip, seat — not one smear.
     if (reload > 0) {
-      const hold = Math.min(1, Math.sin(Math.PI * Math.min(1, reload * 1.18)) * 1.9);
+      // Follow the same smooth out-and-back envelope as the gun. The previous
+      // amplified curve snapped fully to the magazine by 20% progress, before
+      // the weapon had rolled far enough toward the support hand.
+      const hold = Math.sin(Math.PI * Math.min(1, reload));
       _T.copy(HANDGUARD_LOCAL).lerp(MAG_LOCAL, hold);
     } else {
       _T.copy(HANDGUARD_LOCAL);
     }
+    // Wider guns have been moved farther right to clear their complete mesh.
+    // Offset the support grip by the same amount toward the shooter so the
+    // palm stays on the near face instead of being dragged out of arm reach.
+    _T.x -= geometryClearance.outboard;
     _T.applyQuaternion(_q).add(_pos);
     slideToReach(_T, -SHOULDER_X);
+    // Keep the exact displayed grip available to geometry probes and visual
+    // diagnostics.  This is body-local, matching the skeletal rig.
+    if (weapon?.userData)
+      (weapon.userData.rifleSupportTarget ||= new THREE.Vector3()).copy(_T);
     solveArm(rig.armL, rig.elbowL, -SHOULDER_X, _T, SWIVEL_L);
     // A grenade goes in the off hand, overriding the support grip entirely —
     // it has to be applied last or the IK above would put the hand back.
@@ -317,8 +382,9 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 
 /** The neutral (un-animated) transform, for attaching a freshly built weapon. */
 export function restRifleTransform(weapon) {
+  const geometryClearance = weaponClearance(weapon);
   weapon.position.copy(PATROL.wp);
-  weapon.position.x += BASE_OUTBOARD;
-  weapon.position.z -= BODY_FORWARD_CLEARANCE;
+  weapon.position.x += BASE_OUTBOARD + geometryClearance.outboard;
+  weapon.position.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
   weapon.quaternion.copy(_qPatrol);
 }
