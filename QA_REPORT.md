@@ -7,7 +7,7 @@ This report records tests that were actually executed against the running game. 
 ## Executed baseline
 
 - Production build: PASS.
-- Automated certificate: PASS, 25/25 gates.
+- Automated certificate: PASS, 26/26 gates.
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
@@ -150,7 +150,29 @@ This report records tests that were actually executed against the running game. 
 
 **Fix:** Ship the 11,078-vertex graded-weight Hero body for Vanguard/Striker/Phantom, keep the cape only on Phantom, move the receiver to the right shoulder pocket, and retarget the support hand to the reachable receiver-side handguard. The rigid block chassis remains available only for comparison/tooling.
 
-**Verification:** PASS. The runtime factory is gated to the connected Hero body. All vertices are weighted; no weights leak across legs; every tested surface faces outward; the 1.822 m figure matches the camera and human landmarks; feet remain grounded; and the knee preserves volume under a hard bend. Through idle, walk, run, aim up/down, reload, swap, and flinch, trigger-wrist error is 0.00 cm, support-rail error is 0.00 cm laterally, normal receiver clearance is 6.5 cm outside the shoulder, and action clearance never falls below 1.5 cm. Real-browser gameplay smoke passes with zero console/request failures, and the full automated certificate is 25/25 including the 64-player soak.
+**Verification:** PASS. The runtime factory is gated to the connected Hero body. All vertices are weighted; no weights leak across legs; every tested surface faces outward; the 1.822 m figure matches the camera and human landmarks; feet remain grounded; and the knee preserves volume under a hard bend. Through idle, walk, run, aim up/down, reload, swap, and flinch, trigger-wrist error is 0.00 cm, support-rail error is 0.00 cm laterally, normal receiver-origin clearance is 8.5 cm outside the shoulder, and action origin clearance never falls below 5.3 cm. Real-browser gameplay smoke passes with zero console/request failures, and the expanded automated certificate is 26/26 including the 64-player soak.
+
+The receiver-origin checks above were not sufficient to prove clearance for the complete 1.14 m rifle mesh. BUG-009 records the full-mesh correction and supersedes that part of this verification.
+
+## BUG-009
+
+**Severity:** High
+
+**System:** Third-person rifle/body intersection
+
+**Steps to reproduce:** Equip the Auto Rifle on the connected Hero body and inspect the complete weapon mesh at fresh attachment, idle, walk, run, level/up/down aim, flinch, five reload phases, and three swap phases. Check the stock and rear receiver against the torso and shoulder volumes rather than checking only the weapon object's origin.
+
+**Expected behavior:** The stock seats on the visible shoulder surface, the receiver remains in front of the chest, and no weapon surface enters the body during carry or actions. Both wrists must continue to follow the corrected weapon transform.
+
+**Observed behavior:** The earlier regression checked only the receiver origin. The shipped Auto Rifle extends 44.5 cm behind that origin, so all 15 sampled carry/action poses still intersected the model: shoulder penetration reached 8.0 cm and reload torso penetration reached 3.1 cm even while the origin and wrist tests passed.
+
+**Root cause:** `tests/rifle-carry-reference.test.mjs` used an empty `Object3D`, and the pose lab deliberately returned no geometric penetration result for the merged Hero `SkinnedMesh`. Neither gate instantiated or sampled the actual production rifle geometry.
+
+**Files changed:** `src/player/RifleCarry.js`, `tools/rifle_body_clearance_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Move the complete carry plane 12 cm forward, add a reachable outboard offset that increases for level/downward aim and swaps, apply the same clearance to the fresh-attachment transform, and retarget both arms from the final displayed transform. Add a release gate that transforms every vertex of the production Auto Rifle through the real carry states and tests it against conservative torso and shoulder volumes.
+
+**Verification:** PASS. Sixteen production poses now report 0.0 cm torso penetration and no more than 0.7 cm shoulder contact, below the 0.8 cm surface tolerance. Trigger-wrist and support-rail errors remain 0.00 cm laterally. Front, side, rear, run, aim, reload, and swap renders were inspected. Real-browser gameplay smoke passes with walk 6.20 m/s, sprint 10.85 m/s, jump +4.42 m, ammo 50→47, and zero console/request failures. The expanded release certificate passes 26/26 automated gates, including the 64-player soak.
 
 ## Known product gaps, not falsely marked fixed
 

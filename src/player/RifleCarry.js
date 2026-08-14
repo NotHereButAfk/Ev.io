@@ -70,6 +70,11 @@ const AIM = {
   wp: onArm(0.390, 1.600, -0.230),
   wr: new THREE.Euler(-0.020, 0, 0),
 };
+// Clearance belongs to the complete 1.14m rifle mesh, not just the receiver
+// origin above. These two offsets seat the rear of the stock on the visible
+// shoulder surface and keep the receiver in front of the chest.
+const BASE_OUTBOARD = 0.020;
+const BODY_FORWARD_CLEARANCE = 0.120;
 
 // ── where the gun POINTS ─────────────────────────────────────────────────────
 // The AIM pose carries 0.020 rad of its own muzzle droop. `aimPitch` is given
@@ -249,6 +254,17 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     _q.premultiply(_qSwing);
   }
 
+  // The transform origin sits near the receiver, but the production rifle
+  // continues another 44.5 cm toward the stock. Clearing only that origin let
+  // the butt and rear receiver live inside the shoulder even though every
+  // origin/hand assertion passed. Seat the complete mesh on the FRONT surface
+  // of the shoulder pocket. Both hands are solved after this offset, so they
+  // move with the rifle instead of being left behind.
+  const aimOutboard = 0.050 * a
+    * (1 - THREE.MathUtils.clamp(aimPitch / 0.65, 0, 1));
+  _pos.x += BASE_OUTBOARD + aimOutboard + 0.040 * swapB;
+  _pos.z -= BODY_FORWARD_CLEARANCE;
+
   // Network snapshots, animation state edges and coarse frame pacing can move
   // the desired carry by several centimetres in one tick. Smooth the single
   // source-of-truth weapon pose first, then solve both arms against that exact
@@ -302,5 +318,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 /** The neutral (un-animated) transform, for attaching a freshly built weapon. */
 export function restRifleTransform(weapon) {
   weapon.position.copy(PATROL.wp);
+  weapon.position.x += BASE_OUTBOARD;
+  weapon.position.z -= BODY_FORWARD_CLEARANCE;
   weapon.quaternion.copy(_qPatrol);
 }
