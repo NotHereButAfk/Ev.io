@@ -49,6 +49,8 @@ function dirtyMovementState(player, seed) {
   player.recoilPitchVel = 2;
   player.recoilYaw = -0.2;
   player.recoilYawVel = -1;
+  player.teleportCooldown = 4.2;
+  player._padTeleCD = 0.7;
 }
 
 function neutralSnapshot(player) {
@@ -82,6 +84,8 @@ function neutralSnapshot(player) {
       player.recoilYaw,
       player.recoilYawVel,
     ],
+    teleportCooldown: player.teleportCooldown,
+    padTeleportCooldown: player._padTeleCD,
   });
 }
 
@@ -119,6 +123,8 @@ check(
     && player.recoilYaw === 0 && player.recoilYawVel === 0,
   'recoil pose survived respawn',
 );
+check(player.teleportCooldown === 0 && player._padTeleCD === 0,
+  'teleport ability cooldown survived respawn');
 
 // Poison the state differently and prove the same spawn produces the same
 // complete neutral snapshot, independent of the death pose it followed.
@@ -127,5 +133,5 @@ player.respawn(spawn);
 check(neutralSnapshot(player) === first, 'respawn state depends on the previous movement pose');
 
 if (!process.exitCode) {
-  console.log('player respawn animation reset passed: grounded, standing, still, phase zero');
+  console.log('player respawn animation reset passed: grounded, standing, still, abilities ready, phase zero');
 }

@@ -11,8 +11,8 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
-- Browser smoke measurements on the deterministic open lane: walk 1.51 m in 0.9 s, sprint 2.38 m in 0.9 s, jump +1.77 m after 100 ms, Auto Rifle ammo 50 to 49 after firing.
-- Exercised: guest entry, match start, W movement, sprint, jump, firing, reload, reload-to-swap, swap back, blink, scoreboard open/close, lethal damage, death overlay, and automatic respawn.
+- Browser smoke measurements on independent deterministic open-lane trials: walk 1.20 m in 0.9 s, sprint 2.09 m in 0.9 s, jump peak +4.41 m, Auto Rifle ammo 50 to 48 after firing.
+- Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload, reload-to-swap, swap back, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
 
 ## BUG-001
 
@@ -49,6 +49,46 @@ This report records tests that were actually executed against the running game. 
 **Files changed:** `src/core/Game.js`, `tools/gameplay_smoke.mjs`  
 **Fix:** Treat respawn as a new-life inventory boundary by resetting the base loadout's ammo, reload timers, recoil, switch, and viewmodel state before rebuilding HUD slots.  
 **Verification:** PASS when the death-during-reload browser sequence returns with a full magazine and no active reload. The map-boundary probe also requires either legacy death/respawn or MoveSim recovery to produce a finite safe state.
+
+## BUG-004
+
+**Severity:** High
+
+**System:** Ability state / death / respawn
+
+**Steps to reproduce:** Use blink, throw one frag and one smoke, take lethal damage before the blink cooldown expires, and wait for respawn.
+
+**Expected EV.IO behavior:** Respawn is a clean-life boundary: blink is ready and the standard throwable inventory is restored, matching the authoritative room's existing respawn contract.
+
+**Observed behavior in my game:** The local/legacy path kept `teleportCooldown` and depleted grenade counts into the next life. With MoveSim enabled, the bridge could also write its pre-death cooldown state back after `Player.respawn()`.
+
+**Root cause:** `Player.respawn()` reset movement and recoil but not ability state; `MoveBridge` only resynchronized on a large position change; the local respawn path did not refill throwable inventory even though the authoritative server did.
+
+**Files changed:** `src/player/Player.js`, `src/sim/MoveBridge.js`, `src/weapons/GrenadeSystem.js`, `src/core/Game.js`, `tools/player_respawn_check.mjs`, `tools/gameplay_smoke.mjs`
+
+**Fix:** Reset blink/pad cooldowns per life, add a respawn epoch so MoveBridge always rebuilds its deterministic state even at a nearby spawn, and refill local grenade charges without deleting already-active smoke/explosion presentation.
+
+**Verification:** PASS. The real-browser death-during-ability sequence respawns with blink ready and two frag/two smoke charges; deterministic respawn and movement fixtures pass.
+
+## BUG-005
+
+**Severity:** Medium
+
+**System:** Authoritative multiplayer death presentation
+
+**Steps to reproduce:** Enter an authoritative match and receive an alive-to-dead server transition.
+
+**Expected EV.IO behavior:** The match remains visible behind a dedicated death/respawn overlay while control is locked.
+
+**Observed behavior in my game:** The authoritative callback opened the full pause/navigation UI, unlike the corrected local deathmatch path.
+
+**Root cause:** `_onAuthoritativeDeath()` retained a legacy `_openMenu()` call after the local path moved to the dedicated overlay.
+
+**Files changed:** `src/core/Game.js`, `tools/gameplay_smoke.mjs`
+
+**Fix:** Use the respawn overlay as the sole automatic death UI; manual Escape navigation remains available.
+
+**Verification:** PASS. The browser harness invokes the authoritative death/respawn callbacks, proves the navigation menu stays closed, and proves the overlay appears and clears.
 
 ## Known product gaps, not falsely marked fixed
 

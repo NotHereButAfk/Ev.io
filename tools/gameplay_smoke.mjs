@@ -7,7 +7,10 @@ const HIDE = `(() => {
   ['top-nav','nav-side','share-game','social-icons','center-play']
     .forEach(id => document.getElementById(id)?.classList.add('hidden'));
   const g = window.__game || window.game;
-  if (g) g._menuOpen = false;
+  if (g) {
+    g._menuOpen = false;
+    g.menu?.hidePause?.();
+  }
   return !!g;
 })()`;
 
@@ -35,7 +38,8 @@ const key = async (code, ms = 180) => {
   await page.keyboard.up(code);
   await page.evaluate(HIDE);
 };
-const inputKey = async (code, keyValue, settleMs = 260) => {
+const inputKey = async (code, keyValue, settleMs = 650) => {
+  await page.evaluate(HIDE);
   await page.evaluate(({ code, keyValue }) => {
     const g = window.__game || window.game;
     g.input._onKeyDown({ code, key: keyValue, preventDefault() {} });
@@ -70,27 +74,67 @@ try {
   await page.waitForTimeout(100);
   const laneStart = await game(`return {x:g.player.position.x,y:g.player.position.y,z:g.player.position.z};`);
 
-  await page.keyboard.down('w');
+  await game(`g.input._onKeyDown({code:'KeyW',key:'w',preventDefault(){}}); return true;`);
   await page.waitForTimeout(900);
-  await page.keyboard.up('w');
+  await game(`g.input._onKeyUp({code:'KeyW',key:'w'}); return true;`);
   const walked = await game(`return {x:g.player.position.x,y:g.player.position.y,z:g.player.position.z};`);
   const walkDistance = Math.hypot(walked.x - laneStart.x, walked.z - laneStart.z);
   assert(walkDistance > 1.0, `W moved only ${walkDistance.toFixed(2)}m`);
 
-  await page.keyboard.down('Shift');
-  await page.keyboard.down('w');
+  // Restart from the same lane and zero velocity so acceleration retained from
+  // the walk trial cannot bias either side of this comparison.
+  await game(`g.player.position.set(0,0,22); g.player.velocity.set(0,0,0); return true;`);
+  await page.waitForTimeout(150);
+  const sprintStart = await game(`return {x:g.player.position.x,y:g.player.position.y,z:g.player.position.z};`);
+  await game(`
+    g.input._onKeyDown({code:'ShiftLeft',key:'Shift',preventDefault(){}});
+    g.input._onKeyDown({code:'KeyW',key:'w',preventDefault(){}});
+    return true;
+  `);
   await page.waitForTimeout(900);
-  await page.keyboard.up('w');
-  await page.keyboard.up('Shift');
+  await game(`
+    g.input._onKeyUp({code:'KeyW',key:'w'});
+    g.input._onKeyUp({code:'ShiftLeft',key:'Shift'});
+    return true;
+  `);
   const sprinted = await game(`return {x:g.player.position.x,y:g.player.position.y,z:g.player.position.z};`);
-  const sprintDistance = Math.hypot(sprinted.x - walked.x, sprinted.z - walked.z);
+  const sprintDistance = Math.hypot(sprinted.x - sprintStart.x, sprinted.z - sprintStart.z);
   assert(sprintDistance > walkDistance * 1.12, `sprint ${sprintDistance.toFixed(2)}m is not faster than walk ${walkDistance.toFixed(2)}m`);
   mark('movement');
 
-  await key('Space', 60);
-  await page.waitForTimeout(100);
-  const jumpY = await game(`return g.player.position.y;`);
-  assert(jumpY > sprinted.y + 0.08, `jump rose only ${(jumpY - sprinted.y).toFixed(2)}m`);
+  await game(`g.player.position.set(0,0,22); g.player.velocity.set(0,0,0); return true;`);
+  await page.waitForTimeout(200);
+  const jumpBaseY = await game(`return g.player.position.y;`);
+  await game(`g.input._onKeyDown({code:'Space',key:' ',preventDefault(){}}); return true;`);
+  await page.waitForTimeout(80);
+  await game(`g.input._onKeyUp({code:'Space',key:' '}); return true;`);
+  let jumpY = jumpBaseY;
+  for (let i = 0; i < 12; i++) {
+    await page.waitForTimeout(50);
+    jumpY = Math.max(jumpY, await game(`return g.player.position.y;`));
+  }
+  assert(jumpY > jumpBaseY + 0.08, `jump rose only ${(jumpY - jumpBaseY).toFixed(2)}m`);
+
+  // First-person stress: a large single-frame look delta must remain finite,
+  // and ADS must hide/restore the weapon smoothly around its zoom blend.
+  const lookBefore = await game(`return {yaw:g.player.yaw,pitch:g.player.pitch};`);
+  await page.evaluate(HIDE);
+  await game(`g.input.pointerLocked=true; g.input._onMouseMove({movementX:220,movementY:-160}); return true;`);
+  await page.waitForTimeout(650);
+  const lookAfter = await game(`return {yaw:g.player.yaw,pitch:g.player.pitch};`);
+  assert(Number.isFinite(lookAfter.yaw) && Number.isFinite(lookAfter.pitch)
+    && (Math.abs(lookAfter.yaw - lookBefore.yaw) > 0.05 || Math.abs(lookAfter.pitch - lookBefore.pitch) > 0.05),
+  `rapid mouse look was lost or invalid: ${JSON.stringify({lookBefore,lookAfter})}`);
+  await game(`g.input.rightMouseDown=true; return true;`);
+  await page.waitForTimeout(650);
+  assert(await game(`return g.weaponSystem.scopeT > 0.2 && !g.weaponSystem.kickGroup.visible;`), 'ADS did not zoom and hide the hip-fire viewmodel');
+  await game(`g.input.rightMouseDown=false; return true;`);
+  await page.waitForFunction(() => {
+    const g = window.__game || window.game;
+    return g?.weaponSystem?.scopeT < 0.15 && g.weaponSystem.kickGroup?.visible;
+  }, null, { timeout: 6000 });
+  assert(await game(`return g.weaponSystem.scopeT < 0.15 && g.weaponSystem.kickGroup.visible;`), 'ADS release did not restore the viewmodel');
+  mark('rapid look and ADS');
 
   // Stress chord: diagonal air movement while firing. This is deliberately
   // overlapping input, not a sequence of isolated happy-path actions.
@@ -141,6 +185,16 @@ try {
   assert(await page.evaluate(() => document.getElementById('scoreboard-overlay')?.classList.contains('hidden')), 'scoreboard did not close');
   mark('scoreboard');
 
+  // Exercise the authoritative presentation callback independently of server
+  // availability. It must use the respawn overlay without opening the pause
+  // navigation or releasing control behind an unrelated full-screen menu.
+  await game(`g._onAuthoritativeDeath({deaths:g.deaths}); return true;`);
+  assert(!await game(`return g._menuOpen;`), 'authoritative death opened the full navigation menu');
+  assert(await page.evaluate(() => !document.getElementById('respawn-overlay')?.classList.contains('hidden')), 'authoritative death overlay did not appear');
+  await game(`g._onAuthoritativeRespawn({deaths:g.deaths}); return true;`);
+  assert(await page.evaluate(() => document.getElementById('respawn-overlay')?.classList.contains('hidden')), 'authoritative respawn overlay did not clear');
+  mark('authoritative death presentation');
+
   // Kill the player during an active reload. Respawn must not resurrect a
   // frozen magazine animation or carry partial ammunition into the new life.
   await inputKey('KeyR', 'r', 160);
@@ -150,11 +204,17 @@ try {
   assert(await game(`return g.player.isDead;`), 'forced lethal damage did not kill player');
   assert(await page.evaluate(() => !document.getElementById('respawn-overlay')?.classList.contains('hidden')), 'respawn overlay did not appear');
   await page.waitForTimeout(3600);
+  // A software-rendered browser may sample the final pre-deadline frame a few
+  // milliseconds early; wait for the next animation frame that applies the
+  // already-expired monotonic respawn deadline.
+  await page.waitForFunction(() => !(window.__game || window.game)?.player?.isDead, null, { timeout: 2500 });
   const afterRespawn = await game(`return {dead:g.player.isDead, state:g.state, menu:g._menuOpen, remaining:g._respawnRemaining, health:g.player.health};`);
   assert(!afterRespawn.dead, `player did not auto-respawn: ${JSON.stringify(afterRespawn)}`);
   assert(await page.evaluate(() => document.getElementById('respawn-overlay')?.classList.contains('hidden')), 'respawn overlay stayed visible');
   assert(!await game(`return g.weaponSystem.currentState.isReloading;`), 'reload animation survived respawn');
   assert(await game(`return g.weaponSystem.currentState.magAmmo === g.weaponSystem.currentDef.magSize;`), 'respawn did not refill the equipped weapon');
+  assert(await game(`return g.player.teleportCooldown === 0;`), 'blink cooldown survived respawn');
+  assert(await game(`return g.grenadeSystem.frags === 2 && g.grenadeSystem.smokes === 2;`), 'grenade inventory did not refill on respawn');
   mark('death and respawn');
 
   // Map-boundary abuse: the legacy controller kills at the kill plane while
@@ -191,7 +251,7 @@ try {
   assert(ignoredConsole.length === 0, `console errors: ${ignoredConsole.map((entry) => `${entry.text} @ ${entry.url}`).join(' | ')}`);
   const relevantFailures = failedRequests.filter((entry) => !/fonts\.googleapis\.com/i.test(entry));
   assert(relevantFailures.length === 0, `failed requests: ${relevantFailures.join(' | ')}`);
-  console.log(`gameplay smoke passed: walk=${walkDistance.toFixed(2)}m/0.9s sprint=${sprintDistance.toFixed(2)}m/0.9s, jump rose ${(jumpY - sprinted.y).toFixed(2)}m @100ms, ammo ${start.ammo}->${afterFire}; reload/swap/blink/scoreboard/death/respawn green; console=0 request failures=0`);
+  console.log(`gameplay smoke passed: walk=${walkDistance.toFixed(2)}m/0.9s sprint=${sprintDistance.toFixed(2)}m/0.9s, jump peak +${(jumpY - jumpBaseY).toFixed(2)}m, ammo ${start.ammo}->${afterFire}; look/ADS/reload/swap/blink/scoreboard/death/respawn green; console=0 request failures=0`);
 } finally {
   await browser.close();
 }

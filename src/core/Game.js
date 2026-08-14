@@ -1291,6 +1291,10 @@ export class Game {
     this.weaponSystem.resetMotionState();
     this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
+    // Match the authoritative room's clean-life ability contract without
+    // deleting smoke/explosion presentation that is still active in the map.
+    this.grenadeSystem.refillInventory?.();
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     this._respawnRemaining = 0;
     this._respawnDeadline = 0;
     this._resetDeathAnimation();
@@ -1306,7 +1310,9 @@ export class Game {
     this._respawnRemaining = RESPAWN_DELAY;
     this._respawnDeadline = 0;
     this._beginDeathAnimation();
-    if (!this._menuOpen) this._openMenu();
+    // The dedicated overlay is the death UI. Opening the navigation menu here
+    // released pointer lock, obscured the match, and made the authoritative
+    // path disagree with local deathmatch behavior.
     this.hud.showRespawn(this._respawnRemaining);
     this.hud.addKillFeed(`YOU DIED — respawning in ${RESPAWN_DELAY}s`);
     this.weaponSystem.resetMotionState();

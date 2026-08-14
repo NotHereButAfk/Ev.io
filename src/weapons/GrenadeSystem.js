@@ -229,6 +229,11 @@ export class GrenadeSystem {
     return { frags: this.frags, smokes: this.smokes };
   }
 
+  refillInventory() {
+    this.frags = 2;
+    this.smokes = 2;
+  }
+
   reset() {
     for (const t of this.throwables) {
       this.scene.remove(t.mesh);
@@ -244,7 +249,6 @@ export class GrenadeSystem {
       this.scene.remove(e.light);
     }
     this.explosions.length = 0;
-    this.frags  = 2;
-    this.smokes = 2;
+    this.refillInventory();
   }
 }

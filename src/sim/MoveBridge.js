@@ -35,6 +35,7 @@ export class MoveBridge {
     this.acc = 0;
     this._edges = { jump: false, crouch: false, tele: false };
     this._written = new THREE.Vector3().copy(p);
+    this._respawnEpoch = player._respawnEpoch || 0;
     this.recoveredThisFrame = false;
   }
 
@@ -44,10 +45,12 @@ export class MoveBridge {
     // Respawns / pad teleports / external code moved the player — restart the
     // sim from wherever the game put them.
     const p = this.player.position;
-    if (p.distanceToSquared(this._written) > 2.25) {
+    const respawned = (this.player._respawnEpoch || 0) !== this._respawnEpoch;
+    if (respawned || p.distanceToSquared(this._written) > 2.25) {
       this.state = createState(p.x, p.y, p.z);
       this.prev = this.state;
       this.acc = 0;
+      this._respawnEpoch = this.player._respawnEpoch || 0;
     }
   }
 

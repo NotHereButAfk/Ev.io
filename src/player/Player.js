@@ -82,6 +82,7 @@ export class Player {
     // Teleport ability (Q key)
     this.teleportCooldown    = 0;
     this.teleportMaxCooldown = TELEPORT_COOLDOWN;
+    this._respawnEpoch       = 0;
     this.onTeleport = null; // (fromPos, toPos) => void
 
     // Sound state
@@ -114,6 +115,7 @@ export class Player {
   }
 
   respawn(position) {
+    this._respawnEpoch++;
     this.health   = this.maxHealth;
     this.stamina  = this.maxStamina;
     this.shield   = this.maxShield;
@@ -142,6 +144,13 @@ export class Player {
     this._stepPhase    = 0;
     this._lastBobSign  = 1;
     this.camera.rotation.z = 0;
+
+    // Ability state belongs to one life. The authoritative room already
+    // rebuilds its MoveSim state with teleCD=0 on respawn; mirror that contract
+    // in local/legacy matches so blinking immediately before death cannot lock
+    // the next life out of teleport for several seconds.
+    this.teleportCooldown = 0;
+    this._padTeleCD = 0;
 
     this.recoilPitch = 0; this.recoilPitchVel = 0;
     this.recoilYaw = 0;   this.recoilYawVel = 0;
