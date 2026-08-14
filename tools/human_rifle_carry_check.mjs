@@ -9,7 +9,28 @@ import {
   HUMAN_HANDGUARD_LOCAL,
   HUMAN_LOW_READY_AIM,
   HUMAN_MAG_LOCAL,
+  HUMAN_WEAPON_SCALE,
 } from '../src/player/HumanRifleCarry.js';
+
+// WeaponModels builds canvas-backed detail textures at module load. Node has
+// no DOM, so provide an inert 2D surface before importing the production gun
+// builders. This test must exercise the same full meshes the browser displays.
+const noop = () => {};
+const gradient = { addColorStop: noop };
+const context2d = new Proxy({}, {
+  get(target, key) {
+    if (key === 'createLinearGradient' || key === 'createRadialGradient') return () => gradient;
+    if (key === 'measureText') return () => ({ width: 10 });
+    return target[key] ?? (target[key] = noop);
+  },
+  set(target, key, value) { target[key] = value; return true; },
+});
+globalThis.document = {
+  createElement: () => ({ width: 0, height: 0, getContext: () => context2d }),
+};
+
+const { buildWeaponModel } = await import('../src/weapons/WeaponModels.js');
+const { WEAPONS } = await import('../src/weapons/weaponDefs.js');
 
 const assert = (ok, message) => {
   if (!ok) throw new Error(message);
@@ -24,6 +45,68 @@ const findBone = (root, name) => (
   || root.getObjectByName(name)
 );
 const worldPosition = (object) => object.getWorldPosition(new THREE.Vector3());
+
+function roundedVolumePenetration(point, centre, radii) {
+  const dx = (point.x - centre.x) / radii.x;
+  const dy = (point.y - centre.y) / radii.y;
+  const dz = (point.z - centre.z) / radii.z;
+  const q = Math.hypot(dx, dy, dz);
+  return q < 1 ? (1 - q) * Math.min(radii.x, radii.y, radii.z) : 0;
+}
+
+function sampleWeaponGeometry(weapon, sample) {
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const mid = new THREE.Vector3();
+  weapon.traverse((mesh) => {
+    const position = mesh.isMesh && mesh.geometry?.attributes?.position;
+    if (!position) return;
+    const index = mesh.geometry.index;
+    const read = (vertex, out) => out.fromBufferAttribute(position, vertex).applyMatrix4(mesh.matrixWorld);
+    for (let i = 0; i < position.count; i++) sample(read(i, a));
+    // Vertices alone miss a broad stock whose corners all sit outside a rounded
+    // shoulder while its faces pass through it. Sample triangle centres and
+    // edge midpoints so a box cannot hide that penetration.
+    const triangleIndices = index ? index.count : position.count;
+    for (let i = 0; i + 2 < triangleIndices; i += 3) {
+      const ia = index ? index.getX(i) : i;
+      const ib = index ? index.getX(i + 1) : i + 1;
+      const ic = index ? index.getX(i + 2) : i + 2;
+      read(ia, a); read(ib, b); read(ic, c);
+      sample(mid.copy(a).add(b).add(c).multiplyScalar(1 / 3));
+      sample(mid.copy(a).add(b).multiplyScalar(0.5));
+      sample(mid.copy(b).add(c).multiplyScalar(0.5));
+      sample(mid.copy(c).add(a).multiplyScalar(0.5));
+    }
+  });
+}
+
+function weaponSurfaceDistance(weapon, worldPoint) {
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const closest = new THREE.Vector3();
+  const triangle = new THREE.Triangle();
+  let nearest = Infinity;
+  weapon.traverse((mesh) => {
+    const position = mesh.isMesh && mesh.geometry?.attributes?.position;
+    if (!position) return;
+    const index = mesh.geometry.index;
+    const triangleIndices = index ? index.count : position.count;
+    const read = (vertex, out) => out.fromBufferAttribute(position, vertex).applyMatrix4(mesh.matrixWorld);
+    for (let i = 0; i + 2 < triangleIndices; i += 3) {
+      const ia = index ? index.getX(i) : i;
+      const ib = index ? index.getX(i + 1) : i + 1;
+      const ic = index ? index.getX(i + 2) : i + 2;
+      triangle.set(read(ia, a), read(ib, b), read(ic, c));
+      triangle.closestPointToPoint(worldPoint, closest);
+      const distance = closest.distanceTo(worldPoint);
+      if (Number.isFinite(distance)) nearest = Math.min(nearest, distance);
+    }
+  });
+  return nearest;
+}
 
 globalThis.ProgressEvent ??= class ProgressEvent {
   constructor(type, init = {}) {
@@ -96,6 +179,7 @@ function applyProductionTorsoLayers(rig, armor, reload, swap = 0) {
   // applyHumanRifleCarry() in HumanSoldier's armorTick.
   rig.s1?.quaternion.multiply(actionQuat.setFromAxisAngle(axisY, 0.10));
   rig.spine?.quaternion.multiply(actionQuat.setFromAxisAngle(axisX, 0.03));
+  rig.lClav?.quaternion.multiply(actionQuat.setFromAxisAngle(axisX, -0.55));
   sampleHumanActionPose({ reload, swap }, actionPose);
   if (rig.spine && (actionPose.torsoX || actionPose.torsoZ)) {
     rig.spine.quaternion.multiply(actionQuat.setFromEuler(
@@ -104,11 +188,12 @@ function applyProductionTorsoLayers(rig, armor, reload, swap = 0) {
   }
 }
 
-function measure(spec, armorName, armor) {
+function measure(spec, armorName, armor, def) {
   const root = cloneSkeleton(gltf.scene);
   root.scale.setScalar(armor.scale);
   const body = new THREE.Group();
-  const weapon = new THREE.Object3D();
+  const weapon = buildWeaponModel(def, { procedural: true }).group;
+  weapon.scale.setScalar(HUMAN_WEAPON_SCALE);
   body.add(root, weapon);
 
   const mixer = new THREE.AnimationMixer(root);
@@ -122,6 +207,8 @@ function measure(spec, armorName, armor) {
     s2: findBone(root, 'Spine2'),
     neck: findBone(root, 'Neck'),
     head: findBone(root, 'Head'),
+    lClav: findBone(root, 'LeftShoulder'),
+    rClav: findBone(root, 'RightShoulder'),
     lArm: findBone(root, 'LeftArm'),
     rArm: findBone(root, 'RightArm'),
     lFore: findBone(root, 'LeftForeArm'),
@@ -143,7 +230,10 @@ function measure(spec, armorName, armor) {
   applyHumanRifleCarry(body, rig, weapon, spec);
   body.updateMatrixWorld(true);
   const rightTarget = HUMAN_GRIP_LOCAL.clone().applyMatrix4(weapon.matrixWorld);
-  const leftTarget = expectedSupportLocal(spec.reload || 0).applyMatrix4(weapon.matrixWorld);
+  const leftTarget = (
+    weapon.userData.humanSupportLocal?.clone()
+    || expectedSupportLocal(spec.reload || 0)
+  ).applyMatrix4(weapon.matrixWorld);
   const leftShoulderDistance = worldPosition(rig.lArm).distanceTo(leftTarget);
   const rightShoulderDistance = worldPosition(rig.rArm).distanceTo(rightTarget);
   const muzzle = new THREE.Vector3(0, 0, -1).applyQuaternion(
@@ -159,8 +249,34 @@ function measure(spec, armorName, armor) {
   body.worldToLocal(shoulderMid);
   body.worldToLocal(receiver);
 
+  // Check the complete gun mesh, not only its origin. These volumes follow the
+  // live skeleton and deliberately include the armored shoulder pocket. A
+  // stock may touch that pocket, but it may not pass through it or the chest.
+  const shoulderRadius = 0.125 * armor.scale;
+  const torsoCentre = shoulderMid.clone().add(
+    new THREE.Vector3(0, -0.205 * armor.scale, 0.018)
+  );
+  const torsoRadii = new THREE.Vector3(
+    Math.max(0.145 * armor.scale, Math.abs(rightShoulder.x - leftShoulder.x) * 0.47),
+    0.275 * armor.scale,
+    0.125 * armor.scale,
+  );
+  let torsoPenetration = 0;
+  let shoulderPenetration = 0;
+  sampleWeaponGeometry(weapon, (worldPoint) => {
+    const point = body.worldToLocal(worldPoint.clone());
+    torsoPenetration = Math.max(
+      torsoPenetration,
+      roundedVolumePenetration(point, torsoCentre, torsoRadii),
+    );
+    for (const shoulder of [leftShoulder, rightShoulder]) {
+      const penetration = shoulderRadius - point.distanceTo(shoulder);
+      shoulderPenetration = Math.max(shoulderPenetration, penetration);
+    }
+  });
+
   return {
-    name: `${armorName} ${spec.name}`,
+    name: `${def.id} ${armorName} ${spec.name}`,
     rightError: worldPosition(rig.rHand).distanceTo(rightTarget),
     leftError: worldPosition(rig.lHand).distanceTo(leftTarget),
     rightReach,
@@ -174,21 +290,30 @@ function measure(spec, armorName, armor) {
     receiverRightOfShoulders: receiver.x - shoulderMid.x,
     receiverAheadOfShoulders: shoulderMid.z - receiver.z,
     shoulderHalfWidth: Math.abs(rightShoulder.x - leftShoulder.x) * 0.5,
+    torsoPenetration: Math.max(0, torsoPenetration),
+    shoulderPenetration: Math.max(0, shoulderPenetration),
+    rightSurfaceDistance: weaponSurfaceDistance(weapon, rightTarget),
+    leftSurfaceDistance: weaponSurfaceDistance(weapon, leftTarget),
   };
 }
 
-const results = Object.entries(ARMORS).flatMap(([name, armor]) =>
-  CASES.map((spec) => measure(spec, name, armor))
-);
+const firearms = WEAPONS.filter((def) => def.kind !== 'melee');
+const results = firearms.flatMap((def) => Object.entries(ARMORS).flatMap(([name, armor]) =>
+  CASES.map((spec) => measure(spec, name, armor, def))
+));
 const MAX_GRIP_ERROR = 0.008;
+const MAX_MESH_PENETRATION = 0.004;
+// Mixamo hand bones sit at the wrist, not at the palm/finger contact patch.
+// An adult wrist-to-fingertip span is roughly 18cm, so this proves some part of
+// the actual hand can close on the mesh rather than treating the wrist as a
+// zero-size point that must live inside the gun.
+const MAX_GRIP_SURFACE_DISTANCE = 0.18;
 const MAX_REACH_FRACTION = 0.9951;
 const MIN_LOW_READY_DROP = 0.060;
 const MIN_LOW_READY_FORWARD = 0.150;
 const MIN_LATERAL_SHOULDER_RATIO = 1.00;
 let failures = 0;
-
-console.log('real soldier rifle carry (centimetres)');
-console.log('  state'.padEnd(23) + 'right hand  left hand  left target/reach');
+const failedResults = [];
 for (const result of results) {
   const rightOk = result.rightError <= MAX_GRIP_ERROR;
   const leftOk = result.leftError <= MAX_GRIP_ERROR;
@@ -207,22 +332,38 @@ for (const result of results) {
   const bodyClearOk = result.receiverRightOfShoulders
       >= result.shoulderHalfWidth * MIN_LATERAL_SHOULDER_RATIO
     && (!result.lowReady || result.receiverAheadOfShoulders >= MIN_LOW_READY_FORWARD);
-  if (!rightOk || !leftOk || !leftReachOk || !rightReachOk || !pitchOk
-      || !heightOk || !bodyClearOk) failures++;
-  const marker = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk
-      && heightOk && bodyClearOk ? 'ok' : 'FAIL';
+  const meshClearOk = result.torsoPenetration <= MAX_MESH_PENETRATION
+    && result.shoulderPenetration <= MAX_MESH_PENETRATION;
+  const surfaceContactOk = result.rightSurfaceDistance <= MAX_GRIP_SURFACE_DISTANCE
+    && result.leftSurfaceDistance <= MAX_GRIP_SURFACE_DISTANCE;
+  const ok = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk
+    && heightOk && bodyClearOk && meshClearOk && surfaceContactOk;
+  if (!ok) { failures++; failedResults.push(result); }
+}
+
+console.log('real Soldier full-arsenal carry (centimetres)');
+for (const def of firearms) {
+  const weaponResults = results.filter((result) => result.name.startsWith(`${def.id} `));
+  const weaponFailed = failedResults.some((result) => result.name.startsWith(`${def.id} `));
+  const max = (key) => Math.max(...weaponResults.map((result) => result[key]));
   console.log(
-    `  ${marker.padEnd(5)} ${result.name.padEnd(17)}`
-    + `${(result.rightError * 100).toFixed(2).padStart(6)}cm`
-    + `${(result.leftError * 100).toFixed(2).padStart(9)}cm`
-    + `  ${(result.leftShoulderDistance * 100).toFixed(1)}`
-    + `/${(result.leftReach * 100).toFixed(1)}cm`
-    + (result.lowReady
-      ? `  receiver drop ${(result.receiverBelowShoulders * 100).toFixed(1)}cm`
-        + ` right ${(result.receiverRightOfShoulders * 100).toFixed(1)}cm`
-        + ` ahead ${(result.receiverAheadOfShoulders * 100).toFixed(1)}cm`
-        + ` shoulder ${(result.shoulderHalfWidth * 100).toFixed(1)}cm`
-      : '')
+    `  ${weaponFailed ? 'FAIL' : 'ok  '} ${def.id.padEnd(15)} ${String(weaponResults.length).padStart(2)} poses `
+    + `hands R${(max('rightError') * 100).toFixed(2)}`
+    + `/L${(max('leftError') * 100).toFixed(2)}cm `
+    + `surface R${(max('rightSurfaceDistance') * 100).toFixed(1)}`
+    + `/L${(max('leftSurfaceDistance') * 100).toFixed(1)}cm `
+    + `mesh T${(max('torsoPenetration') * 100).toFixed(1)}`
+    + `/S${(max('shoulderPenetration') * 100).toFixed(1)}cm`
+  );
+}
+for (const result of failedResults) {
+  console.error(
+    `FAIL ${result.name}: hands R${(result.rightError * 100).toFixed(2)}`
+    + `/L${(result.leftError * 100).toFixed(2)}cm, `
+    + `surface R${(result.rightSurfaceDistance * 100).toFixed(1)}`
+    + `/L${(result.leftSurfaceDistance * 100).toFixed(1)}cm, `
+    + `mesh T${(result.torsoPenetration * 100).toFixed(1)}`
+    + `/S${(result.shoulderPenetration * 100).toFixed(1)}cm`
   );
 }
 
@@ -233,14 +374,19 @@ const leastReceiverAhead = Math.min(...results.map((result) => result.receiverAh
 const leastShoulderRatio = Math.min(...results.map(
   (result) => result.receiverRightOfShoulders / Math.max(0.001, result.shoulderHalfWidth)
 ));
+const worstTorsoPenetration = Math.max(...results.map((result) => result.torsoPenetration));
+const worstShoulderPenetration = Math.max(...results.map((result) => result.shoulderPenetration));
 if (failures) {
   console.error(`\n${failures} rifle carry state(s) failed the real-rig grip/reach gate`);
   process.exit(1);
 }
 console.log(
-  `\nhuman rifle carry passed: ${results.length} production Soldier states, worst wrist error `
+  `\nhuman rifle carry passed: ${firearms.length} firearms, ${results.length} production Soldier poses, `
+  + `worst wrist error `
   + `R=${(worstRight * 100).toFixed(2)}cm L=${(worstLeft * 100).toFixed(2)}cm; `
   + `minimum receiver clearance right=${(leastReceiverRight * 100).toFixed(1)}cm `
   + `ahead=${(leastReceiverAhead * 100).toFixed(1)}cm, `
-  + `lateral shoulder ratio=${leastShoulderRatio.toFixed(2)}x`
+  + `lateral shoulder ratio=${leastShoulderRatio.toFixed(2)}x; `
+  + `mesh penetration torso=${(worstTorsoPenetration * 100).toFixed(1)}cm `
+  + `shoulder=${(worstShoulderPenetration * 100).toFixed(1)}cm`
 );

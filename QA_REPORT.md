@@ -174,6 +174,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. All 17 firearms pass all 272 production poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact (below the 0.8 cm surface tolerance), at most 0.1 cm trigger-wrist error, and 0.0 cm support-wrist error, including all reload/swap samples. Compact pistol, Auto Rifle, RPG, bolt sniper, and corrected reload renders were inspected from three angles. Real-browser gameplay smoke passes with walk 6.20 m/s, sprint 10.85 m/s, jump +4.42 m, ammo 50→47, and zero console/request failures. The release certificate passes 26/26 automated gates, including the 64-player soak. Runtime commit `e39c657` deployed successfully in run `31793165892`; cache-busted production entered a match and produced first- and third-person captures.
 
+## BUG-010
+
+**Severity:** High
+
+**System:** Rigged Soldier firearm/body intersection and two-handed carry
+
+**Steps to reproduce:** Select a rigged Soldier armor body, equip each firearm, and inspect its complete rendered mesh during idle, low-ready, aim up/down, run, sprint tuck, reload, and swap on assault, recon, heavy, and stealth proportions.
+
+**Expected behavior:** The stock seats in front of the shoulder pocket instead of entering it; the receiver remains outside the chest; both modeled hands can close on the firearm through locomotion and actions.
+
+**Observed behavior:** The previous Soldier carry test passed while using an empty `Object3D` as the gun. On the actual production M4, the rear stock lay almost on the shoulder-joint centre and penetrated the live Soldier shoulder envelope by roughly 11.3 cm. The separate full-mesh Hero-body gate did not exercise this rig or its carry solver.
+
+**Root cause:** Two production body families used different carry implementations, but the Soldier regression measured only receiver placement and wrist targets. Its reach correction moved the whole firearm back toward the body whenever an animation shortened an arm, allowing perfect numerical wrist error while the real stock mesh crossed the shoulder.
+
+**Files changed:** `src/player/HumanRifleCarry.js`, `src/player/HumanSoldier.js`, `tools/human_rifle_carry_check.mjs`, `human-pose-lab.html`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Scale showcase-authored firearms to the live Soldier, place the complete stock in front of the shoulder pocket, toe long guns inward slightly, and add stock-length-specific forward clearance from each weapon's measured geometry. Protract the support clavicle for a natural two-handed stance. Reach-limited poses now slide only the support-wrist contact along the weapon; they no longer pull the entire gun into the body. The pose lab can render any shipped firearm for visual inspection.
+
+**Verification:** PASS locally. All 17 firearms pass 816 production Soldier poses (17 weapons × 4 armor bodies × 12 carry/action states): torso penetration is 0.0 cm, conservative shoulder-envelope contact is at most 0.3 cm under a 0.4 cm limit, both wrist-target errors are 0.00 cm, and the farthest support wrist is 17.8 cm from a firearm surface, within the modeled hand/finger span. M4 front/side/rear, Uzi sprint, sidearm, and heavy bolt-sniper sprint renders were inspected. Production build, gameplay smoke with zero console/request failures, and all 26 automated certificate gates pass.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.

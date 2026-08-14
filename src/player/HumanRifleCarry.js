@@ -7,7 +7,10 @@ import * as THREE from 'three';
 const PATROL_Q = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(-0.160, 0.220, 0.200)
 );
-const AIM_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.020, 0, 0));
+// A shouldered long gun toes inward a few degrees: the butt stays out in the
+// right shoulder pocket while the muzzle converges on the body's sight line.
+// Dead-zero yaw drove the broad bolt-rifle stock through slim armor variants.
+const AIM_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.020, 0.075, 0));
 
 // Assault/Idle shoulder midpoint after HumanSoldier's production UPRIGHT and
 // gun-stance layers, averaged over the real Idle clip. Weapon poses are kept as
@@ -22,20 +25,57 @@ const BASE_ARM_REACH = 0.47268;
 // let a full aim rise only to the shoulder pocket.
 const PATROL_OFFSET = new THREE.Vector3(0.28, -0.13, -0.18);
 const AIM_OFFSET = new THREE.Vector3(0.28, -0.05, -0.20);
+// Seat the rear of the production stock on the front of the shoulder pocket.
+// The stock geometry extends behind the receiver origin. Without this common
+// forward offset a weapon can look clear by its transform while the actual
+// stock mesh still crosses the Soldier's shoulder.
+const BODY_FORWARD_CLEARANCE = 0.21;
+
+// WeaponModels are authored around a 1.05-1.15m showcase silhouette. That is
+// useful in the loadout turntable, but full size made an M4 longer than the
+// Soldier could physically shoulder and put its stock through the deltoid.
+// 0.65 matches the live Soldier's proportions while launchers still read large.
+// Both weapon geometry and local grip targets inherit this same scale.
+export const HUMAN_WEAPON_SCALE = 0.65;
 
 // Idle third person is a low-ready carry, not a permanent 68% ADS pose. Export
 // the contract so the production controller and QA measure the same posture.
 export const HUMAN_LOW_READY_AIM = 0.18;
 
 export const HUMAN_GRIP_LOCAL = new THREE.Vector3(0, -0.12, 0.10);
-// The Mixamo support arm reaches 0.472m shoulder-to-wrist. A target at the
-// muzzle-side end of the authored handguard was 0.66–0.73m away while aiming,
-// leaving the visible palm up to 25.7cm off the rifle. Use the receiver-side
-// handguard: still ahead of the trigger grip, but reachable in every clip.
-export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, -0.16);
+// This is a wrist-bone target behind the visible contact patch. The modeled
+// palm and fingers extend forward from it onto the receiver-side handguard,
+// keeping the two-handed hold reachable throughout the locomotion clips.
+export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, 0.15);
 // Wrist target on the left face of the common magazine, rather than its
 // bottom-centre. The X clearance places the palm around the mag body.
 export const HUMAN_MAG_LOCAL = new THREE.Vector3(-0.08, -0.15, 0.02);
+
+const REFERENCE_STOCK_BACK = 0.445;
+const _bounds = new THREE.Box3();
+const _partBounds = new THREE.Box3();
+const _invWeapon = new THREE.Matrix4();
+const _partToWeapon = new THREE.Matrix4();
+function weaponGeometryClearance(weapon) {
+  if (!weapon?.traverse) return { forward: 0 };
+  if (weapon.userData.humanCarryClearance) return weapon.userData.humanCarryClearance;
+  weapon.updateWorldMatrix(true, true);
+  _bounds.makeEmpty();
+  _invWeapon.copy(weapon.matrixWorld).invert();
+  weapon.traverse((part) => {
+    if (!part.isMesh || !part.geometry) return;
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    _partToWeapon.multiplyMatrices(_invWeapon, part.matrixWorld);
+    _partBounds.copy(part.geometry.boundingBox).applyMatrix4(_partToWeapon);
+    _bounds.union(_partBounds);
+  });
+  const stockBack = _bounds.isEmpty() ? REFERENCE_STOCK_BACK : _bounds.max.z;
+  const result = {
+    forward: Math.max(0, stockBack - REFERENCE_STOCK_BACK) * Math.abs(weapon.scale.z || 1),
+  };
+  weapon.userData.humanCarryClearance = result;
+  return result;
+}
 
 const V = Array.from({ length: 32 }, () => new THREE.Vector3());
 const Q = Array.from({ length: 12 }, () => new THREE.Quaternion());
@@ -83,29 +123,54 @@ function armReach(arm, forearm, hand) {
   return shoulder.distanceTo(elbow) + elbow.distanceTo(wrist);
 }
 
-// Move the entire rifle just enough to keep a requested wrist target inside
-// the real arm's reachable sphere. Alternating both arms preserves the authored
-// silhouette while surviving the shoulder motion in every clip/armor scale.
-function pullWeaponWithinReach(body, weapon, localTarget, shoulderBone, reach) {
-  if (!shoulderBone || reach <= 1e-5) return false;
+// A real shooter changes where the support palm lands along the fore-end when
+// posture shortens their reach. The old solver moved the entire rifle back into
+// the body until the hand could reach, which is exactly how a numerically
+// perfect grip still drove the stock through the shoulder. Keep the weapon
+// fixed and slide only the requested palm point toward the receiver/stock.
+function fitSupportTargetWithinReach(body, weapon, localTarget, shoulderBone, reach) {
+  if (!shoulderBone || reach <= 1e-5) return;
   body.updateMatrixWorld(true);
   const target = V[26].copy(localTarget).applyMatrix4(weapon.matrixWorld);
   const shoulder = worldPosition(shoulderBone, V[27]);
-  const toward = V[28].subVectors(shoulder, target);
-  const distance = toward.length();
+  const towardShoulder = V[28].subVectors(shoulder, target);
+  const distance = towardShoulder.length();
   const limit = reach * 0.992;
-  if (distance <= limit || distance < 1e-6) return false;
-  toward.multiplyScalar((distance - limit) / distance);
+  if (distance <= limit || distance < 1e-6) return;
+
+  // Convert the shortest world-space correction into weapon-local space. The
+  // palm may move across the near face as well as rearward; limiting this to
+  // the barrel axis failed whenever a low-ready/sprint pose put the handguard
+  // line outside the arm's reach cylinder.
+  towardShoulder.multiplyScalar((distance - limit) / distance);
+  weapon.getWorldQuaternion(Q[6]).invert();
+  towardShoulder.applyQuaternion(Q[6]);
+  weapon.getWorldScale(V[30]);
+  localTarget.add(V[29].set(
+    towardShoulder.x / Math.max(1e-6, V[30].x),
+    towardShoulder.y / Math.max(1e-6, V[30].y),
+    towardShoulder.z / Math.max(1e-6, V[30].z),
+  ));
+}
+
+function keepTriggerGripReachable(body, weapon, shoulderBone, reach) {
+  if (!shoulderBone || reach <= 1e-5) return;
+  body.updateMatrixWorld(true);
+  const target = V[26].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
+  const shoulder = worldPosition(shoulderBone, V[27]);
+  const towardShoulder = V[28].subVectors(shoulder, target);
+  const distance = towardShoulder.length();
+  const limit = reach * 0.992;
+  if (distance <= limit || distance < 1e-6) return;
+  towardShoulder.multiplyScalar((distance - limit) / distance);
   body.getWorldQuaternion(Q[6]).invert();
-  toward.applyQuaternion(Q[6]);
+  towardShoulder.applyQuaternion(Q[6]);
   body.getWorldScale(V[29]);
-  toward.set(
-    toward.x / Math.max(1e-6, V[29].x),
-    toward.y / Math.max(1e-6, V[29].y),
-    toward.z / Math.max(1e-6, V[29].z)
-  );
-  weapon.position.add(toward);
-  return true;
+  weapon.position.add(V[30].set(
+    towardShoulder.x / Math.max(1e-6, V[29].x),
+    towardShoulder.y / Math.max(1e-6, V[29].y),
+    towardShoulder.z / Math.max(1e-6, V[29].z),
+  ));
 }
 
 // Rotate a bone in world space so its child segment follows `desiredDirection`,
@@ -179,9 +244,11 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
 
   const anchor = V[18];
   const rigScale = shoulderAnchor(body, rig, anchor);
+  const geometryClearance = weaponGeometryClearance(weapon);
   weapon.position.copy(anchor).add(
     V[25].lerpVectors(PATROL_OFFSET, AIM_OFFSET, aim).multiplyScalar(rigScale)
   );
+  weapon.position.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
   weapon.position.z -= 0.075 * Math.sin(Math.PI * aim) * rigScale;
   weapon.quaternion.slerpQuaternions(PATROL_Q, AIM_Q, aim);
 
@@ -214,6 +281,16 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
     weapon.quaternion.premultiply(Q[5]);
   }
 
+  // Static aim/low-ready already place the trigger grip within reach. Dynamic
+  // run/reload layers can add several centimetres; recover only that excess
+  // before smoothing instead of letting the arm stop short of the pistol grip.
+  keepTriggerGripReachable(
+    body,
+    weapon,
+    rig.rArm,
+    armReach(rig.rArm, rig.rFore, rig.rHand),
+  );
+
   // Smooth the one authoritative rifle transform before solving either arm.
   // The hands are then IK'd to the exact displayed pose, so animation clips,
   // network snapshots and aim/reload edges cannot make them swim off the gun.
@@ -242,18 +319,16 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
     const outT = smoothstep((reload - 0.74) / 0.26);
     supportLocal.lerp(HUMAN_MAG_LOCAL, inT * (1 - outT));
   }
-  const rightReach = armReach(rig.rArm, rig.rFore, rig.rHand);
-  const leftReach = armReach(rig.lArm, rig.lFore, rig.lHand);
-  for (let i = 0; i < 4; i++) {
-    const pulledRight = pullWeaponWithinReach(
-      body, weapon, HUMAN_GRIP_LOCAL, rig.rArm, rightReach
+  if (!(state.throwP > 0)) {
+    fitSupportTargetWithinReach(
+      body,
+      weapon,
+      supportLocal,
+      rig.lArm,
+      armReach(rig.lArm, rig.lFore, rig.lHand),
     );
-    const pulledLeft = !(state.throwP > 0) && pullWeaponWithinReach(
-      body, weapon, supportLocal, rig.lArm, leftReach
-    );
-    if (!pulledRight && !pulledLeft) break;
   }
-
+  (weapon.userData.humanSupportLocal ||= new THREE.Vector3()).copy(supportLocal);
   body.updateMatrixWorld(true);
   const gripWorld = V[14].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
   solveArm(body, rig.rArm, rig.rFore, rig.rHand, gripWorld, 1);
@@ -270,7 +345,9 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
 export function humanRifleGripError(rig, weapon) {
   if (!rig || !weapon) return { right: Infinity, left: Infinity };
   const grip = V[14].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
-  const support = V[15].copy(HUMAN_HANDGUARD_LOCAL).applyMatrix4(weapon.matrixWorld);
+  const support = V[15].copy(
+    weapon.userData.humanSupportLocal || HUMAN_HANDGUARD_LOCAL
+  ).applyMatrix4(weapon.matrixWorld);
   return {
     right: rig.rHand ? worldPosition(rig.rHand, V[16]).distanceTo(grip) : Infinity,
     left: rig.lHand ? worldPosition(rig.lHand, V[17]).distanceTo(support) : Infinity,

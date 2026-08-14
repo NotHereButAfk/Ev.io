@@ -19,7 +19,11 @@ import {
   sampleHumanActionPose,
   sampleHumanDeathPose,
 } from './HumanActionMotion.js';
-import { applyHumanRifleCarry, HUMAN_LOW_READY_AIM } from './HumanRifleCarry.js';
+import {
+  applyHumanRifleCarry,
+  HUMAN_LOW_READY_AIM,
+  HUMAN_WEAPON_SCALE,
+} from './HumanRifleCarry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Real rigged human soldier (Mixamo "Vanguard"), with Idle / Walk / Run clips.
@@ -238,6 +242,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     s2:    findBone(root, 'Spine2'),
     neck:  findBone(root, 'Neck'),
     head:  findBone(root, 'Head'),
+    lClav: findBone(root, 'LeftShoulder'),
+    rClav: findBone(root, 'RightShoulder'),
     lArm:  findBone(root, 'LeftArm'),
     rArm:  findBone(root, 'RightArm'),
     lFore: findBone(root, 'LeftForeArm'),
@@ -720,6 +726,13 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     if (_weaponKind === 'gun') {
       if (B.s1)    B.s1.quaternion.multiply(_q[2].setFromAxisAngle(_AX_Y, 0.10));
       if (B.spine) B.spine.quaternion.multiply(_q[3].setFromAxisAngle(_AX_X, 0.03));
+      // Protract the support shoulder as a real two-handed stance does. The
+      // raw Mixamo clip pins both clavicles square to the chest, shortening the
+      // left arm by several visible centimetres and forcing its wrist target
+      // to float off an outboard, body-clear rifle.
+      if (B.lClav) B.lClav.quaternion.multiply(
+        _q[4].setFromAxisAngle(_AX_X, -0.55)
+      );
     }
 
     const actionProgress = (kind) => _actionLeft[kind] > 0
@@ -796,7 +809,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     _weaponKind = isMelee ? 'melee' : 'gun';
     weaponGroup.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
     if (!isMelee) {
-      weaponGroup.scale.setScalar(1);
+      weaponGroup.scale.setScalar(HUMAN_WEAPON_SCALE);
       group.add(weaponGroup);
       _heldWeapon = weaponGroup;
       return;
