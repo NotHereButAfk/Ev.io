@@ -11,6 +11,7 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
+- Production verification: PASS for commit `9c2757e` via deployment run `31757673148`; cache-busted `kryx.live` entered a match, rendered the Auto Rifle HUD at 50/200, and recorded zero error/warning logs.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements on independent deterministic open-lane trials: walk 1.20 m in 0.9 s, sprint 2.09 m in 0.9 s, jump peak +4.41 m, Auto Rifle ammo 50 to 48 after firing.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload, reload-to-swap, swap back, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -109,7 +110,7 @@ This report records tests that were actually executed against the running game. 
 
 **Fix:** Route the request through a safe boundary that absorbs unsupported, wrong-document, and policy rejection paths while returning whether a request could be initiated.
 
-**Verification:** PASS. The GUI contract covers synchronous and asynchronous rejection shapes; the embedded browser entered a locally served match, rendered the Auto Rifle HUD at 50/200, and reported zero error/warning logs.
+**Verification:** PASS. The GUI contract covers synchronous and asynchronous rejection shapes; both the locally served game and deployed commit `9c2757e` entered an embedded-browser match, rendered the Auto Rifle HUD at 50/200, and reported zero error/warning logs.
 
 ## Known product gaps, not falsely marked fixed
 
