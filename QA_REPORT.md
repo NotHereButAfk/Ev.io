@@ -194,6 +194,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS locally. All 17 firearms pass 816 production Soldier poses (17 weapons × 4 armor bodies × 12 carry/action states): torso penetration is 0.0 cm, conservative shoulder-envelope contact is at most 0.3 cm under a 0.4 cm limit, both wrist-target errors are 0.00 cm, and the farthest support wrist is 17.8 cm from a firearm surface, within the modeled hand/finger span. M4 front/side/rear, Uzi sprint, sidearm, and heavy bolt-sniper sprint renders were inspected. Production build, gameplay smoke with zero console/request failures, and all 26 automated certificate gates pass.
 
+## BUG-011
+
+**Severity:** High
+
+**System:** Late-loading Soldier fallback / active third-person player body
+
+**Steps to reproduce:** Select Assault, enter a match before the optional 2.16 MB `soldier.glb` finishes loading, switch to third person, and inspect the held firearm from behind.
+
+**Expected behavior:** Asset timing must not change anatomy or weapon safety. The loading fallback must remain a connected, correctly rigged player with the complete firearm outside the torso; when the Soldier finishes loading, an active match should upgrade to it without requiring a restart.
+
+**Observed behavior:** A cache-busted production capture of commit `9b2fd97` entered before the Soldier rig was ready and preserved the old procedural mannequin for the whole match. Its disconnected capsule/box parts reappeared and the Auto Rifle hung vertically through the right arm/body, despite both the Hero and loaded-Soldier carry gates passing.
+
+**Root cause:** `buildPreviewCharacter()` still fell through to the original procedural armor builder while optional GLBs loaded. The async model callback rebuilt only the menu preview and menu bots; it never replaced an already-created local player body.
+
+**Files changed:** `src/player/PreviewCharacter.js`, `src/core/Game.js`, `tools/mesh_check.mjs`, `tools/screenshots.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Legacy kits now degrade to the connected weighted Hero body (Assault/Heavy → Vanguard, Recon → Striker, Stealth → Phantom), which already uses the full-mesh RifleCarry solver. The parts-bin procedural mannequin is no longer reachable from those selectable loading paths. When the real Soldier becomes ready during play, Game replaces the fallback body, resets its third-person attachment/animation state, and attaches the current weapon on the next frame. Screenshot tooling can force armor selection and block the Soldier asset to exercise this exact degraded path.
+
+**Verification:** PASS locally. The mesh gate explicitly constructs all four legacy kits with Human loading disabled and requires a connected Hero rather than a `BlockBody` or procedural mannequin. A real-browser run with `/soldier.glb` deliberately aborted entered Assault, switched to third person, and rendered the connected fallback with the Auto Rifle outside the body. Hero full-mesh clearance (272 poses), loaded-Soldier full-mesh clearance (816 poses), and the production build all pass.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.

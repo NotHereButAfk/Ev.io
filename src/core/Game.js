@@ -30,6 +30,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
+import { isLowPolyId } from '../player/LowPolyModels.js';
 import { cameraYawToBodyYaw } from '../player/Facing.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
@@ -49,7 +50,7 @@ import { ServerSim } from './ServerSim.js';
 import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
-import { preloadHumanSoldier } from '../player/HumanSoldier.js';
+import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
@@ -92,6 +93,14 @@ export class Game {
       const wasVisible = this.previewCharacter?.visible ?? false;
       this._rebuildPreviewCharacter();
       this.previewCharacter.visible = wasVisible;
+      // The menu is allowed to become interactive before optional art finishes.
+      // If a legacy Soldier kit entered a match on the connected Hero fallback,
+      // replace that fallback as soon as the skeletal rig becomes available.
+      if (isHumanSoldierReady() && this.state === 'playing'
+          && this._playerBody && !this._playerBody.userData?.isHuman
+          && !isLowPolyId(this.selectedArmorType)) {
+        this._rebuildPlayerBody(this.selectedArmorType, true);
+      }
       if (this._menuBotsActive) {
         this._clearMenuBots();
         this._spawnMenuBots();
@@ -661,6 +670,24 @@ export class Game {
     ));
   }
 
+  _rebuildPlayerBody(armorTypeId = this.selectedArmorType, preserveVisibility = false) {
+    const wasVisible = preserveVisibility && !!this._playerBody?.visible;
+    if (this._playerBody) this.world.scene.remove(this._playerBody);
+    this._playerBody = buildPreviewCharacter(
+      this.selectedSkin, armorTypeId || 'vanguard', this.selectedArmorSkin
+    );
+    // The human Soldier animates through its skeleton; connected arena bodies
+    // use the shared limb-pivot rig and full-mesh RifleCarry solver.
+    if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
+    this._playerBody.rotation.order = 'YXZ';
+    this._playerBody.visible = wasVisible;
+    this._tpsWeaponId = null;
+    this._tpsWeaponMesh = null;
+    this._tpsAnimPrev = null;
+    this._tpsAnimSpeed = this._tpsAnimVX = this._tpsAnimVZ = 0;
+    this.world.scene.add(this._playerBody);
+  }
+
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
     this._clearMenuBots();
     this.audio.resume();
@@ -786,23 +813,9 @@ export class Game {
     this.hud.show();
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
 
-    // Build a third-person body mesh matching the player's current loadout,
-    // then rig its limbs so it can walk/run in third person.
-    if (this._playerBody) this.world.scene.remove(this._playerBody);
-    this._playerBody = buildPreviewCharacter(
-      this.selectedSkin, armorTypeId || this.selectedArmorType || 'vanguard', this.selectedArmorSkin
-    );
-    // The human soldier animates via its own skeleton; only the procedural
-    // block character needs the limb-pivot rig.
-    if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
-    // Yaw-first, so the run lean (rotation.x) pitches about the body's own axis.
-    this._playerBody.rotation.order = 'YXZ';
-    this._playerBody.visible = false;
-    this._tpsWeaponId = null; // force TPS weapon (re)attach on next TPS frame
-    this._tpsWeaponMesh = null; // old weapon went with the removed body
-    this._tpsAnimPrev = null;
-    this._tpsAnimSpeed = this._tpsAnimVX = this._tpsAnimVZ = 0;
-    this.world.scene.add(this._playerBody);
+    // Build a third-person body matching the selected kit. Slow optional art
+    // gets the connected Hero fallback and is hot-upgraded by swapPreview().
+    this._rebuildPlayerBody(armorTypeId || this.selectedArmorType || 'vanguard');
 
     this.state = 'playing';
     this.player._camDist = 0;  // always start in FPS on new game
@@ -1583,8 +1596,8 @@ export class Game {
   }
 
   // Put the currently-held weapon into the third-person body's hand, rebuilding
-  // only when the active weapon changes (gun ↔ melee switch). Human model only —
-  // the procedural fallback body carries no weapon.
+  // only when the active weapon changes (gun ↔ melee switch). Human and
+  // connected arena bodies use their respective gated carry solvers.
   _syncTpsWeapon() {
     const ud = this._playerBody?.userData;
     if (!ud) return;

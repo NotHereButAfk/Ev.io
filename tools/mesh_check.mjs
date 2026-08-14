@@ -22,7 +22,7 @@ import { buildBlockBody } from '../src/player/BlockBody.js';
 import {
   LOWPOLY_IDS, buildLowPolyCharacter, isSharedGeometry,
 } from '../src/player/LowPolyModels.js';
-import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
+import { buildPreviewCharacter, rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
 import * as BODY from '../src/player/Proportions.js';
 
 let fails = 0;
@@ -41,6 +41,18 @@ const boneIndex = (g, name) => g.userData.skeleton.bones.findIndex(b => b.name =
   const runtime = buildLowPolyCharacter('vanguard');
   ok(runtime.userData?.isHero && !runtime.userData?.isBlockBody,
     'the live roster builds the connected weighted Hero body');
+}
+
+// The optional Soldier GLB can still be downloading when Play is pressed.
+// Every selectable legacy kit must degrade to the same connected body, never
+// the old procedural mannequin whose weapon and limbs visibly intersected.
+for (const id of ['assault', 'recon', 'heavy', 'stealth']) {
+  const runtime = buildPreviewCharacter(
+    { primary: 0x777777, secondary: 0x222222 }, id, null, { allowHuman: false }
+  );
+  ok(runtime.userData?.isHero && !runtime.userData?.isBlockBody
+      && runtime.userData?.fallbackForArmorType === id,
+    `${id} Soldier loading fallback is the connected Hero body`);
 }
 
 // Deform a body by its skeleton and read a vertex back out — the same path the

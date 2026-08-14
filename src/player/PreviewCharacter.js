@@ -389,15 +389,31 @@ export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin 
     const sp = buildSpartanModel();
     if (sp) return sp;
   }
-  // Prefer the real rigged human soldier (the player). Bots opt out with
-  // allowHuman:false — they rely on the procedural model's limb-pivot rig,
-  // per-part headshot zones, and weapon-hand attachment.
+  // Prefer the real rigged human Soldier. Callers may opt out with
+  // allowHuman:false and use the connected arena body's limb-pivot rig.
   if (opts.allowHuman !== false && isHumanSoldierReady()) {
     const human = buildHumanSoldier(skin, armorTypeId, armorSkin);
     if (human) return human;
   }
 
-  // Then the blocky Blender GLB
+  // A slow/failed optional Soldier download must never put the old rigid
+  // parts-bin GLB/procedural mannequin into a live match. Fall back to the
+  // connected, weighted arena body whose gait and complete-mesh carry are gated.
+  // The requested kit remains selected; Game upgrades this body in place when
+  // the Soldier rig finishes loading.
+  const arenaFallback = {
+    assault: 'vanguard',
+    recon: 'striker',
+    heavy: 'vanguard',
+    stealth: 'phantom',
+  }[armorTypeId];
+  if (arenaFallback) {
+    const fallback = buildLowPolyCharacter(arenaFallback);
+    fallback.userData.fallbackForArmorType = armorTypeId;
+    return fallback;
+  }
+
+  // Non-roster preview IDs can still use the old imported fallback.
   const glbResult = _buildFromGLB(skin, armorTypeId, armorSkin);
   if (glbResult) return glbResult;
 

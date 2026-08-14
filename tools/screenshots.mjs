@@ -74,6 +74,15 @@ const closeBrowser = async () => {
 // CI/local QA runs are intentionally offline. Abort the optional Google font
 // fetches so Playwright's screenshot font-readiness gate cannot wait forever.
 await page.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.abort());
+if (process.env.KYX_BLOCK_SOLDIER === '1') {
+  await page.route(/\/soldier\.glb(?:\?|$)/, (route) => route.abort());
+}
+if (process.env.KYX_ARMOR_TYPE) {
+  await page.addInitScript((armorType) => {
+    localStorage.setItem('sio_armor_arena_model_v2', '1');
+    localStorage.setItem('sio_armor_type', armorType);
+  }, process.env.KYX_ARMOR_TYPE);
+}
 page.on('pageerror', (e) => console.warn('  page error:', e.message));
 
 const shot = async (name) => {
@@ -95,7 +104,7 @@ const pose = (js) => page.evaluate(`(() => {
 console.log('loading', URL);
 await page.goto(URL, { waitUntil: 'commit', timeout: 30000 });
 await page.waitForSelector('#play-btn', { state: 'attached', timeout: 30000 });
-await page.waitForTimeout(6000);
+await page.waitForTimeout(Number(process.env.KYX_BOOT_WAIT || 6000));
 if (process.env.KYX_SKIP_MENU !== '1') {
   await page.screenshot({ path: `${OUT}/menu.png` });      // chrome intentionally left in
   console.log('  ✓ menu');
