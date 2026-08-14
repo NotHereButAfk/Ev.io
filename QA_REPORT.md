@@ -7,11 +7,12 @@ This report records tests that were actually executed against the running game. 
 ## Executed baseline
 
 - Production build: PASS.
-- Automated certificate: PASS, 26/26 gates.
+- Automated certificate: PASS, 27/27 gates.
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
 - Production verification: PASS for the Hero full-arsenal correction `e39c657` (run `31793165892`), loaded-Soldier correction `9b2fd97` (run `31797011674`), and late-loading fallback correction `62846c0` (run `31798425052`). A cache-busted Assault match on `kryx.live` captured both first- and third-person frames from the deployed runtime; the final frame is the rigged Soldier with its Auto Rifle outside the torso.
+- Current roster correction: PASS locally. Live browser capture renders seven armed bots as Vanguard/Striker/Phantom only; the 27th release gate verifies saved-model migration and shared player/bot/remote chassis ownership. Production verification is pending deployment.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -213,6 +214,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 **Fix:** Legacy kits now degrade to the connected weighted Hero body (Assault/Heavy → Vanguard, Recon → Striker, Stealth → Phantom), which already uses the full-mesh RifleCarry solver. The parts-bin procedural mannequin is no longer reachable from those selectable loading paths. When the real Soldier becomes ready during play, Game replaces the fallback body, resets its third-person attachment/animation state, and attaches the current weapon on the next frame. Screenshot tooling can force armor selection and block the Soldier asset to exercise this exact degraded path.
 
 **Verification:** PASS in production. The mesh gate explicitly constructs all four legacy kits with Human loading disabled and requires a connected Hero rather than a `BlockBody` or procedural mannequin. A real-browser run with `/soldier.glb` deliberately aborted entered Assault, switched to third person, and rendered the connected fallback with the Auto Rifle outside the body. Hero full-mesh clearance (272 poses), loaded-Soldier full-mesh clearance (816 poses), gameplay smoke, production build, and the 26/26 release certificate all pass. Commit `62846c0` deployed successfully in run `31798425052`; the same cache-busted Assault capture that previously showed the mannequin now shows the rigged Soldier and body-clear rifle.
+
+## BUG-012
+
+**Severity:** High
+
+**System:** Live player/bot model roster and firearm readability
+
+**Steps to reproduce:** Start a normal match after the Soldier asset has loaded, inspect the seven bots and any authoritative remote avatars, then load an older profile whose saved armor id is Assault, Recon, Heavy, or Stealth.
+
+**Expected behavior:** Every live combatant uses one connected, weighted body family with the same proven two-handed firearm solver. Saved selections must not silently restore a deprecated model whose gloves, attached plates, or alternate shoulder proportions swallow the weapon silhouette.
+
+**Observed behavior:** The local default used Vanguard, but bots and authoritative remotes still hard-coded the four legacy Soldier ids. Older browser profiles could also retain those ids. As a result, the match visibly mixed the corrected exosuit with the exact layered human/armor bodies the player reported as looking assembled from separate parts; their smaller 0.65-scale Auto Rifle remained difficult to read between the large Soldier gloves.
+
+**Root cause:** Model migration was applied only to a narrow default-profile case. `Bot.js` and `AuthNetBridge.js` owned separate stale chassis arrays, and the armor menu still exposed both body families, so production did not have one authoritative roster contract.
+
+**Files changed:** `src/player/ArmorTypes.js`, `src/entities/Bot.js`, `src/net/AuthNetBridge.js`, `src/player/HumanRifleCarry.js`, `src/player/HumanSoldier.js`, `tools/armor_roster_check.mjs`, `tools/roster_visual_check.mjs`, `tools/human_rifle_carry_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Make Vanguard, Striker, and Phantom the only playable chassis; use that shared roster for the menu, local bots, and authoritative remote avatars; and migrate every saved legacy id to its closest connected exosuit. Retired Soldier code remains available for tooling, with compact guns enlarged and given stock-length-based forward clearance, but it is no longer selected by normal play.
+
+**Verification:** PASS locally. The roster contract test proves the three playable ids, all four legacy migrations, connected-body construction, and shared bot/remote imports. The live-browser roster capture renders seven armed bots as Vanguard/Striker/Phantom only. The exact Hero body passes all 17 firearms across 272 carry/action poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact, and both wrists on their targets. Gameplay smoke completes movement, ADS, fire, reload, swap, abilities, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. The expanded release certificate passes 27/27 automated gates. Production verification is pending deployment of this change.
 
 ## Known product gaps, not falsely marked fixed
 

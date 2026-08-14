@@ -1,70 +1,60 @@
 export const ARMOR_TYPES = [
-  // ── Low-poly cel-shaded cyborg-terminator models (the primary roster) ──
   {
-    id:   'vanguard',
+    id: 'vanguard',
     name: 'VANGUARD',
     desc: 'Graphite arena exosuit — segmented shell, cyan optics',
-    icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z'
+    icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z',
   },
   {
-    id:   'striker',
+    id: 'striker',
     name: 'CRYO HUNTER',
     desc: 'Steel-blue infiltrator cyborg — cyan optics',
-    icon: 'M16 5 L11 8 L12 21 L20 21 L21 8 Z'
+    icon: 'M16 5 L11 8 L12 21 L20 21 L21 8 Z',
   },
   {
-    id:   'phantom',
+    id: 'phantom',
     name: 'NIGHTSTALKER',
     desc: 'Blacked-out graphite cyborg — red optics',
-    icon: 'M16 5 L12 9 L13 21 L19 21 L20 9 Z'
-  },
-  // ── Legacy human-soldier armour kits (still selectable) ──
-  {
-    id:   'assault',
-    name: 'ASSAULT',
-    desc: 'Balanced tactical plate — the standard kit',
-    icon: 'M16 4 L10 8 L10 22 L22 22 L22 8 Z'
-  },
-  {
-    id:   'recon',
-    name: 'RECON',
-    desc: 'Light scout loadout — fast and agile',
-    icon: 'M16 5 L12 8 L12 20 L20 20 L20 8 Z'
-  },
-  {
-    id:   'heavy',
-    name: 'HEAVY',
-    desc: 'Maximum armour coverage — built like a tank',
-    icon: 'M16 3 L8 8 L8 24 L24 24 L24 8 Z'
-  },
-  {
-    id:   'stealth',
-    name: 'STEALTH',
-    desc: 'Minimal profile infiltrator — move unseen',
-    icon: 'M16 6 L13 9 L13 21 L19 21 L19 9 Z'
+    icon: 'M16 5 L12 9 L13 21 L19 21 L20 9 Z',
   },
 ];
 
+export const PLAYABLE_ARMOR_IDS = Object.freeze(ARMOR_TYPES.map((armor) => armor.id));
+
+const LEGACY_ARMOR_MAP = Object.freeze({
+  assault: 'vanguard',
+  recon: 'striker',
+  heavy: 'vanguard',
+  stealth: 'phantom',
+});
+
+export function normalizeArmorType(id) {
+  const mapped = LEGACY_ARMOR_MAP[id] || id;
+  return PLAYABLE_ARMOR_IDS.includes(mapped) ? mapped : PLAYABLE_ARMOR_IDS[0];
+}
+
 export function getArmorType(id) {
-  return ARMOR_TYPES.find((a) => a.id === id) || ARMOR_TYPES[0];
+  const normalized = normalizeArmorType(id);
+  return ARMOR_TYPES.find((armor) => armor.id === normalized) || ARMOR_TYPES[0];
 }
 
 const LS_KEY = 'sio_armor_type';
-const MODEL_MIGRATION_KEY = 'sio_armor_arena_model_v2';
-// The old migration forced every existing profile onto the tactical Mixamo
-// soldier. That body reads as modern military kit in the faceted Rook arena,
-// especially from behind where its vest and pack dominate the silhouette.
-// Move that forced default once onto the connected arena exosuit. Other armor
-// choices remain selectable and are not overwritten after this migration.
+const MODEL_MIGRATION_KEY = 'sio_armor_arena_model_v3';
+
+// Retire the old Soldier kits from the live roster. Their layered tactical
+// plates and oversized gloves made the firearm look embedded even when the
+// mathematical grip points were clear. Preserve the closest visual identity
+// while moving every saved profile onto a connected exosuit chassis.
 export function loadArmorType() {
   const saved = localStorage.getItem(LS_KEY);
-  if (!localStorage.getItem(MODEL_MIGRATION_KEY)) {
+  const normalized = normalizeArmorType(saved);
+  if (!localStorage.getItem(MODEL_MIGRATION_KEY) || saved !== normalized) {
     localStorage.setItem(MODEL_MIGRATION_KEY, '1');
-    if (!saved || saved === 'assault') {
-      localStorage.setItem(LS_KEY, 'vanguard');
-      return 'vanguard';
-    }
+    localStorage.setItem(LS_KEY, normalized);
   }
-  return saved || 'vanguard';
+  return normalized;
 }
-export function saveArmorType(id)     { localStorage.setItem(LS_KEY, id); }
+
+export function saveArmorType(id) {
+  localStorage.setItem(LS_KEY, normalizeArmorType(id));
+}

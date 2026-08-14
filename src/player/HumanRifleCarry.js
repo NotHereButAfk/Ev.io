@@ -34,9 +34,26 @@ const BODY_FORWARD_CLEARANCE = 0.21;
 // WeaponModels are authored around a 1.05-1.15m showcase silhouette. That is
 // useful in the loadout turntable, but full size made an M4 longer than the
 // Soldier could physically shoulder and put its stock through the deltoid.
-// 0.65 matches the live Soldier's proportions while launchers still read large.
-// Both weapon geometry and local grip targets inherit this same scale.
+// Long/heavy firearms stay at 0.65 so their stocks and receivers do not overrun
+// the Soldier's shoulder pocket. Compact/default guns receive a larger scale
+// below: at 0.65 they technically cleared the torso, but the oversized Mixamo
+// gloves hid most of the gun and made it read as embedded in the model. Both
+// weapon geometry and local grip targets inherit the selected scale.
 export const HUMAN_WEAPON_SCALE = 0.65;
+const HUMAN_WEAPON_SCALES = Object.freeze({
+  sidearm: 0.78,
+  uzi: 0.78,
+  m4: 0.80,
+});
+
+// Compact/default guns need enough size to remain readable between the
+// Soldier's large gloves. Long and heavy weapons retain the proven 0.65 scale
+// so their stocks and receivers do not overrun the shoulder pocket.
+export function humanWeaponScale(weaponOrId) {
+  const id = typeof weaponOrId === 'string'
+    ? weaponOrId : weaponOrId?.userData?.weaponId;
+  return HUMAN_WEAPON_SCALES[id] ?? HUMAN_WEAPON_SCALE;
+}
 
 // Idle third person is a low-ready carry, not a permanent 68% ADS pose. Export
 // the contract so the production controller and QA measure the same posture.
@@ -248,7 +265,9 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   weapon.position.copy(anchor).add(
     V[25].lerpVectors(PATROL_OFFSET, AIM_OFFSET, aim).multiplyScalar(rigScale)
   );
-  weapon.position.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
+  const scaleClearance = Math.max(0, Math.abs(weapon.scale.z || 1) - 0.65)
+    * REFERENCE_STOCK_BACK;
+  weapon.position.z -= BODY_FORWARD_CLEARANCE + scaleClearance + geometryClearance.forward;
   weapon.position.z -= 0.075 * Math.sin(Math.PI * aim) * rigScale;
   weapon.quaternion.slerpQuaternions(PATROL_Q, AIM_Q, aim);
 

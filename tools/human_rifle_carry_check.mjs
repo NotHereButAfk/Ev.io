@@ -9,7 +9,7 @@ import {
   HUMAN_HANDGUARD_LOCAL,
   HUMAN_LOW_READY_AIM,
   HUMAN_MAG_LOCAL,
-  HUMAN_WEAPON_SCALE,
+  humanWeaponScale,
 } from '../src/player/HumanRifleCarry.js';
 
 // WeaponModels builds canvas-backed detail textures at module load. Node has
@@ -193,7 +193,7 @@ function measure(spec, armorName, armor, def) {
   root.scale.setScalar(armor.scale);
   const body = new THREE.Group();
   const weapon = buildWeaponModel(def, { procedural: true }).group;
-  weapon.scale.setScalar(HUMAN_WEAPON_SCALE);
+  weapon.scale.setScalar(humanWeaponScale(def.id));
   body.add(root, weapon);
 
   const mixer = new THREE.AnimationMixer(root);

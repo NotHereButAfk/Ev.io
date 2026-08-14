@@ -22,7 +22,7 @@ import {
 import {
   applyHumanRifleCarry,
   HUMAN_LOW_READY_AIM,
-  HUMAN_WEAPON_SCALE,
+  humanWeaponScale,
 } from './HumanRifleCarry.js';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -809,7 +809,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     _weaponKind = isMelee ? 'melee' : 'gun';
     weaponGroup.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
     if (!isMelee) {
-      weaponGroup.scale.setScalar(HUMAN_WEAPON_SCALE);
+      weaponGroup.scale.setScalar(humanWeaponScale(weaponGroup));
       group.add(weaponGroup);
       _heldWeapon = weaponGroup;
       return;

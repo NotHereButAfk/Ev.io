@@ -389,9 +389,10 @@ export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin 
     const sp = buildSpartanModel();
     if (sp) return sp;
   }
-  // Prefer the real rigged human Soldier. Callers may opt out with
-  // allowHuman:false and use the connected arena body's limb-pivot rig.
-  if (opts.allowHuman !== false && isHumanSoldierReady()) {
+  // The layered Soldier is retained for direct pose/carry tooling, but it is
+  // no longer an implicit runtime fallback. A caller must opt in explicitly;
+  // every normal player, bot, remote, and menu path stays on connected bodies.
+  if (opts.allowHuman === true && isHumanSoldierReady()) {
     const human = buildHumanSoldier(skin, armorTypeId, armorSkin);
     if (human) return human;
   }

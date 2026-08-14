@@ -8,6 +8,7 @@ import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
 import { BOT_TACTICS, advanceBurst, botAimErrorMeters, chooseCombatSteering } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
+import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
@@ -48,7 +49,6 @@ let nextId = 1;
 
 // Bots spawn as the cyborg-terminator models — the same low-poly cel-shaded
 // endoskeletons the player uses. Cycling the three chassis keeps the mob varied.
-const ARMOR_TYPES = ['assault', 'recon', 'heavy', 'stealth'];
 let _armorIdx = 0;
 
 // Each bot picks the next skin in sequence so the lobby always looks varied.
@@ -160,11 +160,12 @@ export class Bot {
 
     this.position = spawnPoint.clone();
 
-    const armorTypeId = ARMOR_TYPES[_armorIdx++ % ARMOR_TYPES.length];
+    const armorTypeId = PLAYABLE_ARMOR_IDS[_armorIdx++ % PLAYABLE_ARMOR_IDS.length];
     const skin = BOT_SKINS[_skinIdx++ % BOT_SKINS.length];
-    // Bots use the SAME rigged human model as the player (falls back to the
-    // procedural body only if the GLB hasn't loaded yet).
-    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: true });
+    // Bots use the same connected arena-exosuit family as the player. Keep the
+    // retired layered Soldier path explicitly disabled so an asset-load race
+    // cannot put a gun back inside the older bulky vest/glove silhouette.
+    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: false });
     this._isHuman = !!this.mesh.userData?.isHuman;
     this.bodyMat = this.mesh.userData.primaryMat;
 
@@ -186,8 +187,8 @@ export class Bot {
     // (rotation.z) tilt about the BODY's axes rather than the world's.
     this.mesh.rotation.order = 'YXZ';
 
-    // Rig limb pivots for the walk cycle (procedural model only; the human model
-    // animates via its own skeletal mixer).
+    // Rig limb pivots for the connected exosuit walk cycle. The guarded human
+    // branch remains only for direct development tooling.
     this._rig = this._isHuman ? null : rigCharacterLimbs(this.mesh);
 
     const weaponId = this._isSwordBot ? 'sword' : 'm4';

@@ -39,6 +39,7 @@
     "test:nameplates": "node tools/nameplate_occlusion_check.mjs",
     "test:net-presentation": "node tools/net_presentation_check.mjs",
     "test:skins": "node tools/character_skin_check.mjs",
+    "test:armor-roster": "node tools/armor_roster_check.mjs",
     "test:evmap": "node tools/evmap_check.mjs"
   },
   "repository": {

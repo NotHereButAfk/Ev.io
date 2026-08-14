@@ -41,6 +41,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:actions'); return { ok: r.ok && /all action checks passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-MESH', phase: '—', name: 'Body mesh keeps the rig metrics the animation reads off it',
     fn: () => { const r = run('npm run test:mesh'); return { ok: r.ok && /all mesh checks passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-ARMOR-ROSTER', phase: '—', name: 'Players, bots, and remotes use only connected exosuit bodies',
+    fn: () => { const r = run('npm run test:armor-roster'); return { ok: r.ok && /armor roster passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-RIFLE-CLEAR', phase: '—', name: 'All firearm meshes clear the body and both hands stay attached through actions',
     fn: () => { const r = run('npm run test:rifle-clearance'); return { ok: r.ok && /firearm body clearance passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-MAPS', phase: '—', name: 'Map rotation swaps arenas without leaking or burying spawns',
