@@ -41,6 +41,36 @@ const browser = await chromium.launch({
          '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: VIEW });
+// Chromium's headless mode does not grant pointer lock. The game correctly
+// treats that rejection as Escape and pauses input, which used to make a
+// production capture impossible unless the private Game instance was exposed.
+// Emulate the browser contract before app code runs so public builds can be
+// exercised through their real mouse/keyboard controls instead.
+await page.addInitScript(() => {
+  let lockedElement = null;
+  Object.defineProperty(document, 'pointerLockElement', {
+    configurable: true,
+    get: () => lockedElement,
+  });
+  Element.prototype.requestPointerLock = function requestPointerLock() {
+    lockedElement = this;
+    queueMicrotask(() => document.dispatchEvent(new Event('pointerlockchange')));
+    return Promise.resolve();
+  };
+document.exitPointerLock = () => {
+    lockedElement = null;
+    queueMicrotask(() => document.dispatchEvent(new Event('pointerlockchange')));
+  };
+});
+const closeBrowser = async () => {
+  // Some Windows/SwiftShader runs leave a renderer waiting during shutdown.
+  // The screenshots are already flushed at this point, so bound teardown and
+  // let process.exit below clean up the child process if Chrome does not reply.
+  await Promise.race([
+    browser.close(),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]);
+};
 // CI/local QA runs are intentionally offline. Abort the optional Google font
 // fetches so Playwright's screenshot font-readiness gate cannot wait forever.
 await page.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.abort());
@@ -55,7 +85,12 @@ const shot = async (name) => {
   await page.screenshot({ path: `${OUT}/${name}.png` });
   console.log('  ✓', name);
 };
-const pose = (js) => page.evaluate(`(() => { const g = window.__game || window.game; ${js} })()`);
+const pose = (js) => page.evaluate(`(() => {
+  const g = window.__game || window.game;
+  if (!g) return false;
+  ${js}
+  return true;
+})()`);
 
 console.log('loading', URL);
 await page.goto(URL, { waitUntil: 'commit', timeout: 30000 });
@@ -75,7 +110,7 @@ for (let i = 0; i < 10; i++) {
   inGame = await page.evaluate(`!document.getElementById('hud')?.classList.contains('hidden')`);
   if (inGame) break;
 }
-if (!inGame) { console.error('match never started'); await browser.close(); process.exit(1); }
+if (!inGame) { console.error('match never started'); await closeBrowser(); process.exit(1); }
 console.log('  in match');
 
 await pose(`
@@ -95,11 +130,17 @@ await shot('first-person');
 
 // Document the actual first third-person zoom notch. A stale 3.4m override made
 // the player look much smaller here than during normal gameplay.
-await pose(`g.player._camDist = ${TPS_DEFAULT_DISTANCE};`);
+const setThirdPersonDirectly = await pose(`g.player._camDist = ${TPS_DEFAULT_DISTANCE};`);
+if (!setThirdPersonDirectly) {
+  // Production intentionally keeps the Game instance private. Exercise the
+  // same first-wheel-notch path a player uses instead of relying on internals.
+  await page.mouse.move(VIEW.width / 2, VIEW.height / 2);
+  await page.mouse.wheel(0, 100);
+}
 await page.waitForTimeout(1200);
 await shot('third-person');
 if (process.env.KYX_CAPTURE_MODELS_ONLY === '1') {
-  await browser.close();
+  await closeBrowser();
   console.log('done →', OUT);
   process.exit(0);
 }
@@ -132,5 +173,5 @@ console.log('  combat framing:', framed || 'NO BOT IN FRAME');
 await page.waitForTimeout(1200);
 await shot('combat');
 
-await browser.close();
+await closeBrowser();
 console.log('done →', OUT);

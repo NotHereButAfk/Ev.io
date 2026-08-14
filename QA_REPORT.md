@@ -11,7 +11,7 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
-- Production verification: PASS for commit `9c2757e` via deployment run `31757673148`; cache-busted `kryx.live` entered a match, rendered the Auto Rifle HUD at 50/200, and recorded zero error/warning logs.
+- Production verification: PASS for commit `f6df4b3` via deployment run `31789475181`; cache-busted `kryx.live` entered a match and captured both the corrected first-person rifle and connected third-person Hero body.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -146,7 +146,7 @@ This report records tests that were actually executed against the running game. 
 
 **Root cause:** The runtime builder pointed at the comparison block chassis even though the connected `HeroBody` was already implemented and fully gated. Rifle tests checked height and muzzle direction but did not assert lateral shoulder clearance on the production skinned body or exercise action states.
 
-**Files changed:** `src/player/LowPolyModels.js`, `src/player/HeroBody.js`, `src/player/RifleCarry.js`, `tools/mesh_check.mjs`, `tests/rifle-carry-reference.test.mjs`, `pose-lab.html`, `tools/capture_pose_lab.mjs`
+**Files changed:** `src/player/LowPolyModels.js`, `src/player/HeroBody.js`, `src/player/RifleCarry.js`, `tools/mesh_check.mjs`, `tests/rifle-carry-reference.test.mjs`, `pose-lab.html`, `tools/capture_pose_lab.mjs`, `tools/screenshots.mjs`
 
 **Fix:** Ship the 11,078-vertex graded-weight Hero body for Vanguard/Striker/Phantom, keep the cape only on Phantom, move the receiver to the right shoulder pocket, and retarget the support hand to the reachable receiver-side handguard. The rigid block chassis remains available only for comparison/tooling.
 
