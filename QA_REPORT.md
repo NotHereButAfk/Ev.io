@@ -11,7 +11,7 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
-- Production verification: PASS for full-mesh rifle fix `2fc47af` via deployment run `31791229196`; cache-busted `kryx.live` entered a match and captured both the first-person rifle and corrected third-person Hero carry.
+- Production verification: PASS for full-mesh rifle fix `2fc47af` via deployment run `31791229196` and shoulder-camera follow-up `745984a` via run `31791654237`; cache-busted `kryx.live` entered a match and captured both the first-person rifle and corrected third-person Hero carry.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
