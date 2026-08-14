@@ -12,7 +12,7 @@ This report records tests that were actually executed against the running game. 
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
 - Production verification: PASS for the Hero full-arsenal correction `e39c657` (run `31793165892`), loaded-Soldier correction `9b2fd97` (run `31797011674`), and late-loading fallback correction `62846c0` (run `31798425052`). A cache-busted Assault match on `kryx.live` captured both first- and third-person frames from the deployed runtime; the final frame is the rigged Soldier with its Auto Rifle outside the torso.
-- Current roster correction: PASS locally. Live browser capture renders seven armed bots as Vanguard/Striker/Phantom only; the 27th release gate verifies saved-model migration and shared player/bot/remote chassis ownership. Production verification is pending deployment.
+- Current roster correction: PASS in production. Commit `efd701a` deployed in run `31802937487`; the remote-animation follow-up `fed1d52` deployed in run `31803945570`. A cache-busted `kryx.live` match seeded with an old saved Assault id migrated to the connected Vanguard body and captured first- and third-person frames with zero page errors.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -233,7 +233,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Make Vanguard, Striker, and Phantom the only playable chassis; use that shared roster for the menu, local bots, and authoritative remote avatars; and migrate every saved legacy id to its closest connected exosuit. Retired Soldier code remains available for tooling, with compact guns enlarged and given stock-length-based forward clearance, but it is no longer selected by normal play.
 
-**Verification:** PASS locally. The roster contract test proves the three playable ids, all four legacy migrations, connected-body construction, and shared bot/remote imports. The live-browser roster capture renders seven armed bots as Vanguard/Striker/Phantom only. The exact Hero body passes all 17 firearms across 272 carry/action poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact, and both wrists on their targets. Gameplay smoke completes movement, ADS, fire, reload, swap, abilities, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. The expanded release certificate passes 27/27 automated gates. Production verification is pending deployment of this change.
+**Verification:** PASS in production. The roster contract test proves the three playable ids, all four legacy migrations, connected-body construction, and shared bot/remote imports. The live-browser lineup renders seven armed bots as Vanguard/Striker/Phantom only. The exact Hero body passes all 17 firearms across 272 carry/action poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact, and both wrists on their targets. Gameplay smoke completes movement, ADS, fire, reload, swap, abilities, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. The expanded release certificate passes 27/27 automated gates. Commit `efd701a` deployed successfully in run `31802937487`; a final cache-busted production capture on follow-up `fed1d52` migrated a seeded legacy Assault profile to Vanguard and rendered the corrected first- and third-person holds.
 
 ## BUG-013
 
@@ -253,7 +253,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Declare the frame-local `THREE.Vector3` scratch object used by remote directional animation, and add a network-presentation regression gate that requires both its ownership and use.
 
-**Verification:** PASS locally. The expanded network-presentation gate passes 8/8 checks and the production build compiles. Cache-busted production verification is pending deployment of this follow-up.
+**Verification:** PASS in production. The expanded network-presentation gate passes 8/8 checks, the production build compiles, and the complete 27/27 release certificate remains green. Commit `fed1d52` deployed successfully in run `31803945570`; repeating the exact cache-busted saved-profile capture completed first- and third-person frames with no page errors.
 
 ## Known product gaps, not falsely marked fixed
 
