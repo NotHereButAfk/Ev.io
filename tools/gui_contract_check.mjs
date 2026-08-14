@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requestPointerLockSafely } from '../src/core/InputManager.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFileSync(join(root, file), 'utf8');
@@ -21,6 +22,22 @@ const failures = [];
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };
+
+let rejectedPointerLockCaught = false;
+const rejectedPointerLock = {
+  requestPointerLock: () => ({
+    catch(handler) {
+      rejectedPointerLockCaught = true;
+      handler(new Error('pointer lock rejected'));
+    },
+  }),
+};
+if (!requestPointerLockSafely(rejectedPointerLock) || !rejectedPointerLockCaught) {
+  failures.push('pointer-lock promise rejection is contained');
+}
+if (requestPointerLockSafely({ requestPointerLock: () => { throw new Error('wrong document'); } })) {
+  failures.push('pointer-lock synchronous DOMException is contained');
+}
 
 for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'CRYPTO', 'SETTINGS']) {
   requireMatch(index, new RegExp(`>${label}(?:\\s|&|<)`), `top navigation: ${label}`);

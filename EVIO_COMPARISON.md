@@ -27,7 +27,7 @@ Legend: ✅ matching observable contract · ⚠️ close/partially verified · �
 | King of the Hill | Public EV.IO has objective modes | No hill implemented | ❌ | Mode incomplete |
 | Firefight/survival | Public EV.IO exposes survival/PvE | KYX has wave defense, down/revive, zombies | ⚠️ | Exact wave and difficulty parity unverified |
 | Performance stability | Public value device-dependent | 64-player sim ≤0.7 ms/tick; automated soak reports no leak | ⚠️ | Needs comparable live-client FPS capture on same hardware |
-| Console/network health | Public EV.IO disconnected in this browser session | Zero first-party errors/failures during completed smoke | ✅ | Public server availability is currently outside KYX code |
+| Console/network health | Public EV.IO disconnected in this browser session | Zero first-party errors/failures in system-Chrome smoke; embedded-browser entry also reaches the HUD with no logs after pointer-lock rejection containment | ✅ | Public server availability is currently outside KYX code |
 
 ## Current public reference limitation
 

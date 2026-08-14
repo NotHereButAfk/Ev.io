@@ -1,3 +1,19 @@
+// Pointer lock is a progressive enhancement. Embedded browsers, automation
+// surfaces, cross-document canvas moves, or browser policy can reject it even
+// after a real click. Consume both synchronous DOMExceptions and asynchronous
+// promise rejections so the game remains playable through keyboard/UI fallback
+// without producing an unhandled first-party console error.
+export function requestPointerLockSafely(domElement) {
+  if (!domElement?.requestPointerLock) return false;
+  try {
+    const pending = domElement.requestPointerLock();
+    pending?.catch?.(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export class InputManager {
   constructor(domElement) {
     this.domElement = domElement;
@@ -93,8 +109,8 @@ export class InputManager {
   }
 
   requestPointerLock() {
-    if (this.isMobile) return;
-    this.domElement.requestPointerLock();
+    if (this.isMobile) return false;
+    return requestPointerLockSafely(this.domElement);
   }
 
   exitPointerLock() {

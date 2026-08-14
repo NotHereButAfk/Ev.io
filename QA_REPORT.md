@@ -10,6 +10,7 @@ This report records tests that were actually executed against the running game. 
 - Automated certificate: PASS, 25/25 gates.
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
+- Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements on independent deterministic open-lane trials: walk 1.20 m in 0.9 s, sprint 2.09 m in 0.9 s, jump peak +4.41 m, Auto Rifle ammo 50 to 48 after firing.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload, reload-to-swap, swap back, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -89,6 +90,26 @@ This report records tests that were actually executed against the running game. 
 **Fix:** Use the respawn overlay as the sole automatic death UI; manual Escape navigation remains available.
 
 **Verification:** PASS. The browser harness invokes the authoritative death/respawn callbacks, proves the navigation menu stays closed, and proves the overlay appears and clears.
+
+## BUG-006
+
+**Severity:** Medium
+
+**System:** Browser input / pointer lock / console health
+
+**Steps to reproduce:** Open the production game in an embedded browser where the canvas belongs to a document that is not eligible for pointer lock, then press `CLICK TO PLAY`.
+
+**Expected EV.IO behavior:** Pointer lock is attempted as an enhancement; rejection leaves the game/UI usable and does not emit an unhandled first-party exception.
+
+**Observed behavior in my game:** The match entered and rendered, but the production console logged `WrongDocumentError: The root document of this element is not valid for pointer lock.`
+
+**Root cause:** `InputManager.requestPointerLock()` called the browser API without containing either its synchronous DOMException or its rejected promise.
+
+**Files changed:** `src/core/InputManager.js`, `tools/gui_contract_check.mjs`
+
+**Fix:** Route the request through a safe boundary that absorbs unsupported, wrong-document, and policy rejection paths while returning whether a request could be initiated.
+
+**Verification:** PASS. The GUI contract covers synchronous and asynchronous rejection shapes; the embedded browser entered a locally served match, rendered the Auto Rifle HUD at 50/200, and reported zero error/warning logs.
 
 ## Known product gaps, not falsely marked fixed
 

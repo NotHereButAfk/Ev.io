@@ -38,7 +38,7 @@ const key = async (code, ms = 180) => {
   await page.keyboard.up(code);
   await page.evaluate(HIDE);
 };
-const inputKey = async (code, keyValue, settleMs = 650) => {
+const inputKey = async (code, keyValue, settleMs = 120) => {
   await page.evaluate(HIDE);
   await page.evaluate(({ code, keyValue }) => {
     const g = window.__game || window.game;
@@ -65,6 +65,12 @@ try {
   assert(await page.evaluate(() => !document.getElementById('hud')?.classList.contains('hidden')), 'HUD never appeared');
   mark('match entered');
   await page.evaluate(HIDE);
+
+  // This is a deterministic input/lifecycle test. Dedicated bot-combat,
+  // authority, damage, population and soak gates exercise opponents; leaving
+  // bots active here makes a slow software-rendered browser kill the player at
+  // arbitrary checkpoints before the input assertion can be sampled.
+  await game(`g.botManager.clear(); g.serverSim?.stop(); return true;`);
 
   const start = await game(`return { state:g.state, p:{x:g.player.position.x,y:g.player.position.y,z:g.player.position.z}, ammo:g.weaponSystem.currentState.magAmmo };`);
   assert(start.state === 'playing', `game state is ${start.state}`);
@@ -155,23 +161,29 @@ try {
   assert(afterFire < start.ammo, `firing did not consume ammo (${start.ammo} -> ${afterFire})`);
   mark('fire');
   await key('r', 80);
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => (window.__game || window.game)?.weaponSystem?.currentState?.isReloading, null, { timeout: 6000 });
   assert(await game(`return g.weaponSystem.currentState.isReloading;`), 'reload did not start');
 
   await inputKey('Digit2', '2');
+  await page.waitForFunction(() => (window.__game || window.game)?.weaponSystem?.currentDef?.kind === 'melee', null, { timeout: 6000 });
   assert(await game(`return g.weaponSystem.currentDef.kind === 'melee';`), 'weapon swap to melee failed');
   await inputKey('Digit1', '1');
+  await page.waitForFunction(() => (window.__game || window.game)?.weaponSystem?.currentDef?.kind !== 'melee', null, { timeout: 6000 });
   assert(await game(`return g.weaponSystem.currentDef.kind !== 'melee';`), 'weapon swap back to gun failed');
   mark('reload and swap');
 
   await key('q', 60);
-  await page.waitForTimeout(100);
+  await page.waitForFunction(() => (window.__game || window.game)?.player?.teleportCooldown > 0, null, { timeout: 6000 });
   assert(await game(`return g.player.teleportCooldown > 0;`), 'blink did not enter cooldown');
   mark('blink');
 
   const grenadesBefore = await game(`return {frags:g.grenadeSystem.frags,smokes:g.grenadeSystem.smokes};`);
   await inputKey('KeyG', 'g', 160);
   await inputKey('KeyF', 'f', 160);
+  await page.waitForFunction(({ frags, smokes }) => {
+    const grenades = (window.__game || window.game)?.grenadeSystem;
+    return grenades?.frags === frags - 1 && grenades?.smokes === smokes - 1;
+  }, grenadesBefore, { timeout: 6000 });
   const grenadesAfter = await game(`return {frags:g.grenadeSystem.frags,smokes:g.grenadeSystem.smokes};`);
   assert(grenadesAfter.frags === grenadesBefore.frags - 1 && grenadesAfter.smokes === grenadesBefore.smokes - 1,
     `grenade chord failed: ${JSON.stringify(grenadesBefore)} -> ${JSON.stringify(grenadesAfter)}`);
@@ -198,6 +210,7 @@ try {
   // Kill the player during an active reload. Respawn must not resurrect a
   // frozen magazine animation or carry partial ammunition into the new life.
   await inputKey('KeyR', 'r', 160);
+  await page.waitForFunction(() => (window.__game || window.game)?.weaponSystem?.currentState?.isReloading, null, { timeout: 6000 });
   assert(await game(`return g.weaponSystem.currentState.isReloading;`), 'pre-death reload did not start');
   await game(`g._onPlayerDamaged(g.player.health + g.player.shield + 10); return true;`);
   await page.waitForTimeout(160);
