@@ -31,7 +31,12 @@ const REACH = (UP_ARM + FOREARM) * 0.995;
 // Grip points in weapon-local space (used by the solver; kept here as the
 // contract the poses below were fitted to).
 export const GRIP_LOCAL      = new THREE.Vector3(0, -0.12,  0.10);
-export const HANDGUARD_LOCAL = new THREE.Vector3(0, -0.02, -0.28);
+// Mid-handguard, not the unreachable muzzle-side rail. On the correctly sized
+// 1.82m chassis the old -0.28 target forced slideToReach() to pull the wrist
+// 27cm back toward the magazine, which made the support hand look detached
+// from the authored target. This point stays forward of the receiver and is
+// reachable through the full carry/action sweep.
+export const HANDGUARD_LOCAL = new THREE.Vector3(0, -0.02, -0.16);
 // Where the support hand goes during a reload: under the receiver, on the
 // magazine well, a little behind the handguard it just left.
 const MAG_LOCAL = new THREE.Vector3(0, -0.26, -0.02);
@@ -53,11 +58,16 @@ const ARM_SCALE = (UP_ARM + FOREARM) / (0.48 + 0.385);
 const onArm = (x, y, z) => new THREE.Vector3(
   x * ARM_SCALE, SHOULDER_Y + (y - 1.76) * ARM_SCALE, z * ARM_SCALE);
 const PATROL = {
-  wp: onArm(0.175, 1.475, -0.300),
+  // Keep the receiver in the right shoulder pocket, not behind the sternum.
+  // The old x=0.175 was only 12.3cm from the centreline on the current figure,
+  // well inside its 20.9cm shoulder joint. From the gameplay camera the body
+  // swallowed the whole rifle. This lands 6.5cm outboard of the shoulder while
+  // the grip itself remains close to the trigger-side hand.
+  wp: onArm(0.390, 1.580, -0.270),
   wr: new THREE.Euler(-0.160, 0.220, 0.200),
 };
 const AIM = {
-  wp: onArm(0.240, 1.538, -0.262),
+  wp: onArm(0.390, 1.600, -0.230),
   wr: new THREE.Euler(-0.020, 0, 0),
 };
 

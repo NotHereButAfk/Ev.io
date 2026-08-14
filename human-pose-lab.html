@@ -20,6 +20,19 @@ const query = new URLSearchParams(location.search);
 const angle = Number(query.get('angle') || 0) * Math.PI / 180;
 const aim = THREE.MathUtils.clamp(Number(query.get('aim') || 0), 0, 1);
 const armor = query.get('armor') || 'assault';
+const motion = query.get('motion') || 'idle';
+const speed = Number(query.get('speed') || (motion === 'run' ? 8 : motion === 'walk' ? 3.2 : 0));
+const sprint = query.get('sprint') === '1';
+const grounded = query.get('grounded') !== '0';
+const dirF = Number(query.get('dirF') ?? 1);
+const dirR = Number(query.get('dirR') ?? 0);
+const strafe = Number(query.get('strafe') ?? dirR);
+const pitch = Number(query.get('pitch') || 0);
+const reload = THREE.MathUtils.clamp(Number(query.get('reload') || 0), 0, 1);
+const crouch = THREE.MathUtils.clamp(Number(query.get('crouch') || 0), 0, 1);
+const slide = THREE.MathUtils.clamp(Number(query.get('slide') || 0), 0, 1);
+const action = query.get('action');
+const actionSeconds = Math.max(0, Number(query.get('actionSeconds') || 0.22));
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -70,13 +83,23 @@ preloadHumanSoldier(() => {
     }
   });
   body.userData.attachWeapon(weapon, false);
-  body.userData.setLocomotion?.(0, true, false, 0, 1, 0);
-  body.userData.setAim?.(0, 0);
-  body.userData.setActionState?.({ aim });
+  body.userData.setLocomotion?.(speed, grounded, sprint, strafe, dirF, dirR);
+  body.userData.setAim?.(pitch, 0);
+  body.userData.setActionState?.({
+    aim, reload, crouch, slide, vy: grounded ? 0 : 1.5,
+  });
   // Settle the same animation/IK path used in a live match.
   for (let i = 0; i < 90; i++) {
     body.userData.mixer.update(1 / 60);
     body.userData.armorTick?.(1 / 60);
+  }
+  if (action) {
+    body.userData.triggerAction?.(action);
+    const frames = Math.max(1, Math.round(actionSeconds * 60));
+    for (let i = 0; i < frames; i++) {
+      body.userData.mixer.update(1 / 60);
+      body.userData.armorTick?.(1 / 60);
+    }
   }
   body.updateMatrixWorld(true);
   window.__body = body;

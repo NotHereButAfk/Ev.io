@@ -36,7 +36,6 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildHeroBody } from './HeroBody.js';
-import { buildBlockBody } from './BlockBody.js';
 
 export const LOWPOLY_IDS = ['vanguard', 'striker', 'phantom'];
 export function isLowPolyId(id) { return LOWPOLY_IDS.includes(id); }
@@ -707,8 +706,11 @@ function _build(id) {
 }
 
 // ── Public builder ───────────────────────────────────────────────────────────
+// Ship the connected, graded-weight surface. The rigid block chassis remains
+// available through BlockBody.js for tooling/comparison, but it reads as armor
+// pieces pasted onto a mannequin in the normal third-person view.
 export function buildLowPolyCharacter(id = 'vanguard') {
-  return buildBlockBody(id);
+  return buildHeroBody(id);
 }
 
 /**

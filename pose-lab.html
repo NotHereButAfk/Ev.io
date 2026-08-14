@@ -225,11 +225,18 @@ if (Q.has('sweep')) {
   if (pick) poseInto(pick.p);
 } else {
   // dt = 1 ⇒ the ease factor saturates, so these land exactly on the pose.
-  const gait = applyWalkCycle(rig, { t: WALK, moving: !!Q.has('walk'), run: n('run', 0), dt: 1 });
+  const gait = applyWalkCycle(rig, {
+    t: WALK, moving: !!Q.has('walk'), run: n('run', 0), dt: 1,
+    crouch: n('crouch', 0), slide: n('slide', 0), grounded: n('grounded', 1) > 0,
+  });
   body.position.y = gait.bob;
   body.rotation.order = 'YXZ';
   body.rotation.x = gait.lean;
-  applyRifleCarry(rig, wm, AIM, 1, { swing: gait.swing, kick: n('kick', 0) });
+  applyRifleCarry(rig, wm, AIM, 1, {
+    swing: gait.swing, kick: n('kick', 0), aimPitch: n('pitch', 0),
+    reload: n('reload', 0), swap: n('swap', 0), flinch: n('flinch', 0),
+    throwP: n('throw', 0), bodyPitch: gait.lean,
+  });
 }
 
 body.updateWorldMatrix(true, true);
@@ -237,6 +244,12 @@ const handW = {};
 const _inv = new THREE.Matrix4().copy(body.matrixWorld).invert();
 body.traverse((o) => { if (/^hand_[LR]$/.test(o.name))
   handW[o.name] = o.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv); });
+// Skinned Hero bodies expose wrist bones instead of one mesh per hand.
+const heroBones = body.userData?.bones;
+if (!handW.hand_R && heroBones?.handR)
+  handW.hand_R = heroBones.handR.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv);
+if (!handW.hand_L && heroBones?.handL)
+  handW.hand_L = heroBones.handL.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv);
 const gripW = GRIP_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
 const hgW   = HANDGUARD_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
 // Lowest point of either boot, in WORLD space (bob included) — how well the
@@ -258,11 +271,18 @@ let footLow = Infinity, footHigh = -Infinity;
     footHigh = Math.max(footHigh, lo);   // the higher of the two planted feet
   }
 }
+const receiverRight = wm.position.x
+  - body.worldToLocal(rig.armR.getWorldPosition(new THREE.Vector3())).x;
 window.__probe = {
   footLow: +footLow.toFixed(3), footHigh: +footHigh.toFixed(3),
   gripErr: handW.hand_R ? +handW.hand_R.distanceTo(gripW).toFixed(4) : null,
   hgErr:   handW.hand_L ? +handW.hand_L.distanceTo(hgW).toFixed(4)   : null,
-  clip:    +clipDepth().toFixed(4), where: clipWhere,
+  receiverRight: +receiverRight.toFixed(4),
+  // A merged SkinnedMesh spans the whole body, so its global AABB cannot be a
+  // meaningful penetration solid. The lateral shoulder metric above is the
+  // regression gate for Hero bodies; keep the geometric probe for segmented.
+  clip: body.userData?.isHero ? null : +clipDepth().toFixed(4),
+  where: body.userData?.isHero ? null : clipWhere,
 };
 if (Q.has('dbg')) {
   const dot = (p, c) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8),

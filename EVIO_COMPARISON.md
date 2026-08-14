@@ -1,6 +1,6 @@
 # Public EV.IO Comparison
 
-Last checked: 2026-08-13
+Last checked: 2026-08-14
 
 Legend: PASS = matching observable contract; PARTIAL = close or partially verified; NO = incorrect/incomplete; UNKNOWN = current EV.IO value unavailable.
 
@@ -8,7 +8,7 @@ Legend: PASS = matching observable contract; PARTIAL = close or partially verifi
 |---|---|---|---|---|
 | Game entry | Public site exposes `CLICK TO PLAY` and immediate browser play | Guest entry and play button boot a match in the browser smoke | PASS | Same low-friction observable flow |
 | First-person weapon hold | Public gameplay stills show a compact diagonal rifle from lower right, with hands attached at the grip/handguard | Corrected shared mount: 0.18 rad pitch, 0.31 rad yaw, -0.10 rad roll, 0.76 scale; hands inherit the same transform | PARTIAL | Hold is mechanically correct and similarly readable; KYX model/skin remains intentionally original |
-| Third-person rifle carry | Public character material shows a shouldered rifle with the head and chest readable | Real Soldier holds the receiver 11.0-12.6 cm below the shoulder line at low-ready; both wrists measure 0.00 cm from contacts in 48 states | PASS | Mechanical pose contract matches; art style and exact silhouette are intentionally not copied |
+| Third-person model and rifle carry | Public character material shows a connected animated figure and a shouldered rifle with the head/chest readable | Default runtime now uses the weighted 11,078-vertex Hero body instead of the rigid block chassis. Receiver clearance is 6.5 cm outside the right shoulder normally and at least 1.5 cm through actions; trigger wrist is 0.00 cm from grip. Legacy Soldiers also pass 48 carry states | PASS | Mechanical modeling/pose contract matches; art style and exact silhouette are intentionally original, not copied |
 | Walk | Controlled current EV.IO timing unavailable | Browser peak 6.20 m/s; direction, foot-plant, and real-Soldier locomotion gates pass | UNKNOWN | Need a controlled current EV.IO match for equivalent timing |
 | Sprint | Controlled current EV.IO timing unavailable | Browser peak 10.85 m/s; sprint/walk ratio and gait gates pass | UNKNOWN | KYX behavior works; EV.IO timing not measured today |
 | Jump | Controlled current EV.IO timing unavailable | Browser-observed peak +4.42 m; deterministic jump fixture passes | UNKNOWN | EV.IO jump arc still needs current frame analysis |

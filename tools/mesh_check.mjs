@@ -19,7 +19,9 @@ import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
 import { buildHeroBody } from '../src/player/HeroBody.js';
 import { buildBlockBody } from '../src/player/BlockBody.js';
-import { LOWPOLY_IDS, isSharedGeometry } from '../src/player/LowPolyModels.js';
+import {
+  LOWPOLY_IDS, buildLowPolyCharacter, isSharedGeometry,
+} from '../src/player/LowPolyModels.js';
 import { rigCharacterLimbs } from '../src/player/PreviewCharacter.js';
 import * as BODY from '../src/player/Proportions.js';
 
@@ -31,6 +33,15 @@ const ok = (c, msg, detail = '') => {
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const P = (o) => o.getWorldPosition(new THREE.Vector3());
 const boneIndex = (g, name) => g.userData.skeleton.bones.findIndex(b => b.name === name);
+
+// The live roster must use the connected skinned body. Both implementations
+// are tested below, so geometry correctness alone would not catch the runtime
+// factory accidentally switching back to the pasted-parts block chassis.
+{
+  const runtime = buildLowPolyCharacter('vanguard');
+  ok(runtime.userData?.isHero && !runtime.userData?.isBlockBody,
+    'the live roster builds the connected weighted Hero body');
+}
 
 // Deform a body by its skeleton and read a vertex back out — the same path the
 // renderer and the raycaster take, so what this measures is what is drawn.

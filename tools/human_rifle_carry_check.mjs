@@ -150,8 +150,12 @@ function measure(spec, armorName, armor) {
     weapon.getWorldQuaternion(new THREE.Quaternion())
   );
   const muzzlePitch = Math.asin(THREE.MathUtils.clamp(muzzle.y, -1, 1));
-  const shoulderMid = worldPosition(rig.lArm).add(worldPosition(rig.rArm)).multiplyScalar(0.5);
+  const leftShoulder = worldPosition(rig.lArm);
+  const rightShoulder = worldPosition(rig.rArm);
+  const shoulderMid = leftShoulder.clone().add(rightShoulder).multiplyScalar(0.5);
   const receiver = weapon.getWorldPosition(new THREE.Vector3());
+  body.worldToLocal(leftShoulder);
+  body.worldToLocal(rightShoulder);
   body.worldToLocal(shoulderMid);
   body.worldToLocal(receiver);
 
@@ -167,6 +171,9 @@ function measure(spec, armorName, armor) {
     muzzlePitch,
     lowReady: spec.lowReady === true,
     receiverBelowShoulders: shoulderMid.y - receiver.y,
+    receiverRightOfShoulders: receiver.x - shoulderMid.x,
+    receiverAheadOfShoulders: shoulderMid.z - receiver.z,
+    shoulderHalfWidth: Math.abs(rightShoulder.x - leftShoulder.x) * 0.5,
   };
 }
 
@@ -176,6 +183,8 @@ const results = Object.entries(ARMORS).flatMap(([name, armor]) =>
 const MAX_GRIP_ERROR = 0.008;
 const MAX_REACH_FRACTION = 0.9951;
 const MIN_LOW_READY_DROP = 0.060;
+const MIN_LOW_READY_FORWARD = 0.150;
+const MIN_LATERAL_SHOULDER_RATIO = 1.00;
 let failures = 0;
 
 console.log('real soldier rifle carry (centimetres)');
@@ -192,9 +201,16 @@ for (const result of results) {
   // IK could still be numerically perfect while the whole weapon sat above the
   // real Soldier's shoulders. The production idle pose must remain low-ready.
   const heightOk = !result.lowReady || result.receiverBelowShoulders >= MIN_LOW_READY_DROP;
-  if (!rightOk || !leftOk || !leftReachOk || !rightReachOk || !pitchOk || !heightOk) failures++;
-  const marker = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk && heightOk
-    ? 'ok' : 'FAIL';
+  // Keep the receiver outside the torso silhouette, at or beyond the right
+  // shoulder line. A forward-only offset can be physically clear yet still
+  // look embedded from the normal rear camera, which was the reported defect.
+  const bodyClearOk = result.receiverRightOfShoulders
+      >= result.shoulderHalfWidth * MIN_LATERAL_SHOULDER_RATIO
+    && (!result.lowReady || result.receiverAheadOfShoulders >= MIN_LOW_READY_FORWARD);
+  if (!rightOk || !leftOk || !leftReachOk || !rightReachOk || !pitchOk
+      || !heightOk || !bodyClearOk) failures++;
+  const marker = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk
+      && heightOk && bodyClearOk ? 'ok' : 'FAIL';
   console.log(
     `  ${marker.padEnd(5)} ${result.name.padEnd(17)}`
     + `${(result.rightError * 100).toFixed(2).padStart(6)}cm`
@@ -203,17 +219,28 @@ for (const result of results) {
     + `/${(result.leftReach * 100).toFixed(1)}cm`
     + (result.lowReady
       ? `  receiver drop ${(result.receiverBelowShoulders * 100).toFixed(1)}cm`
+        + ` right ${(result.receiverRightOfShoulders * 100).toFixed(1)}cm`
+        + ` ahead ${(result.receiverAheadOfShoulders * 100).toFixed(1)}cm`
+        + ` shoulder ${(result.shoulderHalfWidth * 100).toFixed(1)}cm`
       : '')
   );
 }
 
 const worstRight = Math.max(...results.map((result) => result.rightError));
 const worstLeft = Math.max(...results.map((result) => result.leftError));
+const leastReceiverRight = Math.min(...results.map((result) => result.receiverRightOfShoulders));
+const leastReceiverAhead = Math.min(...results.map((result) => result.receiverAheadOfShoulders));
+const leastShoulderRatio = Math.min(...results.map(
+  (result) => result.receiverRightOfShoulders / Math.max(0.001, result.shoulderHalfWidth)
+));
 if (failures) {
   console.error(`\n${failures} rifle carry state(s) failed the real-rig grip/reach gate`);
   process.exit(1);
 }
 console.log(
   `\nhuman rifle carry passed: ${results.length} production Soldier states, worst wrist error `
-  + `R=${(worstRight * 100).toFixed(2)}cm L=${(worstLeft * 100).toFixed(2)}cm`
+  + `R=${(worstRight * 100).toFixed(2)}cm L=${(worstLeft * 100).toFixed(2)}cm; `
+  + `minimum receiver clearance right=${(leastReceiverRight * 100).toFixed(1)}cm `
+  + `ahead=${(leastReceiverAhead * 100).toFixed(1)}cm, `
+  + `lateral shoulder ratio=${leastShoulderRatio.toFixed(2)}x`
 );

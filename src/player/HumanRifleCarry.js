@@ -20,8 +20,8 @@ const BASE_ARM_REACH = 0.47268;
 // the receiver 10-16cm ABOVE the shoulders, drove the stock through the head,
 // and made both forearms cover the face. Keep low-ready below the shoulder and
 // let a full aim rise only to the shoulder pocket.
-const PATROL_OFFSET = new THREE.Vector3(0.12, -0.13, -0.29);
-const AIM_OFFSET = new THREE.Vector3(0.13, -0.05, -0.31);
+const PATROL_OFFSET = new THREE.Vector3(0.28, -0.13, -0.18);
+const AIM_OFFSET = new THREE.Vector3(0.28, -0.05, -0.20);
 
 // Idle third person is a low-ready carry, not a permanent 68% ADS pose. Export
 // the contract so the production controller and QA measure the same posture.
@@ -32,7 +32,7 @@ export const HUMAN_GRIP_LOCAL = new THREE.Vector3(0, -0.12, 0.10);
 // muzzle-side end of the authored handguard was 0.66–0.73m away while aiming,
 // leaving the visible palm up to 25.7cm off the rifle. Use the receiver-side
 // handguard: still ahead of the trigger grip, but reachable in every clip.
-export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, -0.04);
+export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, -0.16);
 // Wrist target on the left face of the common magazine, rather than its
 // bottom-centre. The X clearance places the palm around the mag body.
 export const HUMAN_MAG_LOCAL = new THREE.Vector3(-0.08, -0.15, 0.02);

@@ -842,7 +842,11 @@ function buildHeroBuffers(id) {
   // instead of being a one-sided sheet that disappears at a grazing angle.
   // Rigid to the chest — it hangs off the shoulders, and nothing below it is
   // load-bearing for the animation.
-  {
+  // Keep the cape as the Phantom's silhouette feature. It used to cover every
+  // chassis, including the default Vanguard, turning the normal rear gameplay
+  // view into one flat black rectangle and hiding the rifle/arm pose we need to
+  // read. Vanguard and Striker show their shaped back plate and waist instead.
+  if (id === 'phantom') {
     const CAPE = [
       { y: 1.492, rx: 0.104, rz: 0.086, n: 2.6, dz: 0.052 },
       { y: 1.400, rx: 0.140, rz: 0.100, n: 2.6, dz: 0.056 },
@@ -859,10 +863,10 @@ function buildHeroBuffers(id) {
     for (const s of [-1, 1])
       addPlate(buf('armor'), CAPE, 0, B.chest,
                { a0: BACK + s * 0.92, a1: BACK + s * 0.84, lift: 0.004, t: TRIM, seg: 2 });
+    // Collar: the clasp the cape hangs from, over the trapezius.
+    for (const s of [-1, 1])
+      addBox(buf('armor2'), 0.056, 0.040, 0.052, s * 0.088, 1.452, 0.072, B.chest);
   }
-  // Collar: the clasp the cape hangs from, over the trapezius.
-  for (const s of [-1, 1])
-    addBox(buf('armor2'), 0.056, 0.040, 0.052, s * 0.088, 1.452, 0.072, B.chest);
 
   // ── head: a crested helm, not a bare skull ─────────────────────────────────
   // The shell is the same skull loft — it is a good head shape — but finished as

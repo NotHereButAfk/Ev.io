@@ -1,6 +1,6 @@
 # KYX.IO QA Report
 
-Last executed: 2026-08-13
+Last executed: 2026-08-14
 
 This report records tests that were actually executed against the running game. Public EV.IO comparisons use only publicly observable pages, gameplay stills, and live behavior; unavailable values remain marked unknown.
 
@@ -130,7 +130,27 @@ This report records tests that were actually executed against the running game. 
 
 **Fix:** Rebased the rifle on the live shoulder midpoint, lowered idle to an 18% low-ready blend, moved the support contact onto the reachable receiver-side handguard, and kept both arms solved from the displayed weapon transform. Re-composed the first-person mount with a shared 0.18 rad pitch, 0.31 rad yaw, -0.10 rad roll, and lower camera-space origin.
 
-**Verification:** PASS. Across 48 real Soldier/armor/action states, both wrist errors are 0.00 cm and low-ready receiver clearance is 11.0-12.6 cm below the shoulder line. Twenty shipped first-person weapons pass 12 FOV/aspect frames plus ADS, sprint, reload, near-plane, glove, and 30/60/144 Hz checks. Live local first- and third-person captures visually confirm that the rifle no longer crosses the body or helmet. The full automated certificate remains 25/25.
+**Verification:** PASS. Across 48 real Soldier/armor/action states, both wrist errors are 0.00 cm; low-ready receiver clearance is 9.4-11.0 cm below, 18.2-21.3 cm ahead, and at least 1.03x outside the shoulder line. Twenty shipped first-person weapons pass 12 FOV/aspect frames plus ADS, sprint, reload, near-plane, glove, and 30/60/144 Hz checks. The full automated certificate remains 25/25.
+
+## BUG-008
+
+**Severity:** High
+
+**System:** Default player model / third-person rifle silhouette
+
+**Steps to reproduce:** Select the default Vanguard chassis, enter third person, and inspect the player from the normal rear camera plus front/three-quarter views while idle, running, aiming, reloading, throwing, crouching, and sliding.
+
+**Expected behavior:** The character reads as one rigged body with connected torso and limbs, weighted joint deformation, armor that wraps the body, and a rifle seated outside the right shoulder. The weapon must remain readable and the wrists must stay attached through actions.
+
+**Observed behavior:** The shipping factory selected the rigid `BlockBody` chassis. Its rectangular torso, pelvis, limb blocks, and hard seams read as separate parts placed on a mannequin. Its rifle origin was only 12.3-16.9 cm from the centerline, inside the 20.9 cm right shoulder, so the normal rear camera visually swallowed the receiver. The alternative weighted body also placed a large black cape on the default chassis, hiding its back and weapon.
+
+**Root cause:** The runtime builder pointed at the comparison block chassis even though the connected `HeroBody` was already implemented and fully gated. Rifle tests checked height and muzzle direction but did not assert lateral shoulder clearance on the production skinned body or exercise action states.
+
+**Files changed:** `src/player/LowPolyModels.js`, `src/player/HeroBody.js`, `src/player/RifleCarry.js`, `tools/mesh_check.mjs`, `tests/rifle-carry-reference.test.mjs`, `pose-lab.html`, `tools/capture_pose_lab.mjs`
+
+**Fix:** Ship the 11,078-vertex graded-weight Hero body for Vanguard/Striker/Phantom, keep the cape only on Phantom, move the receiver to the right shoulder pocket, and retarget the support hand to the reachable receiver-side handguard. The rigid block chassis remains available only for comparison/tooling.
+
+**Verification:** PASS. The runtime factory is gated to the connected Hero body. All vertices are weighted; no weights leak across legs; every tested surface faces outward; the 1.822 m figure matches the camera and human landmarks; feet remain grounded; and the knee preserves volume under a hard bend. Through idle, walk, run, aim up/down, reload, swap, and flinch, trigger-wrist error is 0.00 cm, support-rail error is 0.00 cm laterally, normal receiver clearance is 6.5 cm outside the shoulder, and action clearance never falls below 1.5 cm. Real-browser gameplay smoke passes with zero console/request failures, and the full automated certificate is 25/25 including the 64-player soak.
 
 ## Known product gaps, not falsely marked fixed
 
@@ -138,7 +158,7 @@ This report records tests that were actually executed against the running game. 
 - Capture the Flag has no flags.
 - King of the Hill has no hill.
 - Authoritative multiplayer is implemented but disabled by default; the standard shipped path is local bots.
-- Current public EV.IO disconnected from its game server in this QA browser session, so live movement/reload/damage timing could not be measured today.
+- The current public EV.IO spectator room loaded, but embedded pointer-lock restrictions prevented a controlled player-input trial; current movement/reload/damage timing remains unmeasured.
 - Human multiplayer feel, legal/provenance review, and production rollback still require human/external validation.
 
 ## Reproduction command
