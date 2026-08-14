@@ -7,6 +7,7 @@ import {
   applyHumanRifleCarry,
   HUMAN_GRIP_LOCAL,
   HUMAN_HANDGUARD_LOCAL,
+  HUMAN_LOW_READY_AIM,
   HUMAN_MAG_LOCAL,
 } from '../src/player/HumanRifleCarry.js';
 
@@ -46,7 +47,8 @@ for (const name of ['Idle', 'Walk', 'Run']) {
 // and recovery; a single idle-frame fixture would miss reach failures caused
 // by locomotion.
 const CASES = [
-  { name: 'low-ready',       clip: 'Idle', phase: 0.13, aim: 0.00 },
+  { name: 'low-ready',       clip: 'Idle', phase: 0.13, aim: HUMAN_LOW_READY_AIM,
+    lowReady: true },
   { name: 'aim',             clip: 'Idle', phase: 0.47, aim: 1.00 },
   { name: 'walk + aim',      clip: 'Walk', phase: 0.31, aim: 0.72, sway: 0.03 },
   { name: 'run + aim',       clip: 'Run',  phase: 0.69, aim: 0.62, sway: -0.03 },
@@ -148,6 +150,10 @@ function measure(spec, armorName, armor) {
     weapon.getWorldQuaternion(new THREE.Quaternion())
   );
   const muzzlePitch = Math.asin(THREE.MathUtils.clamp(muzzle.y, -1, 1));
+  const shoulderMid = worldPosition(rig.lArm).add(worldPosition(rig.rArm)).multiplyScalar(0.5);
+  const receiver = weapon.getWorldPosition(new THREE.Vector3());
+  body.worldToLocal(shoulderMid);
+  body.worldToLocal(receiver);
 
   return {
     name: `${armorName} ${spec.name}`,
@@ -159,6 +165,8 @@ function measure(spec, armorName, armor) {
     leftShoulderDistance,
     requestedPitch: spec.pitch || 0,
     muzzlePitch,
+    lowReady: spec.lowReady === true,
+    receiverBelowShoulders: shoulderMid.y - receiver.y,
   };
 }
 
@@ -167,6 +175,7 @@ const results = Object.entries(ARMORS).flatMap(([name, armor]) =>
 );
 const MAX_GRIP_ERROR = 0.008;
 const MAX_REACH_FRACTION = 0.9951;
+const MIN_LOW_READY_DROP = 0.060;
 let failures = 0;
 
 console.log('real soldier rifle carry (centimetres)');
@@ -179,14 +188,22 @@ for (const result of results) {
   const pitchOk = Math.abs(result.requestedPitch) < 0.01
     || (Math.sign(result.muzzlePitch) === Math.sign(result.requestedPitch)
         && Math.abs(result.muzzlePitch) > 0.25);
-  if (!rightOk || !leftOk || !leftReachOk || !rightReachOk || !pitchOk) failures++;
-  const marker = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk ? 'ok' : 'FAIL';
+  // This is the regression that put the receiver/stock through the face: wrist
+  // IK could still be numerically perfect while the whole weapon sat above the
+  // real Soldier's shoulders. The production idle pose must remain low-ready.
+  const heightOk = !result.lowReady || result.receiverBelowShoulders >= MIN_LOW_READY_DROP;
+  if (!rightOk || !leftOk || !leftReachOk || !rightReachOk || !pitchOk || !heightOk) failures++;
+  const marker = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk && heightOk
+    ? 'ok' : 'FAIL';
   console.log(
     `  ${marker.padEnd(5)} ${result.name.padEnd(17)}`
     + `${(result.rightError * 100).toFixed(2).padStart(6)}cm`
     + `${(result.leftError * 100).toFixed(2).padStart(9)}cm`
     + `  ${(result.leftShoulderDistance * 100).toFixed(1)}`
     + `/${(result.leftReach * 100).toFixed(1)}cm`
+    + (result.lowReady
+      ? `  receiver drop ${(result.receiverBelowShoulders * 100).toFixed(1)}cm`
+      : '')
   );
 }
 

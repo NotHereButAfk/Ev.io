@@ -18,12 +18,16 @@ import { mkdirSync } from 'fs';
 import { TPS_DEFAULT_DISTANCE } from '../src/player/ThirdPersonCamera.js';
 
 const URL = process.env.KYX_URL || 'http://127.0.0.1:5994/';
-const OUT = 'docs/screenshots';
+const OUT = process.env.KYX_SCREENSHOT_OUT || 'docs/screenshots';
 const VIEW = { width: 1280, height: 720 };
 
 const HIDE = `(() => {
   ['top-nav','nav-side','share-game','social-icons','center-play']
-    .forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    .forEach(id => {
+      const element = document.getElementById(id);
+      element?.classList.add('hidden');
+      element?.style.setProperty('display', 'none', 'important');
+    });
   const g = window.__game || window.game;
   if (g) g._menuOpen = false;
   return !!g;
@@ -37,9 +41,16 @@ const browser = await chromium.launch({
          '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: VIEW });
+// CI/local QA runs are intentionally offline. Abort the optional Google font
+// fetches so Playwright's screenshot font-readiness gate cannot wait forever.
+await page.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.abort());
 page.on('pageerror', (e) => console.warn('  page error:', e.message));
 
 const shot = async (name) => {
+  await page.evaluate(HIDE);
+  // Headless cannot own pointer lock. Let the rejection event finish reopening
+  // its chrome, then hide it once more so the captured frame is the live match.
+  await page.waitForTimeout(120);
   await page.evaluate(HIDE);
   await page.screenshot({ path: `${OUT}/${name}.png` });
   console.log('  ✓', name);
@@ -47,13 +58,14 @@ const shot = async (name) => {
 const pose = (js) => page.evaluate(`(() => { const g = window.__game || window.game; ${js} })()`);
 
 console.log('loading', URL);
-await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.goto(URL, { waitUntil: 'commit', timeout: 30000 });
+await page.waitForSelector('#play-btn', { state: 'attached', timeout: 30000 });
 await page.waitForTimeout(6000);
-await page.screenshot({ path: `${OUT}/menu.png` });        // chrome intentionally left in
-console.log('  ✓ menu');
+if (process.env.KYX_SKIP_MENU !== '1') {
+  await page.screenshot({ path: `${OUT}/menu.png` });      // chrome intentionally left in
+  console.log('  ✓ menu');
+}
 
-await page.evaluate(`document.querySelector('#auth-guest-btn')?.click()`);
-await page.waitForTimeout(2000);
 await page.evaluate(`document.querySelector('#play-btn')?.click()`);
 
 // GLBs take a while; wait for the HUD rather than guessing
@@ -66,7 +78,18 @@ for (let i = 0; i < 10; i++) {
 if (!inGame) { console.error('match never started'); await browser.close(); process.exit(1); }
 console.log('  in match');
 
-await pose(`g.weaponSystem.setLoadout('m4', 'sword'); g.player.position.set(0, 0, 22); g.player.yaw = Math.PI; g.player.pitch = -0.04;`);
+await pose(`
+  g.pickupSystem?.dispose();
+  g.pickupSystem = null;
+  g.botManager?.clear();
+  g.weaponSystem.setLoadout('m4', 'sword');
+  const spawn = (g.world.spawnPoints.find(p => p.y <= 3.1) || g.world.spawnPoints[0]).clone();
+  spawn.spawnYaw = g.world.spawnPoints.find(p => p.y <= 3.1)?.spawnYaw
+    ?? g.world.spawnPoints[0]?.spawnYaw;
+  g.player.respawn(spawn);
+  g.player.yaw = Number.isFinite(spawn.spawnYaw) ? spawn.spawnYaw : 0;
+  g.player.pitch = -0.04;
+`);
 await page.waitForTimeout(1200);
 await shot('first-person');
 
@@ -75,6 +98,11 @@ await shot('first-person');
 await pose(`g.player._camDist = ${TPS_DEFAULT_DISTANCE};`);
 await page.waitForTimeout(1200);
 await shot('third-person');
+if (process.env.KYX_CAPTURE_MODELS_ONLY === '1') {
+  await browser.close();
+  console.log('done →', OUT);
+  process.exit(0);
+}
 
 // Stand in front of a living bot and confirm it's actually on screen before
 // calling the shot "combat" — bots wander, so the naive placement often framed

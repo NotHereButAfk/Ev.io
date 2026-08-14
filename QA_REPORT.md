@@ -13,8 +13,8 @@ This report records tests that were actually executed against the running game. 
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
 - Production verification: PASS for commit `9c2757e` via deployment run `31757673148`; cache-busted `kryx.live` entered a match, rendered the Auto Rifle HUD at 50/200, and recorded zero error/warning logs.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
-- Browser smoke measurements on independent deterministic open-lane trials: walk 1.20 m in 0.9 s, sprint 2.09 m in 0.9 s, jump peak +4.41 m, Auto Rifle ammo 50 to 48 after firing.
-- Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload, reload-to-swap, swap back, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
+- Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
+- Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
 
 ## BUG-001
 
@@ -111,6 +111,26 @@ This report records tests that were actually executed against the running game. 
 **Fix:** Route the request through a safe boundary that absorbs unsupported, wrong-document, and policy rejection paths while returning whether a request could be initiated.
 
 **Verification:** PASS. The GUI contract covers synchronous and asynchronous rejection shapes; both the locally served game and deployed commit `9c2757e` entered an embedded-browser match, rendered the Auto Rifle HUD at 50/200, and reported zero error/warning logs.
+
+## BUG-007
+
+**Severity:** High
+
+**System:** First- and third-person character/weapon posing
+
+**Steps to reproduce:** Equip a rifle, inspect the real Soldier from the front or front-three-quarter view, then inspect the first-person idle view at 16:9. Exercise idle, walk, run, sprint, aim, pitch, and reload.
+
+**Expected behavior:** The stock seats at the shoulder; the trigger hand remains on the pistol grip; the support hand remains on the handguard; the receiver stays clear of the head and upper torso; first-person hands move with the same weapon transform; locomotion and action layers do not detach the wrists.
+
+**Observed behavior:** The third-person receiver sat above the real Soldier's shoulder line, placing the stock and forearms through the helmet/face. Idle forced a 68% aim blend. First-person framing was too flat and right-shifted, making the hold read as a floating side grip.
+
+**Root cause:** Carry offsets were inherited from an older 2.2 m procedural body but applied to the 1.8 m rigged Soldier. The controller also forced a near-ADS idle pose. First-person lacked the final yaw/roll and vertical composition needed to make the authored grip contacts readable.
+
+**Files changed:** `src/player/HumanRifleCarry.js`, `src/player/HumanSoldier.js`, `src/weapons/WeaponSystem.js`, `tools/human_rifle_carry_check.mjs`, `tools/viewmodel_check.mjs`, `human-pose-lab.html`, `viewmodel-pose-lab.html`
+
+**Fix:** Rebased the rifle on the live shoulder midpoint, lowered idle to an 18% low-ready blend, moved the support contact onto the reachable receiver-side handguard, and kept both arms solved from the displayed weapon transform. Re-composed the first-person mount with a shared 0.18 rad pitch, 0.31 rad yaw, -0.10 rad roll, and lower camera-space origin.
+
+**Verification:** PASS. Across 48 real Soldier/armor/action states, both wrist errors are 0.00 cm and low-ready receiver clearance is 11.0-12.6 cm below the shoulder line. Twenty shipped first-person weapons pass 12 FOV/aspect frames plus ADS, sprint, reload, near-plane, glove, and 30/60/144 Hz checks. Live local first- and third-person captures visually confirm that the rifle no longer crosses the body or helmet. The full automated certificate remains 25/25.
 
 ## Known product gaps, not falsely marked fixed
 

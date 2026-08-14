@@ -4,11 +4,9 @@ import * as THREE from 'three';
 // body-local -Z, so AIM is nearly identity. PATROL is the high, close
 // combat-ready carry visible in ev.io's official third-person material: stock
 // at the shoulder, receiver at the upper chest, muzzle only slightly lowered.
-const PATROL_POS = new THREE.Vector3(0.175, 1.475, -0.300);
 const PATROL_Q = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(-0.160, 0.220, 0.200)
 );
-const AIM_POS = new THREE.Vector3(0.240, 1.538, -0.262);
 const AIM_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.020, 0, 0));
 
 // Assault/Idle shoulder midpoint after HumanSoldier's production UPRIGHT and
@@ -17,18 +15,27 @@ const AIM_Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.020, 0, 0))
 // body-space rifle behind while the shoulders move.
 const SHOULDER_REF = new THREE.Vector3(-0.05476, 1.37841, 0.04928);
 const BASE_ARM_REACH = 0.47268;
-const PATROL_OFFSET = PATROL_POS.clone().sub(SHOULDER_REF);
-const AIM_OFFSET = AIM_POS.clone().sub(SHOULDER_REF);
+// Receiver offsets from the live shoulder midpoint. The earlier values were
+// inherited from the old 2.2m procedural figure: on the 1.8m Soldier they put
+// the receiver 10-16cm ABOVE the shoulders, drove the stock through the head,
+// and made both forearms cover the face. Keep low-ready below the shoulder and
+// let a full aim rise only to the shoulder pocket.
+const PATROL_OFFSET = new THREE.Vector3(0.12, -0.13, -0.29);
+const AIM_OFFSET = new THREE.Vector3(0.13, -0.05, -0.31);
+
+// Idle third person is a low-ready carry, not a permanent 68% ADS pose. Export
+// the contract so the production controller and QA measure the same posture.
+export const HUMAN_LOW_READY_AIM = 0.18;
 
 export const HUMAN_GRIP_LOCAL = new THREE.Vector3(0, -0.12, 0.10);
 // The Mixamo support arm reaches 0.472m shoulder-to-wrist. A target at the
 // muzzle-side end of the authored handguard was 0.66–0.73m away while aiming,
 // leaving the visible palm up to 25.7cm off the rifle. Use the receiver-side
 // handguard: still ahead of the trigger grip, but reachable in every clip.
-export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.10, -0.02, 0.06);
+export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, -0.04);
 // Wrist target on the left face of the common magazine, rather than its
 // bottom-centre. The X clearance places the palm around the mag body.
-export const HUMAN_MAG_LOCAL = new THREE.Vector3(-0.10, -0.15, -0.02);
+export const HUMAN_MAG_LOCAL = new THREE.Vector3(-0.08, -0.15, 0.02);
 
 const V = Array.from({ length: 32 }, () => new THREE.Vector3());
 const Q = Array.from({ length: 12 }, () => new THREE.Quaternion());
