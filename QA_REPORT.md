@@ -11,7 +11,7 @@ This report records tests that were actually executed against the running game. 
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
-- Production verification: PASS for commit `f6df4b3` via deployment run `31789475181`; cache-busted `kryx.live` entered a match and captured both the corrected first-person rifle and connected third-person Hero body.
+- Production verification: PASS for full-mesh rifle fix `2fc47af` via deployment run `31791229196`; cache-busted `kryx.live` entered a match and captured both the first-person rifle and corrected third-person Hero carry.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -168,9 +168,9 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Root cause:** `tests/rifle-carry-reference.test.mjs` used an empty `Object3D`, and the pose lab deliberately returned no geometric penetration result for the merged Hero `SkinnedMesh`. Neither gate instantiated or sampled the actual production rifle geometry.
 
-**Files changed:** `src/player/RifleCarry.js`, `tools/rifle_body_clearance_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+**Files changed:** `src/player/RifleCarry.js`, `src/player/ThirdPersonCamera.js`, `tools/rifle_body_clearance_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
 
-**Fix:** Move the complete carry plane 12 cm forward, add a reachable outboard offset that increases for level/downward aim and swaps, apply the same clearance to the fresh-attachment transform, and retarget both arms from the final displayed transform. Add a release gate that transforms every vertex of the production Auto Rifle through the real carry states and tests it against conservative torso and shoulder volumes.
+**Fix:** Move the complete carry plane 12 cm forward, add a reachable outboard offset that increases for level/downward aim and swaps, apply the same clearance to the fresh-attachment transform, and retarget both arms from the final displayed transform. Move the gameplay camera from 0.38 m to a 0.55 m right-shoulder offset so the separated gun/forearm silhouette remains readable from the normal rear view. Add a release gate that transforms every vertex of the production Auto Rifle through the real carry states and tests it against conservative torso and shoulder volumes.
 
 **Verification:** PASS. Sixteen production poses now report 0.0 cm torso penetration and no more than 0.7 cm shoulder contact, below the 0.8 cm surface tolerance. Trigger-wrist and support-rail errors remain 0.00 cm laterally. Front, side, rear, run, aim, reload, and swap renders were inspected. Real-browser gameplay smoke passes with walk 6.20 m/s, sprint 10.85 m/s, jump +4.42 m, ammo 50→47, and zero console/request failures. The expanded release certificate passes 26/26 automated gates, including the 64-player soak.
 

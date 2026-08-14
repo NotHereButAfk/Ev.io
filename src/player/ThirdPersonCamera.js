@@ -4,7 +4,9 @@ export const TPS_DEFAULT_DISTANCE = 1.95;
 export const TPS_MAX_DISTANCE = 5.5;
 export const TPS_ZOOM_STEP = 0.7;
 export const TPS_WALL_CLEARANCE = 0.55;
-export const TPS_SHOULDER_OFFSET = 0.38;
+// Far enough over the firing shoulder that the weapon/forearms remain readable
+// instead of stacking behind the torso in the normal rear gameplay view.
+export const TPS_SHOULDER_OFFSET = 0.55;
 export const TPS_CAMERA_HEIGHT = 1.52;
 
 // EV-style combat framing: the camera sits over the right shoulder and looks
