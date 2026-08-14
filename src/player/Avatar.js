@@ -27,6 +27,10 @@ import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 // fastest anyone moves is a 9.6 m/s sprint, which is 0.16m per frame at 60Hz
 // and under 0.5m even on a badly stuttering one.
 const TELEPORT_STEP = 3.0;    // metres
+// Shared frame-local scratch for resolved travel direction. Remote avatars are
+// updated sequentially, so one module vector avoids a per-avatar allocation
+// without leaking state between them.
+const _v = new THREE.Vector3();
 
 export class Avatar {
   /**

@@ -27,6 +27,10 @@ const bridge = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.u
 ok('authoritative enemies render a health bar', /np-bar-fg/.test(bridge) && /healthFg\.style\.width/.test(bridge));
 ok('authoritative bots are honestly labelled', /botBadge\.hidden = !r\.isBot/.test(bridge));
 
+const avatar = readFileSync(new URL('../src/player/Avatar.js', import.meta.url), 'utf8');
+ok('remote directional animation owns its scratch vector',
+  /const _v = new THREE\.Vector3\(\)/.test(avatar) && /_v\.copy\(s\.position\)/.test(avatar));
+
 const game = readFileSync(new URL('../src/core/Game.js', import.meta.url), 'utf8');
 ok('authoritative join does not spawn a duplicate local roster', /if \(expectsAuth\)[\s\S]*?botManager\.clear\(\)[\s\S]*?serverSim\.stop\(\)/.test(game));
 

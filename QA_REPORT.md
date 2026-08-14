@@ -235,6 +235,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS locally. The roster contract test proves the three playable ids, all four legacy migrations, connected-body construction, and shared bot/remote imports. The live-browser roster capture renders seven armed bots as Vanguard/Striker/Phantom only. The exact Hero body passes all 17 firearms across 272 carry/action poses with 0.0 cm torso penetration, at most 0.6 cm shoulder contact, and both wrists on their targets. Gameplay smoke completes movement, ADS, fire, reload, swap, abilities, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. The expanded release certificate passes 27/27 automated gates. Production verification is pending deployment of this change.
 
+## BUG-013
+
+**Severity:** High
+
+**System:** Authoritative remote-player locomotion presentation
+
+**Steps to reproduce:** Enter a deployed authoritative match with remote players present and let a remote avatar move far enough to enter its directional gait calculation.
+
+**Expected behavior:** Remote avatars walk, strafe, and backpedal through the same connected-body locomotion and firearm-carry path without interrupting the render loop.
+
+**Observed behavior:** The cache-busted production verification of `efd701a` reached the corrected roster, then repeatedly raised `ReferenceError: _v is not defined` while remote snapshots were animated.
+
+**Root cause:** `Avatar.update()` used a module scratch vector while calculating resolved travel direction, but that vector was never declared. Local bot smoke did not execute `Avatar`'s authoritative-peer movement branch.
+
+**Files changed:** `src/player/Avatar.js`, `tools/net_presentation_check.mjs`, `QA_REPORT.md`
+
+**Fix:** Declare the frame-local `THREE.Vector3` scratch object used by remote directional animation, and add a network-presentation regression gate that requires both its ownership and use.
+
+**Verification:** PASS locally. The expanded network-presentation gate passes 8/8 checks and the production build compiles. Cache-busted production verification is pending deployment of this follow-up.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.
