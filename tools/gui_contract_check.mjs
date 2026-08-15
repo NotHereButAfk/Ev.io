@@ -90,7 +90,10 @@ requireMatch(css, /\.ml-ad[^}]*width:\s*min\(720px,\s*56\.25vw\)[^}]*height:\s*9
 if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand|ml-progress/.test(index)) {
   failures.push('loading screen has no extra branding or progress stripe');
 }
-requireMatch(game, /Promise\.allSettled\(\[Promise\.resolve\(this\.world\.ready\)/, 'loading waits for map');
+const bootSequence = game.match(/async _runConnectSequence\(\)[\s\S]*?\n  }\n\n  \/\/ The website boot/)?.[0] || '';
+if (/world\.ready/.test(bootSequence)) failures.push('game boot does not wait for the first map');
+requireMatch(game, /async _runMapIntro\(\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?await this\.world\.ready[\s\S]*?_finishMapLoading\(1800\)/,
+  'initial map loader is distinct and readiness-bound');
 requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
 requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');

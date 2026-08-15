@@ -276,6 +276,46 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. All 17 firearms pass 272 production poses with 0.0 cm torso penetration, at most 0.6 cm contact against the expanded pauldron envelope, no surface behind the body plane, and both wrists on the displayed targets. Gait, action, playable-roster, and authoritative-remote presentation gates pass. The complete release certificate is 27/27, including authoritative abuse coverage and the 64-player soak. Real-browser gameplay smoke passes movement, look/ADS, fire, reload, swap, blink, grenades, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. A dedicated browser visual captures clean front, three-quarter, and side views. Commit `7d6d845` deployed successfully in run `31854196098`; a cache-busted `kryx.live` match reached the live 8/8-player HUD and captured both the clear first-person Auto Rifle and the connected Vanguard third-person carry.
 
+## BUG-015
+
+**Severity:** Medium
+
+**System:** Initial game/map loading flow
+
+**Steps to reproduce:** Open the game on a fresh page load and watch the transition from the black connection screen to the main menu.
+
+**Expected behavior:** As publicly observable on EV.IO, game/runtime startup is one stage and arena loading is a second stage. The map card should appear after the connection screen, identify the selected arena, remain readable while the arena becomes ready, and only then reveal the menu.
+
+**Observed behavior:** The connection screen awaited `world.ready`, so it silently performed the first arena load itself. `_runMapIntro()` then explicitly skipped the map card, causing the initial visit to jump directly from the black connection screen to the menu. Only later map rotations displayed the arena loader.
+
+**Root cause:** `_runConnectSequence()` mixed application boot with first-map readiness, while `_runMapIntro()` had no loading-screen lifecycle of its own.
+
+**Files changed:** `src/core/Game.js`, `index.html`, `tools/gui_contract_check.mjs`, `tools/startup_loading_check.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Keep the first screen scoped to renderer, local systems, soldier, and weapon startup. Once it fades, immediately show the selected map card without an automatic timer, await the real `world.ready` promise, enforce a readable 1.8-second minimum, fade the map card, and only then initialize the menu. Later map-change behavior remains unchanged.
+
+**Verification:** PASS locally. The dedicated system-Chrome startup test observed the strict order game boot (3,577 ms) â†’ DAYTIME ROOK map loader (2,496 ms) â†’ menu. The source contract prevents the boot stage from awaiting `world.ready` and requires the initial map loader to be readiness-bound. Production verification will be recorded after deployment.
+
+## BUG-016
+
+**Severity:** Medium
+
+**System:** Between-game map rotation and loading lifecycle
+
+**Steps to reproduce:** Finish a game, let the leaderboard countdown expire (or invoke its restart action twice quickly), and observe the arena card and next match map.
+
+**Expected behavior:** Every completed local game advances exactly once to the next imported arena. The loading card remains visible until the new geometry/collision is ready and for a readable minimum duration, then the next game starts. Connected authoritative games must use the server-selected arena.
+
+**Observed behavior:** Map selection already used `nextImportedMapId`, but its regression only exercised the registry/world loader rather than the actual `Game._restart()` path. The between-round card used unrelated 2.6/3.3-second auto-hide timers and `_startGame()` could hide it immediately after a fast load. Duplicate restart calls could also overlap, and stale disconnected network map state was eligible to override local rotation.
+
+**Root cause:** Map loading visibility was timer-owned instead of readiness-owned; restart had no in-flight guard; authoritative map IDs were not gated by live connection state.
+
+**Files changed:** `src/core/Game.js`, `tools/map_rotation_check.mjs`, `tools/startup_loading_check.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Make `_activateMap()` show a non-auto-hiding card, await the real map load, enforce the same 1.8-second minimum, and cleanly hide it on either success or failure. Serialize restart calls, ignore disconnected network map IDs, and preserve server ownership when a live authoritative session provides the next arena.
+
+**Verification:** PASS locally. The real system-Chrome lifecycle test starts a game, shows the completed-game leaderboard path, invokes the production restart method, observes `daytime-rook` change to `winter-graveyard`, and verifies the next state is `playing` with no loader left over. Three-lap client map loading, GPU disposal, server round rotation, gameplay smoke, and zero-error browser checks pass.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.

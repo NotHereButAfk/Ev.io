@@ -12,6 +12,18 @@ import {
   nextImportedMapId,
 } from '../src/world/MapRegistry.js';
 
+const gameSource = await readFile(new URL('../src/core/Game.js', import.meta.url), 'utf8');
+assert.match(
+  gameSource,
+  /async _restartOnNextMap\(\)[\s\S]*?nextImportedMapId\(this\.world\.currentMapId\)/,
+  'completed local games must advance through the imported-map rotation',
+);
+assert.match(
+  gameSource,
+  /async _activateMap\(mapId\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?await this\.world\.loadMap\(mapId\)[\s\S]*?await this\._finishMapLoading\(1800\)/,
+  'between-game map loading must be readiness-bound and readable',
+);
+
 // TextureLoader expects a browser image. The rotation gate validates geometry,
 // collision, teardown, and authority, so a tiny immediately-loaded image is
 // enough to decode the real embedded-map materials under Node.

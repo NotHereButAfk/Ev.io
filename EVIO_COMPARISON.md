@@ -1,12 +1,14 @@
 # Public EV.IO Comparison
 
-Last checked: 2026-08-14
+Last checked: 2026-08-15
 
 Legend: PASS = matching observable contract; PARTIAL = close or partially verified; NO = incorrect/incomplete; UNKNOWN = current EV.IO value unavailable.
 
 | Mechanic | Public EV.IO observation | KYX.IO measured/observed | Status | Difference / evidence |
 |---|---|---|---|---|
 | Game entry | Public site exposes `CLICK TO PLAY` and immediate browser play | Guest entry and play button boot a match in the browser smoke | PASS | Same low-friction observable flow |
+| Startup loading sequence | Public EV.IO first presents `Connecting ...`, then identifies/builds the arena before exposing the game interface | Black game boot is followed by a distinct DAYTIME ROOK map card; browser measured 3,577 ms boot, 2,496 ms map stage, then menu | PASS | Separate game and map readiness stages are now explicit and regression-tested |
+| Between-game map rotation | EV.IO rounds transition through an arena-loading stage before the next match | A completed local game advanced Daytime Rook â†’ Winter-Graveyard in the real browser, waited for readiness, then entered the next game; imported maps wrap continuously | PASS | Authoritative sessions still accept the server-selected next map to prevent client/server collision desync |
 | First-person weapon hold | Public gameplay stills show a compact diagonal rifle from lower right, with hands attached at the grip/handguard | Corrected shared mount: 0.18 rad pitch, 0.31 rad yaw, -0.10 rad roll, 0.76 scale; hands inherit the same transform | PARTIAL | Hold is mechanically correct and similarly readable; KYX model/skin remains intentionally original |
 | Third-person model and firearm carry | Public character material shows a connected animated figure and a shouldered firearm with the head/chest readable | Vanguard, Striker, and Phantom are the single playable body family for the local player, all seven bots, and authoritative remotes. Oversized showcase-authored meshes are corrected to one fixed physical world envelope (not scaled by character); the shared carry plane then uses measured stock/receiver bounds so the buttpad stays ahead of the full pauldron/body plane and both hands follow the corrected displayed grip surfaces. All 17 firearms pass 272 carry/action poses with 0.0 cm torso penetration and at most 0.6 cm expanded-shoulder contact | PASS | Mechanical modeling/pose contract matches; KYX art remains intentionally original. Three-angle browser captures now guard the visible silhouette as well as the numerical rig |
 | Walk | Controlled current EV.IO timing unavailable | Browser peak 6.20 m/s; direction, foot-plant, and connected-body locomotion gates pass | UNKNOWN | Need a controlled current EV.IO match for equivalent timing |

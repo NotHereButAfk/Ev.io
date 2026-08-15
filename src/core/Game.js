@@ -313,11 +313,11 @@ export class Game {
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const minimumDisplay = delay(2600);
 
-    setBoot(12, 'INITIALIZING ARENA', 'Renderer online');
+    setBoot(12, 'INITIALIZING GAME', 'Renderer online');
     await delay(120);
-    setBoot(30, 'STREAMING ARENA', 'Loading environment geometry');
-    await Promise.allSettled([Promise.resolve(this.world.ready), delay(350)]);
-    setBoot(68, 'PREPARING COMBAT', 'Building navigation and collision');
+    setBoot(30, 'LOADING GAME', 'Preparing local systems');
+    await delay(350);
+    setBoot(68, 'PREPARING COMBAT', 'Loading player and weapon rigs');
     // Optional CDN art continues loading in the background. A slow model host
     // must never trap the player on the boot screen for five seconds.
     await Promise.race([
@@ -335,15 +335,19 @@ export class Game {
     this._runMapIntro();
   }
 
-  // Finish the preview world before revealing the menu. Do not show the match
-  // loading card here: this is only the website boot, not a server map change.
+  // The website boot and first arena load are deliberately separate stages.
+  // Show the map card before awaiting the arena, and keep it visible long
+  // enough to read even when the map was cached during the boot sequence.
   async _runMapIntro() {
+    this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
     try {
       const map = await this.world.ready;
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
+      await this._finishMapLoading(1800);
     } catch (error) {
       console.error('[map] imported map failed to load', error);
+      this._hideMapLoading();
       return;
     }
     this._initAuth();
@@ -1092,7 +1096,7 @@ export class Game {
     this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), Math.max(0, 1800 - elapsed));
   }
 
-  _showMapLoading(modeId, mapId = this.world.currentMapId) {
+  _showMapLoading(modeId, mapId = this.world.currentMapId, { autoHide = true } = {}) {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const map = getImportedMap(mapId);
@@ -1122,14 +1126,32 @@ export class Game {
     if (tip) tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
 
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
+    this._mapLoadingShownAt = performance.now();
     el.classList.remove('hidden', 'ml-fade');
-    this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
-    this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
+    if (autoHide) {
+      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
+      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
+    }
+  }
+
+  async _finishMapLoading(minimumDisplayMs = 0) {
+    const el = document.getElementById('map-loading');
+    if (!el) return;
+    const sequence = this._mapLoadingSequence;
+    const elapsed = performance.now() - (this._mapLoadingShownAt || 0);
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    await delay(Math.max(0, minimumDisplayMs - elapsed));
+    if (sequence !== this._mapLoadingSequence) return;
+    el.classList.add('ml-fade');
+    await delay(650);
+    if (sequence === this._mapLoadingSequence) el.classList.add('hidden');
   }
 
   _hideMapLoading() {
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
+    this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     document.getElementById('map-loading')?.classList.add('hidden');
   }
 
@@ -1184,24 +1206,41 @@ export class Game {
     }
     this.pickupSystem?.dispose();
     this.pickupSystem = null;
-    this._showMapLoading(this._mode?.id || 'deathmatch', mapId);
-    const map = await this.world.loadMap(mapId);
-    this._configureMapCamera(map);
-    this.previewCharacter.position.copy(this.world.previewPedestalPos);
-    if (this.state === 'playing') {
-      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+    this._showMapLoading(this._mode?.id || 'deathmatch', mapId, { autoHide: false });
+    try {
+      const map = await this.world.loadMap(mapId);
+      this._configureMapCamera(map);
+      this.previewCharacter.position.copy(this.world.previewPedestalPos);
+      if (this.state === 'playing') {
+        this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+      }
+      await this._finishMapLoading(1800);
+      this._pendingMapId = null;
+      return map;
+    } catch (error) {
+      this._pendingMapId = null;
+      this._hideMapLoading();
+      throw error;
     }
-    this._pendingMapId = null;
-    return map;
   }
 
   async _restart() {
+    if (this._restartInFlight) return this._restartInFlight;
+    this._restartInFlight = this._restartOnNextMap();
+    try {
+      return await this._restartInFlight;
+    } finally {
+      this._restartInFlight = null;
+    }
+  }
+
+  async _restartOnNextMap() {
     this._saveStats();
     this.hud.hideLeaderboard();
     this.menu.hideGameOver();
     const authoritativeMapId = this._pendingMapId
-      || this._authNet?.client?.mapId
-      || this.net?.mapId;
+      || (this._authNet?.ready ? this._authNet.client?.mapId : null)
+      || (this.net?.connected ? this.net.mapId : null);
     const nextMapId = authoritativeMapId
       || nextImportedMapId(this.world.currentMapId);
     try {
