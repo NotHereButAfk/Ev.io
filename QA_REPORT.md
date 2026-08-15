@@ -1,6 +1,6 @@
 # KYX.IO QA Report
 
-Last executed: 2026-08-14
+Last executed: 2026-08-15
 
 This report records tests that were actually executed against the running game. Public EV.IO comparisons use only publicly observable pages, gameplay stills, and live behavior; unavailable values remain marked unknown.
 
@@ -14,6 +14,7 @@ This report records tests that were actually executed against the running game. 
 - Production verification: PASS for the Hero full-arsenal correction `e39c657` (run `31793165892`), loaded-Soldier correction `9b2fd97` (run `31797011674`), and late-loading fallback correction `62846c0` (run `31798425052`). A cache-busted Assault match on `kryx.live` captured both first- and third-person frames from the deployed runtime; the final frame is the rigged Soldier with its Auto Rifle outside the torso.
 - Current roster correction: PASS in production. Commit `efd701a` deployed in run `31802937487`; the remote-animation follow-up `fed1d52` deployed in run `31803945570`. A cache-busted `kryx.live` match seeded with an old saved Assault id migrated to the connected Vanguard body and captured first- and third-person frames with zero page errors.
 - Current firearm/body correction: PASS in production. Commit `7d6d845` deployed successfully in run `31854196098`; a cache-busted `kryx.live` match reached the 8/8-player HUD and captured the deployed Auto Rifle in first person and the connected Vanguard carry in third person.
+- Current loading/rotation correction: PASS in production for the startup flow. Commit `b6c7d8c` deployed successfully in run `31886365217`; cache-busted `kryx.live` showed the black game loader, then DAYTIME ROOK for 2,357 ms, then the menu with zero page errors. The completed-game Daytime Rook â†’ Winter-Graveyard transition passed in the real local browser against the identical deployed tree.
 - First-party requests: PASS, zero failures during the smoke. Google Fonts is optional and was blocked by the restricted QA network; local fallbacks rendered.
 - Browser smoke measurements: walk peak 6.20 m/s, sprint peak 10.85 m/s, jump peak +4.42 m, and live firearm ammo consumption.
 - Exercised: guest entry, match start, W movement, sprint, jump, rapid mouse look, ADS enter/exit, overlapping diagonal-air-fire input, reload start/completion, gun-to-melee-to-gun swap, blink, frag and smoke grenades, scoreboard open/close, authoritative death presentation, lethal damage during reload/ability cooldown, automatic respawn, and kill-plane recovery.
@@ -294,7 +295,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Keep the first screen scoped to renderer, local systems, soldier, and weapon startup. Once it fades, immediately show the selected map card without an automatic timer, await the real `world.ready` promise, enforce a readable 1.8-second minimum, fade the map card, and only then initialize the menu. Later map-change behavior remains unchanged.
 
-**Verification:** PASS locally. The dedicated system-Chrome startup test observed the strict order game boot (3,577 ms) â†’ DAYTIME ROOK map loader (2,496 ms) â†’ menu. The source contract prevents the boot stage from awaiting `world.ready` and requires the initial map loader to be readiness-bound. Production verification will be recorded after deployment.
+**Verification:** PASS in production. The dedicated system-Chrome startup test observed the strict order game boot (3,577 ms) â†’ DAYTIME ROOK map loader (2,496 ms) â†’ menu. Commit `b6c7d8c` deployed successfully in run `31886365217`; a cache-busted `kryx.live` load repeated game boot â†’ DAYTIME ROOK (2,357 ms) â†’ menu with the boot hidden during the map stage and zero page errors.
 
 ## BUG-016
 
@@ -314,7 +315,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Make `_activateMap()` show a non-auto-hiding card, await the real map load, enforce the same 1.8-second minimum, and cleanly hide it on either success or failure. Serialize restart calls, ignore disconnected network map IDs, and preserve server ownership when a live authoritative session provides the next arena.
 
-**Verification:** PASS locally. The real system-Chrome lifecycle test starts a game, shows the completed-game leaderboard path, invokes the production restart method, observes `daytime-rook` change to `winter-graveyard`, and verifies the next state is `playing` with no loader left over. Three-lap client map loading, GPU disposal, server round rotation, gameplay smoke, and zero-error browser checks pass.
+**Verification:** PASS on the deployed tree. The real system-Chrome lifecycle test starts a game, shows the completed-game leaderboard path, invokes the production restart method, observes `daytime-rook` change to `winter-graveyard`, and verifies the next state is `playing` with no loader left over. Three-lap client map loading, GPU disposal, server round rotation, gameplay smoke, and zero-error browser checks pass. Commit `b6c7d8c` deployed successfully in run `31886365217`; the live initial map-loading lifecycle was reverified after deployment.
 
 ## Known product gaps, not falsely marked fixed
 
