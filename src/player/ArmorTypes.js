@@ -1,20 +1,20 @@
 export const ARMOR_TYPES = [
   {
     id: 'vanguard',
-    name: 'VANGUARD',
-    desc: 'Graphite arena exosuit — segmented shell, cyan optics',
+    name: 'SHINOBI',
+    desc: 'Smoke-black tactical shinobi — light plates, cyan optics',
     icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z',
   },
   {
     id: 'striker',
-    name: 'CRYO HUNTER',
-    desc: 'Steel-blue infiltrator cyborg — cyan optics',
+    name: 'FROST RONIN',
+    desc: 'Steel-blue infiltration shinobi — cyan optics',
     icon: 'M16 5 L11 8 L12 21 L20 21 L21 8 Z',
   },
   {
     id: 'phantom',
     name: 'NIGHTSTALKER',
-    desc: 'Blacked-out graphite cyborg — red optics',
+    desc: 'Blacked-out shadow shinobi — red optics',
     icon: 'M16 5 L12 9 L13 21 L19 21 L20 9 Z',
   },
 ];

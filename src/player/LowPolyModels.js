@@ -140,12 +140,12 @@ const PALETTES = {
   // Neutral hard-surface blocks tie the default chassis to Rook's warm concrete
   // and graphite architecture; cyan is reserved for optics and small status
   // marks so the body stays readable without looking self-illuminated.
-  vanguard: { armor: 0x6f7679, armor2: 0xb7b9b5, frame: 0x242a2d, joint: 0x101417,
-              steel: 0x555d61, bone: 0x969b99, glow: 0x65c8d4, bulk: 1.00 },  // arena graphite
-  striker:  { armor: 0x2478d4, armor2: 0xe4edf5, frame: 0x171b22, joint: 0x090b0f,
-              steel: 0x69707d, bone: 0xc7cfd9, glow: 0x2ff0d8, bulk: 0.96 },  // azure
-  phantom:  { armor: 0x3d3a4d, armor2: 0xdedbe6, frame: 0x141319, joint: 0x08080b,
-              steel: 0x6a6775, bone: 0xc9c6d2, glow: 0xff3d5e, bulk: 0.92 },  // graphite
+  vanguard: { armor: 0x394248, armor2: 0x899398, frame: 0x171d20, joint: 0x090c0e,
+              steel: 0x293237, bone: 0x58646a, glow: 0x65d9e6, bulk: 0.94 },  // smoke shinobi
+  striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
+              steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
+  phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
+              steel: 0x302d3c, bone: 0x554f62, glow: 0xff3d5e, bulk: 0.88 },  // night shinobi
 };
 
 

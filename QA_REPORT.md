@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-020
+
+**Severity:** Medium
+
+**System:** Playable character silhouette and armor art direction
+
+**Steps to reproduce:** View Vanguard, Striker, or Phantom from the front, side, and rear in a live third-person match or the production pose renderer.
+
+**Expected behavior:** The original KYX character should lean toward a lightweight futuristic ninja: a slim athletic outline, close tactical armor, a masked hood, a narrow eye opening, and restrained cloth details. The design must preserve human proportions, weighted joint deformation, firearm contacts, hit registration, and rear weapon visibility.
+
+**Observed behavior:** The connected body was mechanically correct but its three broad shoulder lames, bright superhero chest crest, pale jaw block, and tall helmet crest still read as a bulky arena cyborg.
+
+**Root cause:** The first connected-body pass prioritized deformation and weapon clearance while retaining the older exosuit's hard-surface silhouette and palette.
+
+**Files changed:** `src/player/HeroBody.js`, `src/player/LowPolyModels.js`, `src/player/ArmorTypes.js`, `tools/mesh_check.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Pull all three chassis inward without moving their skeleton, replace the three-layer pauldrons with two close shoulder guards, narrow the chest plates and clasp, convert the helmet into a continuous dark hood/mask with a narrow luminous eye slit, and add a hood knot with two short chest-bound scarf tails. Rename the live loadout identities to Shinobi, Frost Ronin, and Nightstalker and move their palettes toward smoke, navy, and black-violet cloth-over-light-armor colors.
+
+**Verification:** PASS locally. All three connected bodies retain the 1.822 m human figure, animation bones, full skin weighting, outward-facing surfaces, planted soles, and valid headshot height. All 17 firearms still pass 272 production carry/action poses with 0.00 cm hand error, 0.0 cm torso penetration, and no more than 0.6 cm shoulder contact. M4 front, three-quarter, side, and rear renders show the slim shoulders, continuous mask, eye slit, and visible scarf tails with zero browser errors. Production deployment verification is pending this change's release.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.

@@ -482,7 +482,8 @@ export function buildHeroBody(id = 'vanguard') {
   }
 
   group.userData = {
-    isLowPoly: true, isHero: true, armorTypeId: id,
+    isLowPoly: true, isHero: true, isNinjaInspired: true,
+    silhouetteStyle: 'shinobi-operative', armorTypeId: id,
     // Headshots resolve by hit height, the way they already do for the rigged
     // human: a skinned body is a handful of merged meshes, so there is no
     // per-part head mesh left to tag. Measured off this skeleton — the skull
@@ -507,6 +508,13 @@ export function buildHeroBody(id = 'vanguard') {
 function buildHeroBuffers(id) {
   const pal = getLowPolyPalette(id);
   const bulk = pal.bulk ?? 1;
+  // The connected anatomy stays at the animation contract, while visible hard
+  // plates pull inward for a fast, cloth-over-light-armour shinobi silhouette.
+  // This helper is deliberately used only on rigid armour station tables: arm
+  // lengths, shoulder pivots, hit height, and the weapon IK never move.
+  const lightPlate = (st, radial = 0.86, depth = 0.91) => st.map(q => ({
+    ...q, rx: q.rx * radial, rz: q.rz * depth,
+  }));
 
   // One accumulator per material — the whole body ends up as a handful of
   // skinned draw calls instead of ~80 separate meshes.
@@ -671,16 +679,13 @@ function buildHeroBuffers(id) {
       { y: 1.722, rx: 0.091, rz: 0.092, n: 2.4 },
       { y: 1.766, rx: 0.060, rz: 0.062, n: 2.3 },
     ], mapArm), ax * 0.945, () => [[B.chest, 1]]), 18, buf('frame'));
-    // Pauldron: THREE lames, each one lower and wider than the one above it, so
-    // the shoulder steps down the arm instead of capping it with a single dome.
-    // The stack is what gives the silhouette its width — the shoulders read
-    // half again as broad as the hips, which is the whole shape of the figure.
-    // Each lame gets a light rim on its bottom edge: on a cel ramp an unlit
-    // plate edge vanishes, and without the rim three layers read as one lump.
+    // Low-profile overlapping shoulder guards. The former three broad exosuit
+    // lames made the character read like a heavy mech. These sit close to the
+    // deltoid so the arm can still shoulder every gun without becoming bulky.
     const px = ax * 0.945;
     const pa = out > 0 ? 0 : Math.PI;
     const lame = (st, half, t) => {
-      const T = xf(st, mapArm);
+      const T = xf(lightPlate(st), mapArm);
       addPlate(buf('bone'), T, px, B.chest,
                { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11, hard: 4.0 });
       addPlate(buf('armor2'), edgeStrip(T, 0.34, false), px, B.chest,
@@ -688,32 +693,24 @@ function buildHeroBuffers(id) {
                  lift: t * G, t: TRIM * G, seg: 11, hard: 4.0 });
       return T;
     };
-    lame([                                  // top cap, over the deltoid
+    lame([                                  // fitted top guard
       { y: 1.512, rx: 0.100, rz: 0.104, n: 2.5 },
       { y: 1.550, rx: 0.117, rz: 0.119, n: 2.5 },
       { y: 1.602, rx: 0.111, rz: 0.113, n: 2.5 },
       { y: 1.662, rx: 0.109, rz: 0.110, n: 2.6 },
       { y: 1.716, rx: 0.095, rz: 0.096, n: 2.6 },
       { y: 1.762, rx: 0.064, rz: 0.066, n: 2.4 },
-    ], 1.06, 0.030);
-    lame([                                  // middle lame
+    ], 0.88, 0.022);
+    lame([                                  // short lower guard
       { y: 1.512, rx: 0.104, rz: 0.108, n: 2.5 },
       { y: 1.548, rx: 0.124, rz: 0.126, n: 2.5 },
       { y: 1.592, rx: 0.129, rz: 0.131, n: 2.5 },
       { y: 1.642, rx: 0.125, rz: 0.126, n: 2.6 },
       { y: 1.692, rx: 0.114, rz: 0.115, n: 2.6 },
-    ], 1.12, 0.026);
-    lame([                                  // outer flare, the widest point
-      { y: 1.470, rx: 0.112, rz: 0.116, n: 2.5 },
-      { y: 1.502, rx: 0.136, rz: 0.139, n: 2.5 },
-      { y: 1.540, rx: 0.144, rz: 0.146, n: 2.5 },
-      { y: 1.586, rx: 0.139, rz: 0.140, n: 2.6 },
-    ], 1.16, 0.024);
-    // Accent burning on the outer face of the flare.
-    addBox(buf('glow'), 0.028 * G, 0.062 * G, 0.022 * G,
-           px + out * 0.150 * G, mapArm(1.546), -0.048 * G, B.chest);
-    addBox(buf('glow'), 0.04 * G, 0.04 * G, 0.03 * G,
-           px + out * 0.05 * G, mapArm(1.630), -0.088 * G, B.chest);
+    ], 0.94, 0.020);
+    // A single restrained shoulder status mark keeps team identity readable.
+    addBox(buf('glow'), 0.018 * G, 0.046 * G, 0.016 * G,
+           px + out * 0.105 * G, mapArm(1.570), -0.052 * G, B.chest);
 
     // Upper-arm plate. Without it the whole arm between pauldron and gauntlet is
     // bare underframe, and the figure reads sleeveless.
@@ -791,13 +788,13 @@ function buildHeroBuffers(id) {
   // grows the trunk and leaves its own chest plates buried inside it — the plate
   // is still there, it is just under the skin, and the chest reads as bare
   // underframe from every angle.
-  const CHEST = xf(scaled([
+  const CHEST = xf(lightPlate(scaled([
     { y: 1.450, rx: 0.148, rz: 0.107, n: 2.8 },
     { y: 1.505, rx: 0.164, rz: 0.115, n: 2.8 },
     { y: 1.565, rx: 0.176, rz: 0.119, n: 2.9 },
     { y: 1.618, rx: 0.176, rz: 0.117, n: 2.9 },
     { y: 1.660, rx: 0.164, rz: 0.110, n: 2.9 },
-  ], bulk), mapTorso);
+  ], bulk), 0.92, 0.94), mapTorso);
   for (const s of [-1, 1]) {
     addPlate(buf('armor'), CHEST, 0, B.chest,
              { a0: FRONT + s * 0.13, a1: FRONT + s * 1.34,
@@ -826,15 +823,9 @@ function buildHeroBuffers(id) {
   ], bulk), mapTorso), 0, B.chest,
     { a0: arc(BACK, 0.52)[0], a1: arc(BACK, 0.52)[1], t: 0.040 * G, seg: 6, hard: 3.8 });
 
-  // Sternum emblem. The chest plates leave a ±0.13rad gap down the midline for
-  // the frame to show through; the emblem sits in it and stands proud of both,
-  // which is why it is boxes and not another wrapped shell — a crest is applied
-  // to armour, it does not follow its curve.
-  addBox(buf('armor'),  0.104, 0.104, 0.030, 0, 1.352, -0.118, B.chest, Math.PI / 4);
-  addBox(buf('armor2'), 0.070, 0.070, 0.026, 0, 1.352, -0.128, B.chest, Math.PI / 4);
-  addBox(buf('glow'),   0.036, 0.036, 0.026, 0, 1.352, -0.136, B.chest, Math.PI / 4);
-  for (const s of [-1, 1])
-    addBox(buf('glow'), 0.012, 0.058, 0.018, s * 0.086, 1.318, -0.116, B.chest);
+  // Narrow chest clasp instead of a large superhero crest.
+  addBox(buf('steel'),  0.052, 0.092, 0.024, 0, 1.352, -0.118, B.chest);
+  addBox(buf('glow'),   0.016, 0.052, 0.018, 0, 1.352, -0.134, B.chest);
 
   // ── cape ───────────────────────────────────────────────────────────────────
   // A shell, not a plane: plateGeometry already builds a wrapped surface with
@@ -868,50 +859,39 @@ function buildHeroBuffers(id) {
       addBox(buf('armor2'), 0.056, 0.040, 0.052, s * 0.088, 1.452, 0.072, B.chest);
   }
 
-  // ── head: a crested helm, not a bare skull ─────────────────────────────────
-  // The shell is the same skull loft — it is a good head shape — but finished as
-  // armour: a dark visor band across the eye line with the optic burning through
-  // it, a swept crest along the midline, and cheek guards closing the jaw. Two
-  // tones on the shell (armour over the crown, trim on the brow and crest) so
-  // the helmet reads as built out of plates rather than moulded in one piece.
-  loftSkinned(place(domed(skullT, 0.55), 0, () => [[B.head, 1]]), 22, buf('armor'));
+  // ── head: wrapped tactical hood and mask ───────────────────────────────────
+  // The dark shell reads as cloth/undersuit rather than a glossy sci-fi helmet.
+  // A close crown wrap and narrow luminous eye slit retain distant readability.
+  loftSkinned(place(domed(skullT, 0.55), 0, () => [[B.head, 1]]), 22, buf('joint'));
   // Crown plate, hard-faced so the helm has flats and a temple corner rather
   // than being a bowl. Its trim is a band at the BROW, where a helmet's seam
   // actually is — a pale cap over the whole crown reads as a bald head.
   {
     const CROWN = skullT.slice(4).map(q => ({ ...q, z: q.dz }));
     const CA = { a0: -Math.PI, a1: Math.PI, seg: 22, hard: 3.8 };
-    addPlate(buf('bone'), CROWN, 0, B.head, { ...CA, t: 0.014 * G });
-    addPlate(buf('armor2'), edgeStrip(CROWN, 0.24, false), 0, B.head,
+    addPlate(buf('armor'), CROWN, 0, B.head, { ...CA, t: 0.014 * G });
+    addPlate(buf('steel'), edgeStrip(CROWN, 0.18, false), 0, B.head,
              { ...CA, lift: 0.014 * G, t: TRIM });
   }
   addPlate(buf('joint'), skullT.slice(3, 5).map(q => ({ ...q, z: q.dz })), 0, B.head,
            { a0: -Math.PI, a1: Math.PI, t: 0.012 * G, seg: 22, hard: 3.4 });
 
-  // Visor: a dark band sunk across the eye line, with the optic burning out of
-  // the middle of it.
-  addBox(buf('joint'), 0.200 * G, 0.072 * G, 0.060 * G, 0, mapHead(1.988), -0.100 * G, B.head);
-  addBox(buf('glow'),  0.150 * G, 0.026 * G, 0.030 * G, 0, mapHead(1.994), -0.126 * G, B.head);
-  for (const s of [-1, 1])
-    addBox(buf('glow'), 0.030 * G, 0.016 * G, 0.028 * G, (s * 0.082) * G, mapHead(1.978), -0.104 * G, B.head);
+  // Eye opening and lower face wrap. The slit is intentionally narrower than
+  // the old visor so the face reads masked rather than robotic.
+  addBox(buf('frame'), 0.188 * G, 0.052 * G, 0.052 * G, 0, mapHead(1.992), -0.104 * G, B.head);
+  addBox(buf('glow'),  0.126 * G, 0.014 * G, 0.024 * G, 0, mapHead(1.996), -0.132 * G, B.head);
+  addBox(buf('joint'), 0.174 * G, 0.112 * G, 0.056 * G, 0, mapHead(1.912), -0.082 * G, B.head);
 
-  // Crest — a fin swept back over the crown. Tapered slabs rather than one
-  // wedge, so the silhouette steps the way the plates elsewhere do.
-  for (let i = 0; i < 5; i++) {
-    const t0 = i / 4;
-    addBox(buf('armor'),
-           0.030 * G, (0.132 - 0.078 * t0) * G, (0.070 + 0.020 * t0) * G,
-           0, mapHead(2.126 + 0.026 * t0), (-0.075 + 0.086 * t0) * G, B.head);
-    addBox(buf('armor2'),
-           0.034 * G, (0.030 - 0.014 * t0) * G, (0.066 + 0.018 * t0) * G,
-           0, mapHead(2.176 + 0.010 * t0), (-0.075 + 0.086 * t0) * G, B.head);
-  }
-  addBox(buf('glow'), 0.016 * G, 0.070 * G, 0.036 * G, 0, mapHead(2.132), -0.082 * G, B.head);
+  // Hood knot and two short tails. They are chest-bound, so they move as one
+  // clean silhouette and cannot whip through the shouldered weapon.
+  addBox(buf('armor2'), 0.070 * G, 0.052 * G, 0.060 * G, 0, mapHead(1.960), 0.108 * G, B.head);
+  addBox(buf('joint'), 0.050 * G, 0.250 * G, 0.020 * G, -0.040 * G, mapTorso(1.710), 0.132 * G, B.chest, -0.10);
+  addBox(buf('joint'), 0.044 * G, 0.205 * G, 0.018 * G,  0.040 * G, mapTorso(1.720), 0.139 * G, B.chest,  0.13);
 
   // Cheek guards + chin plate close the jaw.
   for (const s of [-1, 1])
-    addBox(buf('armor'), 0.040 * G, 0.130 * G, 0.104 * G, (s * 0.088) * G, mapHead(1.932), -0.020 * G, B.head);
-  addBox(buf('armor2'), 0.118 * G, 0.052 * G, 0.056 * G, 0, mapHead(1.884), -0.086 * G, B.head);
+    addBox(buf('frame'), 0.040 * G, 0.130 * G, 0.104 * G, (s * 0.088) * G, mapHead(1.932), -0.020 * G, B.head);
+  addBox(buf('joint'), 0.118 * G, 0.052 * G, 0.056 * G, 0, mapHead(1.884), -0.086 * G, B.head);
   // Neck seal
   for (const s of [-1, 1])
     addBox(buf('steel'), 0.016 * G, 0.12 * G, 0.016 * G, (s * 0.048) * G, mapTorso(1.800), 0.036 * G, B.neck);
