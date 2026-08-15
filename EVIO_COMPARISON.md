@@ -25,6 +25,7 @@ Legend: PASS = matching observable contract; PARTIAL = close or partially verifi
 | Health/shield | EV.IO shows health/shield resources | 100 health; armor-dependent shield; damage and regeneration gates pass | PARTIAL | Exact public regeneration values unverified |
 | Collision/map bounds | EV.IO uses angular arena collision and kill volumes | Deterministic wall/ceiling/corner/fall fixtures, map topology, and spawn gates pass | PARTIAL | KYX map uses public Rook data, but feel needs human A/B play |
 | Match population | EV.IO displays multiplayer population | KYX displays 8/8 with seven bot slots by default | NO | Default shipped game is not equivalent public multiplayer |
+| Bot weapon behavior | Current EV.IO room advertised an 8-player Team Deathmatch; embedded pointer lock prevented a controlled opponent trial | Eight-slot local lobby now cycles M4, M16, Comet Rifle, LMG, and blade roles; ranged bots use weapon-specific damage/cadence/range/audio, finite magazines, and animated reload pauses | PARTIAL | KYX now exposes real weapon-role variety and reload counterplay; exact public EV.IO opponent loadouts and timings remain unmeasured |
 | Team Slayer | Public EV.IO has team modes | KYX menu entry currently runs deathmatch logic | NO | Teams not implemented |
 | Capture the Flag | Public EV.IO has CTF | No flags implemented | NO | Mode incomplete |
 | King of the Hill | Public EV.IO has objective modes | No hill implemented | NO | Mode incomplete |
@@ -34,7 +35,7 @@ Legend: PASS = matching observable contract; PARTIAL = close or partially verifi
 
 ## Current public reference limitation
 
-The public EV.IO page was re-opened on 2026-08-14. A current Team Deathmatch room and its live map spectator loaded; activating `CLICK TO PLAY` again hit the embedded Chromium pointer-lock limitation, so no controlled EV.IO player-input timings are presented as verified facts. Weapon framing uses public gameplay stills; the KYX acceptance target is anatomically correct holding and animation, not copied EV.IO model art.
+The public EV.IO page was re-opened on 2026-08-15. A current 8-player Team Deathmatch room on Resistance and its live map spectator loaded; activating `CLICK TO PLAY` again hit the embedded Chromium pointer-lock limitation, so no controlled EV.IO player-input timings are presented as verified facts. Weapon framing uses public gameplay stills; the KYX acceptance target is anatomically correct holding and animation, not copied EV.IO model art.
 
 ## Next comparison cycle
 

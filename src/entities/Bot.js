@@ -6,17 +6,13 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_TACTICS, advanceBurst, botAimErrorMeters, chooseCombatSteering } from './BotCombat.js';
+import { BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botLoadoutForId, chooseCombatSteering } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
 const _tmpB = new THREE.Vector3();
-
-// AR-type ranged stats — sword bots skip shooting entirely. The bot remains a
-// fair, imperfect shot; pressure comes from movement, pursuit and short bursts.
-const AR_GUN = { damage: 10, fireRate: 0.24, range: 26 };
 
 const DETECT_RADIUS = BOT_TACTICS.detectRadius;
 const ATTACK_RADIUS = BOT_TACTICS.meleeAttackDistance;
@@ -102,10 +98,12 @@ export class Bot {
     this.lungeTimer = 0;
     // The arena reads primarily as a firefight; a smaller sword cohort supplies
     // close-range disruption instead of turning every encounter into a mob.
-    this._isSwordBot  = Math.random() < 0.20;
+    this._botGun      = botLoadoutForId(this.id);
+    this._isSwordBot  = !this._botGun;
     this.speed = (this._isSwordBot ? 5.15 : 4.55) + Math.random() * 1.15;
-    this._botGun      = this._isSwordBot ? null : AR_GUN;
     this._gunTimer    = Math.random() * 0.8;
+    this._magAmmo     = this._botGun?.magSize || 0;
+    this._reloadTimer = 0;
     this._burstShots  = 2 + Math.floor(Math.random() * 3);
     // Per-bot marksmanship multiplier on the aim error. Rolling this per bot is
     // what makes some of them feel dangerous and others sloppy.
@@ -191,7 +189,7 @@ export class Bot {
     // branch remains only for direct development tooling.
     this._rig = this._isHuman ? null : rigCharacterLimbs(this.mesh);
 
-    const weaponId = this._isSwordBot ? 'sword' : 'm4';
+    const weaponId = this._isSwordBot ? 'sword' : this._botGun.id;
 
     // Human bots hold their weapon in the rigged right hand — same attach +
     // hold-pose animation as the player's third-person body. noHit keeps the
@@ -312,6 +310,8 @@ export class Bot {
     this._losCache = false;
     this._decisionT = 0;
     this._burstShots = 2 + Math.floor(Math.random() * 3);
+    this._magAmmo = this._botGun?.magSize || 0;
+    this._reloadTimer = 0;
     this._targetEntity = null;
     this._targetScanT = 0;
     if (this._isSwordBot) {
@@ -371,7 +371,7 @@ export class Bot {
       this._muzzleFlash.rotation.set(0, 0, Math.random() * Math.PI);
       this._muzzleFlash.scale.setScalar(0.75 + Math.random() * 0.6);
     }
-    if (this.audio) this.audio.playAt(this._shootFrom, () => this.audio.playShot('rifle'));
+    if (this.audio) this.audio.playAt(this._shootFrom, () => this.audio.playShot(this._botGun.sound));
 
     // ── The bullet is a real ray ───────────────────────────────────────────────
     // Scatter it inside the bot's aim cone, then see what it actually hits. This
@@ -498,6 +498,14 @@ export class Bot {
       this.bodyMat.emissiveIntensity = 0;
     }
 
+    // Bot weapons use finite magazines. The pause is both a fair combat window
+    // and a visible action because its progress feeds the shared carry rig.
+    if (this._reloadTimer > 0 && this._botGun) {
+      const magazine = advanceBotMagazine(this._magAmmo, this._reloadTimer, dt, this._botGun);
+      this._magAmmo = magazine.ammo;
+      this._reloadTimer = magazine.reloadRemaining;
+    }
+
     // Melee lunge timer — the swing is conveyed by the weapon thrust (weapon
     // animation block) rather than a whole-body scale "puff", which also freed
     // mesh.scale for the respawn materialize.
@@ -593,10 +601,13 @@ export class Bot {
       );
 
       // Ranged bots use short bursts only with a verified firing lane.
-      if (this._botGun && hasVisual && this._reactT <= 0 && distToPlayer < this._botGun.range) {
+      if (this._botGun && this._reloadTimer <= 0 && hasVisual && this._reactT <= 0 && distToPlayer < this._botGun.range) {
         this._gunTimer -= dt;
         if (this._gunTimer <= 0) {
           this._shootAt(player, onAttack, world);
+          const magazine = advanceBotMagazine(this._magAmmo, this._reloadTimer, 0, this._botGun, true);
+          this._magAmmo = magazine.ammo;
+          this._reloadTimer = magazine.reloadRemaining;
           const burst = advanceBurst(this._burstShots);
           this._burstShots = burst.shotsRemaining;
           this._gunTimer = this._botGun.fireRate * burst.delayScale;
@@ -798,7 +809,8 @@ export class Bot {
         vy: this._velY,
         crouch: 0,
         slide: 0,
-        reload: 0,
+        reload: this._reloadTimer > 0 && this._botGun
+          ? 1 - this._reloadTimer / this._botGun.reloadTime : 0,
         aim: !this._isSwordBot && (this._provoked || engaged) ? 1 : 0,
       });
       ud.mixer.update(dt);
@@ -875,6 +887,8 @@ export class Bot {
         // stride, _gunKick shoves it back and climbs the muzzle.
         applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
           swing: gait.swing, kick: this._gunKick,
+          reload: this._reloadTimer > 0
+            ? 1 - this._reloadTimer / this._botGun.reloadTime : 0,
           smooth: true,
         });
       } else {

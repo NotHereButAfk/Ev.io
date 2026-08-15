@@ -347,6 +347,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 - The current public EV.IO spectator room loaded, but embedded pointer-lock restrictions prevented a controlled player-input trial; current movement/reload/damage timing remains unmeasured.
 - Human multiplayer feel, legal/provenance review, and production rollback still require human/external validation.
 
+## BUG-018
+
+**Severity:** Medium
+
+**System:** Local bot arsenal and reload behavior
+
+**Steps to reproduce:** Enter the default eight-slot public match, inspect each bot's weapon, and keep a ranged bot engaged through several bursts.
+
+**Expected behavior:** Simulated opponents should expose distinct weapon roles and the same basic ammunition counterplay as the player. Their visible model, cadence, range, sound, and reload downtime should agree, and reloads should move the held weapon without detaching either hand or putting the gun through the body.
+
+**Observed behavior:** Every ranged bot was an M4 clone driven by one hard-coded profile. Bots had unlimited ammunition, never reloaded, and always emitted the rifle sound; most of the shipped arsenal therefore had no effect on opponent behavior.
+
+**Root cause:** `Bot.js` selected only `m4` or `sword`, while its combat profile omitted magazine size, reload time, weapon identity, and sound identity.
+
+**Files changed:** `src/entities/Bot.js`, `src/entities/BotCombat.js`, `tools/bot_combat_check.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Assign every five-bot squad a stable M4, M16, Comet Rifle, LMG, and blade pattern. Each ranged role now owns balanced damage, cadence, effective range, magazine size, reload duration, and shot sound. Empty magazines pause firing, refill only after the weapon-specific reload, and drive the same shared two-hand reload pose used by the corrected player-model carry.
+
+**Verification:** PASS locally. The bot combat gate proves the full lobby loadout pattern, actual empty-magazine reload transition, delayed refill, and completed refill. The browser lineup gate proves that one five-slot squad visibly contains M4, M16, Comet Rifle, LMG, and blade roles. All four ranged models pass the 272-pose firearm clearance suite with 0.0 cm torso penetration and at most 0.6 cm shoulder contact. The real-browser gameplay smoke completes movement, look/ADS, fire, reload, swap, blink, grenades, scoreboard, death, respawn, and kill-plane recovery with zero console or request failures. Production build and all 28/28 automated release gates pass; deployed-production verification is pending this change's release.
+
 ## Reproduction command
 
 ```powershell

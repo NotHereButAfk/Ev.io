@@ -107,14 +107,17 @@ try {
       isHero: !!bot.mesh.userData?.isHero,
       hasWeapon: !!bot._weaponMesh,
       isMelee: !!bot._isSwordBot,
+      weaponId: bot._isSwordBot ? 'sword' : bot._botGun?.id,
     }));
   });
 
   const allowed = new Set(['vanguard', 'striker', 'phantom']);
+  const firstSquadWeapons = new Set(roster.slice(0, 5).map((bot) => bot.weaponId));
   if (roster.length !== 7
       || roster.some((bot) => !allowed.has(bot.armorTypeId)
         || bot.isHuman || !bot.isHero || !bot.hasWeapon)
-      || roster.filter((bot) => !bot.isMelee).length < 3) {
+      || roster.filter((bot) => !bot.isMelee).length < 3
+      || ['m4', 'm16', 'rifle', 'lmg', 'sword'].some((id) => !firstSquadWeapons.has(id))) {
     throw new Error(`invalid rendered roster: ${JSON.stringify(roster)}`);
   }
   await page.waitForTimeout(500);
@@ -131,6 +134,12 @@ try {
     g.player.camera.position.set(0, 1.25, 4.2);
     g.player.camera.rotation.set(0, 0, 0);
     g.player.camera.updateMatrixWorld(true);
+    for (const id of ['connect-screen', 'map-loading', 'hud', 'top-nav', 'nav-side',
+      'share-game', 'social-icons', 'center-play']) {
+      const element = document.getElementById(id);
+      element?.classList.add('hidden');
+      element?.style.setProperty('display', 'none', 'important');
+    }
   });
   await page.screenshot({ path: output });
   console.log(`roster visual passed: ${roster.map((bot) => bot.armorTypeId).join(', ')} -> ${output}`);

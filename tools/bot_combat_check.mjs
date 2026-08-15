@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   BOT_TACTICS,
+  advanceBotMagazine,
   advanceBurst,
   botAimErrorMeters,
+  botLoadoutForId,
   combatTargetScore,
   chooseCombatSteering,
 } from '../src/entities/BotCombat.js';
@@ -55,6 +57,28 @@ assert.ok(pauseBurst.shotsRemaining >= 2 && pauseBurst.shotsRemaining <= 4);
 assert.equal(pauseBurst.burstPause, true);
 assert.ok(pauseBurst.delayScale > continueBurst.delayScale);
 console.log('ok   ranged fire uses short bursts with a readable pause');
+
+const lobbyLoadouts = Array.from({ length: 8 }, (_, i) => botLoadoutForId(i + 1));
+assert.equal(lobbyLoadouts.filter(Boolean).length, 7, 'eight-slot lobby should contain one blade bot');
+assert.deepEqual(lobbyLoadouts.slice(0, 5).map((w) => w?.id || 'sword'),
+  ['m4', 'm16', 'rifle', 'lmg', 'sword']);
+assert.ok(lobbyLoadouts.filter(Boolean).every((w) =>
+  w.magSize > 0 && w.reloadTime > 0 && w.damage > 0 && w.range > 0));
+console.log('ok   full lobby receives varied weapons with finite magazines and reloads');
+
+const rifleRole = botLoadoutForId(1);
+let magazine = { ammo: rifleRole.magSize, reloadRemaining: 0 };
+for (let i = 0; i < rifleRole.magSize; i++) {
+  magazine = advanceBotMagazine(magazine.ammo, magazine.reloadRemaining, 0, rifleRole, true);
+}
+assert.equal(magazine.ammo, 0);
+assert.equal(magazine.reloadRemaining, rifleRole.reloadTime, 'empty bot magazine did not start reload');
+magazine = advanceBotMagazine(magazine.ammo, magazine.reloadRemaining, rifleRole.reloadTime - 0.01, rifleRole);
+assert.equal(magazine.ammo, 0, 'bot magazine refilled before reload completed');
+magazine = advanceBotMagazine(magazine.ammo, magazine.reloadRemaining, 0.02, rifleRole);
+assert.equal(magazine.ammo, rifleRole.magSize, 'bot magazine did not refill after reload');
+assert.equal(magazine.reloadRemaining, 0);
+console.log('ok   finite bot magazines block fire until weapon-specific reload completes');
 
 assert.ok(botAimErrorMeters(20, 1.15) < 0.8, '20m bot scatter is still too inaccurate');
 assert.ok(botAimErrorMeters(40, 1.15) < 1.25, '40m bot scatter is still too inaccurate');

@@ -10,6 +10,37 @@ export const BOT_TACTICS = Object.freeze({
   meleeAttackDistance: 2.2,
 });
 
+// A public match should read as an arena full of players, not seven copies of
+// the same infinite-ammo rifleman. These are deliberately gentler bot versions
+// of the player weapons: the model, cadence, magazine and reload identity stay
+// recognizable without importing the player's full damage values into the AI.
+export const BOT_RANGED_LOADOUTS = Object.freeze([
+  Object.freeze({ id: 'm4',      damage: 10, fireRate: 0.24, range: 26, magSize: 12, reloadTime: 1.8, sound: 'rifle' }),
+  Object.freeze({ id: 'm16',     damage: 12, fireRate: 0.22, range: 29, magSize: 9,  reloadTime: 2.0, sound: 'rifle' }),
+  Object.freeze({ id: 'rifle',   damage: 13, fireRate: 0.26, range: 30, magSize: 10, reloadTime: 1.9, sound: 'rifle' }),
+  Object.freeze({ id: 'lmg',     damage: 8,  fireRate: 0.16, range: 24, magSize: 18, reloadTime: 2.7, sound: 'lmg' }),
+]);
+
+/** Stable five-slot squad pattern: four distinct ranged roles, then a blade. */
+export function botLoadoutForId(id) {
+  const slot = Math.max(0, Math.abs(id | 0) - 1) % 5;
+  return slot === 4 ? null : BOT_RANGED_LOADOUTS[slot];
+}
+
+/** Advance a finite bot magazine without tying the rule to rendering. */
+export function advanceBotMagazine(ammo, reloadRemaining, dt, loadout, fired = false) {
+  if (!loadout) return { ammo: 0, reloadRemaining: 0 };
+  const wasReloading = reloadRemaining > 0;
+  let nextReload = Math.max(0, reloadRemaining - Math.max(0, dt));
+  let nextAmmo = ammo;
+  if (wasReloading && nextReload === 0) nextAmmo = loadout.magSize;
+  if (fired && nextReload === 0 && nextAmmo > 0) {
+    nextAmmo -= 1;
+    if (nextAmmo === 0) nextReload = loadout.reloadTime;
+  }
+  return { ammo: nextAmmo, reloadRemaining: nextReload };
+}
+
 // Keep the arena a free-for-all while ensuring the human is not ignored behind
 // a permanent cluster of closer bots. Roughly one third apply human pressure.
 export function combatTargetScore({ distance, isHuman = false, botId = 0, sticky = false }) {
