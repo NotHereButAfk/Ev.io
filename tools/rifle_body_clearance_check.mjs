@@ -27,10 +27,11 @@ const THREE = await import('three');
 const { buildWeaponModel } = await import('../src/weapons/WeaponModels.js');
 const { WEAPONS } = await import('../src/weapons/weaponDefs.js');
 const {
-  applyRifleCarry, restRifleTransform, GRIP_LOCAL,
+  applyRifleCarry, restRifleTransform,
 } = await import('../src/player/RifleCarry.js');
 const { SHOULDER_X, SHOULDER_Y } = await import('../src/player/Proportions.js');
 const { buildHeroBody } = await import('../src/player/HeroBody.js');
+const { WEAPON_HAND_POSES, weaponHandPose } = await import('../src/weapons/WeaponHandPoses.js');
 
 const TORSO = [
   // y, half-width, half-depth. These sit just inside the visible connected
@@ -102,6 +103,10 @@ let globalTorso = 0;
 let globalShoulder = 0;
 let totalPoses = 0;
 for (const def of firearms) {
+  if (!WEAPON_HAND_POSES[def.id]) {
+    console.error(`FAIL ${def.id}: missing explicit hand-contact profile`);
+    failures++;
+  }
   const body = buildHeroBody('vanguard');
   const rig = body.userData.rig;
   const bones = body.userData.bones;
@@ -137,7 +142,8 @@ for (const def of firearms) {
     weaponRear = Math.max(weaponRear, rear);
     let triggerError = 0, supportError = 0;
     if (!freshAttach) {
-      const triggerTarget = GRIP_LOCAL.clone().applyMatrix4(weapon.matrixWorld);
+      const triggerTarget = new THREE.Vector3(...weaponHandPose(def.id).trigger)
+        .applyMatrix4(weapon.matrixWorld);
       const triggerWrist = bones.handR.getWorldPosition(new THREE.Vector3());
       triggerError = triggerWrist.distanceTo(triggerTarget);
       const supportTarget = weapon.userData.rifleSupportTarget

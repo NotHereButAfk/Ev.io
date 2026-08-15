@@ -3,6 +3,7 @@ import { applyThrowArm } from './Actions.js';
 // The figure the IK runs against. From Proportions.js, not a private copy —
 // this file used to hold its own, which is fine right up until it changes.
 import { SHOULDER_Y, SHOULDER_X, UP_ARM, FOREARM } from './Proportions.js';
+import { weaponHandPose } from '../weapons/WeaponHandPoses.js';
 
 const REACH = (UP_ARM + FOREARM) * 0.995;
 
@@ -44,7 +45,6 @@ export const GRIP_LOCAL      = new THREE.Vector3(0, -0.12,  0.10);
 export const HANDGUARD_LOCAL = new THREE.Vector3(-0.07, -0.02, -0.16);
 // Where the support hand goes during a reload: under the receiver, on the
 // magazine well, a little behind the handguard it just left.
-const MAG_LOCAL = new THREE.Vector3(-0.04, -0.26, -0.02);
 
 // Both were additionally swept against the body's own collision volumes so the
 // rifle rides clear of the chest instead of sinking into it — pose-lab.html
@@ -70,11 +70,24 @@ const PATROL = {
   // swallowed the whole rifle. This lands 6.5cm outboard of the shoulder while
   // the grip itself remains close to the trigger-side hand.
   wp: onArm(0.390, 1.580, -0.270),
-  wr: new THREE.Euler(-0.160, 0.220, 0.200),
+  // Muzzle-down high-ready: stock remains seated while elbows relax below the
+  // shoulder line. This is a real movement posture, not a rigid firing pose.
+  wr: new THREE.Euler(-0.240, 0.180, 0.140),
 };
 const AIM = {
   wp: onArm(0.390, 1.600, -0.230),
   wr: new THREE.Euler(-0.020, 0, 0),
+};
+// Pistols do not have a stock to pin to the firing shoulder. A soldier brings
+// both hands toward the centreline and extends the weapon in front of the
+// chest, while the patrol pose retracts it into a compact low-ready position.
+const PISTOL_PATROL = {
+  wp: onArm(0.220, 1.545, -0.500),
+  wr: new THREE.Euler(-0.260, 0.100, 0.060),
+};
+const PISTOL_AIM = {
+  wp: onArm(0.075, 1.585, -0.690),
+  wr: new THREE.Euler(-0.015, 0, 0),
 };
 // Clearance belongs to the complete 1.14m rifle mesh, not just the receiver
 // origin above. These two offsets seat the rear of the stock on the visible
@@ -183,6 +196,8 @@ const SWIVEL_R = -0.6, SWIVEL_L = 0.2;
 
 const _qPatrol = new THREE.Quaternion().setFromEuler(PATROL.wr);
 const _qAim    = new THREE.Quaternion().setFromEuler(AIM.wr);
+const _qPistolPatrol = new THREE.Quaternion().setFromEuler(PISTOL_PATROL.wr);
+const _qPistolAim = new THREE.Quaternion().setFromEuler(PISTOL_AIM.wr);
 const _q       = new THREE.Quaternion();
 const _qSwing  = new THREE.Quaternion();
 const _qArm    = new THREE.Quaternion();
@@ -190,6 +205,9 @@ const _qAct    = new THREE.Quaternion();
 const _eAct    = new THREE.Euler();
 const _pos     = new THREE.Vector3();
 const _T       = new THREE.Vector3();
+const _gripLocal = new THREE.Vector3();
+const _supportLocal = new THREE.Vector3();
+const _reloadLocal = new THREE.Vector3();
 const _d       = new THREE.Vector3();
 const _h       = new THREE.Vector3();
 const _AX_X    = new THREE.Vector3(1, 0, 0);
@@ -277,6 +295,9 @@ function slideToReach(T, sx) {
  */
 export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   fitWeaponToWorldSize(weapon);
+  const handPose = weaponHandPose(weapon);
+  const pistolCarry = handPose.carry === 'pistol';
+  const launcherCarry = handPose.carry === 'launcher';
   const a    = Math.max(0, Math.min(1, aim));
   const kick = o.kick || 0;
   const reload = o.reload || 0, swap = o.swap || 0, flinch = o.flinch || 0;
@@ -307,7 +328,8 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     // Muzzle drops while the hands are busy, and again when hit.
     - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 
-  _pos.lerpVectors(PATROL.wp, AIM.wp, a);
+  _pos.lerpVectors(pistolCarry ? PISTOL_PATROL.wp : PATROL.wp,
+                   pistolCarry ? PISTOL_AIM.wp : AIM.wp, a);
   // Bow the path forward through the middle of the blend so the buttstock
   // swings around the right pec rather than straight through it. Free to do
   // now that the hands are IK'd to wherever the rifle ends up.
@@ -315,7 +337,11 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   _pos.z += kick * 0.03;                           // recoil shoves it back
   // Slerp (not euler-lerp) between the two carries — the patrol pose is a
   // large compound rotation and euler blending swings it through junk.
-  _q.slerpQuaternions(_qPatrol, _qAim, a);
+  _q.slerpQuaternions(pistolCarry ? _qPistolPatrol : _qPatrol,
+                      pistolCarry ? _qPistolAim : _qAim, a);
+  // A launcher is shouldered slightly higher so the tube clears the pauldron
+  // and the sight line stays above the forearm instead of crossing through it.
+  if (launcherCarry) _pos.y += 0.035;
 
   // Reload rolls the receiver up toward the body so the mag well faces the
   // support hand; a swap drops the whole weapon out of frame and brings it
@@ -359,8 +385,13 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // deltoid at the top of the pitch sweep.
   const aimOutboard = a * (0.025 + 0.025
     * (1 - THREE.MathUtils.clamp(aimPitch / 0.65, 0, 1)));
-  _pos.x += BASE_OUTBOARD + geometryClearance.outboard + aimOutboard + 0.055 * swapB;
-  _pos.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
+  if (pistolCarry) {
+    _pos.x += 0.018 + 0.030 * (1 - a) + 0.035 * swapB;
+    _pos.z -= 0.075;
+  } else {
+    _pos.x += BASE_OUTBOARD + geometryClearance.outboard + aimOutboard + 0.055 * swapB;
+    _pos.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
+  }
 
   // Network snapshots, animation state edges and coarse frame pacing can move
   // the desired carry by several centimetres in one tick. Smooth the single
@@ -393,7 +424,8 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 
   if (rig) {
     solveArm(rig.armR, rig.elbowR,  SHOULDER_X,
-             scaledWeaponLocal(_T, GRIP_LOCAL, weapon).applyQuaternion(_q).add(_pos), SWIVEL_R);
+             scaledWeaponLocal(_T, _gripLocal.set(...handPose.trigger), weapon)
+               .applyQuaternion(_q).add(_pos), pistolCarry ? -0.18 : SWIVEL_R);
     // The support hand leaves the handguard for the magazine and comes back.
     // Held at the mag through the middle of the reload rather than sliding
     // continuously, so it reads as two moves — strip, seat — not one smear.
@@ -402,14 +434,28 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
       // amplified curve snapped fully to the magazine by 20% progress, before
       // the weapon had rolled far enough toward the support hand.
       const hold = Math.sin(Math.PI * Math.min(1, reload));
-      _T.copy(HANDGUARD_LOCAL).lerp(MAG_LOCAL, hold);
+      _supportLocal.set(...handPose.support);
+      if (!pistolCarry) {
+        _supportLocal.x = HANDGUARD_LOCAL.x;
+        _supportLocal.y = HANDGUARD_LOCAL.y;
+      }
+      // Long fore-ends are gripped at the rear handguard when the forward
+      // authored point would lock the elbow. The palm remains on the rail.
+      _supportLocal.z = Math.max(_supportLocal.z, -0.18);
+      _T.copy(_supportLocal).lerp(_reloadLocal.set(...handPose.reload), hold);
     } else {
-      _T.copy(HANDGUARD_LOCAL);
+      _T.set(...handPose.support);
+      if (!pistolCarry) {
+        _T.x = HANDGUARD_LOCAL.x;
+        _T.y = HANDGUARD_LOCAL.y;
+      }
+      _T.z = Math.max(_T.z, -0.18);
     }
     // Wider guns have been moved farther right to clear their complete mesh.
     // Offset the support grip by the same amount toward the shooter so the
     // palm stays on the near face instead of being dragged out of arm reach.
-    const supportNearFace = geometryClearance.outboard + (BASE_OUTBOARD - 0.020);
+    const supportNearFace = pistolCarry ? 0
+      : geometryClearance.outboard + (BASE_OUTBOARD - 0.020);
     _T.x -= supportNearFace / Math.max(0.001, Math.abs(weapon?.scale?.x || 1));
     if (weapon?.scale) _T.multiply(weapon.scale);
     _T.applyQuaternion(_q).add(_pos);
@@ -418,7 +464,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     // diagnostics.  This is body-local, matching the skeletal rig.
     if (weapon?.userData)
       (weapon.userData.rifleSupportTarget ||= new THREE.Vector3()).copy(_T);
-    solveArm(rig.armL, rig.elbowL, -SHOULDER_X, _T, SWIVEL_L);
+    solveArm(rig.armL, rig.elbowL, -SHOULDER_X, _T, pistolCarry ? -0.12 : SWIVEL_L);
     // A grenade goes in the off hand, overriding the support grip entirely —
     // it has to be applied last or the IK above would put the hand back.
     if (o.throwP) applyThrowArm(rig, o.throwP);
@@ -428,8 +474,17 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 /** The neutral (un-animated) transform, for attaching a freshly built weapon. */
 export function restRifleTransform(weapon) {
   fitWeaponToWorldSize(weapon);
+  const handPose = weaponHandPose(weapon);
+  if (handPose.carry === 'pistol') {
+    weapon.position.copy(PISTOL_PATROL.wp);
+    weapon.position.x += 0.048;
+    weapon.position.z -= 0.075;
+    weapon.quaternion.copy(_qPistolPatrol);
+    return;
+  }
   const geometryClearance = weaponClearance(weapon);
   weapon.position.copy(PATROL.wp);
+  if (handPose.carry === 'launcher') weapon.position.y += 0.035;
   weapon.position.x += BASE_OUTBOARD + geometryClearance.outboard;
   weapon.position.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
   weapon.quaternion.copy(_qPatrol);

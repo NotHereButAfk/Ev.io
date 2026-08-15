@@ -347,6 +347,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 - The current public EV.IO spectator room loaded, but embedded pointer-lock restrictions prevented a controlled player-input trial; current movement/reload/damage timing remains unmeasured.
 - Human multiplayer feel, legal/provenance review, and production rollback still require human/external validation.
 
+## BUG-019
+
+**Severity:** High
+
+**System:** Per-weapon soldier carry and hand contact
+
+**Steps to reproduce:** Equip each of the 17 firearms in third person, then inspect idle, movement, aim-up/down, flinch, reload, and swap poses from the front, three-quarter, and side views.
+
+**Expected behavior:** A soldier should hold each weapon by its actual pistol grip and reachable fore-end. Rifles should retain a shouldered, elbow-down ready posture; pistols should use a centered two-hand stance instead of pretending to have a stock; launchers should sit above the support forearm. Reloads must move the support hand to that weapon's magazine/control area without separating the firing hand.
+
+**Observed behavior:** First-person viewmodels already had per-gun contact coordinates, but third-person bodies applied one M4 trigger grip, handguard, magazine target, and shouldered pose to every firearm. Numerical IK could therefore pass while short pistols, compact SMGs, long rifles, and launchers were visibly held at the wrong physical location.
+
+**Root cause:** Weapon contact geometry lived privately inside `WeaponSystem.js`; `RifleCarry.js` owned an unrelated pair of hard-coded M4 targets and only one rifle-style carry family.
+
+**Files changed:** `src/weapons/WeaponHandPoses.js`, `src/weapons/WeaponSystem.js`, `src/player/RifleCarry.js`, `pose-lab.html`, `tests/rifle-carry-reference.test.mjs`, `tools/rifle_body_clearance_check.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Move all 20 shipped weapon contact profiles into one shared source, including explicit trigger, support, and reload targets for every firearm. Third-person IK now consumes those model-specific points, caps long fore-end contact to a reachable rear-rail grip, and keeps action targets attached to the displayed weapon. Add a centered two-handed pistol carry, an elevated launcher shoulder carry, and a 13.5-degree muzzle-low rifle patrol stance with the stock still seated. The same profile table continues to drive first-person gloves.
+
+**Verification:** PASS locally. The updated gate rejects any firearm without an explicit profile. All 17 firearms pass 272 production carry/action poses with 0.00 cm trigger/support wrist error, 0.0 cm torso penetration, and at most 0.6 cm armor-shoulder contact. Rifle reference, first-person viewmodel, and complete action-continuity suites pass. Front/three-quarter/side renders were inspected for pistols, SMG, shotgun, M4, LMG, sniper, RPG, fuel-rod launcher, and needler; the category-specific soldier silhouettes and physical palm contacts are visible. Real-browser gameplay smoke reports zero console/request failures, and all 28/28 automated release gates pass. Deployed-production verification is pending this change's release.
+
 ## BUG-018
 
 **Severity:** Medium

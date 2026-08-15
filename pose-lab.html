@@ -22,6 +22,7 @@ import { rigCharacterLimbs } from '/src/player/PreviewCharacter.js';
 import { buildWeaponModel } from '/src/weapons/WeaponModels.js';
 import { getWeapon } from '/src/weapons/weaponDefs.js';
 import { applyRifleCarry, GRIP_LOCAL, HANDGUARD_LOCAL } from '/src/player/RifleCarry.js';
+import { weaponHandPose } from '/src/weapons/WeaponHandPoses.js';
 import { applyWalkCycle } from '/src/player/Locomotion.js';
 
 const Q = new URLSearchParams(location.search);
@@ -253,7 +254,9 @@ if (!handW.hand_R && heroBones?.handR)
   handW.hand_R = heroBones.handR.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv);
 if (!handW.hand_L && heroBones?.handL)
   handW.hand_L = heroBones.handL.getWorldPosition(new THREE.Vector3()).applyMatrix4(_inv);
-const gripW = GRIP_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
+const handPose = weaponHandPose(wm);
+const gripW = new THREE.Vector3(...handPose.trigger).multiply(wm.scale)
+  .applyQuaternion(wm.quaternion).add(wm.position);
 const hgW   = wm.userData.rifleSupportTarget ||
   HANDGUARD_LOCAL.clone().applyQuaternion(wm.quaternion).add(wm.position);
 // Lowest point of either boot, in WORLD space (bob included) — how well the

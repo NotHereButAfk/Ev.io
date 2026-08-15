@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { WEAPONS } from './weaponDefs.js';
+import { weaponHandPose } from './WeaponHandPoses.js';
 import { buildWeaponModel, onWeaponModelsReady } from './WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
@@ -74,34 +75,6 @@ const REFERENCE_ASPECT = 16 / 9;
 // made short weapons miss the palm and made rifles appear to float in front of
 // it. These targets describe the centre of the physical grip/handguard; the
 // rig converts them to wrist-group transforms below.
-const DEFAULT_HAND_POSE = {
-  trigger: [0.012, -0.086, 0.19],
-  support: [-0.012, 0.022, -0.22],
-  supportVisible: true,
-};
-const VIEWMODEL_HAND_POSES = {
-  sidearm:       { trigger: [0.010, -0.108, 0.105], supportVisible: false },
-  magnum:        { trigger: [0.010, -0.112, 0.105], supportVisible: false },
-  uzi:           { trigger: [0.010, -0.060, 0.040], support: [-0.010, 0.020, -0.105] },
-  levershotgun:  { trigger: [0.010, -0.088, 0.140], support: [-0.012, 0.016, -0.255] },
-  m4:            { trigger: [0.012, -0.092, 0.200], support: [-0.012, 0.026, -0.235] },
-  m16:           { trigger: [0.012, -0.088, 0.200], support: [-0.012, 0.020, -0.270] },
-  rifle:         { trigger: [0.012, -0.100, 0.150], support: [-0.012, 0.018, -0.225] },
-  lmg:           { trigger: [0.012, -0.114, 0.220], support: [-0.012, 0.012, -0.280] },
-  rpg:           { trigger: [0.012, -0.082, 0.060], support: [-0.012, 0.010, -0.255] },
-  boltsniper:    { trigger: [0.012, -0.082, 0.200], support: [-0.012, 0.016, -0.285] },
-  battlerifle:   { trigger: [0.012, -0.090, 0.190], support: [-0.012, 0.020, -0.245] },
-  needler:       { trigger: [0.012, -0.090, 0.145], support: [-0.012, 0.018, -0.185] },
-  plasmarifle:   { trigger: [0.012, -0.086, 0.155], support: [-0.012, 0.018, -0.205] },
-  dmr:           { trigger: [0.012, -0.082, 0.220], support: [-0.012, 0.020, -0.260] },
-  fuelrod:       { trigger: [0.012, -0.095, 0.110], support: [-0.012, 0.015, -0.235] },
-  concussion:    { trigger: [0.012, -0.090, 0.120], support: [-0.012, 0.018, -0.215] },
-  energyshotgun: { trigger: [0.012, -0.092, 0.175], support: [-0.012, 0.018, -0.245] },
-  sword:         { trigger: [0.000, -0.020, 0.160], supportVisible: false },
-  knife:         { trigger: [0.000, -0.020, 0.120], supportVisible: false },
-  ghammer:       { trigger: [0.010, -0.120, 0.180], support: [-0.010, -0.015, -0.035] },
-};
-
 // Preserve the lower-right composition on landscape screens without pushing
 // both gloves out of portrait/mobile view. Capped on ultrawide so the weapon
 // does not drift all the way into the corner.
@@ -480,8 +453,7 @@ export class WeaponSystem {
   _applyViewmodelHandPose() {
     if (!this.armGroup || !this.supportArmGroup) return;
     const def = this.currentDef;
-    const authored = VIEWMODEL_HAND_POSES[def?.id] || {};
-    const pose = { ...DEFAULT_HAND_POSE, ...authored };
+    const pose = weaponHandPose(def?.id);
     const portrait = this.camera.aspect < 1;
 
     // gripArm's palm centre is offset (0,-.006,-.034) from its group origin.

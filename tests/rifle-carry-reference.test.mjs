@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import {
-  applyRifleCarry, GRIP_LOCAL, HANDGUARD_LOCAL,
-} from '../src/player/RifleCarry.js';
+import { applyRifleCarry, HANDGUARD_LOCAL } from '../src/player/RifleCarry.js';
 import { SHOULDER_X } from '../src/player/Proportions.js';
 import { buildHeroBody } from '../src/player/HeroBody.js';
+import { weaponHandPose } from '../src/weapons/WeaponHandPoses.js';
 
 const assert = (ok, message) => {
   if (!ok) throw new Error(message);
@@ -65,7 +64,8 @@ let leastActionReceiverRight = Infinity;
 for (const [name, aim, options] of carryStates) {
   applyRifleCarry(rig, liveWeapon, aim, 1 / 60, options);
   body.updateMatrixWorld(true);
-  const triggerTarget = GRIP_LOCAL.clone().applyMatrix4(liveWeapon.matrixWorld);
+  const triggerTarget = new THREE.Vector3(...weaponHandPose(liveWeapon).trigger)
+    .applyMatrix4(liveWeapon.matrixWorld);
   const triggerWrist = bones.handR.getWorldPosition(new THREE.Vector3());
   const triggerError = triggerWrist.distanceTo(triggerTarget);
   worstTriggerWrist = Math.max(worstTriggerWrist, triggerError);
