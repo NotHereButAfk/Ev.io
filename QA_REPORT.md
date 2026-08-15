@@ -7,7 +7,7 @@ This report records tests that were actually executed against the running game. 
 ## Executed baseline
 
 - Production build: PASS.
-- Automated certificate: PASS, 27/27 gates.
+- Automated certificate: PASS, 28/28 gates.
 - Real browser gameplay smoke: PASS.
 - Browser console: PASS, zero first-party errors during the smoke.
 - Embedded-browser entry: PASS, live HUD reached with zero error/warning logs after pointer-lock rejection containment.
@@ -316,6 +316,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 **Fix:** Make `_activateMap()` show a non-auto-hiding card, await the real map load, enforce the same 1.8-second minimum, and cleanly hide it on either success or failure. Serialize restart calls, ignore disconnected network map IDs, and preserve server ownership when a live authoritative session provides the next arena.
 
 **Verification:** PASS on the deployed tree. The real system-Chrome lifecycle test starts a game, shows the completed-game leaderboard path, invokes the production restart method, observes `daytime-rook` change to `winter-graveyard`, and verifies the next state is `playing` with no loader left over. Three-lap client map loading, GPU disposal, server round rotation, gameplay smoke, and zero-error browser checks pass. Commit `b6c7d8c` deployed successfully in run `31886365217`; the live initial map-loading lifecycle was reverified after deployment.
+
+## BUG-017
+
+**Severity:** Medium
+
+**System:** Advertising placeholders and blocker detection
+
+**Steps to reproduce:** Open the connection screen, initial map loader, death screen, or post-match leaderboard before production advertising markup has been configured. Then repeat with a content blocker that collapses common ad-placement bait classes.
+
+**Expected behavior:** Unconfigured ads must not leave gray rectangles or empty reserved space. A blocker should be detected independently and produce a clear, dismissible notice without preventing the game from loading.
+
+**Observed behavior:** Four placeholder placements were still rendered: gray banners on the game boot and map-loading screens plus empty AdSense containers on death and leaderboard screens. No blocker detector existed.
+
+**Root cause:** Placeholder markup and styling were kept as visual stand-ins for future ad HTML, coupling an unfinished integration to the live layout.
+
+**Files changed:** `index.html`, `src/style.css`, `src/main.js`, `src/ui/SponsorAvailability.js`, `tools/sponsor_block_check.mjs`, `tools/sponsor_block_browser_check.mjs`, `tools/weapon_gallery_capture.mjs`, `tools/gui_contract_check.mjs`, `tools/certify.mjs`, `package.json`, `QA_REPORT.md`
+
+**Fix:** Remove every gray/empty ad container and all reserved ad styling. Add an off-screen 1×1 bait element whose collapse triggers a high-priority KYX.IO warning; the warning can be dismissed for the current browser tab and never reserves ad space itself.
+
+**Verification:** PASS locally. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build passes, all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models.
 
 ## Known product gaps, not falsely marked fixed
 

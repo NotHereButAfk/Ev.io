@@ -68,16 +68,14 @@ requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
   requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
 }
-for (const bootClass of ['boot-connect-logo', 'boot-connect-text', 'boot-connect-ad']) {
+for (const bootClass of ['boot-connect-logo', 'boot-connect-text']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${bootClass}`), `initial connection composition: ${bootClass}`);
 }
 requireMatch(css, /#connect-screen[^}]*background:\s*#000/s, 'initial connection black field');
 requireMatch(css, /\.boot-connect-logo[^}]*top:\s*42\.7%[^}]*width:\s*270px[^}]*height:\s*105px/s,
   'initial connection measured logo frame');
 requireMatch(css, /\.boot-connect-text[^}]*top:\s*63\.98%/s, 'initial connection measured status position');
-requireMatch(css, /\.boot-connect-ad[^}]*width:\s*min\(720px,\s*56\.25vw\)[^}]*height:\s*90px/s,
-  'initial connection measured ad slot');
-for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner', 'ml-ad']) {
+for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
 }
 requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
@@ -85,8 +83,9 @@ requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
 requireMatch(css, /@keyframes ml-spin/, 'arena loading activity indicator');
 requireMatch(css, /\.ml-panel[^}]*padding:\s*20vh\s+29px\s+0/s, 'arena loading upper-left information position');
 requireMatch(css, /\.ml-tip[^}]*bottom:\s*19vh/s, 'arena loading tip position');
-requireMatch(css, /\.ml-ad[^}]*width:\s*min\(720px,\s*56\.25vw\)[^}]*height:\s*90px/s,
-  'EV-proportioned loading ad slot');
+if (/adsbygoogle|data-ad-(?:client|slot)|boot-connect-ad|ml-ad|ad-slot/.test(index + css)) {
+  failures.push('advertising placeholders remain disabled until production markup is supplied');
+}
 if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand|ml-progress/.test(index)) {
   failures.push('loading screen has no extra branding or progress stripe');
 }

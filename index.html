@@ -8,12 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/src/style.css" />
-  <!--
-    Google AdSense — replace data-ad-client with your publisher ID (ca-pub-XXXXXXXXXXXXXXXX)
-    and each data-ad-slot with your per-unit slot IDs before enabling the loader.
-    Placeholder slots deliberately stay inert so local and production pages do
-    not request an invalid publisher account.
-  -->
+  <!-- Advertising is intentionally disabled until production markup is supplied. -->
 </head>
 <body>
   <!-- Colour-blind correction matrices (Phase 8 accessibility). Applied to the
@@ -36,7 +31,6 @@
     <div id="connect-screen" class="overlay">
       <div class="boot-connect-logo" aria-label="KYX.IO">kyx.io</div>
       <div class="boot-connect-text">connecting ...</div>
-      <div class="boot-connect-ad" aria-label="Advertisement"></div>
       <div class="boot-status" aria-live="polite">
         <span id="boot-progress"></span>
         <span id="boot-phase">INITIALIZING GAME</span>
@@ -567,7 +561,6 @@
         <div class="ml-players" id="ml-players">8 players</div>
         <div class="ml-tip" id="ml-tip">TIP: press Q to blink-teleport forward</div>
       </div>
-      <div class="ml-ad" aria-label="Advertisement"></div>
       <div class="ml-spinner" aria-label="Loading arena"></div>
     </div>
 
@@ -585,14 +578,6 @@
       <div class="menu-panel small">
         <h2 id="gameover-title">YOU DIED</h2>
         <div class="stats" id="gameover-stats"></div>
-        <!-- Ad: death screen 300×250 — captive audience between stats and respawn -->
-        <div class="ad-slot ad-slot-gameover">
-          <ins class="adsbygoogle"
-               style="display:block;width:300px;height:250px"
-               data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-               data-ad-slot="2222222222"
-               data-ad-format="rectangle"></ins>
-        </div>
         <button id="restart-btn" class="play-btn">RESPAWN</button>
         <button id="menu-btn" class="ghost-btn">MAIN MENU</button>
       </div>
@@ -766,15 +751,6 @@
             <div class="lb-stat"><span>TIME ACTIVE</span><strong id="lb-stat-time">0:00</strong></div>
           </div>
         </div>
-        <!-- Ad: post-match banner — 10-second countdown = captive audience -->
-        <div class="ad-slot ad-slot-leaderboard">
-          <ins class="adsbygoogle"
-               style="display:block;width:100%;height:100%"
-               data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
-               data-ad-slot="3333333333"
-               data-ad-format="horizontal"
-               data-full-width-responsive="true"></ins>
-        </div>
         <div class="lb-footer">
           <div class="lb-new-match">NEW MATCH STARTING IN <span id="lb-countdown">10</span>s</div>
           <div class="lb-bar-wrap"><div id="lb-bar"></div></div>
@@ -804,6 +780,14 @@
           <tbody id="sb-rows"></tbody>
         </table>
         <div class="sb-hint">Hold <span class="sb-key">TAB</span> to view scores</div>
+      </div>
+    </div>
+    <div id="sponsor-block-warning" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="sponsor-block-title">
+      <div class="sponsor-block-card">
+        <div class="sponsor-block-kicker">KYX.IO NOTICE</div>
+        <h2 id="sponsor-block-title">AD BLOCKER DETECTED</h2>
+        <p>Please allow ads on this site to help support the game. No ad space is shown until the production ad code is ready.</p>
+        <button id="sponsor-block-dismiss" class="play-btn" type="button">CONTINUE</button>
       </div>
     </div>
   </div>

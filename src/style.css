@@ -3169,69 +3169,6 @@ html, body {
   #weapon-slots { display: none !important; }
 }
 
-/* ===================== Ad Slots ===================== */
-
-.ad-slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
-/* Label shown while the real ad loads / for fallback */
-.ad-slot::before {
-  content: 'ADVERTISEMENT';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: rgba(255,255,255,0.22);
-  text-align: center;
-  pointer-events: none;
-  line-height: 14px;
-}
-
-/* Game over — 300×250 rectangle below the stats */
-.ad-slot-gameover {
-  position: relative;
-  width: 300px;
-  height: 250px;
-  margin: 14px auto 6px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(0, 229, 255, 0.10);
-}
-
-/* Leaderboard — responsive banner above the footer countdown */
-.ad-slot-leaderboard {
-  position: relative;
-  width: 100%;
-  max-width: 468px;
-  height: 60px;
-  margin: 0 auto 16px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(0, 229, 255, 0.10);
-}
-
-/* Connect / loading screen — horizontal banner below the panel */
-.ad-slot-connect {
-  position: relative;
-  width: min(468px, 92vw);
-  height: 60px;
-  margin: 18px auto 0;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-@media (pointer: coarse) {
-  /* On mobile show a smaller 320×50 strip instead */
-  .ad-slot-gameover   { width: min(300px, 92vw); height: 250px; }
-  .ad-slot-leaderboard { height: 50px; max-width: 320px; }
-  .ad-slot-connect    { height: 50px; max-width: 320px; }
-}
-
 /* ============================================================================
    ev.io-style LOADOUT (inventory) + PROFILE (stats) panels
    ============================================================================ */
@@ -4350,11 +4287,6 @@ html, body {
   position: absolute; bottom: 19vh; left: 20px; right: 20px; z-index: 4;
   color: #d9e83e; font-size: 11px; letter-spacing: 0.2px;
 }
-.ml-ad {
-  position: absolute; left: 50%; bottom: 16.67vh; z-index: 3;
-  width: min(720px, 56.25vw); height: 90px;
-  transform: translateX(-50%); background: #8d8d8d;
-}
 .ml-spinner {
   position: absolute; right: 28px; bottom: 17.78vh; z-index: 4; width: 34px; height: 34px;
   border: 7px solid rgba(255,255,255,.94); border-right-color: transparent;
@@ -4365,7 +4297,6 @@ html, body {
   .ml-panel { width: min(78vw, 360px); padding: 20vh 22px 0; }
   .ml-name { font-size: 39px; }
   .ml-spinner { right: 18px; }
-  .ml-ad { width: 56.25vw; height: 12.5vw; min-height: 50px; }
 }
 
 /* ============================================================================
@@ -4778,10 +4709,6 @@ a.profile-menu-item { text-decoration: none; }
   font: 500 20px/29px 'Rajdhani', system-ui, sans-serif;
   letter-spacing: .2px; text-transform: lowercase;
 }
-.boot-connect-ad {
-  position: absolute; left: 50%; bottom: 0; width: min(720px, 56.25vw); height: 90px;
-  transform: translateX(-50%); background: #808080;
-}
 #boot-progress {
   display: none;
 }
@@ -4792,7 +4719,6 @@ a.profile-menu-item { text-decoration: none; }
 @media (max-width: 620px) {
   .boot-connect-logo { width: 220px; height: 86px; font-size: 43px; }
   .boot-connect-text { font-size: 18px; }
-  .boot-connect-ad { width: 100vw; height: min(90px, 12.5vw); }
 }
 
 /* ============================================================================
@@ -4997,6 +4923,39 @@ html, body { margin: 0; }
   .legal-main { padding: 22px 20px 50px; }
   .auth-page .login-tabs .auth-tab { font-size: 15px; padding: 10px 9px; }
 }
+
+/* Ad-block detection has no visible ad placeholder. The off-screen probe keeps
+   a measurable box unless a filter list collapses one of its bait classes. */
+#sponsor-availability-probe {
+  position: fixed; left: -10000px; top: -10000px;
+  display: block; width: 1px; height: 1px;
+  pointer-events: none;
+}
+#sponsor-block-warning {
+  z-index: 1400;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2, 5, 10, .86);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#sponsor-block-warning.hidden { display: none; }
+.sponsor-block-card {
+  width: min(470px, calc(100vw - 40px)); box-sizing: border-box;
+  padding: 32px 34px 28px; border-left: 3px solid #d7e83e;
+  background: rgba(7, 13, 22, .98); color: #edf1f5;
+  box-shadow: 0 22px 80px rgba(0, 0, 0, .58);
+}
+.sponsor-block-kicker {
+  color: #d7e83e; font: 700 11px/1 'Rajdhani', sans-serif;
+  letter-spacing: 2.4px; margin-bottom: 13px;
+}
+.sponsor-block-card h2 {
+  margin: 0 0 14px; font: 600 27px/1.15 'Michroma', 'Rajdhani', sans-serif;
+}
+.sponsor-block-card p {
+  margin: 0 0 24px; color: rgba(237, 241, 245, .78);
+  font: 500 16px/1.45 'Rajdhani', sans-serif;
+}
+.sponsor-block-card .play-btn { width: auto; min-width: 150px; margin: 0; }
 
 /* ============================================================================
    ================  KYX.IO  INVENTORY (ev.io-EXACT)  =========================

@@ -59,6 +59,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:audio'); return { ok: r.ok && /audio contract passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-GUI', phase: 'Phase 8', name: 'EV-style navigation, panels, auth pages and dynamic crosshair are wired',
     fn: () => { const r = run('npm run test:gui'); return { ok: r.ok && /gui contract passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-ADBLOCK', phase: 'UI', name: 'Ad blocker warning works without visible placeholder inventory',
+    fn: () => { const r = run('npm run test:adblock'); return { ok: r.ok && /sponsor blocker check passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-POP', phase: 'match', name: 'Bots occupy player slots in every roster path',
     fn: () => { const r = run('npm run test:population'); return { ok: r.ok && /player population passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-SPEC', phase: 'camera', name: 'Spectator camera continuously roams the complete arena',
