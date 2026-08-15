@@ -34,6 +34,7 @@ export function installSponsorBlockCheck({ delayMs = 700 } = {}) {
   setTimeout(() => {
     const blocked = isSponsorProbeBlocked(probe, getComputedStyle(probe));
     probe.remove();
+    warning.dataset.sponsorCheck = blocked ? 'blocked' : 'clear';
     if (blocked) warning.classList.remove('hidden');
   }, delayMs);
 }
