@@ -43,7 +43,10 @@ const TORSO = [
   [1.64, 0.170, 0.112],
   [1.74, 0.105, 0.080],
 ];
-const SHOULDER_RADIUS = 0.105;
+// Includes the largest playable pauldron, not only the bare shoulder joint.
+// The smaller core sphere let the stock vanish into visible armor while the
+// numerical test still reported zero contact.
+const SHOULDER_RADIUS = 0.145;
 const MAX_PENETRATION = 0.008;
 
 function torsoRadii(y) {
@@ -102,7 +105,7 @@ for (const def of firearms) {
   const body = buildHeroBody('vanguard');
   const rig = body.userData.rig;
   const bones = body.userData.bones;
-  let weaponTorso = 0, weaponShoulder = 0;
+  let weaponTorso = 0, weaponShoulder = 0, weaponRear = -Infinity;
   let weaponTrigger = 0, weaponSupport = 0, weaponFailures = 0;
   for (const [name, aim, options, freshAttach = false] of states) {
     totalPoses++;
@@ -112,7 +115,7 @@ for (const def of firearms) {
     else applyRifleCarry(rig, weapon, aim, 1 / 60, options);
     body.updateMatrixWorld(true);
 
-    let torso = 0, shoulder = 0;
+    let torso = 0, shoulder = 0, rear = -Infinity;
     const p = new THREE.Vector3();
     weapon.traverse((mesh) => {
       const position = mesh.isMesh && mesh.geometry?.attributes?.position;
@@ -121,12 +124,17 @@ for (const def of firearms) {
         p.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
         torso = Math.max(torso, torsoPenetration(p));
         shoulder = Math.max(shoulder, shoulderPenetration(p));
+        // A stock disappearing behind the body-facing shoulder plane reads as
+        // embedded even when no sampled vertex lands inside the conservative
+        // torso volumes. Track the complete gun's rear-most surface too.
+        if (p.y >= 1.20 && p.y <= 1.72) rear = Math.max(rear, p.z);
       }
     });
     globalTorso = Math.max(globalTorso, torso);
     globalShoulder = Math.max(globalShoulder, shoulder);
     weaponTorso = Math.max(weaponTorso, torso);
     weaponShoulder = Math.max(weaponShoulder, shoulder);
+    weaponRear = Math.max(weaponRear, rear);
     let triggerError = 0, supportError = 0;
     if (!freshAttach) {
       const triggerTarget = GRIP_LOCAL.clone().applyMatrix4(weapon.matrixWorld);
@@ -139,7 +147,8 @@ for (const def of firearms) {
     }
     weaponTrigger = Math.max(weaponTrigger, triggerError);
     weaponSupport = Math.max(weaponSupport, supportError);
-    const ok = torso <= MAX_PENETRATION && shoulder <= MAX_PENETRATION
+    const rearClear = rear === -Infinity || rear <= 0;
+    const ok = torso <= MAX_PENETRATION && shoulder <= MAX_PENETRATION && rearClear
       && triggerError <= MAX_PENETRATION && supportError <= MAX_PENETRATION;
     if (!ok) {
       failures++;
@@ -147,6 +156,7 @@ for (const def of firearms) {
       console.log(
         `FAIL ${def.id.padEnd(15)} ${name.padEnd(14)} `
         + `torso=${(torso * 100).toFixed(1)}cm shoulder=${(shoulder * 100).toFixed(1)}cm `
+        + `rear=${rear === -Infinity ? 'n/a' : `${(rear * 100).toFixed(1)}cm`} `
         + `trigger=${(triggerError * 100).toFixed(1)}cm `
         + `support=${(supportError * 100).toFixed(1)}cm`,
       );
@@ -158,6 +168,7 @@ for (const def of firearms) {
     `${ok ? 'ok  ' : 'FAIL'} ${def.id.padEnd(15)} ${states.length} poses `
     + `torso=${(weaponTorso * 100).toFixed(1)}cm `
     + `shoulder=${(weaponShoulder * 100).toFixed(1)}cm `
+    + `rear=${weaponRear === -Infinity ? 'n/a' : `${(weaponRear * 100).toFixed(1)}cm`} `
     + `trigger=${(weaponTrigger * 100).toFixed(1)}cm `
     + `support=${(weaponSupport * 100).toFixed(1)}cm`,
   );

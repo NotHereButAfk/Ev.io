@@ -84,7 +84,10 @@ for (const [name, aim, options] of carryStates) {
       supportLocal.y - HANDGUARD_LOCAL.y,
     );
     worstSupportRail = Math.max(worstSupportRail, railError);
-    assert(railError < 0.008,
+    // The displayed hand belongs on the near face, not the weapon centreline.
+    // The shared carry can move it up to 1.2cm inward when extra shoulder
+    // clearance is needed; that is still well inside a real handguard surface.
+    assert(railError < 0.015,
       `${name} support wrist leaves the handguard rail by ${(railError * 100).toFixed(2)}cm`);
   }
 

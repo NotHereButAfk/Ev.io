@@ -56,9 +56,10 @@ const MAG_LOCAL = new THREE.Vector3(-0.04, -0.26, -0.02);
 // line — the same place the carry's own swing pivots about — so the rifle sits
 // at the same point on the chest relative to the arm holding it.
 //
-// The gun itself is NOT scaled with the body, and should not be: a rifle is
-// about 0.9m whoever is holding it. On the old 2.2m figure it read as a
-// carbine; at human scale it reads as a rifle.
+// Gun size is not derived from the body: a rifle is about 0.9m whoever is
+// holding it. A few procedural assets were authored at first-person showcase
+// size, however, so fitWeaponToWorldSize() corrects those to one fixed physical
+// envelope before this body-independent carry solve runs.
 const ARM_SCALE = (UP_ARM + FOREARM) / (0.48 + 0.385);
 const onArm = (x, y, z) => new THREE.Vector3(
   x * ARM_SCALE, SHOULDER_Y + (y - 1.76) * ARM_SCALE, z * ARM_SCALE);
@@ -78,10 +79,21 @@ const AIM = {
 // Clearance belongs to the complete 1.14m rifle mesh, not just the receiver
 // origin above. These two offsets seat the rear of the stock on the visible
 // shoulder surface and keep the receiver in front of the chest.
-const BASE_OUTBOARD = 0.020;
-const BODY_FORWARD_CLEARANCE = 0.120;
+const BASE_OUTBOARD = 0.032;
+// The weapon origin is at the receiver, while a real M4 continues roughly
+// 44.5cm back to its buttpad.  The previous 12cm nudge only cleared the
+// receiver: the stock still ended behind the shoulder centre, so from the side
+// and three-quarter views it visibly disappeared into the player model.  Seat
+// the buttpad on the FRONT of the shoulder pocket instead.  Longer stocks add
+// their measured excess in weaponClearance(), so this remains one shared rule
+// for the full arsenal rather than another per-gun offset table.
+const BODY_FORWARD_CLEARANCE = 0.330;
 const REFERENCE_STOCK_BACK = 0.445;
 const REFERENCE_HALF_WIDTH = 0.052;
+// Fixed world-size target for procedural meshes whose authored showcase size
+// is longer than a person can shoulder. This is independent of character
+// stature: it corrects the weapon asset once instead of scaling guns to bodies.
+const WORLD_STOCK_BACK = 0.380;
 
 // Each gun shares the same grip coordinate system, but its authored stock and
 // receiver have different dimensions. Measure those dimensions once from the
@@ -92,14 +104,7 @@ const _bounds = new THREE.Box3();
 const _partBounds = new THREE.Box3();
 const _invWeapon = new THREE.Matrix4();
 const _partToWeapon = new THREE.Matrix4();
-function weaponClearance(weapon) {
-  if (!weapon) return { forward: 0, outboard: 0 };
-  // Lightweight action/unit probes pass a transform-only stand-in. They have
-  // no mesh to measure and intentionally use the reference dimensions.
-  if (!weapon.userData || typeof weapon.traverse !== 'function'
-      || typeof weapon.updateWorldMatrix !== 'function')
-    return { forward: 0, outboard: 0 };
-  if (weapon.userData.rifleCarryClearance) return weapon.userData.rifleCarryClearance;
+function measureWeaponBounds(weapon) {
   weapon.updateWorldMatrix(true, true);
   _bounds.makeEmpty();
   _invWeapon.copy(weapon.matrixWorld).invert();
@@ -110,9 +115,39 @@ function weaponClearance(weapon) {
     _partBounds.copy(part.geometry.boundingBox).applyMatrix4(_partToWeapon);
     _bounds.union(_partBounds);
   });
-  const back = _bounds.isEmpty() ? REFERENCE_STOCK_BACK : _bounds.max.z;
-  const halfWidth = _bounds.isEmpty() ? REFERENCE_HALF_WIDTH
-    : Math.max(Math.abs(_bounds.min.x), Math.abs(_bounds.max.x));
+  return _bounds;
+}
+
+// Correct only oversized authored assets to a fixed physical stock envelope.
+// This is deliberately not proportional to the player model: every chassis
+// and every network peer sees the same world-size firearm.
+function fitWeaponToWorldSize(weapon) {
+  if (!weapon?.userData || weapon.userData.rifleWorldScaleApplied) return;
+  const measured = measureWeaponBounds(weapon);
+  const stockBack = measured.isEmpty() ? REFERENCE_STOCK_BACK : Math.max(0.001, measured.max.z);
+  const scale = THREE.MathUtils.clamp(WORLD_STOCK_BACK / stockBack, 0.60, 1);
+  weapon.scale.multiplyScalar(scale);
+  weapon.userData.rifleWorldScale = scale;
+  weapon.userData.rifleWorldScaleApplied = true;
+  weapon.updateMatrix();
+  weapon.updateMatrixWorld(true);
+}
+
+function weaponClearance(weapon) {
+  if (!weapon) return { forward: 0, outboard: 0 };
+  // Lightweight action/unit probes pass a transform-only stand-in. They have
+  // no mesh to measure and intentionally use the reference dimensions.
+  if (!weapon.userData || typeof weapon.traverse !== 'function'
+      || typeof weapon.updateWorldMatrix !== 'function')
+    return { forward: 0, outboard: 0 };
+  fitWeaponToWorldSize(weapon);
+  if (weapon.userData.rifleCarryClearance) return weapon.userData.rifleCarryClearance;
+  const measured = measureWeaponBounds(weapon);
+  const scaleX = Math.abs(weapon.scale.x || 1);
+  const scaleZ = Math.abs(weapon.scale.z || 1);
+  const back = measured.isEmpty() ? REFERENCE_STOCK_BACK : measured.max.z * scaleZ;
+  const halfWidth = measured.isEmpty() ? REFERENCE_HALF_WIDTH
+    : Math.max(Math.abs(measured.min.x), Math.abs(measured.max.x)) * scaleX;
   const result = {
     forward: Math.max(0, back - REFERENCE_STOCK_BACK),
     // Preserve the same body-facing inner edge as the reference rifle.  Half
@@ -180,10 +215,14 @@ function solveArm(shoulder, elbow, sx, T, swivel) {
   elbow.rotation.set(bend, 0, 0);
 }
 
-// The guns are NOT scaled to the body, and should not be — a rifle is about
-// 0.9m whoever is holding it. But that means the front of a long handguard can
-// sit past a shorter shooter's reach, and an arm that cannot get there leaves
-// the hand hovering off the end of the weapon.
+function scaledWeaponLocal(out, local, weapon) {
+  out.copy(local);
+  if (weapon?.scale) out.multiply(weapon.scale);
+  return out;
+}
+
+// A long handguard can sit past the support arm's reach and leave the hand
+// hovering off its front end.
 //
 // A real shooter answers this by gripping FURTHER BACK, so that is what happens
 // here: the support target slides along the weapon's own axis, toward the stock,
@@ -237,6 +276,7 @@ function slideToReach(T, sx) {
  *   posing them here as well would just fight that solve.
  */
 export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
+  fitWeaponToWorldSize(weapon);
   const a    = Math.max(0, Math.min(1, aim));
   const kick = o.kick || 0;
   const reload = o.reload || 0, swap = o.swap || 0, flinch = o.flinch || 0;
@@ -290,6 +330,9 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     _q.multiply(_qAct);
     _pos.y -= 0.13 * reloadB + 0.24 * swapB;
     _pos.x -= 0.05 * reloadB;
+    // Once the muzzle is lowered there is room to bring the action back into
+    // reach without returning the stock to its firing-height shoulder pocket.
+    _pos.z += 0.08 * reloadB + 0.12 * swapB;
   }
   if (rack) _pos.z += 0.045 * rack;                // the bolt going back
 
@@ -350,7 +393,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 
   if (rig) {
     solveArm(rig.armR, rig.elbowR,  SHOULDER_X,
-             _T.copy(GRIP_LOCAL).applyQuaternion(_q).add(_pos), SWIVEL_R);
+             scaledWeaponLocal(_T, GRIP_LOCAL, weapon).applyQuaternion(_q).add(_pos), SWIVEL_R);
     // The support hand leaves the handguard for the magazine and comes back.
     // Held at the mag through the middle of the reload rather than sliding
     // continuously, so it reads as two moves — strip, seat — not one smear.
@@ -366,7 +409,9 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     // Wider guns have been moved farther right to clear their complete mesh.
     // Offset the support grip by the same amount toward the shooter so the
     // palm stays on the near face instead of being dragged out of arm reach.
-    _T.x -= geometryClearance.outboard;
+    const supportNearFace = geometryClearance.outboard + (BASE_OUTBOARD - 0.020);
+    _T.x -= supportNearFace / Math.max(0.001, Math.abs(weapon?.scale?.x || 1));
+    if (weapon?.scale) _T.multiply(weapon.scale);
     _T.applyQuaternion(_q).add(_pos);
     slideToReach(_T, -SHOULDER_X);
     // Keep the exact displayed grip available to geometry probes and visual
@@ -382,6 +427,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 
 /** The neutral (un-animated) transform, for attaching a freshly built weapon. */
 export function restRifleTransform(weapon) {
+  fitWeaponToWorldSize(weapon);
   const geometryClearance = weaponClearance(weapon);
   weapon.position.copy(PATROL.wp);
   weapon.position.x += BASE_OUTBOARD + geometryClearance.outboard;

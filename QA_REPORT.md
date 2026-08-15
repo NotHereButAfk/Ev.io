@@ -255,6 +255,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. The expanded network-presentation gate passes 8/8 checks, the production build compiles, and the complete 27/27 release certificate remains green. Commit `fed1d52` deployed successfully in run `31803945570`; repeating the exact cache-busted saved-profile capture completed first- and third-person frames with no page errors.
 
+## BUG-014
+
+**Severity:** High
+
+**System:** Playable exosuit firearm scale / stock and shoulder clearance
+
+**Steps to reproduce:** Enter a match on Vanguard, Striker, or Phantom; inspect the Auto Rifle from the front-three-quarter and side views; then exercise idle, walk, run, aim up/down, flinch, reload, and swap with every firearm. Watch the complete rear stock rather than only the weapon origin.
+
+**Expected behavior:** The buttpad seats at the front of the firing shoulder, the complete stock remains outside the visible pauldron/body plane, and both hands remain on the displayed grip surfaces throughout motion and actions.
+
+**Observed behavior:** The receiver-origin and sparse vertex-volume checks passed, but the Auto Rifle stock could still disappear into the visible shoulder silhouette. Several procedural assets also retained first-person showcase dimensions in third person; moving the receiver alone either preserved the clipping or straightened the arms beyond a natural reach.
+
+**Root cause:** The clearance gate used a 10.5 cm bare-joint shoulder sphere instead of the largest 14.5 cm playable pauldron envelope and did not assert the complete gun's rear-most body plane. `RifleCarry` positioned the receiver while the visible stock extends about 44.5 cm behind it, and did not correct overlong showcase-authored assets to a physical world size.
+
+**Files changed:** `src/player/RifleCarry.js`, `tests/rifle-carry-reference.test.mjs`, `tools/rifle_body_clearance_check.mjs`, `tools/rifle_carry_visual_check.mjs`, `package.json`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Normalize only oversized showcase-authored firearms to one fixed 38 cm world-space stock envelope, independent of character size; apply that same correction to both grip targets; move the shared carry plane forward and slightly outboard by measured stock/receiver clearance; and put the support palm on the shooter-facing handguard surface. Reload and swap tuck toward the body only after the muzzle lowers, preserving anatomical reach without returning the stock to the shoulder. The regression now checks the expanded visible-armor shoulder volume and the complete gun's rear plane in addition to torso penetration and both wrist contacts.
+
+**Verification:** PASS locally. All 17 firearms pass 272 production poses with 0.0 cm torso penetration, at most 0.6 cm contact against the expanded pauldron envelope, no surface behind the body plane, and both wrists on the displayed targets. Gait, action, playable-roster, and authoritative-remote presentation gates pass. The complete release certificate is 27/27, including authoritative abuse coverage and the 64-player soak. Real-browser gameplay smoke passes movement, look/ADS, fire, reload, swap, blink, grenades, scoreboard, death, respawn, and kill-plane recovery with zero console/request failures. A dedicated browser visual captures clean front, three-quarter, and side views, and the current first-person match view remains clear of the body. Production deployment verification is recorded after publication below.
+
 ## Known product gaps, not falsely marked fixed
 
 - Team Slayer is currently a menu label backed by deathmatch logic.
