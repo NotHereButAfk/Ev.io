@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-021
+
+**Severity:** Medium
+
+**System:** Third-person locomotion cadence and transition smoothing
+
+**Steps to reproduce:** Enter third person, walk at the standard 6.2-unit speed, then sprint at 10.85 units while watching the legs from behind or the side.
+
+**Expected behavior:** The ninja should use a readable athletic step cadence that accelerates smoothly from walking into sprinting. Arena movement speed should feel stylized without making the legs spin like a treadmill.
+
+**Observed behavior:** The ground-distance solver tried to cancel all arena-scale travel with a physically planted 1.82 m body. That forced the standard walk to 6.35 full gait cycles per second (12.7 footfalls/s) and sprint to 13.58 cycles/s (27.2 footfalls/s), visibly much faster than the character's apparent travel.
+
+**Root cause:** Locomotion derived phase only from world distance and the figure's anatomically limited step length. That is correct at ordinary human-scale speed but has no plausible solution at the game's much faster arena movement scale.
+
+**Files changed:** `src/player/Locomotion.js`, `tools/gait_check.mjs`, `tools/certify.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Preserve distance-driven phase at ordinary speeds, then smoothly ease into an athletic visual cap of 1.85 cycles/s for walking and 2.35 cycles/s for sprinting. Lengthen the thigh swing moderately so high-speed travel still reads as purposeful, and apply the same shared gait to the local player, bots, and remote avatars.
+
+**Verification:** PASS locally. Standard movement now settles at 2.08 cycles/s (4.15 footfalls/s) and sprint at 2.35 cycles/s (4.70 footfalls/s), eliminating the previous 12.7/27.2 footfall treadmill effect. Human-scale 1.5 m/s foot slip remains 0.14, crouched soles stay at 0 mm, directional gait, jumps, teleports, landing absorption, actions, all 272 firearm poses, production build, and all 28/28 automated release gates pass. A real local 8/8 third-person match accepted movement with the visibly slower gait and zero page errors. Production deployment verification is pending this change's release.
+
 ## BUG-020
 
 **Severity:** Medium

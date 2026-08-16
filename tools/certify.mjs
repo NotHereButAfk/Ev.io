@@ -35,7 +35,7 @@ const AUTO = [
     fn: () => { const r = run('npm run test:player-death'); return { ok: r.ok && /player death fall passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-GRENADE', phase: 'combat', name: 'Grenade keys and self-damage enter authoritative flow',
     fn: () => { const r = run('npm run test:grenades'); return { ok: r.ok && /grenade contract passed/.test(r.out), detail: tail(r.out) }; } },
-  { id: 'G-GAIT', phase: '—', name: 'Walk cycle plants in every direction, jump has a pose',
+  { id: 'G-GAIT', phase: '—', name: 'Locomotion cadence stays readable in every direction; jump has a pose',
     fn: () => { const r = run('npm run test:gait'); return { ok: r.ok && /all gait checks passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-ACT', phase: '—', name: 'Every action moves the body',
     fn: () => { const r = run('npm run test:actions'); return { ok: r.ok && /all action checks passed/.test(r.out), detail: tail(r.out) }; } },

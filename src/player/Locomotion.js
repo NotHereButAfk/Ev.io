@@ -112,6 +112,16 @@ function soleY(py, pz, thigh, knee, ankle, lean, hipYaw) {
 // left the feet skating at ~45% of body speed at a walk.
 const STEP_SAMPLES = 128;
 const _stepCache = new Map();
+
+// Arena movement is several times faster than a human body of this scale can
+// cover with a physically planted stride. Driving phase from distance alone
+// made the legs cycle at 12.7 steps/s while walking and 27.2 while sprinting.
+// Keep distance-lock at ordinary speeds, then cap the visual cadence at a
+// readable athletic rate. The remaining game-space travel is intentionally
+// represented as stylised speed instead of turning the character into a
+// treadmill. Exported so the gait regression test guards the feel directly.
+export const WALK_CADENCE_CAP = 1.85;   // cycles/s = 3.7 footfalls/s
+export const SPRINT_CADENCE_CAP = 2.35; // cycles/s = 4.7 footfalls/s
 function groundPerStep(amp, kAmp, kneeBase, cHip, run, lean) {
   // Depends only on the pose parameters, which change slowly — quantize and
   // cache so this doesn't run a full sweep on every frame of every body.
@@ -311,7 +321,10 @@ export function applyWalkCycle(rig, o = {}) {
   const cKnee  = -1.05 * crouch;
   const cHip   =  0.55 * crouch;
 
-  const amp  = 0.50 + 0.38 * run;   // thigh swing
+  // A longer stride lets the capped cadence still read as fast travel. These
+  // remain comfortably inside the hip range and retain the same knee/ankle
+  // ground solve, so crouch, jump, slide, and weapon layers stay independent.
+  const amp  = 0.58 + 0.42 * run;   // thigh swing
   const kAmp = 0.95 + 0.55 * run;   // knee flex through the swing phase
 
   // ── Lock the stride to the ground ──────────────────────────────────────────
@@ -327,8 +340,15 @@ export function applyWalkCycle(rig, o = {}) {
   // contact; advancing a hidden walk underneath it makes the feet switch phase
   // during the blend and on the first landing frame.
   const airborne = o.grounded === false;
+  const distanceCycles = Math.max(speed, 0.4) / (step * 2);
+  const cadenceCap = WALK_CADENCE_CAP
+    + (SPRINT_CADENCE_CAP - WALK_CADENCE_CAP) * run;
+  const targetCadence = Math.min(distanceCycles, cadenceCap);
+  if (rig._gaitCadence === undefined) rig._gaitCadence = targetCadence;
+  const cadenceEase = 1 - Math.exp(-9 * dt);
+  rig._gaitCadence += (targetCadence - rig._gaitCadence) * cadenceEase;
   rig._walkT += moving && !airborne
-    ? strideSign * (Math.PI * Math.max(speed, 0.4) / step) * dt
+    ? strideSign * (Math.PI * 2 * rig._gaitCadence) * dt
     : airborne ? 0 : dt * 1.2;
   const t = rig._walkT;
 
