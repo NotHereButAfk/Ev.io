@@ -312,6 +312,8 @@ const MAX_REACH_FRACTION = 0.9951;
 const MIN_LOW_READY_DROP = 0.060;
 const MIN_LOW_READY_FORWARD = 0.150;
 const MIN_LATERAL_SHOULDER_RATIO = 1.00;
+const MIN_SOLDIER_LOW_READY_PITCH = THREE.MathUtils.degToRad(22);
+const MAX_SOLDIER_LOW_READY_PITCH = THREE.MathUtils.degToRad(38);
 let failures = 0;
 const failedResults = [];
 for (const result of results) {
@@ -326,6 +328,11 @@ for (const result of results) {
   // IK could still be numerically perfect while the whole weapon sat above the
   // real Soldier's shoulders. The production idle pose must remain low-ready.
   const heightOk = !result.lowReady || result.receiverBelowShoulders >= MIN_LOW_READY_DROP;
+  // Guard the actual loaded Soldier path, not only the procedural fallback:
+  // idle must visibly carry muzzle-down instead of looking almost ADS.
+  const soldierCarryOk = !result.lowReady
+    || (result.muzzlePitch < -MIN_SOLDIER_LOW_READY_PITCH
+      && result.muzzlePitch > -MAX_SOLDIER_LOW_READY_PITCH);
   // Keep the receiver outside the torso silhouette, at or beyond the right
   // shoulder line. A forward-only offset can be physically clear yet still
   // look embedded from the normal rear camera, which was the reported defect.
@@ -337,7 +344,7 @@ for (const result of results) {
   const surfaceContactOk = result.rightSurfaceDistance <= MAX_GRIP_SURFACE_DISTANCE
     && result.leftSurfaceDistance <= MAX_GRIP_SURFACE_DISTANCE;
   const ok = rightOk && leftOk && leftReachOk && rightReachOk && pitchOk
-    && heightOk && bodyClearOk && meshClearOk && surfaceContactOk;
+    && heightOk && soldierCarryOk && bodyClearOk && meshClearOk && surfaceContactOk;
   if (!ok) { failures++; failedResults.push(result); }
 }
 

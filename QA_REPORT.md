@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-023
+
+**Severity:** High
+
+**System:** Loaded third-person Soldier weapon carry
+
+**Steps to reproduce:** Allow `soldier.glb` to finish loading, enter a match in third person, and compare the idle M4 hold with the fallback ninja pose or the supplied standing-soldier reference.
+
+**Expected behavior:** The character model actually used after asynchronous Soldier loading must receive the same visible soldier-style low-ready correction: shoulder-retained stock, diagonal muzzle-down rifle, hands on the grip and fore-end, and elbows held close to the ribs.
+
+**Observed behavior:** The previous correction changed only `RifleCarry.js`, which controls the connected fallback body. When `soldier.glb` loaded successfully, `Game` switched to `HumanSoldier` and returned through its separate `HumanRifleCarry.js` path, whose old 9-degree high-ready transform remained unchanged. The live model therefore looked identical despite the earlier deployment.
+
+**Root cause:** Two third-person body implementations own separate weapon transforms. Verification captured the fallback pose renderer and numerical firearm clearance but did not assert the loaded Soldier's visible idle muzzle angle.
+
+**Files changed:** `src/player/HumanRifleCarry.js`, `tools/human_rifle_carry_check.mjs`, `QA_REPORT.md`
+
+**Fix:** Apply the supplied reference directly to the loaded Soldier solver: a 35.5-degree patrol target blended to a 22-38-degree runtime low-ready, receiver held just below the shoulders, stock moved 6 cm closer while preserving 31.1 cm of forward body clearance, and tighter IK elbow poles. Reduce the redundant sprint/reload/swap pitch additions so actions build on the new low-ready instead of doubling it. Preserve the separate level ADS target.
+
+**Verification:** PASS locally. The real `soldier.glb` was rendered from front, three-quarter, and side views at the production 18% idle blend. All 17 firearms pass 816 loaded-Soldier pose/armor/action combinations with 0.00 cm wrist error, 0.0 cm torso/shoulder penetration, at least 21.7 cm lateral receiver clearance, and at least 31.1 cm forward clearance. Human locomotion and action continuity pass. Production verification is pending deployment.
+
 ## BUG-022
 
 **Severity:** Medium

@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 
 // Body-local weapon poses. The muzzle is model-local -Z and the soldier faces
-// body-local -Z, so AIM is nearly identity. PATROL is the high, close
-// combat-ready carry visible in ev.io's official third-person material: stock
-// at the shoulder, receiver at the upper chest, muzzle only slightly lowered.
+// body-local -Z, so AIM is nearly identity. PATROL matches the supplied real
+// soldier reference: stock retained at the shoulder, receiver at the lower
+// chest, firing hand on the grip, support hand under the fore-end, and muzzle
+// carried safely down and across the body.
 const PATROL_Q = new THREE.Quaternion().setFromEuler(
-  new THREE.Euler(-0.160, 0.220, 0.200)
+  new THREE.Euler(-0.620, 0.280, 0.120)
 );
 // A shouldered long gun toes inward a few degrees: the butt stays out in the
 // right shoulder pocket while the muzzle converges on the body's sight line.
@@ -23,7 +24,10 @@ const BASE_ARM_REACH = 0.47268;
 // the receiver 10-16cm ABOVE the shoulders, drove the stock through the head,
 // and made both forearms cover the face. Keep low-ready below the shoulder and
 // let a full aim rise only to the shoulder pocket.
-const PATROL_OFFSET = new THREE.Vector3(0.28, -0.13, -0.18);
+// The receiver remains just below the shoulder midpoint. The stronger pitch
+// raises the stock into the shoulder pocket and drops the muzzle; lowering the
+// entire weapon as well would pull long-gun fore-ends beyond the support arm.
+const PATROL_OFFSET = new THREE.Vector3(0.28, -0.14, -0.12);
 const AIM_OFFSET = new THREE.Vector3(0.28, -0.05, -0.20);
 // Seat the rear of the production stock on the front of the shoulder pocket.
 // The stock geometry extends behind the receiver origin. Without this common
@@ -231,7 +235,10 @@ function solveArm(body, arm, forearm, hand, targetWorld, side) {
   // Elbows prefer down and away from the ribs. Build that pole in body-local
   // coordinates, transform it into world space, and remove its component along
   // the shoulder→hand line.
-  const pole = V[8].set(side * 0.72, -0.82, 0.20).transformDirection(body.matrixWorld);
+  // Soldier low-ready keeps both elbows below the shoulder line and close to
+  // the ribs. The old wide pole produced a conspicuous chicken-wing firing arm
+  // even though the wrists were numerically attached to the gun.
+  const pole = V[8].set(side * 0.45, -1.00, 0.12).transformDirection(body.matrixWorld);
   pole.addScaledVector(direction, -pole.dot(direction));
   if (pole.lengthSq() < 1e-8) pole.set(side, -0.5, 0);
   pole.normalize();
@@ -274,8 +281,12 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   // Same common-mode vertical follow as the procedural third-person rig:
   // looking pitch moves the shouldered weapon and both IK arms as one unit.
   const lookPitch = aim * THREE.MathUtils.clamp(state.pitch || 0, -0.95, 0.95) * 0.62;
-  const carryPitch = lookPitch + (state.sway || 0) - sprint * 0.26
-    - reloadBell * 0.30 - swapBell * 0.54 - recoil * 0.10 - rack * 0.08;
+  // PATROL is already a genuine low-ready. Dynamic actions only need a small
+  // additional tuck; retaining the old high-ready correction here doubled the
+  // drop, overextended the support arm on long rifles, and hid the gun against
+  // the thighs during sprint/swap.
+  const carryPitch = lookPitch + (state.sway || 0) - sprint * 0.12
+    - reloadBell * 0.22 - swapBell * 0.30 - recoil * 0.10 - rack * 0.08;
   if (reloadBell || swapBell) {
     // Roll the magazine toward the support shoulder. The opposite sign presents
     // it body-right and puts the target beyond the real Mixamo arm's reach.
