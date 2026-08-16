@@ -193,7 +193,9 @@ export class Game {
     this.pickupSystem = null; // created on first play, cleared on restart
     this.menu           = new MenuUI();
 
-    this.menuCamera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 300);
+    // The menu background is a first-person spectator POV, not a fixed hero
+    // shot. Match the playable camera's wider spatial feel.
+    this.menuCamera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
 
     // Cinematic spectator waypoints (pos + lookAt) for the fly-through
     this._camWpts = [
@@ -214,6 +216,7 @@ export class Game {
     this._camLook = new THREE.Vector3();
     this._camPreviousPos = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
     this._camStallTime = 0;
+    this._camFadeIn = 0;
     this._rebuildSpectatorCurves();
 
     this.selectedSkin      = getSkin('spartan');
@@ -331,6 +334,9 @@ export class Game {
   }
 
   _configureMapCamera(map) {
+    // Imported routes are authored from valid player viewpoints. Float along
+    // every lane, then briefly dissolve between lanes so touring the complete
+    // arena never exposes a camera cut or crosses solid map geometry.
     if (map.spectatorRoutes?.length) {
       this._camRoutes = map.spectatorRoutes
         .map((route) => route.filter((waypoint, index) => (
@@ -341,12 +347,15 @@ export class Game {
       this._camRouteIndex = 0;
       this._camWpts = this._camRoutes[0];
       this._camTravelTime = 0;
+      this._camFadeIn = 0;
+      this.canvas.style.opacity = '1';
       this._rebuildSpectatorCurves();
       this.menuCamera.far = 600;
       this.menuCamera.updateProjectionMatrix();
       return;
     }
-    // Use the authored playable bounds. Imported maps also contain enormous
+    // Fallback for maps without authored safe lanes. Use the authored playable
+    // bounds; imported maps also contain enormous
     // decorative sky/fog meshes and off-map collision shells; including those
     // would push the camera kilometres away from the actual arena.
     const bounds = map.bounds;
@@ -354,15 +363,10 @@ export class Game {
     const size = bounds.getSize(new THREE.Vector3());
     const pad = Math.max(18, Math.min(size.x, size.z) * 0.08);
     const height = Math.max(30, bounds.max.y + 18);
-    // Every control point must clear the tallest rendered mesh. Lowering this
-    // as a ratio of total height put the camera underneath tall map towers.
     const lowHeight = Math.max(24, bounds.max.y + 10);
     const tx = Math.max(12, size.x * 0.18);
     const tz = Math.max(12, size.z * 0.18);
     const targetY = THREE.MathUtils.clamp(12, bounds.min.y + 6, bounds.max.y - 5);
-    // Imported EV maps used to override this with three points packed into a
-    // two-metre lane. These perimeter points cover every side of the arena and
-    // stay above authored geometry, so the spectator really tours the map.
     this._camWpts = [
       { p: new THREE.Vector3(center.x - tx, height, bounds.max.z + pad), t: new THREE.Vector3(center.x - tx, targetY, center.z + tz) },
       { p: new THREE.Vector3(bounds.max.x + pad, lowHeight, center.z + tz), t: new THREE.Vector3(center.x + tx, targetY, center.z + tz) },
@@ -393,8 +397,8 @@ export class Game {
     );
     const pathLength = this._camPath.getLength();
     this._camCycleDuration = closed
-      ? THREE.MathUtils.clamp(pathLength / 14, 12, 28)
-      : THREE.MathUtils.clamp(pathLength / 12, 5.5, 11);
+      ? THREE.MathUtils.clamp(pathLength / 7, 32, 90)
+      : THREE.MathUtils.clamp(pathLength / 3.5, 4, 8);
     this._camStallTime = 0;
   }
 
@@ -668,6 +672,7 @@ export class Game {
   }
 
   _startGame(name, skinId, modeId = 'deathmatch', armorTypeId) {
+    this.canvas.style.opacity = '1';
     this._clearMenuBots();
     this.audio.resume();
     this.selectedSkin      = getSkin(skinId);
@@ -1938,14 +1943,26 @@ export class Game {
     // Continuous map-wide spectator fly-through. getPointAt is arc-length
     // sampled, keeping travel speed stable even when waypoint spacing varies.
     this._camTravelTime += dt;
+    const fadeWindow = 0.18;
+    let cameraOpacity = 1;
+    if (this._camRoutes.length > 1) {
+      const remaining = this._camCycleDuration - this._camTravelTime;
+      if (remaining < fadeWindow) cameraOpacity = THREE.MathUtils.clamp(remaining / fadeWindow, 0, 1);
+    }
     if (this._camTravelTime >= this._camCycleDuration) {
       this._camTravelTime %= this._camCycleDuration;
       if (this._camRoutes.length > 1) {
         this._camRouteIndex = (this._camRouteIndex + 1) % this._camRoutes.length;
         this._camWpts = this._camRoutes[this._camRouteIndex];
         this._rebuildSpectatorCurves();
+        this._camFadeIn = fadeWindow;
       }
     }
+    if (this._camFadeIn > 0) {
+      this._camFadeIn = Math.max(0, this._camFadeIn - dt);
+      cameraOpacity = Math.min(cameraOpacity, 1 - this._camFadeIn / fadeWindow);
+    }
+    this.canvas.style.opacity = String(cameraOpacity);
     const u = this._camTravelTime / this._camCycleDuration;
     this._camPath.getPointAt(u, this._camPos);
     this._camLookPath.getPointAt(u, this._camLook);
