@@ -152,6 +152,24 @@ const REFERENCE_HALF_WIDTH = 0.052;
 // is longer than a person can shoulder. This is independent of character
 // stature: it corrects the weapon asset once instead of scaling guns to bodies.
 const WORLD_STOCK_BACK = 0.380;
+// Procedural guns were originally authored as menu/showcase pieces, so stock
+// length alone is not enough to normalize them: stockless pistols/SMGs and
+// tall sci-fi receivers can remain enormous even when max.z looks harmless.
+// These are complete real-world envelopes in metres. Scaling is uniform so
+// barrels, grips and sights keep their authored proportions.
+const WORLD_LENGTH_BY_ID = Object.freeze({
+  sidearm: 0.30, magnum: 0.34,
+  uzi: 0.48, needler: 0.54, plasmarifle: 0.65,
+  levershotgun: 0.90, energyshotgun: 0.88,
+  m4: 0.90, m16: 1.07, rifle: 0.88,
+  lmg: 0.98,
+  boltsniper: 1.02, battlerifle: 0.98, dmr: 0.98,
+  rpg: 1.00, fuelrod: 0.82, concussion: 0.78,
+});
+const WORLD_HEIGHT_BY_CARRY = Object.freeze({
+  pistol: 0.25, compact: 0.28, shotgun: 0.30, rifle: 0.34,
+  support: 0.36, precision: 0.36, launcher: 0.30,
+});
 
 // Each gun shares the same grip coordinate system, but its authored stock and
 // receiver have different dimensions. Measure those dimensions once from the
@@ -183,7 +201,16 @@ function fitWeaponToWorldSize(weapon) {
   if (!weapon?.userData || weapon.userData.rifleWorldScaleApplied) return;
   const measured = measureWeaponBounds(weapon);
   const stockBack = measured.isEmpty() ? REFERENCE_STOCK_BACK : Math.max(0.001, measured.max.z);
-  const scale = THREE.MathUtils.clamp(WORLD_STOCK_BACK / stockBack, 0.60, 1);
+  const size = measured.getSize(new THREE.Vector3());
+  const handPose = weaponHandPose(weapon);
+  const targetLength = WORLD_LENGTH_BY_ID[weapon.userData.weaponId];
+  const targetHeight = WORLD_HEIGHT_BY_CARRY[handPose.carry];
+  const stockScale = WORLD_STOCK_BACK / stockBack;
+  const lengthScale = targetLength && size.z > 0.001 ? targetLength / size.z : 1;
+  const heightScale = targetHeight && size.y > 0.001 ? targetHeight / size.y : 1;
+  const scale = THREE.MathUtils.clamp(
+    Math.min(stockScale, lengthScale, heightScale, 1), 0.45, 1,
+  );
   weapon.scale.multiplyScalar(scale);
   weapon.userData.rifleWorldScale = scale;
   weapon.userData.rifleWorldScaleApplied = true;

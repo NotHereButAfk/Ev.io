@@ -50,6 +50,24 @@ const TORSO = [
 const SHOULDER_RADIUS = 0.145;
 const MAX_PENETRATION = 0.008;
 
+const _localBounds = new THREE.Box3();
+const _partBounds = new THREE.Box3();
+const _invRoot = new THREE.Matrix4();
+const _partToRoot = new THREE.Matrix4();
+function weaponLocalSize(weapon) {
+  weapon.updateWorldMatrix(true, true);
+  _localBounds.makeEmpty();
+  _invRoot.copy(weapon.matrixWorld).invert();
+  weapon.traverse((part) => {
+    if (!part.isMesh || !part.geometry) return;
+    if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    _partToRoot.multiplyMatrices(_invRoot, part.matrixWorld);
+    _partBounds.copy(part.geometry.boundingBox).applyMatrix4(_partToRoot);
+    _localBounds.union(_partBounds);
+  });
+  return _localBounds.getSize(new THREE.Vector3()).multiply(weapon.scale);
+}
+
 function torsoRadii(y) {
   if (y < TORSO[0][0] || y > TORSO.at(-1)[0]) return null;
   for (let i = 0; i < TORSO.length - 1; i++) {
@@ -114,6 +132,18 @@ const IDLE_PITCH_RANGE = {
   pistol: [12, 25], compact: [22, 38], shotgun: [30, 45],
   rifle: [30, 45], support: [20, 36], precision: [27, 42], launcher: [10, 28],
 };
+const MAX_LENGTH_BY_ID = {
+  sidearm: 0.30, magnum: 0.34,
+  uzi: 0.48, needler: 0.54, plasmarifle: 0.65,
+  levershotgun: 0.90, energyshotgun: 0.88,
+  m4: 0.90, m16: 1.07, rifle: 0.88, lmg: 0.98,
+  boltsniper: 1.02, battlerifle: 0.98, dmr: 0.98,
+  rpg: 1.00, fuelrod: 0.82, concussion: 0.78,
+};
+const MAX_HEIGHT_BY_CARRY = {
+  pistol: 0.25, compact: 0.28, shotgun: 0.30, rifle: 0.34,
+  support: 0.36, precision: 0.36, launcher: 0.30,
+};
 let failures = 0;
 let globalTorso = 0;
 let globalShoulder = 0;
@@ -132,6 +162,7 @@ for (const def of firearms) {
   const rig = body.userData.rig;
   const bones = body.userData.bones;
   let weaponTorso = 0, weaponShoulder = 0, weaponRear = -Infinity;
+  let fittedSize = new THREE.Vector3();
   let weaponTrigger = 0, weaponSupport = 0, weaponFailures = 0;
   for (const [name, aim, options, freshAttach = false] of states) {
     totalPoses++;
@@ -139,6 +170,7 @@ for (const def of firearms) {
     body.add(weapon);
     if (freshAttach) restRifleTransform(weapon);
     else applyRifleCarry(rig, weapon, aim, 1 / 60, options);
+    if (freshAttach) fittedSize = weaponLocalSize(weapon);
     body.updateMatrixWorld(true);
 
     let soldierCarry = true;
@@ -204,13 +236,24 @@ for (const def of firearms) {
     body.remove(weapon);
   }
   const ok = weaponFailures === 0;
+  const physicalSizeOk = fittedSize.z <= MAX_LENGTH_BY_ID[def.id] + 0.005
+    && fittedSize.y <= MAX_HEIGHT_BY_CARRY[actualCarry] + 0.005;
+  if (!physicalSizeOk) {
+    failures++;
+    console.error(
+      `FAIL ${def.id}: physical envelope ${fittedSize.y.toFixed(2)}m high x `
+      + `${fittedSize.z.toFixed(2)}m long`,
+    );
+  }
   console.log(
-    `${ok ? 'ok  ' : 'FAIL'} ${def.id.padEnd(15)} ${states.length} poses `
+    `${ok && physicalSizeOk ? 'ok  ' : 'FAIL'} ${def.id.padEnd(15)} ${states.length} poses `
     + `torso=${(weaponTorso * 100).toFixed(1)}cm `
     + `shoulder=${(weaponShoulder * 100).toFixed(1)}cm `
     + `rear=${weaponRear === -Infinity ? 'n/a' : `${(weaponRear * 100).toFixed(1)}cm`} `
     + `trigger=${(weaponTrigger * 100).toFixed(1)}cm `
-    + `support=${(weaponSupport * 100).toFixed(1)}cm`,
+    + `support=${(weaponSupport * 100).toFixed(1)}cm `
+    + `size=${fittedSize.x.toFixed(2)}x${fittedSize.y.toFixed(2)}`
+    + `x${fittedSize.z.toFixed(2)}m`,
   );
 }
 

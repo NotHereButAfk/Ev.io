@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-025
+
+**Severity:** High
+
+**System:** Third-person firearm physical scale and LMG assembly
+
+**Steps to reproduce:** Equip each firearm on the active ninja roster and compare its complete model against the 1.82 m body, then inspect the pistol, Uzi, Needler, LMG, bolt rifle, battle rifle, and DMR from a three-quarter standing view.
+
+**Expected behavior:** Weapon class determines physical size. Pistols and compact guns remain hand-sized, service rifles fit the shoulder-to-hand reach, precision/support guns are longer without overwhelming the torso, and every visible barrel/accessory remains connected to its receiver.
+
+**Observed behavior:** The carry solver normalized only stock-back length. Stockless pistols and compact guns therefore kept showcase scale, while tall sci-fi receivers and magazines could remain visually oversized. Correcting the LMG receiver size also made its existing barrel gap and splayed carry-state bipod read as disconnected pieces.
+
+**Root cause:** `fitWeaponToWorldSize()` used one 0.38 m rear-stock envelope and a 0.60 minimum scale. That measurement cannot constrain stockless or unusually tall meshes. The LMG procedural builder also left an uncovered receiver-to-barrel transition and modeled its bipod as deployed while the weapon was being carried.
+
+**Files changed:** `src/player/RifleCarry.js`, `src/weapons/WeaponModels.js`, `tools/rifle_body_clearance_check.mjs`, `QA_REPORT.md`
+
+**Fix:** Uniformly fit every firearm to explicit real-world complete-length limits plus class-specific height envelopes; no axis is distorted. Retain already-believable weapons at their current dimensions. Add an LMG barrel trunnion/heat shield and fold both bipod legs along the barrel. Extend the production geometry gate to print and enforce the fitted dimensions for all 17 firearms.
+
+**Verification:** PASS. Sidearm length is reduced from 0.49 m to 0.30 m, Magnum to 0.34 m, Uzi to 0.44 m, Needler to 0.54 m, Plasma Rifle to 0.65 m, M4 to 0.89 m, LMG to 0.98 m, Battle Rifle to 0.98 m, and DMR to 0.88 m. Every firearm remains within its physical envelope and passes all 272 complete-mesh fresh/idle/walk/run/aim/flinch/reload/swap poses with 0.0 cm torso/shoulder penetration and attached trigger/support wrists. Browser inspection confirms the resized pistol, Uzi, LMG, and DMR proportions.
+
 ## BUG-024
 
 **Severity:** High

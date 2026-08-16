@@ -1275,6 +1275,13 @@ function buildLMG(color) {
   handleBar.position.set(0, 0.21, -0.035);
   g.add(handleBar);
 
+  // Barrel trunnion / short heat shield. The old receiver stopped at -0.24m
+  // while the visible barrel began around -0.32m, leaving a bright-background
+  // gap that made the front assembly look detached from the gun.
+  const trunnion = cyl(0.041, 0.034, 0.18, dark);
+  trunnion.position.set(0, 0.082, -0.285);
+  g.add(trunnion);
+
   // Long heavy barrel with fluted section
   const barrel = cyl(0.026, 0.022, 0.52, metal);
   barrel.position.set(0, 0.082, -0.58);
@@ -1318,14 +1325,13 @@ function buildLMG(color) {
   butt.position.set(0, 0.055, 0.49);
   g.add(butt);
 
-  // Bipod (folded down position)
-  const legL = cyl(0.011, 0.011, 0.3, metal, 8, Math.PI / 2.3);
-  legL.position.set(-0.065, -0.085, -0.56);
-  legL.rotation.z = 0.48;
+  // Bipod folded tight along the barrel for a carried weapon. Splayed legs
+  // read as floating rods in a low-ready pose and inflated the visible gun.
+  const legL = cyl(0.009, 0.009, 0.28, metal, 8);
+  legL.position.set(-0.045, 0.035, -0.49);
   g.add(legL);
-  const legR = cyl(0.011, 0.011, 0.3, metal, 8, Math.PI / 2.3);
-  legR.position.set(0.065, -0.085, -0.56);
-  legR.rotation.z = -0.48;
+  const legR = cyl(0.009, 0.009, 0.28, metal, 8);
+  legR.position.set(0.045, 0.035, -0.49);
   g.add(legR);
   // Bipod hinge
   const bipodBase = box(0.072, 0.022, 0.035, dark);
