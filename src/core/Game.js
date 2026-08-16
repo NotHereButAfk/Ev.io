@@ -58,6 +58,7 @@ import { countLocalMatchPlayers } from './Population.js';
 import { consumeThrowable } from './GameplayInput.js';
 import { deathCameraPose, deathFallProgress } from '../player/DeathAnimation.js';
 import { buildLeaderboardRows, buildMatchRows } from './MatchRows.js';
+import { bloomEnabled, postFxPixelRatio, rendererPixelRatio } from './RenderQuality.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -81,7 +82,7 @@ export class Game {
     });
     this.renderer.shadowMap.enabled = false; // sky-only lighting: no shadow casters
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.setPixelRatio(_q === 'high' ? Math.min(window.devicePixelRatio, 2) : _q === 'low' ? 0.6 : 1);
+    this.renderer.setPixelRatio(rendererPixelRatio(_q, window.devicePixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.78;
@@ -179,6 +180,14 @@ export class Game {
     this.hud            = new HUD();
     this.damageNumbers  = new DamageNumbers();
     this.nameplates     = new Nameplates();
+    // Reused by both active and menu simulation; do not allocate closures or
+    // temporary player vectors in the 60Hz loop.
+    this._damageCallback = (dmg, from) => this._onPlayerDamaged(dmg, from);
+    this._noopCallback = () => {};
+    this._menuDummyPlayer = {
+      position: new THREE.Vector3(9999, 9999, 9999),
+      isDead: true,
+    };
     this.serverSim      = new ServerSim({ maxPlayers: MAX_PLAYERS, botManager: this.botManager, hud: this.hud });
 
     // Optional shared match-state relay (see src/core/NetClient.js and
@@ -450,9 +459,8 @@ export class Game {
     const vol = GameSettings.get('volume');
     this.audio.setVolume(vol);
     const q = GameSettings.get('quality');
-    const pr = q === 'high' ? Math.min(window.devicePixelRatio, 2)
-             : q === 'low'  ? 0.6 : 1;
-    this.renderer.setPixelRatio(pr);
+    this.renderer.setPixelRatio(rendererPixelRatio(q, window.devicePixelRatio));
+    this.composer?.setPixelRatio(postFxPixelRatio(q, window.devicePixelRatio));
 
     // accessibility → runtime (visuals are CSS-driven; these are the 3D + audio bits)
     const rm = GameSettings.get('reduceMotion');
@@ -636,13 +644,12 @@ export class Game {
         this.player.camera.updateProjectionMatrix();
       }
       this.audio.setVolume(s.volume);
-      const pr = s.quality === 'high' ? Math.min(window.devicePixelRatio, 2)
-               : s.quality === 'low'  ? 0.6 : 1;
-      this.renderer.setPixelRatio(pr);
+      this.renderer.setPixelRatio(rendererPixelRatio(s.quality, window.devicePixelRatio));
+      this.composer?.setPixelRatio(postFxPixelRatio(s.quality, window.devicePixelRatio));
       // Apply the heavy toggles live so a quality drop gives immediate relief
       // (bloom + shadows). The decorative light budget is baked at world build,
       // so the lighting part of the change takes full effect on the next reload.
-      this._bloomEnabled = s.quality !== 'low';
+      this._bloomEnabled = bloomEnabled(s.quality);
       // shadows stay off — sky-only lighting has no shadow casters.
       // accessibility toggles apply live
       const rm = GameSettings.get('reduceMotion');
@@ -1436,7 +1443,8 @@ export class Game {
   _buildPostFX() {
     const w = window.innerWidth, h = window.innerHeight;
     this.composer = new EffectComposer(this.renderer);
-    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const quality = GameSettings.get('quality');
+    this.composer.setPixelRatio(postFxPixelRatio(quality, window.devicePixelRatio));
     this.composer.setSize(w, h);
 
     // RenderPass camera is swapped each frame between player/menu cameras.
@@ -1458,7 +1466,7 @@ export class Game {
     this.composer.addPass(new OutputPass());
 
     // Bloom on by default; disabled on the 'low' quality preset for performance.
-    this._bloomEnabled = GameSettings.get('quality') !== 'low';
+    this._bloomEnabled = bloomEnabled(quality);
   }
 
   // ── Resize ─────────────────────────────────────────────────────────────────
@@ -1573,7 +1581,7 @@ export class Game {
       this.weaponSystem.update(dt, this.input, this.world, this._activeManager, this.player);
     }
     this.deathEffects.update(dt);
-    this._activeManager.update(dt, this.player, this.player.camera, (dmg, from) => this._onPlayerDamaged(dmg, from), this.world);
+    this._activeManager.update(dt, this.player, this.player.camera, this._damageCallback, this.world);
     this.pickupSystem?.update(dt, this.player, this.weaponSystem, this.hud);
 
     // The same G/F contract shown by the HUD. Online, the local projectile is
@@ -1879,7 +1887,8 @@ export class Game {
       }
 
       // Mode info panel (ev.io-style 3-line wave HUD)
-      const alive = this.zombieManager.zombies.filter((z) => z.alive).length;
+      let alive = 0;
+      for (const zombie of this.zombieManager.zombies) if (zombie.alive) alive++;
       const best  = `YOUR BEST TIME: ${this._fmtHMS(sm.bestTime())}`;
       const mmss  = (t) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${m}:${String(s).padStart(2, '0')}`; };
       if (sm.graceActive) {
@@ -1916,7 +1925,8 @@ export class Game {
       return;
     }
     if (this._mode.id === 'elimination') {
-      const alive = this.botManager.bots.filter(b => b.alive).length;
+      let alive = 0;
+      for (const bot of this.botManager.bots) if (bot.alive) alive++;
       this.hud.setModeHUD('ELIMINATION', `${alive} REMAINING`);
     }
   }
@@ -1952,8 +1962,9 @@ export class Game {
     // Spectator bots — visible running around the map during the home screen.
     if (this.state === 'menu' && !this._menuBotsActive) this._spawnMenuBots();
     if (this._menuBotsActive) {
-      const dummyPlayer = { position: new THREE.Vector3(9999, 9999, 9999), isDead: true };
-      this.botManager.update(dt, dummyPlayer, this.menuCamera, () => {}, this.world, false);
+      this.botManager.update(
+        dt, this._menuDummyPlayer, this.menuCamera, this._noopCallback, this.world, false,
+      );
     }
 
     // Continuous map-wide spectator fly-through. getPointAt is arc-length

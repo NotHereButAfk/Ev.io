@@ -25,16 +25,14 @@ function expDamp(current, target, lambda, dt) {
 }
 // Exact critically damped spring. Unlike an Euler step, this produces the same
 // pose after a given elapsed time at 30, 60, 144Hz, or a briefly uneven frame.
-function springTo(x, v, target, stiffness, _damping, dt) {
+function springTo(out, x, v, target, stiffness, _damping, dt) {
   const h = Math.max(0, dt);
   const omega = Math.sqrt(stiffness);
   const offset = x - target;
   const impulse = v + omega * offset;
   const decay = Math.exp(-omega * h);
-  return [
-    target + (offset + impulse * h) * decay,
-    (v - omega * impulse * h) * decay,
-  ];
+  out[0] = target + (offset + impulse * h) * decay;
+  out[1] = (v - omega * impulse * h) * decay;
 }
 
 // Kawaii skins (anime pew, cat meow, uwu squeak, puppy yip, magic sparkle) all
@@ -140,6 +138,7 @@ export class WeaponSystem {
     this.prevMouseDown = false;
     this.kickPos = new THREE.Vector3();
     this.kickVel = new THREE.Vector3();   // recoil spring velocity
+    this._springOut = new Float64Array(2);
     this.kickRotX = 0;
     this.kickRotXVel = 0;
     this.swingPhase = 1;
@@ -1486,10 +1485,15 @@ export class WeaponSystem {
     // punchy kick that snaps back and settles smoothly, instead of a stiff
     // frame-rate-dependent linear decay.
     const K = 190, D = 25;   // stiffness / damping (~critically damped, tiny snap)
-    [this.kickPos.x, this.kickVel.x] = springTo(this.kickPos.x, this.kickVel.x, 0, K, D, dt);
-    [this.kickPos.y, this.kickVel.y] = springTo(this.kickPos.y, this.kickVel.y, 0, K, D, dt);
-    [this.kickPos.z, this.kickVel.z] = springTo(this.kickPos.z, this.kickVel.z, 0, K, D, dt);
-    [this.kickRotX, this.kickRotXVel] = springTo(this.kickRotX, this.kickRotXVel, 0, K, D, dt);
+    const spring = this._springOut;
+    springTo(spring, this.kickPos.x, this.kickVel.x, 0, K, D, dt);
+    this.kickPos.x = spring[0]; this.kickVel.x = spring[1];
+    springTo(spring, this.kickPos.y, this.kickVel.y, 0, K, D, dt);
+    this.kickPos.y = spring[0]; this.kickVel.y = spring[1];
+    springTo(spring, this.kickPos.z, this.kickVel.z, 0, K, D, dt);
+    this.kickPos.z = spring[0]; this.kickVel.z = spring[1];
+    springTo(spring, this.kickRotX, this.kickRotXVel, 0, K, D, dt);
+    this.kickRotX = spring[0]; this.kickRotXVel = spring[1];
     // weapon-switch raise: the model eases up from lowered on every swap
     this._raiseT = expDamp(this._raiseT, 1, 14, dt);
     const raiseDrop = (1 - this._raiseT) * 0.28;
@@ -1714,23 +1718,29 @@ export class WeaponSystem {
     const spreadMin = def.spreadMin ?? def.spread ?? 0;
     const spreadMax = def.spreadMax ?? def.spread ?? spreadMin;
     const spreadSpan = Math.max(1e-6, spreadMax - spreadMin);
-    return {
-      name: def.name,
-      isMelee: def.kind === 'melee',
-      magAmmo: st.magAmmo,
-      reserveAmmo: st.reserveAmmo,
-      isReloading: st.isReloading,
-      reloadProgress: st.isReloading
-        ? THREE.MathUtils.clamp(1 - st.reloadTimer / Math.max(0.01, def.reloadTime), 0, 1)
-        : 0,
-      reloadRemaining: Math.max(0, st.reloadTimer),
-      reloadDuration: def.reloadTime || 0,
-      aiming: this.scopeT,
-      spreadRatio: spreadMax > spreadMin
-        ? THREE.MathUtils.clamp((this._shotBloom - spreadMin) / spreadSpan, 0, 1)
-        : 0,
-      currentIndex: this.currentIndex,
-      slots: this.loadout.map((w, i) => ({ key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee' }))
-    };
+    const info = this._hudInfo ||= {};
+    if (this._hudSlotsLoadout !== this.loadout) {
+      this._hudSlotsLoadout = this.loadout;
+      this._hudSlots = this.loadout.map((w, i) => ({
+        key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee',
+      }));
+    }
+    info.name = def.name;
+    info.isMelee = def.kind === 'melee';
+    info.magAmmo = st.magAmmo;
+    info.reserveAmmo = st.reserveAmmo;
+    info.isReloading = st.isReloading;
+    info.reloadProgress = st.isReloading
+      ? THREE.MathUtils.clamp(1 - st.reloadTimer / Math.max(0.01, def.reloadTime), 0, 1)
+      : 0;
+    info.reloadRemaining = Math.max(0, st.reloadTimer);
+    info.reloadDuration = def.reloadTime || 0;
+    info.aiming = this.scopeT;
+    info.spreadRatio = spreadMax > spreadMin
+      ? THREE.MathUtils.clamp((this._shotBloom - spreadMin) / spreadSpan, 0, 1)
+      : 0;
+    info.currentIndex = this.currentIndex;
+    info.slots = this._hudSlots;
+    return info;
   }
 }

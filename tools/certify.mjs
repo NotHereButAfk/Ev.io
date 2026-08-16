@@ -78,6 +78,8 @@ const AUTO = [
     fn: () => { const r = run('npm run arena:metrics'); return { ok: r.ok && /topology looks healthy/.test(r.out), detail: 'no dead zones, combat scales' }; } },
   { id: 'G8-perf', phase: 'Phase 9', name: 'Stress + soak (20Hz budget under load)',
     fn: () => { const r = run('npm run stress:soak'); return { ok: r.ok && /soaks clean/.test(r.out), detail: '≤0.7ms/tick @64p, no leak' }; } },
+  { id: 'G-CLIENT-PERF', phase: 'Phase 9', name: 'Client render scale and frame-loop allocation budget',
+    fn: () => { const r = run('npm run test:client-performance'); return { ok: r.ok && /client performance passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-ASSETS', phase: 'Phase 7/9', name: 'glTF asset validation + provenance manifest',
     fn: () => { const r = run('node tools/asset_pipeline.mjs'); return { ok: r.ok && existsSync(join(root, 'public/assets.manifest.json')), detail: tail(r.out) }; } },
   { id: 'G7-a11y', phase: 'Phase 8', name: 'Accessibility settings present + wired',

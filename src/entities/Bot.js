@@ -155,6 +155,7 @@ export class Bot {
     this._bulletRay   = new THREE.Ray();
     this._sphere      = new THREE.Sphere();
     this._hitPt       = new THREE.Vector3();
+    this._healthQuat  = new THREE.Quaternion();
 
     this.position = spawnPoint.clone();
 
@@ -758,9 +759,9 @@ export class Bot {
       if (this._muzzleT <= 0 && this._muzzleFlash) this._muzzleFlash.visible = false;
     }
 
-    if (this.healthBarGroup) {
-      const localQuat = this.mesh.quaternion.clone().invert().multiply(camera.quaternion);
-      this.healthBarGroup.quaternion.copy(localQuat);
+    if (this.healthBarGroup?.visible) {
+      this._healthQuat.copy(this.mesh.quaternion).invert().multiply(camera.quaternion);
+      this.healthBarGroup.quaternion.copy(this._healthQuat);
     }
 
     const resolvedMoving = this._animSpeed > 0.25 && actualMoved > 1e-5;

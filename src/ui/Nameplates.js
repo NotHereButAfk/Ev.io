@@ -16,13 +16,17 @@ export class Nameplates {
     this._cam = new THREE.Vector3();
     this._target = new THREE.Vector3();
     this._raycaster = new THREE.Raycaster();
+    this._live = new Set();
+    this._occlusion = new WeakMap();
   }
 
   update(camera, bots, world) {
     if (!camera || !bots) return;
     const w = window.innerWidth, h = window.innerHeight;
     camera.getWorldPosition(this._cam);
-    const live = new Set();
+    const live = this._live;
+    live.clear();
+    const now = performance.now();
 
     for (const bot of bots) {
       if (!bot.alive || !bot.mesh) continue;
@@ -30,19 +34,32 @@ export class Nameplates {
       if (bot.healthBarGroup) bot.healthBarGroup.visible = false;
 
       this._target.set(bot.position.x, bot.position.y + 2.15, bot.position.z);
-      const dist = this._cam.distanceTo(this._target);
-      const occluded = isNameplateOccluded(
-        world, this._cam, this._target, this._raycaster,
-      );
+      const distSq = this._cam.distanceToSquared(this._target);
       this._v.copy(this._target);
       this._v.project(camera);
       const onScreen = this._v.z < 1 &&
         this._v.x > -1.05 && this._v.x < 1.05 && this._v.y > -1.05 && this._v.y < 1.05;
       let el = this._labels.get(bot);
 
-      if (!onScreen || dist > MAX_DIST || occluded) {
+      // Projection and squared-distance rejection are cheap. Only raycast for
+      // nameplates that could actually be drawn, and stagger those queries at
+      // 10Hz so eight opponents do not generate 480 world raycasts per second.
+      if (!onScreen || distSq > MAX_DIST * MAX_DIST) {
         if (el) el.style.display = 'none';
         if (bot.alive) live.add(bot);
+        continue;
+      }
+      let visibility = this._occlusion.get(bot);
+      if (!visibility || now >= visibility.nextCheck) {
+        visibility = {
+          occluded: isNameplateOccluded(world, this._cam, this._target, this._raycaster),
+          nextCheck: now + 100,
+        };
+        this._occlusion.set(bot, visibility);
+      }
+      if (visibility.occluded) {
+        if (el) el.style.display = 'none';
+        live.add(bot);
         continue;
       }
       live.add(bot);
@@ -64,6 +81,7 @@ export class Nameplates {
       el.style.display = 'block';
       const x = (this._v.x * 0.5 + 0.5) * w;
       const y = (-this._v.y * 0.5 + 0.5) * h;
+      const dist = Math.sqrt(distSq);
       const s = Math.max(0.6, Math.min(1.1, 16 / dist));
       el.style.left = `${x}px`;
       el.style.top  = `${y}px`;

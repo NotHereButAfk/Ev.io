@@ -75,6 +75,9 @@ export class AuthNetBridge {
     this._nameRaycaster = new THREE.Raycaster();
     this._nameOrigin = new THREE.Vector3();
     this._nameTarget = new THREE.Vector3();
+    this._remoteProject = new THREE.Vector3();
+    this._collisionPosition = new THREE.Vector3();
+    this._remoteSeen = new Set();
     this._edges = { jump: false, crouch: false, tele: false };
     this._wasAlive = true;
     this.ready = false;
@@ -304,7 +307,7 @@ export class AuthNetBridge {
       next.py = ground; next.vy = 0; next.onGround = 1;
       next.nX = 0; next.nY = 1; next.nZ = 0;
     }
-    const position = new THREE.Vector3(next.px, next.py, next.pz);
+    const position = this._collisionPosition.set(next.px, next.py, next.pz);
     world.resolveCollisions(position, 0.45);
     next.px = Math.round(position.x * 1e6) / 1e6;
     next.py = Math.round(position.y * 1e6) / 1e6;
@@ -313,11 +316,13 @@ export class AuthNetBridge {
   }
 
   _syncRemotes(dt) {
-    const seen = new Set();
+    const seen = this._remoteSeen;
+    seen.clear();
     const cam = this.player.camera;
     cam.getWorldPosition(this._nameOrigin);
     const w = window.innerWidth, h = window.innerHeight;
-    const v = new THREE.Vector3();
+    const v = this._remoteProject;
+    const now = performance.now();
     for (const r of this.client.remoteStates()) {
       seen.add(r.id);
       const a = this._remoteAvatar(r.id, r.isBot);
@@ -334,18 +339,24 @@ export class AuthNetBridge {
       });
       // Keep semantic plate state current even while it is off-screen or
       // occluded, so the first visible frame never flashes an empty bar/name.
-      a.nameText.textContent = r.name;
-      a.botBadge.hidden = !r.isBot;
-      a.healthFg.style.width = `${THREE.MathUtils.clamp(r.health || 0, 0, 100)}%`;
+      if (a.nameText.textContent !== r.name) a.nameText.textContent = r.name;
+      if (a.botBadge.hidden === !!r.isBot) a.botBadge.hidden = !r.isBot;
+      const healthWidth = `${THREE.MathUtils.clamp(r.health || 0, 0, 100)}%`;
+      if (a.healthFg.style.width !== healthWidth) a.healthFg.style.width = healthWidth;
       // nameplate
       this._nameTarget.set(r.x, r.y + NAMEPLATE_Y, r.z);
-      const occluded = isNameplateOccluded(
-        this.game.world, this._nameOrigin, this._nameTarget, this._nameRaycaster,
-      );
       v.copy(this._nameTarget).project(cam);
-      const distance = this._nameOrigin.distanceTo(this._nameTarget);
-      if (v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
-          && distance <= 90 && r.alive && !occluded) {
+      const distanceSq = this._nameOrigin.distanceToSquared(this._nameTarget);
+      const drawable = v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1
+        && distanceSq <= 90 * 90 && r.alive;
+      if (drawable && (!a._losNext || now >= a._losNext)) {
+        a._nameOccluded = isNameplateOccluded(
+          this.game.world, this._nameOrigin, this._nameTarget, this._nameRaycaster,
+        );
+        a._losNext = now + 100;
+      }
+      if (drawable && !a._nameOccluded) {
+        const distance = Math.sqrt(distanceSq);
         a.nameEl.style.display = 'block';
         a.nameEl.style.left = `${(v.x * 0.5 + 0.5) * w}px`;
         a.nameEl.style.top = `${(-v.y * 0.5 + 0.5) * h}px`;

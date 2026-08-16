@@ -769,6 +769,7 @@ export class Zombie {
     this._reach      = 0;                          // 0..1 arm-reach blend
     this._headTrack  = 0;                          // 0..1 look-at-player blend
     this._tmpQuat    = new THREE.Quaternion();
+    this._healthQuat = new THREE.Quaternion();
     this._tmpObj     = new THREE.Object3D();
 
     // Armed state
@@ -1074,8 +1075,10 @@ export class Zombie {
       this._growlTimer -= dt;
       if (this._growlTimer <= 0) {
         this._growlTimer = 3.5 + Math.random() * 4;
-        const toP = new THREE.Vector3(player.position.x - this.position.x, 0, player.position.z - this.position.z);
-        if (toP.length() < DETECT_RADIUS + 4) this.audio.playZombieGrowl();
+        const dx = player.position.x - this.position.x;
+        const dz = player.position.z - this.position.z;
+        const growlRadius = DETECT_RADIUS + 4;
+        if (dx * dx + dz * dz < growlRadius * growlRadius) this.audio.playZombieGrowl();
       }
     }
 
@@ -1254,8 +1257,8 @@ export class Zombie {
 
     // Billboard health bar
     if (this.healthBarGroup) {
-      const lq = this.mesh.quaternion.clone().invert().multiply(camera.quaternion);
-      this.healthBarGroup.quaternion.copy(lq);
+      this._healthQuat.copy(this.mesh.quaternion).invert().multiply(camera.quaternion);
+      this.healthBarGroup.quaternion.copy(this._healthQuat);
     }
   }
 }
