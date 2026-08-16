@@ -15,14 +15,17 @@ const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(weapon.quaternion);
 const pitch = Math.asin(THREE.MathUtils.clamp(forward.y, -1, 1));
 const yaw = Math.atan2(forward.x, -forward.z);
 
-// Verified against ev.io's official Hall of Champions third-person frame:
-// the relaxed rifle remains shoulder-high and nearly forward, not at the old
-// -23.4-degree / 45.9-degree deep cross-body angle.
-assert(weapon.position.y > 1.24, `patrol receiver is too low (${weapon.position.y.toFixed(3)}m)`);
-assert(Math.abs(pitch) < THREE.MathUtils.degToRad(15),
-  `patrol muzzle drops ${THREE.MathUtils.radToDeg(pitch).toFixed(1)} degrees`);
-assert(Math.abs(yaw) < THREE.MathUtils.degToRad(20),
-  `patrol muzzle crosses ${THREE.MathUtils.radToDeg(yaw).toFixed(1)} degrees`);
+// The supplied standing-soldier reference carries the rifle diagonally across
+// the chest: stock retained near the shoulder, receiver around lower-chest
+// height, muzzle safely down, and elbows relaxed instead of held in ADS.
+assert(weapon.position.y > 1.18 && weapon.position.y < 1.40,
+  `patrol receiver is outside the lower-chest pocket (${weapon.position.y.toFixed(3)}m)`);
+assert(Math.abs(pitch) > THREE.MathUtils.degToRad(20)
+    && Math.abs(pitch) < THREE.MathUtils.degToRad(34),
+  `patrol muzzle drop is not soldier low-ready (${THREE.MathUtils.radToDeg(pitch).toFixed(1)} degrees)`);
+assert(Math.abs(yaw) > THREE.MathUtils.degToRad(8)
+    && Math.abs(yaw) < THREE.MathUtils.degToRad(28),
+  `patrol cross-body angle is not soldier low-ready (${THREE.MathUtils.radToDeg(yaw).toFixed(1)} degrees)`);
 assert(weapon.position.x > SHOULDER_X,
   `patrol receiver is inside the torso/shoulder silhouette (`
   + `${weapon.position.x.toFixed(3)}m <= ${SHOULDER_X.toFixed(3)}m)`);

@@ -12,10 +12,9 @@ const REACH = (UP_ARM + FOREARM) * 0.995;
 //
 // Two hand-solved poses, blended by an `aim` weight (0 = relaxed, 1 = engaged):
 //
-//   PATROL  ev.io-style combat ready: buttstock tight to the right shoulder,
-//           rifle high across the upper chest, muzzle only slightly lowered.
-//           The old deep across-body carry put the receiver at stomach height
-//           and rolled the weapon much farther than the reference silhouette.
+//   PATROL  soldier's relaxed ready: buttstock retained at the right shoulder,
+//           rifle diagonal across the chest, muzzle safely lowered, firing
+//           hand at the pistol grip and support palm under the fore-end.
 //   AIM     shouldered and level: stock in the shoulder, barrel straight down
 //           the body's forward axis, support arm extended along the handguard.
 //           What a bot/player snaps to the instant it engages.
@@ -69,10 +68,11 @@ const PATROL = {
   // well inside its 20.9cm shoulder joint. From the gameplay camera the body
   // swallowed the whole rifle. This lands 6.5cm outboard of the shoulder while
   // the grip itself remains close to the trigger-side hand.
-  wp: onArm(0.390, 1.580, -0.270),
-  // Muzzle-down high-ready: stock remains seated while elbows relax below the
-  // shoulder line. This is a real movement posture, not a rigid firing pose.
-  wr: new THREE.Euler(-0.240, 0.180, 0.140),
+  wp: onArm(0.390, 1.500, -0.270),
+  // Diagonal low-ready from the supplied soldier reference: the muzzle points
+  // down and slightly across the body while the stock stays retained near the
+  // shoulder. The hands remain model-specific and are IK-solved below.
+  wr: new THREE.Euler(-0.480, 0.240, 0.100),
 };
 const AIM = {
   wp: onArm(0.390, 1.600, -0.230),
@@ -192,7 +192,7 @@ export const AIM_PITCH_LIMIT = Math.PI / 2 - 0.05;   // ~87.1°, Player.js's own
 // Elbow swivel about the shoulder→hand axis: where the elbow sits on the cone
 // of valid solutions. Tuned to drop the trigger elbow down/back against the
 // ribs and swing the support elbow out under the handguard.
-const SWIVEL_R = -0.6, SWIVEL_L = 0.2;
+const SWIVEL_R = -0.82, SWIVEL_L = 0.05;
 
 const _qPatrol = new THREE.Quaternion().setFromEuler(PATROL.wr);
 const _qAim    = new THREE.Quaternion().setFromEuler(AIM.wr);
@@ -208,6 +208,7 @@ const _T       = new THREE.Vector3();
 const _gripLocal = new THREE.Vector3();
 const _supportLocal = new THREE.Vector3();
 const _reloadLocal = new THREE.Vector3();
+const _supportStow = new THREE.Vector3(-0.10, 1.24, -0.24);
 const _d       = new THREE.Vector3();
 const _h       = new THREE.Vector3();
 const _AX_X    = new THREE.Vector3(1, 0, 0);
@@ -354,7 +355,10 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     _qAct.setFromEuler(_eAct.set(0.30 * reloadB - 0.70 * swapB, 0,
                                 -0.85 * reloadB + 0.30 * swapB));
     _q.multiply(_qAct);
-    _pos.y -= 0.13 * reloadB + 0.24 * swapB;
+    // The patrol pose already sits at lower-chest height. A deep second drop
+    // during swap put long-gun fore-ends beyond the support arm's reach, so the
+    // swap now folds the weapon inward and only dips it enough to read clearly.
+    _pos.y -= 0.13 * reloadB + (pistolCarry ? 0.24 : 0.08) * swapB;
     _pos.x -= 0.05 * reloadB;
     // Once the muzzle is lowered there is room to bring the action back into
     // reach without returning the stock to its firing-height shoulder pocket.
@@ -459,7 +463,14 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     _T.x -= supportNearFace / Math.max(0.001, Math.abs(weapon?.scale?.x || 1));
     if (weapon?.scale) _T.multiply(weapon.scale);
     _T.applyQuaternion(_q).add(_pos);
-    slideToReach(_T, -SHOULDER_X);
+    if (swapB && !pistolCarry) {
+      // A soldier does not keep the support palm glued to a disappearing
+      // fore-end. Release it toward the vest while the firing hand controls the
+      // weapon, then reacquire the handguard as the new gun rises.
+      _T.lerp(_supportStow, swapB);
+    } else {
+      slideToReach(_T, -SHOULDER_X);
+    }
     // Keep the exact displayed grip available to geometry probes and visual
     // diagnostics.  This is body-local, matching the skeletal rig.
     if (weapon?.userData)

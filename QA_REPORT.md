@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-022
+
+**Severity:** Medium
+
+**System:** Relaxed third-person rifle carry
+
+**Steps to reproduce:** Equip a rifle, leave ADS, and inspect the ninja from the front, three-quarter, and side while idle or moving. Compare the hand, stock, elbow, and muzzle relationships with the supplied standing-soldier reference.
+
+**Expected behavior:** The firing hand stays on the pistol grip, the support palm sits under the fore-end, the stock remains retained near the shoulder, and relaxed elbows keep the rifle diagonally across the chest with its muzzle safely lowered. During a swap, the support hand should release toward the vest and naturally reacquire the new fore-end.
+
+**Observed behavior:** The previous 13.5-degree high-ready pose looked like a softened firing stance: the receiver sat high on the upper chest, the muzzle was nearly level, and both elbows remained too raised to read as a relaxed soldier carry.
+
+**Root cause:** The patrol target had been tuned against a near-ADS silhouette rather than the user's real standing-soldier reference. Its shallow pitch and high receiver origin dominated the otherwise correct per-weapon grip contacts.
+
+**Files changed:** `src/player/RifleCarry.js`, `tests/rifle-carry-reference.test.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Lower the patrol receiver to the lower-chest pocket, increase the muzzle-low diagonal to 26.7 degrees with 15.4 degrees of cross-body angle, and tuck both elbow swivel solutions. Preserve the level ADS target and category-specific pistol/launcher stances. Long-gun swaps now fold inward with a smaller dip while the support hand releases to the vest, keeping the motion believable and reachable.
+
+**Verification:** PASS locally. All 17 firearms pass all 272 production carry/action samples with 0.00 cm trigger/support error, 0.0 cm torso penetration, and at most 0.6 cm armor-shoulder contact. The reference gate measures receiver height 1.380 m, muzzle pitch -26.7 degrees, cross-body angle -15.4 degrees, and 9.7 cm lateral clearance. Front, three-quarter, and side browser renders were inspected at the runtime idle blend; M4, RPG, and sidearm silhouettes remain category-correct with zero page errors. Production verification is pending deployment.
+
 ## BUG-021
 
 **Severity:** Medium
