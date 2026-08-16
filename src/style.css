@@ -4261,16 +4261,16 @@ html, body {
 #map-loading {
   position: absolute; inset: 0; z-index: 250; pointer-events: none;
   opacity: 1; transition: opacity 0.6s ease; overflow: hidden;
-  background: linear-gradient(90deg, rgba(5,8,14,.18), rgba(5,8,14,.03) 60%, rgba(5,8,14,.08));
+  background: linear-gradient(90deg, rgba(5,8,14,.2), rgba(5,8,14,.02) 60%, rgba(5,8,14,.06));
 }
 #map-loading.hidden { display: none; }
 #map-loading.ml-fade { opacity: 0; }
 .ml-panel {
   position: absolute; top: 0; bottom: 0; left: 0; width: clamp(320px, 29vw, 430px);
   box-sizing: border-box;
-  background: linear-gradient(180deg, rgba(4,9,17,.98) 0%, rgba(4,9,17,.97) 68%, rgba(4,9,17,.85) 100%);
-  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
-  padding: 20vh 29px 0;
+  background: linear-gradient(180deg, rgba(4,9,17,.54) 0%, rgba(4,9,17,.48) 68%, rgba(4,9,17,.58) 100%);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  padding: 37vh 29px 0;
 }
 .ml-building {
   position: absolute; top: 0; left: 0; z-index: 4;
@@ -4284,17 +4284,17 @@ html, body {
 .ml-region { color: #d7e83e; font-size: 15px; font-weight: 600; margin-bottom: 7px; }
 .ml-mode, .ml-players { color: #edf1f5; font-size: 15px; margin-bottom: 5px; }
 .ml-tip {
-  position: absolute; bottom: 19vh; left: 20px; right: 20px; z-index: 4;
+  position: absolute; bottom: 25px; left: 20px; right: 20px; z-index: 4;
   color: #d9e83e; font-size: 11px; letter-spacing: 0.2px;
 }
 .ml-spinner {
-  position: absolute; right: 28px; bottom: 17.78vh; z-index: 4; width: 34px; height: 34px;
+  position: absolute; right: 28px; bottom: 20px; z-index: 4; width: 34px; height: 34px;
   border: 7px solid rgba(255,255,255,.94); border-right-color: transparent;
   border-radius: 50%; animation: ml-spin .72s linear infinite;
 }
 @keyframes ml-spin { to { transform: rotate(360deg); } }
 @media (max-width: 620px) {
-  .ml-panel { width: min(78vw, 360px); padding: 20vh 22px 0; }
+  .ml-panel { width: min(78vw, 360px); padding: 34vh 22px 0; }
   .ml-name { font-size: 39px; }
   .ml-spinner { right: 18px; }
 }
@@ -4681,43 +4681,39 @@ a.profile-menu-item { text-decoration: none; }
 .inv3-stage-img.hidden { display: none !important; }
 @keyframes inv3Float { 0%,100% { transform: translateY(-4px); } 50% { transform: translateY(6px); } }
 
-/* Initial connection screen. EV uses this before its separate map-building
-   rail: a black field, centred thin wordmark/status, and a bottom leaderboard
-   ad. Keep KYX branding while matching the measured 1280x720 composition. */
+/* Brief engine connection stage. The map loader is already being populated
+   underneath it, so this is a real handoff rather than a second fake load. */
 #connect-screen {
   display: block;
+  z-index: 300;
   background: #000;
   overflow: hidden;
+  opacity: 1;
+  transition: opacity .18s linear;
 }
+#connect-screen.fade-out { opacity: 0; }
 .boot-connect-logo {
   position: absolute; top: 42.7%; left: 50%; width: 270px; height: 105px;
   transform: translateX(-50%);
   display: flex; align-items: center; justify-content: center;
-  color: rgba(154,160,166,.36); -webkit-text-stroke: 1px rgba(220,225,229,.72);
+  color: transparent; -webkit-text-stroke: 1px rgba(220,225,229,.76);
   font: 300 80px/1 'Michroma', 'Rajdhani', system-ui, sans-serif;
   letter-spacing: -5px; text-transform: lowercase;
   filter: drop-shadow(0 0 5px rgba(255,255,255,.08));
-  animation: boot-logo-cycle 1.6s ease-in-out infinite;
+  animation: boot-logo-cycle 1.05s steps(4, end) infinite;
 }
 @keyframes boot-logo-cycle {
-  0%, 100% { color: transparent; opacity: .62; }
-  50% { color: rgba(154,160,166,.48); opacity: .92; }
+  0%, 100% { clip-path: inset(0 72% 0 0); opacity: .55; }
+  50% { clip-path: inset(0 0 0 0); opacity: .95; }
 }
 .boot-connect-text {
-  position: absolute; top: 63.98%; left: 0; width: 100%;
+  position: absolute; top: 64.5%; left: 0; width: 100%;
   color: rgba(244,246,248,.92); text-align: center;
   font: 500 20px/29px 'Rajdhani', system-ui, sans-serif;
   letter-spacing: .2px; text-transform: lowercase;
 }
-#boot-progress {
-  display: none;
-}
-.boot-status {
-  position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
-}
 @media (max-width: 620px) {
-  .boot-connect-logo { width: 220px; height: 86px; font-size: 43px; }
+  .boot-connect-logo { width: 220px; height: 86px; font-size: 56px; }
   .boot-connect-text { font-size: 18px; }
 }
 

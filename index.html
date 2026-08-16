@@ -27,16 +27,10 @@
   <div id="app">
     <canvas id="game-canvas"></canvas>
 
-    <!-- ===================== INITIAL CONNECTION SCREEN ===================== -->
-    <div id="connect-screen" class="overlay">
+    <!-- The brief engine connection stage shown before the arena card. -->
+    <div id="connect-screen" class="overlay" aria-live="polite" aria-label="Connecting">
       <div class="boot-connect-logo" aria-label="KYX.IO">kyx.io</div>
       <div class="boot-connect-text">connecting ...</div>
-      <div class="boot-status" aria-live="polite">
-        <span id="boot-progress"></span>
-        <span id="boot-phase">INITIALIZING GAME</span>
-        <span id="boot-detail">Renderer online</span>
-        <span id="boot-percent">0%</span>
-      </div>
     </div>
 
     <!-- Login & register are standalone pages: /login and /register -->
@@ -552,7 +546,7 @@
     </div>
 
     <!-- ===================== MAP LOADING SCREEN (ev.io style) ===================== -->
-    <div id="map-loading" class="hidden">
+    <div id="map-loading" aria-live="polite" aria-label="Loading arena">
       <div class="ml-building" id="ml-building">Building map...</div>
       <div class="ml-panel">
         <div class="ml-name">DAYTIME ROOK</div>

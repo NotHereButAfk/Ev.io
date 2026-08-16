@@ -31,22 +31,30 @@ page.on('requestfailed', (request) => failedRequests.push(`${request.url()} (${r
 try {
   await page.goto(url, { waitUntil: 'commit', timeout: 30000 });
   await page.waitForSelector('#connect-screen:not(.hidden)', { timeout: 5000 });
+  await page.waitForSelector('#map-loading:not(.hidden)', { timeout: 5000 });
+  const mapName = (await page.locator('#map-loading .ml-name').textContent())?.trim();
   await page.waitForFunction(() => Boolean(window.__game || window.game), null, {
     timeout: 60000, polling: 100,
   });
-  const bootSeenAt = Date.now();
-
-  await page.waitForSelector('#map-loading:not(.hidden)', { timeout: 15000 });
+  const connectSeenAt = Date.now();
+  await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
+    timeout: 5000, polling: 25,
+  });
   const mapSeenAt = Date.now();
-  const bootHiddenDuringMap = await page.locator('#connect-screen').evaluate((node) => (
-    node.classList.contains('hidden')
-  ));
-  if (!bootHiddenDuringMap) throw new Error('map loader appeared before game boot finished');
+  const connectDuration = mapSeenAt - connectSeenAt;
+  if (connectDuration < 900 || connectDuration > 1800) {
+    throw new Error(`connection handoff took ${connectDuration}ms`);
+  }
   if (screenshot) await page.screenshot({ path: screenshot });
 
-  const mapName = (await page.locator('#map-loading .ml-name').textContent())?.trim();
+  const sequenceDuringStartup = await page.evaluate(() => (
+    (window.__game || window.game)?._mapLoadingSequence
+  ));
+  if (sequenceDuringStartup !== 1) {
+    throw new Error(`startup created ${sequenceDuringStartup || 0} loading stages`);
+  }
   await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null, {
-    timeout: 10000, polling: 50,
+    timeout: 60000, polling: 50,
   });
   const mapHiddenAt = Date.now();
   await page.waitForFunction(() => !document.getElementById('top-nav')?.classList.contains('hidden'), null, {
@@ -90,16 +98,14 @@ try {
     ].join(' | ')}`);
   }
 
-  console.log(`startup loading passed: game boot ${mapSeenAt - bootSeenAt}ms -> ${mapName} map ${mapDuration}ms -> menu; completed game rotated ${rotation.before} -> ${rotation.after}`);
+  console.log(`startup loading passed: connecting ${connectDuration}ms -> ${mapName} readiness ${mapDuration}ms -> menu; completed game rotated ${rotation.before} -> ${rotation.after}`);
 } catch (error) {
   const state = await page.evaluate(() => ({
-    boot: document.getElementById('connect-screen')?.className,
     map: document.getElementById('map-loading')?.className,
+    connect: document.getElementById('connect-screen')?.className,
     nav: document.getElementById('top-nav')?.className,
     hasGame: Boolean(window.__game || window.game),
     ready: document.readyState,
-    phase: document.getElementById('boot-phase')?.textContent,
-    detail: document.getElementById('boot-detail')?.textContent,
   })).catch(() => ({}));
   throw new Error(`${error.message}; DOM=${JSON.stringify(state)}; errors=${[
     ...consoleErrors.map(({ text, url: source }) => `${text} @ ${source}`), ...pageErrors, ...failedRequests,

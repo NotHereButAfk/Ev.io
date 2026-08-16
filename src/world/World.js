@@ -25,7 +25,7 @@ function disposeRoot(root) {
 }
 
 export class World {
-  constructor(initialMapId = DEFAULT_MAP_ID) {
+  constructor(initialMapId = DEFAULT_MAP_ID, { autoLoad = true } = {}) {
     this.scene = new THREE.Scene();
     this.colliders = [];
     this.platforms = [];
@@ -50,7 +50,15 @@ export class World {
     this._playerCapsule = new Capsule(new THREE.Vector3(), new THREE.Vector3(), 0.45);
 
     this._buildLighting();
-    this.ready = this.loadMap(initialMapId);
+    // Game startup can explicitly begin the CPU-heavy .evmap decode after its
+    // connection handoff has painted. Direct World users keep immediate load.
+    this._initialMapId = initialMapId;
+    this.ready = autoLoad ? this.loadMap(initialMapId) : null;
+  }
+
+  startInitialLoad() {
+    if (!this.ready) this.ready = this.loadMap(this._initialMapId);
+    return this.ready;
   }
 
   _buildLighting() {

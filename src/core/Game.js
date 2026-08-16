@@ -51,7 +51,7 @@ import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels, buildWeaponModel, onWeaponModelsReady } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 import { countLocalMatchPlayers } from './Population.js';
@@ -87,41 +87,14 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.78;
 
-    // Kick off model fetches immediately so they're ready before first use.
-    // The real rigged human soldier is preferred; both callbacks swap the
-    // preview to the best available model once it finishes loading.
-    const swapPreview = () => {
-      const wasVisible = this.previewCharacter?.visible ?? false;
-      this._rebuildPreviewCharacter();
-      this.previewCharacter.visible = wasVisible;
-      // The menu is allowed to become interactive before optional art finishes.
-      // If a legacy Soldier kit entered a match on the connected Hero fallback,
-      // replace that fallback as soon as the skeletal rig becomes available.
-      if (isHumanSoldierReady() && this.state === 'playing'
-          && this._playerBody && !this._playerBody.userData?.isHuman
-          && !isLowPolyId(this.selectedArmorType)) {
-        this._rebuildPlayerBody(this.selectedArmorType, true);
-      }
-      if (this._menuBotsActive) {
-        this._clearMenuBots();
-        this._spawnMenuBots();
-      }
-    };
-    this._bootHumanReady = new Promise((resolve) => {
-      preloadHumanSoldier(() => { swapPreview(); resolve(); });
-      setTimeout(resolve, 5000); // degraded startup if the optional model CDN stalls
-    });
-    preloadPlayerModel(swapPreview);
-    preloadSpartanModel(swapPreview);
-    this._bootWeaponsReady = new Promise((resolve) => {
-      onWeaponModelsReady(resolve);
-      preloadWeaponModels();
-      setTimeout(resolve, 5000);
-    });
+    // Presentation models start after the arena decode. Starting their parsers
+    // here could block the one-second connection handoff on a cold cache.
+    this._presentationPreloadsStarted = false;
 
     const requestedMapId = new URLSearchParams(window.location.search).get('map');
     this._initialMapId = getImportedMap(requestedMapId).id;
-    this.world        = new World(this._initialMapId);
+    // The cold .evmap decode starts after the connection card hands off.
+    this.world        = new World(this._initialMapId, { autoLoad: false });
 
     // IBL — makes every MeshStandardMaterial look physically accurate
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -302,58 +275,53 @@ export class Game {
     this.zombieManager.clear();
   }
 
-  // ── Connect sequence ─────────────────────────────────────────────────────────
-
-  // Boot only reports work that is actually known locally. The authoritative
-  // arena is not known until the match server welcomes us, so naming the
-  // current preview map here can lie about the map the player will join.
-  async _runConnectSequence() {
-    const screen = document.getElementById('connect-screen');
-    const bar = document.getElementById('boot-progress');
-    const phase = document.getElementById('boot-phase');
-    const detail = document.getElementById('boot-detail');
-    const percent = document.getElementById('boot-percent');
-    const setBoot = (value, title, copy) => {
-      if (bar) bar.style.width = `${value}%`;
-      if (phase) phase.textContent = title;
-      if (detail) detail.textContent = copy;
-      if (percent) percent.textContent = `${value}%`;
+  _startPresentationPreloads() {
+    if (this._presentationPreloadsStarted) return;
+    this._presentationPreloadsStarted = true;
+    const swapPreview = () => {
+      const wasVisible = this.previewCharacter?.visible ?? false;
+      this._rebuildPreviewCharacter();
+      this.previewCharacter.visible = wasVisible;
+      if (isHumanSoldierReady() && this.state === 'playing'
+          && this._playerBody && !this._playerBody.userData?.isHuman
+          && !isLowPolyId(this.selectedArmorType)) {
+        this._rebuildPlayerBody(this.selectedArmorType, true);
+      }
+      if (this._menuBotsActive) {
+        this._clearMenuBots();
+        this._spawnMenuBots();
+      }
     };
-    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const minimumDisplay = delay(2600);
-
-    setBoot(12, 'INITIALIZING GAME', 'Renderer online');
-    await delay(120);
-    setBoot(30, 'LOADING GAME', 'Preparing local systems');
-    await delay(350);
-    setBoot(68, 'PREPARING COMBAT', 'Loading player and weapon rigs');
-    // Optional CDN art continues loading in the background. A slow model host
-    // must never trap the player on the boot screen for five seconds.
-    await Promise.race([
-      Promise.allSettled([this._bootHumanReady, this._bootWeaponsReady]),
-      delay(1400),
-    ]);
-    setBoot(92, 'SYNCING LOADOUT', 'Soldier rig and weapon models ready');
-    await minimumDisplay;
-    setBoot(100, 'DEPLOYMENT READY', 'Opening game interface');
-    await delay(260);
-
-    screen.classList.add('fade-out');
-    await delay(700);
-    screen.classList.add('hidden');
-    this._runMapIntro();
+    preloadHumanSoldier(swapPreview);
+    preloadPlayerModel(swapPreview);
+    preloadSpartanModel(swapPreview);
+    preloadWeaponModels();
   }
 
-  // The website boot and first arena load are deliberately separate stages.
-  // Show the map card before awaiting the arena, and keep it visible long
-  // enough to read even when the map was cached during the boot sequence.
-  async _runMapIntro() {
+  // ── Connect sequence ─────────────────────────────────────────────────────────
+
+  // Match ev.io's cold-open handoff: a brief engine connection card gives way
+  // to the arena card, which stays up until the real map is ready. The old
+  // sequence held both cards on unrelated multi-second timers.
+  async _runConnectSequence() {
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
+    const connectScreen = document.getElementById('connect-screen');
+    await delay(950);
+    connectScreen?.classList.add('fade-out');
+    await delay(180);
+    connectScreen?.classList.add('hidden');
+    const initialMapReady = this.world.startInitialLoad();
+
     try {
-      const map = await this.world.ready;
+      const map = await initialMapReady;
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
-      await this._finishMapLoading(1800);
+      this._startPresentationPreloads();
+      // Keep the completed arena visible through the translucent map card for
+      // a beat, as ev.io does, instead of disappearing on the decode frame.
+      this._mapLoadingShownAt = performance.now();
+      await this._finishMapLoading(1200);
     } catch (error) {
       console.error('[map] imported map failed to load', error);
       this._hideMapLoading();

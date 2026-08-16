@@ -65,36 +65,33 @@ requireMatch(privacy, /Privacy policy/i, 'privacy page');
 requireMatch(terms, /Terms of use/i, 'terms page');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
-for (const bootId of ['boot-phase', 'boot-progress', 'boot-detail', 'boot-percent', 'map-loading']) {
-  requireMatch(index, new RegExp(`id=["']${bootId}["']`), `loading flow: ${bootId}`);
-}
-for (const bootClass of ['boot-connect-logo', 'boot-connect-text']) {
-  requireMatch(index, new RegExp(`class=["'][^"']*${bootClass}`), `initial connection composition: ${bootClass}`);
-}
-requireMatch(css, /#connect-screen[^}]*background:\s*#000/s, 'initial connection black field');
-requireMatch(css, /\.boot-connect-logo[^}]*top:\s*42\.7%[^}]*width:\s*270px[^}]*height:\s*105px/s,
-  'initial connection measured logo frame');
-requireMatch(css, /\.boot-connect-text[^}]*top:\s*63\.98%/s, 'initial connection measured status position');
+requireMatch(index, /id=["']map-loading["'](?![^>]*class=["'][^"']*hidden)/,
+  'initial arena loader is visible in the server-rendered shell');
+requireMatch(index, /id=["']connect-screen["'][\s\S]*?boot-connect-logo[\s\S]*?boot-connect-text/,
+  'brief engine connection composition');
 for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
 }
 requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
   'arena loading left information rail');
 requireMatch(css, /@keyframes ml-spin/, 'arena loading activity indicator');
-requireMatch(css, /\.ml-panel[^}]*padding:\s*20vh\s+29px\s+0/s, 'arena loading upper-left information position');
-requireMatch(css, /\.ml-tip[^}]*bottom:\s*19vh/s, 'arena loading tip position');
+requireMatch(css, /\.ml-panel[^}]*padding:\s*37vh\s+29px\s+0/s, 'arena loading reference information position');
+requireMatch(css, /\.ml-tip[^}]*bottom:\s*25px/s, 'arena loading tip position');
 if (/adsbygoogle|data-ad-(?:client|slot)|boot-connect-ad|ml-ad|ad-slot/.test(index + css)) {
   failures.push('advertising placeholders remain disabled until production markup is supplied');
 }
 if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand|ml-progress/.test(index)) {
   failures.push('loading screen has no extra branding or progress stripe');
 }
-const bootSequence = game.match(/async _runConnectSequence\(\)[\s\S]*?\n  }\n\n  \/\/ The website boot/)?.[0] || '';
-if (/world\.ready/.test(bootSequence)) failures.push('game boot does not wait for the first map');
-requireMatch(game, /async _runMapIntro\(\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?await this\.world\.ready[\s\S]*?_finishMapLoading\(1800\)/,
-  'initial map loader is distinct and readiness-bound');
-requireMatch(game, /_bootHumanReady/, 'loading waits for soldier rig');
-requireMatch(game, /_bootWeaponsReady/, 'loading waits for weapon models');
+requireMatch(game, /new World\(this\._initialMapId,\s*\{\s*autoLoad:\s*false\s*\}\)/,
+  'cold map decode begins after the connection handoff paints');
+requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?classList\.add\(['"]hidden['"]\)[\s\S]*?startInitialLoad\(\)[\s\S]*?_mapLoadingShownAt = performance\.now\(\)[\s\S]*?_finishMapLoading\(1200\)/,
+  'initial map loader owns startup and is readiness-bound');
+if (/boot-progress|boot-phase|boot-detail|boot-percent/.test(index + game)) {
+  failures.push('connection stage has no synthetic progress report');
+}
+requireMatch(game, /_startPresentationPreloads\(\)[\s\S]*?preloadHumanSoldier[\s\S]*?preloadWeaponModels/,
+  'optional soldier and weapon art starts after arena readiness');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
 requireMatch(index, /ability-page-key["']>Q<[\s\S]*?<strong>TELEPORT<\/strong>/,
   'abilities page advertises Q teleport');
