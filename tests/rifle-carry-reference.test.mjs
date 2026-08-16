@@ -64,6 +64,7 @@ const carryStates = [
 let worstTriggerWrist = 0;
 let worstSupportRail = 0;
 let leastActionReceiverRight = Infinity;
+let idleElbowDropR = 0, idleElbowDropL = 0;
 for (const [name, aim, options] of carryStates) {
   applyRifleCarry(rig, liveWeapon, aim, 1 / 60, options);
   body.updateMatrixWorld(true);
@@ -97,6 +98,16 @@ for (const [name, aim, options] of carryStates) {
   const receiverLocal = body.worldToLocal(
     liveWeapon.getWorldPosition(new THREE.Vector3())
   );
+  if (name === 'idle') {
+    idleElbowDropR = rig.armR.getWorldPosition(new THREE.Vector3()).y
+      - rig.elbowR.getWorldPosition(new THREE.Vector3()).y;
+    idleElbowDropL = rig.armL.getWorldPosition(new THREE.Vector3()).y
+      - rig.elbowL.getWorldPosition(new THREE.Vector3()).y;
+    assert(idleElbowDropR > 0.15 && idleElbowDropL > 0.11,
+      `idle elbows are not tucked below the shoulder line (`
+      + `R=${(idleElbowDropR * 100).toFixed(1)}cm, `
+      + `L=${(idleElbowDropL * 100).toFixed(1)}cm)`);
+  }
   leastActionReceiverRight = Math.min(leastActionReceiverRight, receiverLocal.x);
   assert(receiverLocal.x > SHOULDER_X,
     `${name} receiver enters the torso silhouette at ${receiverLocal.x.toFixed(3)}m`);
@@ -108,6 +119,8 @@ console.log(
   + `cross-body=${THREE.MathUtils.radToDeg(yaw).toFixed(1)}deg, `
   + `minimum lateral clearance=${((minimumReceiverRight - SHOULDER_X) * 100).toFixed(1)}cm, `
   + `action clearance=${((leastActionReceiverRight - SHOULDER_X) * 100).toFixed(1)}cm, `
+  + `idle elbow drop R=${(idleElbowDropR * 100).toFixed(1)}cm `
+  + `L=${(idleElbowDropL * 100).toFixed(1)}cm, `
   + `wrist error R=${(worstTriggerWrist * 100).toFixed(2)}cm `
   + `L=${(worstSupportRail * 100).toFixed(2)}cm`,
 );

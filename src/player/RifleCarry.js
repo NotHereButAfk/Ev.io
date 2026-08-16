@@ -192,7 +192,7 @@ export const AIM_PITCH_LIMIT = Math.PI / 2 - 0.05;   // ~87.1°, Player.js's own
 // Elbow swivel about the shoulder→hand axis: where the elbow sits on the cone
 // of valid solutions. Tuned to drop the trigger elbow down/back against the
 // ribs and swing the support elbow out under the handguard.
-const SWIVEL_R = -0.82, SWIVEL_L = 0.05;
+const SWIVEL_R = -0.82, SWIVEL_L = 0.70;
 
 const _qPatrol = new THREE.Quaternion().setFromEuler(PATROL.wr);
 const _qAim    = new THREE.Quaternion().setFromEuler(AIM.wr);

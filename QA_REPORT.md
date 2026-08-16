@@ -352,11 +352,11 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Root cause:** Two third-person body implementations own separate weapon transforms. Verification captured the fallback pose renderer and numerical firearm clearance but did not assert the loaded Soldier's visible idle muzzle angle.
 
-**Files changed:** `src/player/HumanRifleCarry.js`, `tools/human_rifle_carry_check.mjs`, `QA_REPORT.md`
+**Files changed:** `src/player/HumanRifleCarry.js`, `src/player/RifleCarry.js`, `tools/human_rifle_carry_check.mjs`, `tests/rifle-carry-reference.test.mjs`, `QA_REPORT.md`
 
-**Fix:** Apply the supplied reference directly to the loaded Soldier solver: a 35.5-degree patrol target blended to a 22-38-degree runtime low-ready, receiver held just below the shoulders, stock moved 6 cm closer while preserving 31.1 cm of forward body clearance, and tighter IK elbow poles. Reduce the redundant sprint/reload/swap pitch additions so actions build on the new low-ready instead of doubling it. Preserve the separate level ADS target.
+**Fix:** Apply the supplied reference directly to the loaded Soldier solver: a 35.5-degree patrol target blended to a 22-38-degree runtime low-ready, receiver held just below the shoulders, stock moved 6 cm closer while preserving 31.1 cm of forward body clearance, and tighter IK elbow poles. Reduce the redundant sprint/reload/swap pitch additions so actions build on the new low-ready instead of doubling it. Preserve the separate level ADS target. On the connected fallback seen during Soldier loading, lower the support elbow as well and make both elbow drops part of the reference regression.
 
-**Verification:** PASS locally. The real `soldier.glb` was rendered from front, three-quarter, and side views at the production 18% idle blend. All 17 firearms pass 816 loaded-Soldier pose/armor/action combinations with 0.00 cm wrist error, 0.0 cm torso/shoulder penetration, at least 21.7 cm lateral receiver clearance, and at least 31.1 cm forward clearance. Human locomotion and action continuity pass. Production verification is pending deployment.
+**Verification:** PASS locally. The real `soldier.glb` was rendered from front, three-quarter, and side views at the production 18% idle blend. All 17 firearms pass 816 loaded-Soldier pose/armor/action combinations with 0.00 cm wrist error, 0.0 cm torso/shoulder penetration, at least 21.7 cm lateral receiver clearance, and at least 31.1 cm forward clearance. The fallback reference measures 19.4 cm firing-elbow drop and 12.2 cm support-elbow drop. Human locomotion, firearm clearance, and action continuity pass. Production verification is pending deployment.
 
 ## BUG-022
 
