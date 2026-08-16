@@ -338,6 +338,26 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Verification:** PASS in production. Source and GUI gates prove no `adsbygoogle`, publisher/slot attributes, gray boot/map placements, or generic ad-slot containers remain. The real-browser detector test keeps a clean page silent, forces the bait to zero height to reproduce a blocker, observes the warning, and dismisses it successfully. Production build and all 28/28 automated certificate gates pass, and a gallery generated through the production model builder contains all 17 firearm models. Commit `d6c7826` deployed successfully in run `31889356114`; follow-up `8aa3b56` deployed in run `31889655614`. The same clean/blocked detector test passed against cache-busted `kryx.live`, whose deployed HTML reports the warning present and every former gray placeholder identifier absent.
 
+## BUG-024
+
+**Severity:** High
+
+**System:** Per-weapon loaded-Soldier carry families
+
+**Steps to reproduce:** Let `soldier.glb` load, then equip all 17 firearms in third person and compare their idle silhouettes. In particular compare sidearm/magnum, Uzi, M4/M16, shotguns, LMG, precision rifles, and the three launchers.
+
+**Expected behavior:** The loaded production model should handle each weapon by its real physical role: two-handed compressed-ready pistols; tight shouldered compact guns; stock-retained low-ready rifles and shotguns; a weight-bearing LMG hold; supported precision rifles; and shoulder-height launcher tubes. ADS, sprint, reload, recoil, and swap must retain both hands and body clearance.
+
+**Observed behavior:** `HumanRifleCarry` applied one M4 transform and one pair of wrist targets to every firearm. Numerical IK stayed attached, but pistols looked stocked, launchers were dipped like rifles, and compact/heavy weapons shared the same receiver height and action pitch.
+
+**Root cause:** The earlier per-weapon carry table was consumed by the connected fallback solver, while the asynchronously loaded Soldier path selected only scale overrides and a single rifle pose.
+
+**Files changed:** `src/player/HumanRifleCarry.js`, `tools/human_rifle_carry_check.mjs`, `human-weapon-gallery.html`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+
+**Fix:** Add seven loaded-Soldier carry families—pistol, compact, shotgun, rifle, support, precision, and launcher—and explicitly map every shipped firearm. Each family owns patrol/aim rotations, shoulder-relative receiver anchors, forward clearance, and action-tuck behavior while continuing to use the authoritative two-arm IK and level ADS tracking.
+
+**Verification:** PASS locally. The carry gate asserts the required family for every firearm and passes all 17 weapons across 816 real-Soldier armor/locomotion/aim/reload/sprint states with 0.00 cm wrist error, 0.0 cm torso penetration, at most 0.3 cm shoulder-surface contact, at least 5.1 cm lateral receiver clearance, and at least 29.5 cm forward clearance. A browser gallery rendered and visually inspected all 17 production holds at the runtime 18% idle blend. Production verification is pending deployment.
+
 ## BUG-023
 
 **Severity:** High

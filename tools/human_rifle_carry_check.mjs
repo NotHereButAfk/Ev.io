@@ -285,6 +285,7 @@ function measure(spec, armorName, armor, def) {
     leftShoulderDistance,
     requestedPitch: spec.pitch || 0,
     muzzlePitch,
+    carryFamily: weapon.userData.humanCarryFamily,
     lowReady: spec.lowReady === true,
     receiverBelowShoulders: shoulderMid.y - receiver.y,
     receiverRightOfShoulders: receiver.x - shoulderMid.x,
@@ -301,6 +302,23 @@ const firearms = WEAPONS.filter((def) => def.kind !== 'melee');
 const results = firearms.flatMap((def) => Object.entries(ARMORS).flatMap(([name, armor]) =>
   CASES.map((spec) => measure(spec, name, armor, def))
 ));
+const EXPECTED_CARRY_FAMILY = Object.freeze({
+  sidearm: 'pistol', magnum: 'pistol',
+  uzi: 'compact', needler: 'compact', plasmarifle: 'compact',
+  levershotgun: 'shotgun', energyshotgun: 'shotgun',
+  m4: 'rifle', m16: 'rifle', rifle: 'rifle',
+  lmg: 'support',
+  boltsniper: 'precision', battlerifle: 'precision', dmr: 'precision',
+  rpg: 'launcher', fuelrod: 'launcher', concussion: 'launcher',
+});
+for (const def of firearms) {
+  const families = new Set(results
+    .filter((result) => result.name.startsWith(`${def.id} `))
+    .map((result) => result.carryFamily));
+  assert(families.size === 1 && families.has(EXPECTED_CARRY_FAMILY[def.id]),
+    `${def.id} does not use its required soldier carry family (`
+      + `${[...families].join(', ') || 'missing'})`);
+}
 const MAX_GRIP_ERROR = 0.008;
 const MAX_MESH_PENETRATION = 0.004;
 // Mixamo hand bones sit at the wrist, not at the palm/finger contact patch.
@@ -312,8 +330,15 @@ const MAX_REACH_FRACTION = 0.9951;
 const MIN_LOW_READY_DROP = 0.060;
 const MIN_LOW_READY_FORWARD = 0.150;
 const MIN_LATERAL_SHOULDER_RATIO = 1.00;
-const MIN_SOLDIER_LOW_READY_PITCH = THREE.MathUtils.degToRad(22);
-const MAX_SOLDIER_LOW_READY_PITCH = THREE.MathUtils.degToRad(38);
+const LOW_READY_PITCH_RANGE = Object.freeze({
+  pistol: [3, 18],
+  compact: [15, 30],
+  shotgun: [22, 38],
+  rifle: [22, 38],
+  support: [14, 28],
+  precision: [18, 34],
+  launcher: [3, 20],
+});
 let failures = 0;
 const failedResults = [];
 for (const result of results) {
@@ -327,17 +352,22 @@ for (const result of results) {
   // This is the regression that put the receiver/stock through the face: wrist
   // IK could still be numerically perfect while the whole weapon sat above the
   // real Soldier's shoulders. The production idle pose must remain low-ready.
-  const heightOk = !result.lowReady || result.receiverBelowShoulders >= MIN_LOW_READY_DROP;
+  const minimumDrop = result.carryFamily === 'pistol' ? 0.02
+    : result.carryFamily === 'launcher' ? -0.02 : MIN_LOW_READY_DROP;
+  const heightOk = !result.lowReady || result.receiverBelowShoulders >= minimumDrop;
   // Guard the actual loaded Soldier path, not only the procedural fallback:
   // idle must visibly carry muzzle-down instead of looking almost ADS.
+  const [minPitch, maxPitch] = LOW_READY_PITCH_RANGE[result.carryFamily]
+    || LOW_READY_PITCH_RANGE.rifle;
   const soldierCarryOk = !result.lowReady
-    || (result.muzzlePitch < -MIN_SOLDIER_LOW_READY_PITCH
-      && result.muzzlePitch > -MAX_SOLDIER_LOW_READY_PITCH);
+    || (result.muzzlePitch < -THREE.MathUtils.degToRad(minPitch)
+      && result.muzzlePitch > -THREE.MathUtils.degToRad(maxPitch));
   // Keep the receiver outside the torso silhouette, at or beyond the right
   // shoulder line. A forward-only offset can be physically clear yet still
   // look embedded from the normal rear camera, which was the reported defect.
-  const bodyClearOk = result.receiverRightOfShoulders
-      >= result.shoulderHalfWidth * MIN_LATERAL_SHOULDER_RATIO
+  const minimumRight = result.carryFamily === 'pistol'
+    ? 0.04 : result.shoulderHalfWidth * MIN_LATERAL_SHOULDER_RATIO;
+  const bodyClearOk = result.receiverRightOfShoulders >= minimumRight
     && (!result.lowReady || result.receiverAheadOfShoulders >= MIN_LOW_READY_FORWARD);
   const meshClearOk = result.torsoPenetration <= MAX_MESH_PENETRATION
     && result.shoulderPenetration <= MAX_MESH_PENETRATION;
@@ -370,7 +400,11 @@ for (const result of failedResults) {
     + `surface R${(result.rightSurfaceDistance * 100).toFixed(1)}`
     + `/L${(result.leftSurfaceDistance * 100).toFixed(1)}cm, `
     + `mesh T${(result.torsoPenetration * 100).toFixed(1)}`
-    + `/S${(result.shoulderPenetration * 100).toFixed(1)}cm`
+    + `/S${(result.shoulderPenetration * 100).toFixed(1)}cm, `
+    + `${result.carryFamily} pitch=${THREE.MathUtils.radToDeg(result.muzzlePitch).toFixed(1)}deg `
+    + `drop=${(result.receiverBelowShoulders * 100).toFixed(1)}cm `
+    + `right=${(result.receiverRightOfShoulders * 100).toFixed(1)}cm `
+    + `ahead=${(result.receiverAheadOfShoulders * 100).toFixed(1)}cm`
   );
 }
 

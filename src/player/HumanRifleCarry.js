@@ -35,6 +35,51 @@ const AIM_OFFSET = new THREE.Vector3(0.28, -0.05, -0.20);
 // stock mesh still crosses the Soldier's shoulder.
 const BODY_FORWARD_CLEARANCE = 0.21;
 
+// A normal soldier does not hold a sidearm, an SMG, an LMG, and a launcher as
+// if they were the same M4. These families preserve the shared wrist IK while
+// giving each mass/stock type its own low-ready and shouldered silhouette.
+function carryPose(family, patrolEuler, aimEuler, patrolOffset, aimOffset, forward) {
+  return Object.freeze({
+    family,
+    patrolQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(...patrolEuler)),
+    aimQ: new THREE.Quaternion().setFromEuler(new THREE.Euler(...aimEuler)),
+    patrolOffset: new THREE.Vector3(...patrolOffset),
+    aimOffset: new THREE.Vector3(...aimOffset),
+    forward,
+  });
+}
+
+const CARRY_RIFLE = Object.freeze({
+  family: 'rifle', patrolQ: PATROL_Q, aimQ: AIM_Q,
+  patrolOffset: PATROL_OFFSET, aimOffset: AIM_OFFSET,
+  forward: BODY_FORWARD_CLEARANCE,
+});
+const CARRY_COMPACT = carryPose('compact', [-0.45, 0.22, 0.10], [-0.02, 0.06, 0],
+  [0.27, -0.11, -0.10], [0.27, -0.04, -0.18], 0.23);
+const CARRY_SHOTGUN = carryPose('shotgun', [-0.58, 0.24, 0.10], [-0.02, 0.07, 0],
+  [0.28, -0.13, -0.12], [0.28, -0.05, -0.20], 0.21);
+const CARRY_SUPPORT = carryPose('support', [-0.42, 0.18, 0.06], [-0.02, 0.06, 0],
+  [0.30, -0.10, -0.11], [0.30, -0.03, -0.18], 0.22);
+const CARRY_PRECISION = carryPose('precision', [-0.50, 0.20, 0.08], [-0.02, 0.06, 0],
+  [0.29, -0.11, -0.13], [0.29, -0.04, -0.20], 0.22);
+const CARRY_PISTOL = carryPose('pistol', [-0.16, 0.04, 0], [-0.01, 0.02, 0],
+  [0.10, -0.07, -0.23], [0.10, -0.02, -0.29], 0.08);
+const CARRY_LAUNCHER = carryPose('launcher', [-0.20, 0.12, 0.04], [-0.01, 0.05, 0],
+  [0.32, -0.02, -0.10], [0.32, 0.00, -0.18], 0.22);
+
+const HUMAN_CARRY_BY_ID = Object.freeze({
+  sidearm: CARRY_PISTOL, magnum: CARRY_PISTOL,
+  uzi: CARRY_COMPACT, needler: CARRY_COMPACT, plasmarifle: CARRY_COMPACT,
+  levershotgun: CARRY_SHOTGUN, energyshotgun: CARRY_SHOTGUN,
+  lmg: CARRY_SUPPORT,
+  boltsniper: CARRY_PRECISION, battlerifle: CARRY_PRECISION, dmr: CARRY_PRECISION,
+  rpg: CARRY_LAUNCHER, fuelrod: CARRY_LAUNCHER, concussion: CARRY_LAUNCHER,
+});
+
+function humanCarryPose(weapon) {
+  return HUMAN_CARRY_BY_ID[weapon?.userData?.weaponId] || CARRY_RIFLE;
+}
+
 // WeaponModels are authored around a 1.05-1.15m showcase silhouette. That is
 // useful in the loadout turntable, but full size made an M4 longer than the
 // Soldier could physically shoulder and put its stock through the deltoid.
@@ -265,18 +310,20 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   const reloadBell = reload > 0 ? Math.sin(Math.PI * reload) : 0;
   const swapBell = swap > 0 ? Math.sin(Math.PI * swap) : 0;
   const rack = reload > 0 ? Math.exp(-Math.pow((reload - 0.70) / 0.055, 2)) : 0;
+  const carry = humanCarryPose(weapon);
+  weapon.userData.humanCarryFamily = carry.family;
 
   const anchor = V[18];
   const rigScale = shoulderAnchor(body, rig, anchor);
   const geometryClearance = weaponGeometryClearance(weapon);
   weapon.position.copy(anchor).add(
-    V[25].lerpVectors(PATROL_OFFSET, AIM_OFFSET, aim).multiplyScalar(rigScale)
+    V[25].lerpVectors(carry.patrolOffset, carry.aimOffset, aim).multiplyScalar(rigScale)
   );
   const scaleClearance = Math.max(0, Math.abs(weapon.scale.z || 1) - 0.65)
     * REFERENCE_STOCK_BACK;
-  weapon.position.z -= BODY_FORWARD_CLEARANCE + scaleClearance + geometryClearance.forward;
+  weapon.position.z -= carry.forward + scaleClearance + geometryClearance.forward;
   weapon.position.z -= 0.075 * Math.sin(Math.PI * aim) * rigScale;
-  weapon.quaternion.slerpQuaternions(PATROL_Q, AIM_Q, aim);
+  weapon.quaternion.slerpQuaternions(carry.patrolQ, carry.aimQ, aim);
 
   // Same common-mode vertical follow as the procedural third-person rig:
   // looking pitch moves the shouldered weapon and both IK arms as one unit.
@@ -285,8 +332,12 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   // additional tuck; retaining the old high-ready correction here doubled the
   // drop, overextended the support arm on long rifles, and hid the gun against
   // the thighs during sprint/swap.
-  const carryPitch = lookPitch + (state.sway || 0) - sprint * 0.12
-    - reloadBell * 0.22 - swapBell * 0.30 - recoil * 0.10 - rack * 0.08;
+  const compactAction = carry.family === 'pistol' || carry.family === 'launcher';
+  const carryPitch = lookPitch + (state.sway || 0)
+    - sprint * (compactAction ? 0.08 : 0.12)
+    - reloadBell * (compactAction ? 0.12 : 0.22)
+    - swapBell * (compactAction ? 0.22 : 0.30)
+    - recoil * 0.10 - rack * 0.08;
   if (reloadBell || swapBell) {
     // Roll the magazine toward the support shoulder. The opposite sign presents
     // it body-right and puts the target beyond the real Mixamo arm's reach.
