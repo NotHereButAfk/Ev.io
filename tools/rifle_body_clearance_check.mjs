@@ -106,8 +106,10 @@ const states = [
   // Do not borrow HumanSoldier's separate 18% low-ready blend here: doing so
   // hid a too-level normal-match stance from this production gate.
   ['idle', 0, {}],
-  ['walk crest', 0, { swing: 0.055 }],
-  ['run trough', 0, { swing: -0.065, bodyPitch: -0.12 }],
+  ['walk low-ready', 0, { move: 1, swing: 0.055 }],
+  ['sprint carry', 0, { move: 1, run: 1, swing: -0.065, bodyPitch: -0.12 }],
+  ['moving fire', 1, { move: 1, firing: 1, swing: 0.055 }],
+  ['scoped move', 1, { move: 1, scoped: 1, swing: 0.055 }],
   ['aim', 1, {}],
   ['aim up', 1, { aimPitch: 0.65 }],
   ['aim down', 1, { aimPitch: -0.65 }],

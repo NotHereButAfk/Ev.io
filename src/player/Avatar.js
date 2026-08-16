@@ -248,6 +248,10 @@ export class Avatar {
         slide: s.sliding ? 1 : 0,
         vy: s.vy || 0,
         aim: (s.firing || s.aiming) ? 1 : 0,
+        move: speed > 0.6 && grounded ? 1 : 0,
+        run: s.sprint ? 1 : 0,
+        firing: s.firing ? 1 : 0,
+        scoped: s.aiming ? 1 : 0,
       });
       this._firePulseT = Math.max(0, this._firePulseT - dt);
       if (s.firing && this._firePulseT <= 0) {
@@ -337,6 +341,8 @@ export class Avatar {
       swing: gait.swing,
       kick:  this._kick,
       reload: s.reload || 0, swap: act.swap, flinch: act.flinch, throwP: act.throw,
+      move: moving ? 1 : 0, run,
+      firing: s.firing ? 1 : 0, scoped: s.aiming ? 1 : 0,
       smooth: true,
     });
   }

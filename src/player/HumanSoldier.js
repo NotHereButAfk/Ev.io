@@ -339,6 +339,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _targetSlide = 0, _slideT = 0;
   let _reloadP = 0, _meleeSwing = 1;
   let _targetWeaponAim = 0, _weaponAim = 0;
+  let _weaponMove = 0, _weaponRun = 0, _weaponFiring = 0, _weaponScoped = 0;
   const _actionLeft = { swap: 0, throw: 0 };
   const _actionPose = createHumanActionPose();
   const _deathPose = createHumanDeathPose();
@@ -415,6 +416,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       const combatReady = _weaponKind === 'gun' ? HUMAN_LOW_READY_AIM : 0;
       _targetWeaponAim = Math.max(combatReady, _clamp(state.aim, 0, 1));
     }
+    if (Number.isFinite(state.move)) _weaponMove = _clamp(state.move, 0, 1);
+    if (Number.isFinite(state.run)) _weaponRun = _clamp(state.run, 0, 1);
+    if (Number.isFinite(state.firing)) _weaponFiring = _clamp(state.firing, 0, 1);
+    if (Number.isFinite(state.scoped)) _weaponScoped = _clamp(state.scoped, 0, 1);
   };
   const triggerAction = (kind) => {
     if (kind === 'swap' || kind === 'throw') {
@@ -774,6 +779,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
         swap: swapP,
         throwP,
         sprint: _holdRunT,
+        move: _weaponMove,
+        run: _weaponRun,
+        firing: _weaponFiring,
+        scoped: _weaponScoped,
         sway: carrySway - landDip,
         recoil: _fireRecoil,
         pitch: _sAimPitch,

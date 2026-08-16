@@ -365,7 +365,8 @@ function slideToReach(T, sx) {
  * @param {THREE.Object3D} weapon  the weapon model parented to the body (or null)
  * @param {number} aim     0 = patrol carry, 1 = shouldered and aiming
  * @param {number} dt      frame delta (seconds) — unused, kept for callers
- * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP, smooth }
+ * @param {object} [o]     { aimPitch, swing, kick, reload, swap, flinch, throwP,
+ *                           move, run, firing, scoped, smooth }
  *   `aimPitch` is where this body is SHOOTING, in radians against the horizon
  *   (positive up) — pass the look pitch, or for a bot the elevation of the ray
  *   it actually fires. Shouldered, the muzzle comes out on exactly that angle.
@@ -384,6 +385,16 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   const profile = CARRY_PROFILES[carryFamily];
   const pistolCarry = carryFamily === 'pistol';
   const a    = Math.max(0, Math.min(1, aim));
+  // Locomotion/combat poses are blended as independent weights instead of
+  // swapping meshes. This preserves one authoritative weapon transform and
+  // lets the arm IK keep both palms attached throughout every transition.
+  const move = THREE.MathUtils.clamp(o.move || 0, 0, 1);
+  const scoped = THREE.MathUtils.clamp(o.scoped || 0, 0, 1);
+  const firing = THREE.MathUtils.clamp(o.firing || 0, 0, 1);
+  const combat = Math.max(scoped, firing);
+  const sprint = THREE.MathUtils.clamp(o.run || 0, 0, 1) * (1 - combat);
+  const movingFire = move * firing * (1 - scoped);
+  const walk = move * (1 - sprint) * (1 - combat);
   const kick = o.kick || 0;
   const reload = o.reload || 0, swap = o.swap || 0, flinch = o.flinch || 0;
   // 0 → 1 → 0 shapes for the actions that go somewhere and come back.
@@ -408,8 +419,15 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // common-mode shoulder pitch: the aim itself, idle breathing / stride, recoil,
   // and a lift through the middle of the patrol→aim blend (a straight
   // interpolation drags the buttstock through the right pec on the way across).
+  // Walking lets the low-ready rifle ride lightly with the stride. Sprinting
+  // tucks it down and inward. Shooting on the move and scoped movement keep
+  // the upper body stabilized, leaving only a small amount of gait motion.
+  const gaitSwing = (o.swing || 0)
+    * (1 - 0.78 * movingFire)
+    * (1 - 0.92 * scoped);
   const swing = (aimPitch - AIM_BASE_PITCH) * a
-    + (o.swing || 0) - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
+    + gaitSwing
+    - kick * 0.10 + 0.16 * Math.sin(Math.PI * a)
     // Muzzle drops while the hands are busy, and again when hit.
     - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 
@@ -419,6 +437,12 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   // now that the hands are IK'd to wherever the rifle ends up.
   _pos.z -= 0.075 * Math.sin(Math.PI * a);
   _pos.z += kick * 0.03;                           // recoil shoves it back
+  // Four readable silhouettes from the same correctly-sized weapon model:
+  // low-ready walk, tucked sprint, braced moving fire, tight scoped shoulder.
+  _pos.y -= walk * 0.012;
+  _pos.z += sprint * (pistolCarry ? 0.025 : 0.040);
+  _pos.y += movingFire * 0.016 + scoped * 0.030;
+  _pos.z -= movingFire * 0.012 + scoped * 0.020;
   // Slerp (not euler-lerp) between the two carries — the patrol pose is a
   // large compound rotation and euler blending swings it through junk.
   _q.slerpQuaternions(profile.qPatrol, profile.qAim, a);

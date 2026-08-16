@@ -812,6 +812,10 @@ export class Bot {
         reload: this._reloadTimer > 0 && this._botGun
           ? 1 - this._reloadTimer / this._botGun.reloadTime : 0,
         aim: !this._isSwordBot && (this._provoked || engaged) ? 1 : 0,
+        move: moving ? 1 : 0,
+        run: THREE.MathUtils.clamp((this._animSpeed - 3.0) / 3.0, 0, 1),
+        firing: this._gunKick > 0 ? 1 : 0,
+        scoped: 0,
       });
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
@@ -887,6 +891,8 @@ export class Bot {
         // stride, _gunKick shoves it back and climbs the muzzle.
         applyRifleCarry(this._rig, wm, this._alertBlend, dt, {
           swing: gait.swing, kick: this._gunKick,
+          move: isMoving ? 1 : 0, run,
+          firing: this._gunKick > 0 ? 1 : 0, scoped: 0,
           reload: this._reloadTimer > 0
             ? 1 - this._reloadTimer / this._botGun.reloadTime : 0,
           smooth: true,

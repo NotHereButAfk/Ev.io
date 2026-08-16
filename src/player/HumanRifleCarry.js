@@ -305,7 +305,15 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   const aim = THREE.MathUtils.clamp(state.aim || 0, 0, 1);
   const reload = THREE.MathUtils.clamp(state.reload || 0, 0, 1);
   const swap = THREE.MathUtils.clamp(state.swap || 0, 0, 1);
-  const sprint = THREE.MathUtils.clamp(state.sprint || 0, 0, 1);
+  const sprint = THREE.MathUtils.clamp(
+    Math.max(state.sprint || 0, state.run || 0), 0, 1,
+  );
+  const move = THREE.MathUtils.clamp(state.move || 0, 0, 1);
+  const scoped = THREE.MathUtils.clamp(state.scoped || 0, 0, 1);
+  const firing = THREE.MathUtils.clamp(state.firing || 0, 0, 1);
+  const combat = Math.max(scoped, firing);
+  const sprintCarry = sprint * (1 - combat);
+  const movingFire = move * firing * (1 - scoped);
   const recoil = Math.max(0, state.recoil || 0);
   const reloadBell = reload > 0 ? Math.sin(Math.PI * reload) : 0;
   const swapBell = swap > 0 ? Math.sin(Math.PI * swap) : 0;
@@ -333,11 +341,15 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   // drop, overextended the support arm on long rifles, and hid the gun against
   // the thighs during sprint/swap.
   const compactAction = carry.family === 'pistol' || carry.family === 'launcher';
-  const carryPitch = lookPitch + (state.sway || 0)
-    - sprint * (compactAction ? 0.08 : 0.12)
+  const carrySway = (state.sway || 0)
+    * (1 - 0.78 * movingFire) * (1 - 0.92 * scoped);
+  const carryPitch = lookPitch + carrySway
+    - sprintCarry * (compactAction ? 0.08 : 0.12)
     - reloadBell * (compactAction ? 0.12 : 0.22)
     - swapBell * (compactAction ? 0.22 : 0.30)
     - recoil * 0.10 - rack * 0.08;
+  weapon.position.y += (movingFire * 0.014 + scoped * 0.025) * rigScale;
+  weapon.position.z -= (movingFire * 0.010 + scoped * 0.018) * rigScale;
   if (reloadBell || swapBell) {
     // Roll the magazine toward the support shoulder. The opposite sign presents
     // it body-right and puts the target beyond the real Mixamo arm's reach.

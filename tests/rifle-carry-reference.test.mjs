@@ -52,8 +52,10 @@ const rig = body.userData.rig;
 const bones = body.userData.bones;
 const carryStates = [
   ['idle', 0, {}],
-  ['walk', 0, { swing: 0.04 }],
-  ['run', 0, { swing: -0.05, bodyPitch: -0.12 }],
+  ['walk low-ready', 0, { move: 1, swing: 0.04 }],
+  ['sprint tuck', 0, { move: 1, run: 1, swing: -0.05, bodyPitch: -0.12 }],
+  ['moving fire', 1, { move: 1, firing: 1, swing: 0.055 }],
+  ['scoped move', 1, { move: 1, scoped: 1, swing: 0.055 }],
   ['aim', 1.00, {}],
   ['aim up', 1.00, { aimPitch: 0.65 }],
   ['aim down', 1.00, { aimPitch: -0.65 }],
@@ -112,6 +114,32 @@ for (const [name, aim, options] of carryStates) {
   assert(receiverLocal.x > SHOULDER_X,
     `${name} receiver enters the torso silhouette at ${receiverLocal.x.toFixed(3)}m`);
 }
+
+// The four requested states must be genuinely different silhouettes, not four
+// names routed to the same pose. Probe the authoritative weapon transform;
+// both arms are derived from it above, so these differences move the complete
+// held assembly without detaching either hand.
+const samplePose = (aim, options) => {
+  applyRifleCarry(null, liveWeapon, aim, 0, options);
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(liveWeapon.quaternion);
+  return {
+    p: liveWeapon.position.clone(),
+    pitch: Math.asin(THREE.MathUtils.clamp(
+      forward.y, -1, 1,
+    )),
+    yaw: Math.atan2(forward.x, -forward.z),
+  };
+};
+const walkPose = samplePose(0, { move: 1, swing: 0.04 });
+const sprintPose = samplePose(0, { move: 1, run: 1, swing: 0.04 });
+const firePose = samplePose(1, { move: 1, firing: 1, swing: 0.055 });
+const scopePose = samplePose(1, { move: 1, scoped: 1, swing: 0.055 });
+assert(sprintPose.p.z > walkPose.p.z + 0.030,
+  'sprint does not pull the weapon into a compact carry');
+assert(firePose.p.distanceTo(scopePose.p) > 0.008,
+  'moving-fire and scoped shoulder poses are visually identical');
+assert(Math.abs(scopePose.pitch) < THREE.MathUtils.degToRad(1),
+  `scoped muzzle is not aligned with the shot (${THREE.MathUtils.radToDeg(scopePose.pitch).toFixed(1)} degrees)`);
 
 console.log(
   `rifle carry reference passed: receiver y=${weapon.position.y.toFixed(3)}m, `

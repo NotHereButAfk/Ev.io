@@ -1745,6 +1745,10 @@ export class Game {
         slide: p.isSliding ? 1 : 0,
         vy: p.velocity.y,
         aim: (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0,
+        move: speed > 0.6 && p.onGround ? 1 : 0,
+        run: p.isSprinting ? 1 : 0,
+        firing: this._tpsAimHold > 0 ? 1 : 0,
+        scoped: this.weaponSystem.scopeT,
       });
       ud.mixer.update(dt);
       ud.armorTick?.(dt);
@@ -1826,6 +1830,9 @@ export class Game {
         swing: gait.swing,
         kick:  this._tpsGunKick,
         reload, swap: act.swap, flinch: act.flinch, throwP: act.throw,
+        move: moving ? 1 : 0, run,
+        firing: this._tpsAimHold > 0 ? 1 : 0,
+        scoped: this.weaponSystem.scopeT,
         smooth: true,
       });
     } else {

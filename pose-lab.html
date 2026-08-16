@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Rifle-carry graybox.
 //
-//   ?weapon=m4&aim=0..1&walk=<phase>&dbg=1
+//   ?weapon=m4&aim=0..1&walk=<phase>&run=0..1&firing=0..1&scoped=0..1
 //                                     render the live applyRifleCarry() pose
 //   ?sweep=1                          search anchor/muzzle space for a carry
 //                                     that keeps the hands on the gun AND the
@@ -243,6 +243,8 @@ if (Q.has('sweep')) {
     swing: gait.swing, kick: n('kick', 0), aimPitch: n('pitch', 0),
     reload: n('reload', 0), swap: n('swap', 0), flinch: n('flinch', 0),
     throwP: n('throw', 0), bodyPitch: gait.lean,
+    move: Q.has('walk') ? 1 : 0, run: n('run', 0),
+    firing: n('firing', 0), scoped: n('scoped', 0),
   });
 }
 
