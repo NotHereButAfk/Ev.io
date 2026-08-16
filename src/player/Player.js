@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import {
-  nextThirdPersonDistance,
   safeThirdPersonObstructionDistance,
   setThirdPersonDesired,
   findThirdPersonObstruction,
@@ -9,8 +8,8 @@ import { sprintRequested } from '../core/GameplayInput.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
-const WALK_SPEED = 6.2;
-const SPRINT_MULT = 1.75;
+const WALK_SPEED = 6.6;
+const SPRINT_MULT = 1.8;
 const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
@@ -175,10 +174,9 @@ export class Player {
   }
 
   update(dt, input, world) {
-    // --- third-person camera zoom (scroll wheel) ---
-    if (input.wheelDelta !== 0) {
-      this._camDist = nextThirdPersonDistance(this._camDist, input.wheelDelta);
-    }
+    // Competitive view is first-person only. Scroll remains available to the
+    // weapon system, but can no longer switch into a shoulder camera.
+    this._camDist = 0;
 
     // --- look ---
     // Standard (non-inverted) is mouse/finger up → look up. invertY flips the

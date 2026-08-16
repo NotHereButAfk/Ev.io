@@ -61,7 +61,9 @@ const VIEWMODEL_Z = -0.82;
 // shared transform so the weapon and both gripping hands cannot drift apart.
 const VIEWMODEL_X = 0.40;
 const VIEWMODEL_Y = -0.37;
-const VIEWMODEL_SCALE = 0.76;
+// Weapon-only first person: keep the gun large and readable like the reference
+// while world/player weapons retain their physical third-person scale.
+const VIEWMODEL_SCALE = 0.86;
 const VIEWMODEL_PITCH = 0.18;
 const VIEWMODEL_YAW = 0.31;
 const VIEWMODEL_ROLL = -0.10;
@@ -93,15 +95,72 @@ function viewmodelFovLift(fov) {
   return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
-// The reticle owns the sight picture for the complete ADS transition. Hiding
-// only near full zoom let a centered receiver sweep directly across the target
-// while the FOV narrowed—the obstruction players actually notice most. Clear
-// on the first held-aim frame, then keep the rig out until the zoom is almost
-// completely released so it cannot flash back over the target on scope-out.
-// Melee weapons never enter ADS.
+// Normal EV-style ADS keeps the firearm on screen and brings its physical sight
+// onto the camera axis. Only a magnified sniper optic hands off to the full-screen
+// scope overlay, and only after the gun has travelled most of the way there.
+// This also gives scope-out a readable reverse animation instead of popping the
+// complete gun-and-hands rig in and out on right mouse down/up.
 export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
-  if (!def || def.kind === 'melee') return false;
-  return aimHeld || scopeT > 0.08;
+  void aimHeld;
+  return !!def?.scoped && scopeT > 0.68;
+}
+
+const _adsBox = new THREE.Box3();
+const _adsSpecialBox = new THREE.Box3();
+const _adsPoint = new THREE.Vector3();
+const _adsCorner = new THREE.Vector3();
+const _adsInverse = new THREE.Matrix4();
+
+// Measure a weapon's rear sight in its own coordinate system. Authored models
+// can provide an exact `sight_point`; otherwise optic glass is preferred and a
+// conservative top/rear point is inferred from the complete weapon. Measuring
+// the actual asset keeps one shared ADS solver working for pickups and future
+// models instead of maintaining a brittle list of hand-tuned screen offsets.
+export function measureWeaponSight(group) {
+  const declared = group?.getObjectByName?.('sight_point');
+  if (declared) {
+    group.updateWorldMatrix(true, true);
+    return group.worldToLocal(declared.getWorldPosition(new THREE.Vector3()));
+  }
+
+  group.updateWorldMatrix(true, true);
+  _adsInverse.copy(group.matrixWorld).invert();
+  _adsBox.makeEmpty();
+  _adsSpecialBox.makeEmpty();
+  group.traverse((object) => {
+    if (!object.isMesh || !object.geometry) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    const box = object.geometry.boundingBox;
+    if (!box) return;
+    const role = object.material?.userData?.role;
+    for (let ix = 0; ix < 2; ix++) for (let iy = 0; iy < 2; iy++) for (let iz = 0; iz < 2; iz++) {
+      _adsCorner.set(
+        ix ? box.max.x : box.min.x,
+        iy ? box.max.y : box.min.y,
+        iz ? box.max.z : box.min.z,
+      ).applyMatrix4(object.matrixWorld).applyMatrix4(_adsInverse);
+      _adsBox.expandByPoint(_adsCorner);
+      if (role === 'special') _adsSpecialBox.expandByPoint(_adsCorner);
+    }
+  });
+
+  const source = !_adsSpecialBox.isEmpty() ? _adsSpecialBox : _adsBox;
+  if (source.isEmpty()) return new THREE.Vector3(0, 0.14, 0.05);
+  source.getCenter(_adsPoint);
+  // Optic glass centres define the axis directly. With iron sights, sit just
+  // below the weapon's highest point so the front post remains visible.
+  const y = !_adsSpecialBox.isEmpty()
+    ? _adsPoint.y
+    : THREE.MathUtils.lerp(_adsPoint.y, source.max.y, 0.88);
+  return new THREE.Vector3(_adsPoint.x, y, source.max.z - 0.015);
+}
+
+export function adsMountForSight(sight, scale = VIEWMODEL_SCALE, depth = -0.42) {
+  return new THREE.Vector3(
+    -sight.x * scale,
+    -sight.y * scale,
+    depth - sight.z * scale,
+  );
 }
 
 export class WeaponSystem {
@@ -244,7 +303,8 @@ export class WeaponSystem {
       const { group, muzzle } = buildWeaponModel(w);
       group.visible = false;
       this.kickGroup.add(group);
-      this.models.set(w.id, { group, muzzle });
+      const sight = measureWeaponSight(group);
+      this.models.set(w.id, { group, muzzle, sight, adsMount: adsMountForSight(sight) });
     }
     this._setActiveModel(0);
     this._buildArm();
@@ -263,7 +323,8 @@ export class WeaponSystem {
       group.visible = old ? old.group.visible : false;
       if (old) this.kickGroup.remove(old.group);
       this.kickGroup.add(group);
-      this.models.set(w.id, { group, muzzle });
+      const sight = measureWeaponSight(group);
+      this.models.set(w.id, { group, muzzle, sight, adsMount: adsMountForSight(sight) });
     }
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
     if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
@@ -477,6 +538,10 @@ export class WeaponSystem {
       portrait ? 0.60 : 0.72,
     );
     this.supportArmGroup.visible = pose.supportVisible !== false && def?.kind !== 'melee';
+    // First person deliberately renders only the weapon. The complete hands,
+    // arms and soldier carry remain visible to other players in world space.
+    this.armGroup.visible = false;
+    this.supportArmGroup.visible = false;
     this.armGroup.userData.gripTarget = trigger.slice();
     this.supportArmGroup.userData.gripTarget = support.slice();
   }
@@ -1465,8 +1530,9 @@ export class WeaponSystem {
     // Sprint blend for COD carry animation (blocks ADS)
     this._sprintT = expDamp(this._sprintT, player.isSprinting ? 1 : 0, 9, dt);
 
-    // Every EV.IO firearm can zoom. Snipers still use the full scope overlay;
-    // regular guns shoulder into a centered, lower-FOV sight picture.
+    // Every EV.IO firearm can zoom. Regular guns remain visible and travel
+    // onto their physical sight axis; snipers hand off to the overlay late in
+    // the same motion rather than disappearing on the first held frame.
     const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
     this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
     this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT, wantScope);
@@ -1624,7 +1690,8 @@ export class WeaponSystem {
     // start/stop sprint or scope in/out).
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
-    const adsShiftX    = -this.scopeT * baseX;
+    const adsPose      = this.models.get(def.id)?.adsMount;
+    const adsEase      = this.scopeT * this.scopeT * (3 - 2 * this.scopeT);
     // Sprint lowers the complete gun-and-hands rig. The old positive offset
     // raised it 12cm, contradicting the intended carry and forcing implausibly
     // long sleeves just to keep them connected to the bottom of the frame.
@@ -1635,24 +1702,35 @@ export class WeaponSystem {
     const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
-    const tgtX = baseX + sprintShiftX + adsShiftX
+    const hipX = baseX + sprintShiftX;
+    const hipY = VIEWMODEL_Y + viewmodelFovLift(this.camera.fov) + sprintDropY;
+    const hipZ = VIEWMODEL_Z;
+    const adsX = adsPose?.x ?? 0;
+    const adsY = adsPose?.y ?? -0.12;
+    const adsZ = adsPose?.z ?? -0.46;
+    const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;
-    const tgtY = VIEWMODEL_Y + viewmodelFovLift(this.camera.fov) + sprintDropY + bobV
+    const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV
       - 0.07 * framedBell - 0.015 * framedRack - landPulse * 0.055;
+    const tgtZ = THREE.MathUtils.lerp(hipZ, adsZ, adsEase);
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
+    this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 18, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      VIEWMODEL_PITCH + this._sprintT * 0.22 + 0.50 * framedBell
+      THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, 0, adsEase)
+        + 0.50 * framedBell
         + 0.14 * framedRack + landPulse * 0.12, 14, dt);
-    this._mountRot.y = expDamp(this._mountRot.y, VIEWMODEL_YAW, 14, dt);
+    this._mountRot.y = expDamp(this._mountRot.y,
+      THREE.MathUtils.lerp(VIEWMODEL_YAW, 0, adsEase), 14, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
-      VIEWMODEL_ROLL + this._sprintT * -0.40 + 0.42 * framedBell, 14, dt);
+      THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, 0, adsEase)
+        + 0.42 * framedBell, 14, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
-    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, VIEWMODEL_Z);
+    this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, this._mountPos.z);
     this.weaponMount.rotation.x = this._mountRot.x;
     this.weaponMount.rotation.y = this._mountRot.y;
     this.weaponMount.rotation.z = this._mountRot.z;

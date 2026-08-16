@@ -5,6 +5,7 @@
 
 const _DB  = 'sio_accounts';
 const _SES = 'sio_session';
+const _GUEST = 'sio_guest_name';
 const _PBKDF2_ITERS = 210_000;
 const _SALT_BYTES = 16;
 
@@ -133,9 +134,20 @@ export const UserAccount = {
   },
 
   logout() { sessionStorage.removeItem(_SES); },
-  guest()  { sessionStorage.setItem(_SES, '__guest__'); },
+  guest()  {
+    sessionStorage.setItem(_SES, '__guest__');
+    if (!sessionStorage.getItem(_GUEST)) {
+      const bytes = new Uint32Array(1);
+      crypto.getRandomValues(bytes);
+      sessionStorage.setItem(_GUEST, `Guest${(bytes[0] % 1_000_000).toString().padStart(6, '0')}`);
+    }
+  },
 
   getDisplayName(username) {
+    if (username === '__guest__') {
+      if (!sessionStorage.getItem(_GUEST)) this.guest();
+      return sessionStorage.getItem(_GUEST);
+    }
     const { accounts } = _load();
     return accounts[username]?.displayName || username;
   },

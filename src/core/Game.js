@@ -28,6 +28,7 @@ import {
 } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
+import { preloadUniversalAnimations } from '../player/UniversalAnimations.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { isLowPolyId } from '../player/LowPolyModels.js';
@@ -51,7 +52,7 @@ import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels, buildWeaponModel } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 import { countLocalMatchPlayers } from './Population.js';
@@ -299,6 +300,7 @@ export class Game {
     preloadPlayerModel(swapPreview);
     preloadSpartanModel(swapPreview);
     preloadWeaponModels();
+    preloadUniversalAnimations();
   }
 
   // ── Connect sequence ─────────────────────────────────────────────────────────
@@ -414,7 +416,7 @@ export class Game {
   _onAuth(username) {
     this.currentUsername = username;
     this.menu.setUsername(username);
-    if (username && !UserAccount.isGuest()) {
+    if (username) {
       document.getElementById('player-name').value = UserAccount.getDisplayName(username);
     }
     this.menu.showMain();
@@ -593,7 +595,14 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, modeId, armorTypeId) => this._startGame(name, skinId, modeId, armorTypeId);
+    this.menu.onPlay = (name, skinId, modeId, armorTypeId) => {
+      if (!this.currentUsername || UserAccount.isGuest()) {
+        if (!UserAccount.isGuest()) UserAccount.guest();
+        this._onAuth('__guest__');
+        name = UserAccount.getDisplayName('__guest__');
+      }
+      this._startGame(name, skinId, modeId, armorTypeId);
+    };
     this.menu.onResume        = () => this._resume();
     this.menu.onQuit          = () => this._quitToMenu();
     this.menu.onRestart       = () => this._restart();
@@ -1622,7 +1631,10 @@ export class Game {
     const ud = this._playerBody?.userData;
     if (!ud) return;
     const def = this.weaponSystem.currentDef;
-    if (!def || this._tpsWeaponId === def.id) return;
+    const needsImportedRefresh = def && this._tpsWeaponMesh
+      && this._tpsWeaponMesh.userData.modelSource !== 'quaternius'
+      && hasLoadedWeaponModel(def.id);
+    if (!def || (this._tpsWeaponId === def.id && !needsImportedRefresh)) return;
     const isSwap = this._tpsWeaponId !== null;
     this._tpsWeaponId = def.id;
     // Human soldier: attach to the rigged hand via its own hold system.
@@ -1762,6 +1774,10 @@ export class Game {
       speed, moving, run, crouch: this._tpsCrouch, dt, dirF, dirR,
       grounded: p.onGround, vy: p.velocity.y,
       slide: p.isSliding ? 1 : 0,
+    });
+    rig.universalAnimator?.update(dt, {
+      speed, moving, run, crouch: this._tpsCrouch,
+      grounded: p.onGround, vy: p.velocity.y,
     });
     // Subtle side-to-side weight transfer makes the armored chassis feel
     // connected through the hips. Apply it in body-local +X so strafing and

@@ -42,6 +42,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   chainWeights, loftSkinned, appendGeometry, newBuffer, toGeometry, sePoint,
 } from './BodyGeometry.js';
+import { attachUniversalAnimator } from './UniversalAnimations.js';
 
 // Inverted-hull source: weld, re-smooth, push out along the normal. Welding
 // keeps the contour continuous across a ring seam; the skin weights come along
@@ -501,6 +502,7 @@ export function buildHeroBody(id = 'vanguard') {
       hips: bones.hips, spine: bones.spine, chest: bones.chest, head: bones.head,
     },
   };
+  attachUniversalAnimator(group);
   return group;
 }
 
@@ -878,15 +880,32 @@ function buildHeroBuffers(id) {
 
   // Eye opening and lower face wrap. The slit is intentionally narrower than
   // the old visor so the face reads masked rather than robotic.
-  addBox(buf('frame'), 0.188 * G, 0.052 * G, 0.052 * G, 0, mapHead(1.992), -0.104 * G, B.head);
-  addBox(buf('glow'),  0.126 * G, 0.014 * G, 0.024 * G, 0, mapHead(1.996), -0.132 * G, B.head);
+  const operative = id === 'vanguard';
+  addBox(buf('frame'), (operative ? 0.208 : 0.188) * G,
+         (operative ? 0.084 : 0.052) * G, 0.052 * G,
+         0, mapHead(operative ? 1.982 : 1.992), -0.104 * G, B.head);
+  addBox(buf('glow'), (operative ? 0.174 : 0.126) * G,
+         (operative ? 0.052 : 0.014) * G, 0.024 * G,
+         0, mapHead(operative ? 1.984 : 1.996), -0.132 * G, B.head);
+  if (operative) {
+    addBox(buf('armor2'), 0.210 * G, 0.020 * G, 0.028 * G,
+           0, mapHead(2.030), -0.126 * G, B.head);
+    for (const s of [-1, 1])
+      addBox(buf('steel'), 0.026 * G, 0.100 * G, 0.046 * G,
+             s * 0.102 * G, mapHead(1.982), -0.092 * G, B.head);
+  }
   addBox(buf('joint'), 0.174 * G, 0.112 * G, 0.056 * G, 0, mapHead(1.912), -0.082 * G, B.head);
 
   // Hood knot and two short tails. They are chest-bound, so they move as one
   // clean silhouette and cannot whip through the shouldered weapon.
   addBox(buf('armor2'), 0.070 * G, 0.052 * G, 0.060 * G, 0, mapHead(1.960), 0.108 * G, B.head);
-  addBox(buf('joint'), 0.050 * G, 0.250 * G, 0.020 * G, -0.040 * G, mapTorso(1.710), 0.132 * G, B.chest, -0.10);
-  addBox(buf('joint'), 0.044 * G, 0.205 * G, 0.018 * G,  0.040 * G, mapTorso(1.720), 0.139 * G, B.chest,  0.13);
+  if (!operative) {
+    addBox(buf('joint'), 0.050 * G, 0.250 * G, 0.020 * G, -0.040 * G, mapTorso(1.710), 0.132 * G, B.chest, -0.10);
+    addBox(buf('joint'), 0.044 * G, 0.205 * G, 0.018 * G,  0.040 * G, mapTorso(1.720), 0.139 * G, B.chest,  0.13);
+  } else {
+    addBox(buf('steel'), 0.142 * G, 0.052 * G, 0.052 * G,
+           0, mapTorso(1.744), 0.094 * G, B.chest);
+  }
 
   // Cheek guards + chin plate close the jaw.
   for (const s of [-1, 1])

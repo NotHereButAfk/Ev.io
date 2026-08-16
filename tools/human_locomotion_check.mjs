@@ -37,12 +37,12 @@ assert(humanMotionTransitionSeconds('air', 'run') >= 0.1
 
 const walkRate = targetHumanTimeScale('walk', 2.5);
 const runRate = targetHumanTimeScale('run', 6.2);
-const sprintRate = targetHumanTimeScale('run', 10.85);
+const sprintRate = targetHumanTimeScale('run', 11.88);
 assert(walkRate > 1 && walkRate < 1.7, `walk rate is implausible (${walkRate})`);
 assert(runRate > 1.3 && runRate < 1.6, `run rate is implausible (${runRate})`);
 assert(sprintRate === 1.72, `sprint cadence cap changed (${sprintRate})`);
-const sprintStride = targetHumanStrideScale('run', 10.85, sprintRate);
-assert(sprintStride > 1.4 && sprintStride < 1.6,
+const sprintStride = targetHumanStrideScale('run', 11.88, sprintRate);
+assert(sprintStride > 1.55 && sprintStride <= 1.6,
   `sprint stride warp is implausible (${sprintStride})`);
 assert(Math.abs(targetHumanStrideScale('run', HUMAN_CLIP_SPEED.run, 1) - 1) < 1e-6,
   'native run speed should not warp the stride');
@@ -232,8 +232,8 @@ const measuredSprint = HUMAN_CLIP_SPEED.run
   * (warpedRun.plantedSpeed / nativeRun.plantedSpeed)
   * sprintRate;
 assert(
-  Math.abs(measuredSprint - 10.85) / 10.85 < 0.04,
-  `warped sprint delivers ${measuredSprint.toFixed(2)}m/s instead of 10.85m/s`
+  Math.abs(measuredSprint - 11.88) / 11.88 < 0.04,
+  `warped sprint delivers ${measuredSprint.toFixed(2)}m/s instead of 11.88m/s`
 );
 assert(
   warpedRun.minHeight >= nativeRun.minHeight - 0.01,

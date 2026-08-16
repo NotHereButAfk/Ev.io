@@ -501,7 +501,7 @@ export class MenuUI {
     const account   = document.getElementById('nav-account');
 
     if (nameEl) {
-      nameEl.textContent = registered ? UserAccount.getDisplayName(username) : 'guest';
+      nameEl.textContent = username ? UserAccount.getDisplayName(username) : 'guest';
     }
     loginLink?.classList.toggle('hidden', registered);
     account?.classList.toggle('hidden', !registered);
@@ -521,7 +521,7 @@ export class MenuUI {
   _renderProfile() {
     const u       = this._currentUser;
     const isGuest = !u || u === '__guest__';
-    const name    = isGuest ? 'GUEST' : UserAccount.getDisplayName(u);
+    const name    = u ? UserAccount.getDisplayName(u) : 'GUEST';
     const stats   = isGuest ? { kills: 0, deaths: 0, score: 0, games: 0 } : UserAccount.getStats(u);
     const kills   = stats.kills  || 0;
     const deaths  = stats.deaths || 0;

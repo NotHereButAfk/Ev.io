@@ -372,7 +372,9 @@ assert(referenceRifleBounds.minX > -0.24,
   `EV.IO rifle crosses too far over the reticle (${JSON.stringify(referenceRifleBounds)})`);
 assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >= 0.11,
   `EV.IO rifle lacks its shouldered pitch/yaw (${system.weaponMount.rotation.x}, ${system.weaponMount.rotation.y})`);
-let worstGlove = { value: Infinity, label: '' };
+let worstGlove = { value: 0, label: 'weapon-only' };
+assert(!system.armGroup.visible && !system.supportArmGroup.visible,
+  'first-person must not render hands or sleeves');
 for (const stateName of ['idle', 'sprint', 'reload']) {
   player.isSprinting = stateName === 'sprint';
   player.velocity.z = stateName === 'sprint' ? 10.85 : 0;
@@ -393,6 +395,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         ['trigger', system.armGroup],
         ['support', system.supportArmGroup],
       ]) {
+        if (!glove.visible) continue;
         const grip = glove.getObjectByName('viewmodel_grip') || glove;
         const ratio = gloveRatio(grip);
         const label = `${stateName}/${viewport.label}/${fov}/${side}`;
@@ -435,7 +438,8 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   reloadState.isReloading = false;
 }
 
-assert(system.supportArmGroup.visible, 'rifle support hand is not visible');
+assert(!system.armGroup.visible && !system.supportArmGroup.visible,
+  'rifle viewmodel unexpectedly renders hands');
 assert(
   system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === false,
   'support hand grew a second full-screen upper arm',
@@ -559,7 +563,7 @@ const adsStability = [];
 for (const fps of rates) {
   resetMotionState();
   input.rightMouseDown = true;
-  player.velocity.z = 6.2;
+  player.velocity.z = 6.6;
   advanceSeconds(1.2, fps, (dt) => {
     input.mouseDX = 600 * dt;
     input.mouseDY = -300 * dt;
@@ -583,32 +587,34 @@ assert(system.kickGroup.visible, 'viewmodel did not return after leaving the sco
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
-// A centered receiver used to sweep across the target during the zoom and was
-// tested only after ADS had already settled. Exercise the complete transition
-// at 240Hz: every firearm must clear on its first held-aim frame, stay clear
-// through full ADS and early scope-out, then return near the hip-fire FOV.
+// Exercise the complete transition at 240Hz. Ordinary guns stay visible and
+// place their authored sight on the camera axis; true scoped optics disappear
+// only after the scope overlay is established, never on the first aim frame.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
   input.rightMouseDown = true;
   advanceSeconds(1 / 240, 240);
-  assert(!system.kickGroup.visible, `${def.id} crosses the target on the first ADS frame`);
+  assert(system.kickGroup.visible, `${def.id} vanishes on the first ADS frame`);
   assert(system.scopeT < 0.5, `${def.id} first-frame ADS probe skipped the transition`);
-  advanceSeconds(0.5 - 1 / 240, 240, () => {
-    assert(!system.kickGroup.visible, `${def.id} reappears during scope-in`);
-  });
-  assert(!system.kickGroup.visible, `${def.id} blocks the target at full ADS`);
+  advanceSeconds(0.5 - 1 / 240, 240);
+  assert(system.kickGroup.visible === !def.scoped,
+    `${def.id} uses the wrong full-ADS viewmodel mode`);
+  if (!def.scoped) {
+    assert(Math.abs(system.weaponMount.rotation.x) < 0.012
+      && Math.abs(system.weaponMount.rotation.y) < 0.012
+      && Math.abs(system.weaponMount.rotation.z) < 0.012,
+    `${def.id} sight is not squared to the camera axis`);
+  }
   input.rightMouseDown = false;
-  advanceSeconds(0.2, 240, () => {
-    if (system.scopeT > 0.08) {
-      assert(!system.kickGroup.visible, `${def.id} flashes over the target during scope-out`);
-    }
-  });
+  advanceSeconds(0.2, 240);
   advanceSeconds(0.3, 240);
   assert(system.kickGroup.visible, `${def.id} viewmodel did not return after ADS`);
 }
-assert(shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'm4'), 0, true),
-  'held ADS must clear the viewmodel before the first zoom blend step');
+assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'm4'), 1, true),
+  'ordinary rifle ADS must retain the aligned weapon and hands');
+assert(shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'boltsniper'), 0.8, true),
+  'scoped rifle must clear only after the scope overlay is established');
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'knife'), 1),
   'melee viewmodel must not be hidden by firearm ADS rules');
 

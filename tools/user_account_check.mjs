@@ -20,6 +20,13 @@ const assert = (ok, message) => {
 };
 const db = () => JSON.parse(localStorage.getItem('sio_accounts') || '{"accounts":{}}');
 
+UserAccount.guest();
+const guestName = UserAccount.getDisplayName('__guest__');
+assert(/^Guest\d{6}$/.test(guestName), `guest identity has the wrong format (${guestName})`);
+assert(UserAccount.getDisplayName('__guest__') === guestName,
+  'guest identity changed during the same browser session');
+UserAccount.logout();
+
 const weak = await UserAccount.register('Pilot', 'short');
 assert(!weak.ok, 'new registrations accepted a weak password');
 

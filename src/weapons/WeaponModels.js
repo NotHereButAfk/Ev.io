@@ -12,6 +12,24 @@ let _weaponTemplate = null, _weaponLoading = false;
 // placeholder build). Each file has a node named `weapon_<id>`.
 const WEAPON_GLB_OVERRIDES = { sidearm: '/sidearm.glb' };
 const _overrideTemplates = new Map();   // id -> gltf.scene
+// User-selected Quaternius Sci-Fi Modular Gun Pack (CC0). Each shipped firearm
+// gets a complete authored model; categories without a one-to-one pack entry
+// use the nearest readable silhouette (launchers use the grenade-launcher set).
+export const QUATERNIUS_GUNS = Object.freeze({
+  sidearm: 'Pistol_1', uzi: 'SMG_1', levershotgun: 'AR_2',
+  m4: 'AR_1', m16: 'AR_3', rifle: 'AR_5', lmg: 'AR_6',
+  rpg: 'Grenade_3', boltsniper: 'Sniper_1', magnum: 'Pistol_3',
+  battlerifle: 'AR_4', needler: 'Crossbow_1', plasmarifle: 'SMG_2',
+  dmr: 'Sniper_2', fuelrod: 'Grenade_1', concussion: 'Grenade_2',
+  energyshotgun: 'Crossbow_2',
+});
+const QUATERNIUS_LENGTH = Object.freeze({
+  sidearm: 0.30, uzi: 0.44, levershotgun: 0.82, m4: 0.89, m16: 1.07,
+  rifle: 0.87, lmg: 0.98, rpg: 1.00, boltsniper: 0.92, magnum: 0.34,
+  battlerifle: 0.98, needler: 0.54, plasmarifle: 0.65, dmr: 0.88,
+  fuelrod: 0.73, concussion: 0.69, energyshotgun: 0.81,
+});
+const _quaterniusTemplates = new Map();
 // Authored atlases — Blender-scripted real-firearm models for the whole
 // arsenal (tools/model_arsenal.py). Searched before the legacy weapons.glb.
 const AUTHORED_ATLASES = ['/weapons_authored.glb'];
@@ -47,6 +65,10 @@ export function onWeaponModelsReady(cb) {
   _readyCallbacks.push(cb);
 }
 
+export function hasLoadedWeaponModel(id) {
+  return _quaterniusTemplates.has(id);
+}
+
 export function preloadWeaponModels() {
   if (_weaponTemplate || _weaponLoading) return;
   _weaponLoading = true;
@@ -57,13 +79,17 @@ export function preloadWeaponModels() {
     ['/weapons.glb', { kind: 'main' }],
     ...AUTHORED_ATLASES.map((url) => [url, { kind: 'authored' }]),
     ...Object.entries(WEAPON_GLB_OVERRIDES).map(([id, url]) => [url, { kind: 'override', id }]),
+    ...Object.entries(QUATERNIUS_GUNS).map(([id, model]) => [
+      `/vendor/quaternius/scifi-guns/${model}.gltf`, { kind: 'quaternius', id },
+    ]),
   ];
   let pending = jobs.length;
   const done = () => { if (--pending === 0) { _weaponLoading = false; _fireReady(); } };
   for (const [url, tag] of jobs) {
     loader.load(url,
       (gltf) => {
-        if (tag.kind === 'override') _overrideTemplates.set(tag.id, gltf.scene);
+        if (tag.kind === 'quaternius') _quaterniusTemplates.set(tag.id, gltf.scene);
+        else if (tag.kind === 'override') _overrideTemplates.set(tag.id, gltf.scene);
         else if (tag.kind === 'authored') _authoredTemplates.push(gltf.scene);
         else _weaponTemplate = gltf.scene;
         done();
@@ -120,13 +146,32 @@ function _outlineGeometry(src) {
 
 function _buildFromGLB(weaponDef) {
   const name = `weapon_${weaponDef.id}`;
-  let weaponRoot = _overrideTemplates.get(weaponDef.id)?.getObjectByName(name) || null;
+  const supplied = _quaterniusTemplates.get(weaponDef.id) || null;
+  let weaponRoot = supplied || _overrideTemplates.get(weaponDef.id)?.getObjectByName(name) || null;
   if (!weaponRoot) for (const t of _authoredTemplates) { weaponRoot = t.getObjectByName(name); if (weaponRoot) break; }
   if (!weaponRoot) weaponRoot = _weaponTemplate?.getObjectByName(name) || null;
   if (!weaponRoot) return null;
 
   const cloned = weaponRoot.clone(true);
   cloned.position.set(0, 0, 0);
+
+  // The supplied pack is authored with muzzle-forward +X and real metre-scale
+  // proportions. Rotate it into the game's -Z convention, then scale each gun
+  // to the established gameplay silhouette so sniper/launcher assets do not
+  // become body-sized in first person or in a soldier's hands.
+  if (supplied) {
+    cloned.rotation.y = Math.PI / 2;
+    cloned.updateMatrixWorld(true);
+    const raw = new THREE.Box3().setFromObject(cloned);
+    const rawSize = raw.getSize(new THREE.Vector3());
+    const targetLength = QUATERNIUS_LENGTH[weaponDef.id] || 0.8;
+    cloned.scale.setScalar(targetLength / Math.max(0.001, rawSize.z));
+    cloned.updateMatrixWorld(true);
+    const normalized = new THREE.Box3().setFromObject(cloned);
+    const center = normalized.getCenter(new THREE.Vector3());
+    cloned.position.set(-center.x, 0.06 - center.y, -center.z);
+    cloned.userData.quaterniusModel = QUATERNIUS_GUNS[weaponDef.id];
+  }
 
   const color = weaponDef.color ?? 0x2a2a2a;
   // Glow hue for the energy parts (default cyan). Main guns share one finish
@@ -152,6 +197,15 @@ function _buildFromGLB(weaponDef) {
   cloned.traverse(obj => {
     if (!obj.isMesh) return;
     const n = (obj.material?.name || '').toLowerCase();
+    if (supplied) {
+      if (n.includes('black')) obj.material = T('accent', 0x24292e);
+      else if (n.includes('grey')) obj.material = T('metal', 0x707981);
+      else if (n.includes('white')) obj.material = T('body', 0xd7dde0);
+      else if (n.includes('main')) obj.material = T('accent', 0xd67822);
+      else obj.material = T('body', 0xd7dde0);
+      obj.castShadow = true;
+      return;
+    }
     if      (n.includes('dark_metal'))  obj.material = dark;
     else if (n.includes('energy'))      obj.material = energy;
     else if (n.includes('wood'))        obj.material = wood;
@@ -186,7 +240,9 @@ function _buildFromGLB(weaponDef) {
 
   if (!muzzle) {
     muzzle = new THREE.Object3D();
-    muzzle.position.set(0, 0.062, -0.32);
+    muzzle.position.set(0, 0.062, supplied
+      ? -(QUATERNIUS_LENGTH[weaponDef.id] || 0.8) * 0.52
+      : -0.32);
     cloned.add(muzzle);
   }
 
@@ -194,6 +250,9 @@ function _buildFromGLB(weaponDef) {
 
   const group = new THREE.Group();
   group.add(cloned);
+  group.userData.weaponId = weaponDef.id;
+  group.userData.weaponKind = weaponDef.kind;
+  group.userData.modelSource = supplied ? 'quaternius' : 'authored';
   return { group, muzzle };
 }
 
@@ -2440,7 +2499,10 @@ export function buildWeaponModel(weaponDef, opts = {}) {
   // weaponDef.proceduralModel forces the procedural builder even when the GLB
   // is loaded — used by the main guns, whose GLB entries are low-detail
   // placeholders and whose detailed sci-fi look lives in buildSciFiRifle.
-  const glb = !opts.procedural && !weaponDef.proceduralModel && _buildFromGLB(weaponDef);
+  // The supplied pack is normalized above, so use it for first-person,
+  // third-person carry and pickups alike. Procedural geometry is the instant
+  // fallback only while the external models are still loading.
+  const glb = _quaterniusTemplates.has(weaponDef.id) && _buildFromGLB(weaponDef);
   if (glb) return glb;
 
   // Fall back to procedural

@@ -6455,3 +6455,51 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   #hud .ability-indicator { left: 143px !important; }
   #hud #ammo-text { font-size: 29px !important; line-height: 30px; }
 }
+
+/* Final reference-screen placement. */
+#hud #dm-timer::before {
+  content: '◷';
+  display: inline-block;
+  margin-right: 7px;
+  font-size: 22px;
+  vertical-align: -1px;
+}
+#hud #killfeed {
+  left: 20px !important;
+  right: auto !important;
+  top: 105px !important;
+  align-items: flex-start !important;
+}
+#hud .kill-entry {
+  padding: 4px 8px !important;
+  background: rgba(7, 8, 17, 0.48) !important;
+  border-left: 0 !important;
+  font-size: 12px !important;
+}
+#hud #grenade-wrap,
+#hud .ability-indicator { bottom: 94px !important; }
+#hud #health-wrap  { bottom: 18px !important; }
+#hud #shield-wrap  { bottom: 39px !important; }
+#hud #stamina-wrap { bottom: 60px !important; }
+#hud #weapon-slots {
+  left: auto !important;
+  right: 25px !important;
+  bottom: 84px !important;
+  transform: none !important;
+  flex-direction: column-reverse !important;
+  gap: 5px !important;
+}
+#hud .weapon-slot {
+  width: 78px !important;
+  height: 34px !important;
+  background: rgba(7, 8, 17, 0.40) !important;
+}
+#hud .weapon-slot .ws-thumb { inset: 3px 13px 3px 4px; }
+#hud .weapon-slot .ws-key { right: 4px; bottom: 2px; font-size: 10px; }
+#hud #score-wrap { top: 16px !important; right: 20px !important; }
+
+@media (max-width: 700px) {
+  #hud #killfeed { left: 12px !important; top: 74px !important; }
+  #hud #weapon-slots { right: 12px !important; bottom: 72px !important; }
+  #hud .weapon-slot { width: 58px !important; height: 29px !important; }
+}

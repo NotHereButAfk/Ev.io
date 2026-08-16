@@ -13,20 +13,11 @@ const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-assert(nextThirdPersonDistance(0, 1) === TPS_DEFAULT_DISTANCE,
-  'first outward notch must frame the whole player');
-assert(nextThirdPersonDistance(TPS_DEFAULT_DISTANCE, -1) === 0,
-  'first inward notch at the default distance must return to FPS');
-assert(nextThirdPersonDistance(TPS_DEFAULT_DISTANCE, 1) > TPS_DEFAULT_DISTANCE,
-  'outward notches must continue zooming');
-assert(nextThirdPersonDistance(TPS_MAX_DISTANCE, 1) === TPS_MAX_DISTANCE,
-  'camera distance must respect the maximum');
-assert(nextThirdPersonDistance(4.4, -1) >= TPS_DEFAULT_DISTANCE,
-  'intermediate inward zoom must not enter the model');
-assert(nextThirdPersonDistance(TPS_DEFAULT_DISTANCE + 0.3, -1) === TPS_DEFAULT_DISTANCE,
-  'inward zoom must clamp to the safe TPS framing distance');
-assert(nextThirdPersonDistance(3.2, 0) === 3.2,
-  'zero wheel input must leave the camera untouched');
+for (const [distance, wheel] of [[0, 1], [TPS_DEFAULT_DISTANCE, -1],
+  [TPS_DEFAULT_DISTANCE, 1], [TPS_MAX_DISTANCE, 1], [4.4, -1], [3.2, 0]]) {
+  assert(nextThirdPersonDistance(distance, wheel) === 0,
+    `player camera must stay first-person (${distance}, ${wheel})`);
+}
 assert(Math.abs(safeThirdPersonObstructionDistance(2) - 1.45) < 1e-9,
   'wall collision must keep the camera near plane clear of the surface');
 assert(safeThirdPersonObstructionDistance(0.6) === 0.35,
@@ -67,6 +58,6 @@ assert(obstruction && obstruction.distance < TPS_DEFAULT_DISTANCE,
   'camera embedded in a one-sided wall must be pulled back in front of it');
 
 console.log(
-  `third-person camera passed — shoulder=${TPS_SHOULDER_OFFSET.toFixed(2)}m, `
+  `first-person lock and spectator framing passed — shoulder=${TPS_SHOULDER_OFFSET.toFixed(2)}m, `
   + `body=${(bodyFrame * 100).toFixed(1)}%, safe frame ${TPS_DEFAULT_DISTANCE.toFixed(2)}-${TPS_MAX_DISTANCE.toFixed(1)}m`,
 );

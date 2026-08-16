@@ -357,7 +357,7 @@ export function applyWalkCycle(rig, o = {}) {
   // it, so the realized step comes out ~16% shorter than the one the rate was
   // solved for, and the feet skate again. Only the stand↔stride transition is
   // smoothed, which is the part that actually needs it.
-  rig._moveBlend = (rig._moveBlend || 0) + ((moving ? 1 : 0) - (rig._moveBlend || 0)) * Math.min(1, dt * 7);
+  rig._moveBlend = (rig._moveBlend || 0) + ((moving ? 1 : 0) - (rig._moveBlend || 0)) * (1 - Math.exp(-9 * dt));
   const mb = rig._moveBlend;
   const mix = (a, b) => a + (b - a) * mb;
 

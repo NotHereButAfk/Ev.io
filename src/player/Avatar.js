@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from './PreviewCharacter.js';
 import { isSharedGeometry } from './LowPolyModels.js';
-import { buildWeaponModel } from '../weapons/WeaponModels.js';
+import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
@@ -24,8 +24,8 @@ import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 // ═══════════════════════════════════════════════════════════════════════════
 
 // A position jump bigger than this in a single frame can't be running — the
-// fastest anyone moves is a 9.6 m/s sprint, which is 0.16m per frame at 60Hz
-// and under 0.5m even on a badly stuttering one.
+// the normal sprint is 11.88 m/s, which is 0.20m per frame at 60Hz and still
+// under 0.6m on a badly stuttering one.
 const TELEPORT_STEP = 3.0;    // metres
 // Shared frame-local scratch for resolved travel direction. Remote avatars are
 // updated sequentially, so one module vector avoids a per-avatar allocation
@@ -71,8 +71,8 @@ export class Avatar {
     this._animSpeed = 0;
   }
 
-  setWeapon(id) {
-    if (id === this.weaponId) return;
+  setWeapon(id, force = false) {
+    if (!force && id === this.weaponId) return;
     const isSwap = this.weaponId !== null;
     this.weaponId = id;
     if (this.weapon) { this.group.remove(this.weapon); this.weapon = null; }
@@ -118,6 +118,8 @@ export class Avatar {
    */
   update(dt, s) {
     const g = this.group;
+    if (this.weapon && this.weapon.userData.modelSource !== 'quaternius'
+        && hasLoadedWeaponModel(this.weaponId)) this.setWeapon(this.weaponId, true);
     const alive = s.alive !== false;
 
     // Keep a body on screen long enough for a kill to read. The server already
@@ -196,7 +198,9 @@ export class Avatar {
       this._animSpeed = 0;
       this.hop();
     }
-    const speedEase = 1 - Math.exp(-(speed < this._animSpeed ? 18 : 10) * dt);
+    // Critically damp the network/sample jitter without lagging a sprint start.
+    // Exponential damping is refresh-rate independent and cannot overshoot.
+    const speedEase = 1 - Math.exp(-(speed < this._animSpeed ? 20 : 12) * dt);
     this._animSpeed += (Math.min(14, speed) - this._animSpeed) * speedEase;
     speed = this._animSpeed;
 
@@ -300,6 +304,9 @@ export class Avatar {
     const gait = applyWalkCycle(this.rig, {
       speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
       grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
+    });
+    this.rig.universalAnimator?.update(dt, {
+      speed, moving, run, crouch: this._crouch, grounded, vy: s.vy || 0,
     });
     this._walkT = gait.phase;
     g.position.set(

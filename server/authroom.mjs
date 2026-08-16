@@ -227,13 +227,16 @@ export class AuthRoom {
   // Add a HUMAN-controlled player (a real socket).
   add(send, name) {
     // A real player always gets a seat. Remove one server bot first when the
-    // target-sized room is full, then backfill only after that human leaves.
+    // advertised room is full. Once four real people are present the match is
+    // human-only: guests are real socket players and count toward that limit.
     if (this.targetPopulation && this.players.size >= this.targetPopulation) {
       const bot = Array.from(this.players.values()).find((p) => p.isBot);
       if (bot) this._remove(bot.id, false);
       else { send({ t: 'kick', reason: 'match full' }); return null; }
     }
-    return this._add(send, name, false);
+    const id = this._add(send, name, false);
+    this._rebalanceBots();
+    return id;
   }
 
   // Add a clearly-labelled BOT for gameplay/load/stability testing. isBot
@@ -242,10 +245,23 @@ export class AuthRoom {
   addBot(name) { return this._add(() => {}, name, true); }
 
   _fillBotSlots() {
-    while (this.players.size < this.targetPopulation) {
+    this._rebalanceBots();
+  }
+
+  _rebalanceBots() {
+    if (!this.targetPopulation) return;
+    const humans = Array.from(this.players.values()).filter((player) => !player.isBot).length;
+    const desiredBots = humans >= 4 ? 0 : Math.max(0, this.targetPopulation - humans);
+    const bots = Array.from(this.players.values()).filter((player) => player.isBot);
+    while (bots.length > desiredBots) {
+      const bot = bots.pop();
+      this._remove(bot.id, false);
+    }
+    while (bots.length < desiredBots) {
       this._botSerial++;
       const usedNames = new Set(Array.from(this.players.values()).map((player) => player.name));
-      this.addBot(randomBotName(usedNames));
+      const id = this.addBot(randomBotName(usedNames));
+      bots.push(this.players.get(id));
     }
   }
 

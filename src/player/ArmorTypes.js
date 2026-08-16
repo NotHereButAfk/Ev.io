@@ -1,8 +1,8 @@
 export const ARMOR_TYPES = [
   {
     id: 'vanguard',
-    name: 'SHINOBI',
-    desc: 'Smoke-black tactical shinobi — light plates, cyan optics',
+    name: 'DEFAULT OPERATIVE',
+    desc: 'Plated arena operative — white armor, orange marks, cyan optics',
     icon: 'M16 3 L9 8 L9 23 L23 23 L23 8 Z',
   },
   {

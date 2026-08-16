@@ -157,7 +157,7 @@ try {
   assert(jumpY > jumpBaseY + 0.08, `jump rose only ${(jumpY - jumpBaseY).toFixed(2)}m`);
 
   // First-person stress: a large single-frame look delta must remain finite,
-  // and ADS must hide/restore the weapon smoothly around its zoom blend.
+  // and ADS must align/restore the weapon smoothly around its zoom blend.
   const lookBefore = await game(`return {yaw:g.player.yaw,pitch:g.player.pitch};`);
   await page.evaluate(HIDE);
   await game(`g.input.pointerLocked=true; g.input._onMouseMove({movementX:220,movementY:-160}); return true;`);
@@ -167,8 +167,21 @@ try {
     && (Math.abs(lookAfter.yaw - lookBefore.yaw) > 0.05 || Math.abs(lookAfter.pitch - lookBefore.pitch) > 0.05),
   `rapid mouse look was lost or invalid: ${JSON.stringify({lookBefore,lookAfter})}`);
   await game(`g.input.rightMouseDown=true; return true;`);
-  await page.waitForTimeout(650);
-  assert(await game(`return g.weaponSystem.scopeT > 0.2 && !g.weaponSystem.kickGroup.visible;`), 'ADS did not zoom and hide the hip-fire viewmodel');
+  // Asset-heavy software WebGL may render well below real-time in CI. Wait on
+  // the production blend itself instead of assuming 650 wall-clock ms yielded
+  // enough animation frames.
+  await page.waitForFunction(() => {
+    const ws = (window.__game || window.game)?.weaponSystem;
+    return ws?.scopeT > 0.9 && Math.abs(ws.weaponMount.rotation.x) < 0.02
+      && Math.abs(ws.weaponMount.rotation.y) < 0.02;
+  }, null, { timeout: 8000 });
+  const adsState = await game(`return { scopeT:g.weaponSystem.scopeT,
+    visible:g.weaponSystem.kickGroup.visible,
+    rx:g.weaponSystem.weaponMount.rotation.x,
+    ry:g.weaponSystem.weaponMount.rotation.y };`);
+  assert(adsState.scopeT > 0.9 && adsState.visible
+    && Math.abs(adsState.rx) < 0.02 && Math.abs(adsState.ry) < 0.02,
+  `ADS did not zoom and align the rifle sight to the camera: ${JSON.stringify(adsState)}`);
   await game(`g.input.rightMouseDown=false; return true;`);
   await page.waitForFunction(() => {
     const g = window.__game || window.game;

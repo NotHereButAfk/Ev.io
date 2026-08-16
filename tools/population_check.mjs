@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { countAuthoritativePlayers, countLocalMatchPlayers } from '../src/core/Population.js';
 import { ServerSim } from '../src/core/ServerSim.js';
 import { AuthRoom } from '../server/authroom.mjs';
+import { randomGuestName } from '../server/authserver.mjs';
 import { ROOK } from '../server/rookarena.mjs';
 import { AuthClient } from '../src/net/AuthClient.js';
 import { buildLeaderboardRows, buildMatchRows } from '../src/core/MatchRows.js';
@@ -13,6 +14,9 @@ const bots = Array.from({ length: 7 }, (_, index) => ({
   isHumanSlot: index < 3,
   displayName: index < 3 ? `Human ${index + 1}` : `Bot ${index - 2}`,
 }));
+
+assert.equal(randomGuestName(new Set(), () => 0.000042), 'Guest000042',
+  'server guest names must contain exactly six random digits');
 
 assert.equal(countLocalMatchPlayers(bots), 8, 'seven bots plus the local human must count as eight players');
 assert.equal(countAuthoritativePlayers([
@@ -82,6 +86,8 @@ assert.ok(before.some(([id, x, z]) => {
 }), 'server bots must actively move rather than filling the roster as inert labels');
 
 for (let i = 0; i < 3; i++) room.add(() => {}, `Human ${i + 2}`);
+assert.equal([...room.players.values()].filter((p) => p.isBot).length, 0,
+  'four real players, including guests, must remove every server bot');
 let fullReply = null;
 assert.equal(room.add((message) => { fullReply = message; }, 'Overflow'), null,
   'an extra join must not push a full human room beyond its advertised capacity');

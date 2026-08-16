@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildPreviewCharacter, rigCharacterLimbs } from '../player/PreviewCharacter.js';
-import { buildWeaponModel } from '../weapons/WeaponModels.js';
+import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
@@ -242,6 +242,31 @@ export class Bot {
 
   get isDead() { return !this.alive; }
 
+  refreshWeaponModel() {
+    if (this._isHuman || this._isSwordBot || !hasLoadedWeaponModel(this._botGun?.id)) return;
+    if (this._weaponMesh?.userData?.modelSource === 'quaternius') return;
+    const def = getWeapon(this._botGun.id);
+    const wm = def && buildWeaponModel(def)?.group;
+    if (!wm) return;
+    this.mesh.remove(this._weaponMesh);
+    wm.traverse(o => { if (o.isMesh) { o.castShadow = true; o.userData.noHit = true; } });
+    restRifleTransform(wm);
+    this.mesh.add(wm);
+    this._weaponMesh = wm;
+    this._weaponBaseZ = wm.position.z;
+    const flash = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.11),
+      new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.95,
+                                    blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    flash.position.set(0, 0.03, -0.52);
+    flash.visible = false;
+    flash.renderOrder = 6;
+    flash.raycast = () => {};
+    wm.add(flash);
+    this._muzzleFlash = flash;
+  }
+
   takeDamage(amount, attacker = null) {
     if (!this.alive) return false;
     // Damage immediately refreshes combat memory even if the attacker fired
@@ -425,6 +450,7 @@ export class Bot {
   }
 
   update(dt, player, camera, onAttack, world) {
+    this.refreshWeaponModel();
     // ── death animation ──────────────────────────────────────────────────────
     if (this._dying) {
       this._deathT += dt;
@@ -845,6 +871,11 @@ export class Bot {
         grounded: this._onGround,
         vy: this._velY,
         dt,
+      });
+      this._rig.universalAnimator?.update(dt, {
+        speed: isMoving ? this._animSpeed : 0,
+        moving: isMoving, run, crouch: 0,
+        grounded: this._onGround, vy: this._velY,
       });
       this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so

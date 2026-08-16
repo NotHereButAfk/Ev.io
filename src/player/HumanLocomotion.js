@@ -73,7 +73,7 @@ export function targetHumanTimeScale(motion, speed, characterScale = 1) {
     return characterScale * Math.max(0.55, Math.min(1.70, speed / HUMAN_CLIP_SPEED.walk));
   }
   if (motion === 'run') {
-    // A full ground-match at the 10.85 m/s sci-fi sprint would require 2.5x
+    // A full ground-match at the 11.88 m/s sci-fi sprint would require 2.8x
     // playback and read like a cartoon. Cap cadence at a believable five-ish
     // steps/second; the remaining speed is expressed as a longer powered stride.
     return characterScale * Math.max(0.72, Math.min(1.72, speed / HUMAN_CLIP_SPEED.run));

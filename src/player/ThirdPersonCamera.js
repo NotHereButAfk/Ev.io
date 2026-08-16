@@ -55,20 +55,13 @@ export function findThirdPersonObstruction(raycaster, world, target, desired, sc
   return nearest;
 }
 
-// The first wheel notch is a view-mode switch, not a tiny zoom increment.
-// Enter TPS far enough back to frame the whole soldier; one notch toward the
-// player returns to FPS from the default shoulder-camera distance.
+// Player-controlled third person is disabled. Keep the old framing helpers for
+// the floating spectator/QA cameras, but every gameplay wheel input resolves
+// to first person so weapon scrolling cannot accidentally change POV.
 export function nextThirdPersonDistance(current, wheelDelta) {
-  if (!Number.isFinite(wheelDelta) || wheelDelta === 0) return current;
-  const distance = Number.isFinite(current) ? current : 0;
-
-  if (distance <= 0 && wheelDelta > 0) return TPS_DEFAULT_DISTANCE;
-  if (distance <= TPS_DEFAULT_DISTANCE && wheelDelta < 0) return 0;
-
-  return Math.min(
-    TPS_MAX_DISTANCE,
-    Math.max(TPS_DEFAULT_DISTANCE, distance + wheelDelta * TPS_ZOOM_STEP),
-  );
+  void current;
+  void wheelDelta;
+  return 0;
 }
 
 export function safeThirdPersonObstructionDistance(hitDistance) {

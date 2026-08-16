@@ -102,9 +102,24 @@ function originOk(origin) {
   return ALLOWED.includes(origin);
 }
 
-function sanitizeName(n) {
+export function randomGuestName(usedNames = new Set(), random = Math.random) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const name = `Guest${Math.floor(random() * 1_000_000).toString().padStart(6, '0')}`;
+    if (!usedNames.has(name)) return name;
+  }
+  for (let number = 0; number < 1_000_000; number++) {
+    const name = `Guest${number.toString().padStart(6, '0')}`;
+    if (!usedNames.has(name)) return name;
+  }
+  return 'Guest000000';
+}
+
+function sanitizeName(n, usedNames = new Set()) {
   const c = String(n ?? '').replace(/[^\x20-\x7E]/g, '').trim().slice(0, MAX_NAME);
-  return c || 'Recruit';
+  if (!c || c === '__guest__' || /^(guest|recruit)$/i.test(c)) {
+    return randomGuestName(usedNames);
+  }
+  return c;
 }
 
 export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 } = {}) {
@@ -148,7 +163,10 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
       switch (msg.t) {
         case 'hello':
           if (conn.id != null) return;                   // duplicate session on live socket
-          conn.id = room.add(send, sanitizeName(msg.name));
+          conn.id = room.add(send, sanitizeName(
+            msg.name,
+            new Set(Array.from(room.players.values()).map((player) => player.name)),
+          ));
           if (conn.id == null) ws.close(1013, 'match full');
           break;
         case 'input':
