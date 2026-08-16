@@ -38,7 +38,6 @@ const SPAWN_PROTECTION_TICKS = Math.ceil(TICK_HZ * 1.5);
 const MAX_INPUT_QUEUE = 8;                  // drop floods; catch-up caps here
 const INPUT_LEAD_TICKS = 6;                 // how far ahead of server tick we allow
 const HISTORY_TICKS = 20;                   // 1s of position history for lag-comp
-const BOT_PROVOKE_TICKS = Math.ceil(TICK_HZ * 5.5);
 const START_HEALTH = 100, START_SHIELD = 0;
 
 // Derive authority from the same catalog used by the client. The old
@@ -137,6 +136,7 @@ export class AuthRoom {
     this.frags = [];            // pending authoritative detonations
     this.matchStart = Date.now();
     this.matchDurationMs = 8 * 60 * 1000;
+    this._arenaBroadcastUntilTick = -1;
     const requestedPopulation = Number.isFinite(targetPopulation) ? targetPopulation | 0 : 0;
     this.targetPopulation = clamp(requestedPopulation, 0, 8);
     this._botSerial = 0;
@@ -173,6 +173,10 @@ export class AuthRoom {
     this.matchStart = now;
     this._arenaIndex = (this._arenaIndex + 1) % this.arenas.length;
     this._setSimArena(this.arenas[this._arenaIndex]);
+    // Repeat the collision/map payload for five seconds. A congested client
+    // may skip an individual snapshot; map identity must never advance without
+    // the matching simulation geometry.
+    this._arenaBroadcastUntilTick = this.tick + TICK_HZ * 5;
     this.smokes.length = 0;
     this.frags.length = 0;
 
@@ -211,7 +215,6 @@ export class AuthRoom {
       player._lastSprint = false;
       player._lastAim = false;
       player._firingTicks = 0;
-      player._provokedHumans?.clear();
       player.blindUntil = 0;
       player.abilities = {
         frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges,
@@ -282,7 +285,6 @@ export class AuthRoom {
       _swingStart: 0, _swingUntil: 0,
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       _botReloadUntil: 0,
-      _provokedHumans: new Map(),
       history: [],               // [{tick, x,y,z,eye,crouch,slide}]
       lastFireSeq: 0, lastFireRequestTick: -Infinity,
       abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
@@ -313,15 +315,12 @@ export class AuthRoom {
     let bestScore = Infinity;
     for (const other of this.players.values()) {
       if (other === p || !other.alive || this.tick < (other.invulnerableUntil || 0)) continue;
-      // Bots may fight one another freely, but a human is neutral until that
-      // specific player damages this bot. This keeps a new spawn from being
-      // treated as an enemy merely for entering line of sight.
-      if (!other.isBot && (p._provokedHumans?.get(other.id) || 0) <= this.tick) continue;
       const dx = other.state.px - p.state.px;
       const dz = other.state.pz - p.state.pz;
       const d2 = dx * dx + dz * dz;
       const score = combatTargetScore({
         distance: Math.sqrt(d2), isHuman: !other.isBot, botId: p.id,
+        sticky: other.id === p._botTargetId,
       });
       if (score < bestScore) { bestScore = score; target = other; }
     }
@@ -539,12 +538,6 @@ export class AuthRoom {
 
   _damage(target, shooter, dmg, head) {
     if (!target.alive || this.tick < (target.invulnerableUntil || 0)) return;
-    if (target.isBot && shooter && !shooter.isBot) {
-      target._provokedHumans ??= new Map();
-      target._provokedHumans.set(shooter.id, this.tick + BOT_PROVOKE_TICKS);
-      target._botTargetId = null;
-      target._botTargetSince = this.tick;
-    }
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
@@ -562,11 +555,6 @@ export class AuthRoom {
     target._firingTicks = 0;
     target.deadUntil = this.tick + RESPAWN_TICKS;
     target.deaths++;
-    // Dying and respawning is a clean engagement boundary. No bot should
-    // remember a human's old aggression and spawn-camp their next life.
-    if (!target.isBot) {
-      for (const bot of this.players.values()) bot._provokedHumans?.delete(target.id);
-    }
     if (shooter && target !== shooter) {
       shooter.kills++;
       shooter.score += head ? 150 : 100;
@@ -691,7 +679,6 @@ export class AuthRoom {
           p._firingTicks = 0;
           p._swingStart = p._swingUntil = 0;
           p._botReloadUntil = 0;
-          p._provokedHumans?.clear();
           p.gunBloom = 0;
           p.blindUntil = 0;
           p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
@@ -827,7 +814,7 @@ export class AuthRoom {
         mapName: this.arena.name,
         matchStart: this.matchStart,
         matchDurationMs: this.matchDurationMs,
-        arena: rotated ? this._arenaPayload() : undefined,
+        arena: rotated || now <= this._arenaBroadcastUntilTick ? this._arenaPayload() : undefined,
         you: { x: p.state.px, y: p.state.py, z: p.state.pz,
                vx: p.state.vx, vy: p.state.vy, vz: p.state.vz,
                eye: p.state.eye,

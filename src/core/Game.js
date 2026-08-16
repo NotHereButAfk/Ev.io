@@ -911,16 +911,36 @@ export class Game {
       const remaining = match.durationMs / 1000 - (Date.now() - match.start) / 1000;
       this._modeTimer = THREE.MathUtils.clamp(remaining, 0, match.durationMs / 1000);
     }
-    if (mapId === this.world.currentMapId) return Promise.resolve(this.world.currentMap);
+    this._authoritativeMapTarget = mapId;
     this._pendingMapId = mapId;
-    if (initial) {
-      return this._activateMap(mapId);
-    } else if (this.state === 'playing') {
-      // The server has advanced the shared round. Preserve the finished map
-      // behind the results screen; _restart loads the new one after countdown.
-      this._showLeaderboard();
+    if (mapId === this.world.currentMapId && !this._authoritativeMapTransitioning) {
+      return Promise.resolve(this.world.currentMap);
     }
-    return Promise.resolve(this.world.currentMap);
+    if (this._authoritativeMapPromise) return this._authoritativeMapPromise;
+
+    // The dedicated room is continuous. Loading the new arena immediately is
+    // essential: keeping the old mesh behind a results screen while applying
+    // new-map server coordinates causes void spawns, wrong labels and jitter.
+    this._authoritativeMapPromise = (async () => {
+      this._authoritativeMapTransitioning = true;
+      this.hud?.hideLeaderboard?.();
+      if (this.state === 'leaderboard') this.state = 'playing';
+      try {
+        while (this.world.currentMapId !== this._authoritativeMapTarget) {
+          const target = this._authoritativeMapTarget;
+          await this._activateMap(target);
+        }
+        this._authNet?.client?.resetPresentation?.();
+        this.weaponSystem?.resetMotionState?.();
+        this._resetDeathAnimation?.();
+        return this.world.currentMap;
+      } finally {
+        this._authoritativeMapTransitioning = false;
+        this._pendingMapId = null;
+        this._authoritativeMapPromise = null;
+      }
+    })();
+    return this._authoritativeMapPromise;
   }
 
   // Reconcile which existing bot slots represent real connected players vs
@@ -1855,7 +1875,7 @@ export class Game {
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${mins}:${String(secs).padStart(2, '0')}`, this._modeTimer <= 30);
-      if (this._modeTimer <= 0) {
+      if (this._modeTimer <= 0 && !this._netDriven) {
         this._showLeaderboard();
       }
       return;

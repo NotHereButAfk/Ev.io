@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
 import { AuthRoom } from '../server/authroom.mjs';
 import { IMPORTED_ARENAS } from '../server/rookarena.mjs';
+import { createState } from '../src/sim/MoveSim.js';
 import {
   IMPORTED_MAPS,
   getImportedMap,
@@ -185,6 +186,28 @@ assert.ok(room.events.some((event) => event.e === 'map' && event.id === room.are
 const snapshot = sent.findLast((message) => message.t === 'snapshot');
 assert.equal(snapshot.mapId, room.arena.id);
 assert.equal(snapshot.arena.id, room.arena.id, 'rotation snapshot lacks new collision metadata');
+
+// Losing the exact rotation packet must not leave a client with the new map id
+// and old collision. The complete payload is repeated for a five-second grace
+// window, which also covers browsers that temporarily apply backpressure.
+sent.length = 0;
+for (let i = 0; i < 100; i++) room.update();
+const graceSnapshots = sent.filter((message) => message.t === 'snapshot');
+assert.equal(graceSnapshots.length, 100);
+assert.ok(graceSnapshots.every((message) => message.mapId === room.arena.id));
+assert.ok(graceSnapshots.every((message) => message.arena?.id === room.arena.id),
+  'rotation metadata was not repeated through the packet-loss grace window');
+
+// Every authoritative spawn must begin on collision and survive several
+// simulation ticks without a void recovery.
+for (const arena of IMPORTED_ARENAS) {
+  for (const spawn of arena.spawns) {
+    const state = createState(spawn[0], spawn[1], spawn[2]);
+    const resolved = arena.resolveState({ ...state }, { ...state });
+    assert.equal(resolved.onGround, 1, `${arena.id} has an airborne/void spawn ${spawn}`);
+    assert.ok(resolved.py > arena.killY, `${arena.id} spawn is below its kill plane ${spawn}`);
+  }
+}
 
 console.log(
   `all map-rotation checks passed: ${IMPORTED_MAPS.map((map) => map.name).join(' -> ')}`

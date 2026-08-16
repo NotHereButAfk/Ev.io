@@ -160,12 +160,14 @@ export class AuthNetBridge {
   update(dt, input, controlsEnabled = true) {
     const p = this.player, c = this.client;
     if (!c.sim) return;                 // not welcomed yet
+    const mapReady = !this.game._authoritativeMapTransitioning
+      && this.game.world.currentMapId === c.mapId;
 
     const alive = c.self.alive !== false;
     if (this._wasAlive && !alive) this.game._onAuthoritativeDeath?.(c.self);
     if (!this._wasAlive && alive) this.game._onAuthoritativeRespawn?.(c.self);
     this._wasAlive = alive;
-    const canControl = alive && controlsEnabled;
+    const canControl = alive && controlsEnabled && mapReady;
 
     // ── look (client-owned), same math as the legacy controller ──
     if (canControl) {
@@ -204,7 +206,8 @@ export class AuthNetBridge {
     }
 
     // ── drive the local player from the predicted sim ──
-    const lp = c.localPos();
+    c.advancePresentation(dt);
+    const lp = mapReady ? c.localPos() : null;
     if (lp) { p.position.set(lp.x, lp.y, lp.z); }
     p.velocity.set(alive ? (c.sim.vx || 0) : 0, alive ? (c.sim.vy || 0) : 0, alive ? (c.sim.vz || 0) : 0);
     p.onGround = !!c.sim.onGround;
@@ -232,7 +235,9 @@ export class AuthNetBridge {
       }
     }
     this.game.hud?.updateBlind?.((c.self.blindTicks || 0) / 20);
-    if (p._camDist > 0) {
+    if (!mapReady) {
+      p.velocity.set(0, 0, 0);
+    } else if (p._camDist > 0) {
       setThirdPersonDesired(
         this._tpsDesired, p.position, p.yaw, p.pitch, p._camDist,
       );
@@ -291,7 +296,7 @@ export class AuthNetBridge {
     this._prevFireDown = canControl && !!input.mouseDown;
 
     // ── render remote players ──
-    this._syncRemotes(dt);
+    this._syncRemotes(dt, mapReady);
     // Count the authoritative roster, not only currently interpolated remote
     // meshes. Bots are full match participants and remain counted while dead,
     // respawning, or waiting for their first render buffer.
@@ -301,7 +306,8 @@ export class AuthNetBridge {
 
   _resolveRookCollision(next, previous) {
     const world = this.game.world;
-    if (!world?._mapOctree) return next;
+    if (!world?._mapOctree || this.game._authoritativeMapTransitioning
+      || world.currentMapId !== this.client.mapId) return next;
     const ground = world.groundHeightAt(next.px, next.pz, previous.py, next.py);
     if (next.py <= ground + 0.05 && next.vy <= 0.001) {
       next.py = ground; next.vy = 0; next.onGround = 1;
@@ -315,7 +321,7 @@ export class AuthNetBridge {
     return next;
   }
 
-  _syncRemotes(dt) {
+  _syncRemotes(dt, mapReady = true) {
     const seen = this._remoteSeen;
     seen.clear();
     const cam = this.player.camera;
@@ -326,6 +332,8 @@ export class AuthNetBridge {
     for (const r of this.client.remoteStates()) {
       seen.add(r.id);
       const a = this._remoteAvatar(r.id, r.isBot);
+      a.avatar.group.visible = mapReady;
+      if (!mapReady) { a.nameEl.style.display = 'none'; continue; }
       a.pos.set(r.x, r.y, r.z);
       a.avatar.setWeapon(r.wid || 'm4');
       // Derive cadence from rendered interpolation displacement, so a stalled

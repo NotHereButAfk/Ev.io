@@ -88,6 +88,10 @@ export class AuthClient {
     this.postStep = null;
     this._serverClockOffset = null;
     this._acc = 0;
+    // Reconciliation corrects the deterministic simulation immediately, but
+    // presentation absorbs small packet corrections over a few frames. This
+    // prevents the camera from visibly stepping at the server's 20 Hz rate.
+    this._visualOffset = { x: 0, y: 0, z: 0 };
   }
 
   connect() {
@@ -137,11 +141,19 @@ export class AuthClient {
 
   _reconcile(snap) {
     if (!this.sim) return;
+    const before = { x: this.sim.px, y: this.sim.py, z: this.sim.pz };
     if (Number.isFinite(snap.tick)) this.lastServerTick = snap.tick;
     const previousMapId = this.mapId;
-    this.mapId = snap.mapId || this.mapId;
+    // A map id without its matching collision payload is not actionable. Keep
+    // simulating the current map until a repeated rotation payload arrives.
+    const requestedMapId = snap.mapId || this.mapId;
+    const canAdoptMap = requestedMapId === this.mapId || !!snap.arena;
+    if (canAdoptMap) this.mapId = requestedMapId;
     this.matchStart = snap.matchStart ?? this.matchStart;
     this.matchDurationMs = snap.matchDurationMs ?? this.matchDurationMs;
+    // Do not apply a spawn from an unknown map to the current map. The room
+    // repeats arena metadata, so the next complete snapshot safely catches up.
+    if (!canAdoptMap) return;
     if (snap.arena) {
       this.arena = snap.arena;
       this.simWorld = {
@@ -202,6 +214,25 @@ export class AuthClient {
     // drop acked inputs, replay the rest
     this.pending = this.pending.filter((c) => c.seq > snap.ack);
     for (const c of this.pending) this._predict(c.inp);
+
+    const correctionX = before.x - this.sim.px;
+    const correctionY = before.y - this.sim.py;
+    const correctionZ = before.z - this.sim.pz;
+    const correctionSq = correctionX ** 2 + correctionY ** 2 + correctionZ ** 2;
+    if (this.mapId !== previousMapId || correctionSq > TELEPORT_DISTANCE_SQ) {
+      this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
+    } else {
+      this._visualOffset.x += correctionX;
+      this._visualOffset.y += correctionY;
+      this._visualOffset.z += correctionZ;
+      const length = Math.hypot(this._visualOffset.x, this._visualOffset.y, this._visualOffset.z);
+      if (length > 1.5) {
+        const scale = 1.5 / length;
+        this._visualOffset.x *= scale;
+        this._visualOffset.y *= scale;
+        this._visualOffset.z *= scale;
+      }
+    }
 
     // remote interpolation buffers
     const arrivalT = performance.now();
@@ -292,7 +323,26 @@ export class AuthClient {
   }
 
   // Predicted local position (for the camera/viewmodel owner).
-  localPos() { return this.sim ? { x: this.sim.px, y: this.sim.py, z: this.sim.pz } : null; }
+  advancePresentation(dt) {
+    // Frame-rate independent decay: roughly 95% of an ordinary correction is
+    // gone in 120 ms, with no dependence on the server snapshot cadence.
+    const decay = Math.exp(-Math.max(0, dt) * 25);
+    this._visualOffset.x *= decay;
+    this._visualOffset.y *= decay;
+    this._visualOffset.z *= decay;
+  }
+
+  resetPresentation() {
+    this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
+  }
+
+  localPos() {
+    return this.sim ? {
+      x: this.sim.px + this._visualOffset.x,
+      y: this.sim.py + this._visualOffset.y,
+      z: this.sim.pz + this._visualOffset.z,
+    } : null;
+  }
 
   // Interpolated remote players at render time.
   remoteStates() {
