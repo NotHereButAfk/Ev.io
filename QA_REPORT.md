@@ -356,7 +356,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Preserve distance-driven phase at ordinary speeds, then smoothly ease into an athletic visual cap of 1.85 cycles/s for walking and 2.35 cycles/s for sprinting. Lengthen the thigh swing moderately so high-speed travel still reads as purposeful, and apply the same shared gait to the local player, bots, and remote avatars.
 
-**Verification:** PASS locally. Standard movement now settles at 2.08 cycles/s (4.15 footfalls/s) and sprint at 2.35 cycles/s (4.70 footfalls/s), eliminating the previous 12.7/27.2 footfall treadmill effect. Human-scale 1.5 m/s foot slip remains 0.14, crouched soles stay at 0 mm, directional gait, jumps, teleports, landing absorption, actions, all 272 firearm poses, production build, and all 28/28 automated release gates pass. A real local 8/8 third-person match accepted movement with the visibly slower gait and zero page errors. Production deployment verification is pending this change's release.
+**Verification:** PASS in production. Standard movement now settles at 2.08 cycles/s (4.15 footfalls/s) and sprint at 2.35 cycles/s (4.70 footfalls/s), eliminating the previous 12.7/27.2 footfall treadmill effect. Human-scale 1.5 m/s foot slip remains 0.14, crouched soles stay at 0 mm, directional gait, jumps, teleports, landing absorption, actions, all 272 firearm poses, production build, and all 28/28 automated release gates pass. Commit `6214cfc` deployed successfully in run `31918509230`; a cache-busted `kryx.live` replay entered the 8/8 match, switched to third person, accepted repeated movement input with the visibly slower stride and stable shouldered weapon, and recorded zero page errors.
 
 ## BUG-020
 
