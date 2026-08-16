@@ -72,7 +72,7 @@ const PATROL = {
   // Diagonal low-ready from the supplied soldier reference: the muzzle points
   // down and slightly across the body while the stock stays retained near the
   // shoulder. The hands remain model-specific and are IK-solved below.
-  wr: new THREE.Euler(-0.480, 0.240, 0.100),
+  wr: new THREE.Euler(-0.620, 0.240, 0.100),
 };
 const AIM = {
   wp: onArm(0.390, 1.600, -0.230),
@@ -85,7 +85,7 @@ const AIM = {
 // lands both wrists on each weapon's authored grip points.
 const COMPACT_PATROL = {
   wp: onArm(0.350, 1.520, -0.315),
-  wr: new THREE.Euler(-0.380, 0.200, 0.080),
+  wr: new THREE.Euler(-0.500, 0.200, 0.080),
 };
 const COMPACT_AIM = {
   wp: onArm(0.350, 1.590, -0.280),
@@ -93,7 +93,7 @@ const COMPACT_AIM = {
 };
 const SHOTGUN_PATROL = {
   wp: onArm(0.405, 1.500, -0.275),
-  wr: new THREE.Euler(-0.520, 0.220, 0.080),
+  wr: new THREE.Euler(-0.600, 0.220, 0.080),
 };
 const SHOTGUN_AIM = {
   wp: onArm(0.400, 1.600, -0.235),
@@ -101,7 +101,7 @@ const SHOTGUN_AIM = {
 };
 const SUPPORT_PATROL = {
   wp: onArm(0.425, 1.515, -0.285),
-  wr: new THREE.Euler(-0.360, 0.160, 0.060),
+  wr: new THREE.Euler(-0.480, 0.160, 0.060),
 };
 const SUPPORT_AIM = {
   wp: onArm(0.390, 1.600, -0.230),
@@ -109,7 +109,7 @@ const SUPPORT_AIM = {
 };
 const PRECISION_PATROL = {
   wp: onArm(0.405, 1.510, -0.285),
-  wr: new THREE.Euler(-0.440, 0.180, 0.080),
+  wr: new THREE.Euler(-0.580, 0.180, 0.080),
 };
 const PRECISION_AIM = {
   wp: onArm(0.390, 1.600, -0.230),
@@ -120,7 +120,7 @@ const PRECISION_AIM = {
 // chest, while the patrol pose retracts it into a compact low-ready position.
 const PISTOL_PATROL = {
   wp: onArm(0.220, 1.545, -0.500),
-  wr: new THREE.Euler(-0.260, 0.100, 0.060),
+  wr: new THREE.Euler(-0.340, 0.100, 0.060),
 };
 const PISTOL_AIM = {
   wp: onArm(0.075, 1.585, -0.690),
@@ -128,7 +128,7 @@ const PISTOL_AIM = {
 };
 const LAUNCHER_PATROL = {
   wp: onArm(0.425, 1.590, -0.255),
-  wr: new THREE.Euler(-0.180, 0.120, 0.040),
+  wr: new THREE.Euler(-0.300, 0.120, 0.040),
 };
 const LAUNCHER_AIM = {
   wp: onArm(0.390, 1.600, -0.230),

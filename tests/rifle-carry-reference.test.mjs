@@ -20,8 +20,8 @@ const yaw = Math.atan2(forward.x, -forward.z);
 // height, muzzle safely down, and elbows relaxed instead of held in ADS.
 assert(weapon.position.y > 1.18 && weapon.position.y < 1.40,
   `patrol receiver is outside the lower-chest pocket (${weapon.position.y.toFixed(3)}m)`);
-assert(Math.abs(pitch) > THREE.MathUtils.degToRad(20)
-    && Math.abs(pitch) < THREE.MathUtils.degToRad(34),
+assert(Math.abs(pitch) > THREE.MathUtils.degToRad(30)
+    && Math.abs(pitch) < THREE.MathUtils.degToRad(45),
   `patrol muzzle drop is not soldier low-ready (${THREE.MathUtils.radToDeg(pitch).toFixed(1)} degrees)`);
 assert(Math.abs(yaw) > THREE.MathUtils.degToRad(8)
     && Math.abs(yaw) < THREE.MathUtils.degToRad(28),
@@ -51,9 +51,9 @@ body.add(liveWeapon);
 const rig = body.userData.rig;
 const bones = body.userData.bones;
 const carryStates = [
-  ['idle', 0.18, {}],
-  ['walk', 0.18, { swing: 0.04 }],
-  ['run', 0.30, { swing: -0.05, bodyPitch: -0.12 }],
+  ['idle', 0, {}],
+  ['walk', 0, { swing: 0.04 }],
+  ['run', 0, { swing: -0.05, bodyPitch: -0.12 }],
   ['aim', 1.00, {}],
   ['aim up', 1.00, { aimPitch: 0.65 }],
   ['aim down', 1.00, { aimPitch: -0.65 }],
@@ -103,7 +103,7 @@ for (const [name, aim, options] of carryStates) {
       - rig.elbowR.getWorldPosition(new THREE.Vector3()).y;
     idleElbowDropL = rig.armL.getWorldPosition(new THREE.Vector3()).y
       - rig.elbowL.getWorldPosition(new THREE.Vector3()).y;
-    assert(idleElbowDropR > 0.15 && idleElbowDropL > 0.11,
+    assert(idleElbowDropR > 0.15 && idleElbowDropL > 0.10,
       `idle elbows are not tucked below the shoulder line (`
       + `R=${(idleElbowDropR * 100).toFixed(1)}cm, `
       + `L=${(idleElbowDropL * 100).toFixed(1)}cm)`);

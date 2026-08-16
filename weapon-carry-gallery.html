@@ -14,11 +14,20 @@
     .view { width: 384px; height: 179px; overflow: hidden; }
     iframe { display: block; width: 1200px; height: 560px; border: 0; transform: scale(.32); transform-origin: 0 0; }
     .view img { display: block; width: 384px; height: 179px; object-fit: cover; }
+    /* Keep automated proof captures in one physical frame so tall-page
+       stitching cannot repeat WebGL-backed cards between viewport tiles. */
+    @media (max-height: 1000px) {
+      body { zoom: .82; }
+      #grid { grid-template-columns: repeat(5, 230px); }
+      .view { width: 230px; height: 107px; }
+      iframe { transform: scale(.1917); }
+      .view img { width: 230px; height: 107px; }
+    }
   </style>
 </head>
 <body>
   <h1>Active ninja roster — all 17 firearm holds</h1>
-  <p>Production 18% idle blend, three-quarter view. Each panel runs the real connected Hero + RifleCarry match path.</p>
+  <p>Production standing idle, three-quarter view. Each panel runs the real connected Hero + RifleCarry match path.</p>
   <main id="grid"></main>
   <script>
     const weapons = [
@@ -43,7 +52,7 @@
       for (let i = 0; i < weapons.length; i++) {
         const iframe = document.createElement('iframe');
         iframe.title = `${weapons[i]} active-roster hold`;
-        iframe.src = `/pose-lab.html?model=vanguard&aim=0.18&ang=2.262&weapon=${weapons[i]}`;
+        iframe.src = `/pose-lab.html?model=vanguard&aim=0&ang=2.262&weapon=${weapons[i]}`;
         views[i].append(iframe);
         await new Promise((resolve) => iframe.addEventListener('load', resolve, { once: true }));
         await new Promise((resolve) => setTimeout(resolve, 250));

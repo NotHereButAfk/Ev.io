@@ -356,7 +356,7 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Fix:** Add seven carry families—pistol, compact, shotgun, rifle, support, precision, and launcher—to both production solvers and explicitly map every shipped firearm. Each active-roster family owns its patrol/aim rotations and shoulder-relative receiver anchors while continuing to use authoritative two-arm IK, per-model grip points, mesh-derived body clearance, and level ADS tracking.
 
-**Verification:** PASS. The loaded-Soldier gate passes all 17 weapons across 816 armor/locomotion/aim/reload/sprint states with 0.00 cm wrist error and 0.0 cm torso penetration. The active-roster gate asserts the required family for every firearm and passes 272 complete-mesh fresh/idle/walk/run/aim/flinch/reload/swap poses with 0.0 cm torso and shoulder penetration and at most 0.5 cm wrist error. Separate browser galleries render all 17 weapons through each real production rig at the runtime 18% idle blend.
+**Verification:** PASS. The loaded-Soldier gate passes all 17 weapons across 816 armor/locomotion/aim/reload/sprint states with 0.00 cm wrist error and 0.0 cm torso penetration. The active-roster gate asserts the required family for every firearm and passes 272 complete-mesh fresh/idle/walk/run/aim/flinch/reload/swap poses with 0.0 cm torso and shoulder penetration and at most 0.5 cm wrist error. Separate browser galleries render all 17 weapons through each real production rig: the loaded Soldier at its 18% idle blend and the active ninja roster at its actual 0% standing aim state.
 
 ## BUG-023
 
@@ -394,9 +394,9 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Files changed:** `src/player/RifleCarry.js`, `tests/rifle-carry-reference.test.mjs`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
 
-**Fix:** Lower the patrol receiver to the lower-chest pocket, increase the muzzle-low diagonal to 26.7 degrees with 15.4 degrees of cross-body angle, and tuck both elbow swivel solutions. Preserve the level ADS target and category-specific pistol/launcher stances. Long-gun swaps now fold inward with a smaller dip while the support hand releases to the vest, keeping the motion believable and reachable.
+**Fix:** Lower the patrol receiver to the lower-chest pocket and preserve the level ADS target and category-specific weapon stances. The follow-up correction makes the active standing contract match the live controller's real 0% aim state and increases the rifle patrol diagonal from 26.7 to 34.4 degrees muzzle-down. Compact, shotgun, support, precision, pistol, and launcher families receive corresponding low-ready drops. Long-gun swaps continue to fold inward while the support hand releases to the vest.
 
-**Verification:** PASS in production. All 17 firearms pass all 272 production carry/action samples with 0.00 cm trigger/support error, 0.0 cm torso penetration, and at most 0.6 cm armor-shoulder contact. The reference gate measures receiver height 1.380 m, muzzle pitch -26.7 degrees, cross-body angle -15.4 degrees, and 9.7 cm lateral clearance. Front, three-quarter, and side browser renders were inspected at the runtime idle blend; M4, RPG, and sidearm silhouettes remain category-correct. The complete release certificate passes 28/28 automated gates. Commit `86d54a1` deployed successfully in run `31920288712`; a cache-busted `kryx.live` session loaded the arena and entered the live 8/8-player match with zero page errors.
+**Verification:** PASS for the corrected standing contract. All 17 firearms pass all 272 production carry/action samples with 0.00 cm trigger/support error and 0.0 cm torso/shoulder penetration. The reference gate measures receiver height 1.380 m, muzzle pitch -34.4 degrees, cross-body angle -16.7 degrees, and 9.7 cm lateral clearance. The browser gallery renders every firearm at the active roster's true standing state and visibly confirms the category-specific muzzle-down silhouettes. The prior 26.7-degree production correction was commit `86d54a1`, deployed successfully in run `31920288712`.
 
 ## BUG-021
 

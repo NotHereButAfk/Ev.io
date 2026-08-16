@@ -84,9 +84,12 @@ function shoulderPenetration(p) {
 
 const states = [
   ['fresh attach', 0, {}, true],
-  ['idle', 0.18, {}],
-  ['walk crest', 0.18, { swing: 0.055 }],
-  ['run trough', 0.30, { swing: -0.065, bodyPitch: -0.12 }],
+  // The active Game/Avatar/Bot controllers settle at aim=0 when not firing.
+  // Do not borrow HumanSoldier's separate 18% low-ready blend here: doing so
+  // hid a too-level normal-match stance from this production gate.
+  ['idle', 0, {}],
+  ['walk crest', 0, { swing: 0.055 }],
+  ['run trough', 0, { swing: -0.065, bodyPitch: -0.12 }],
   ['aim', 1, {}],
   ['aim up', 1, { aimPitch: 0.65 }],
   ['aim down', 1, { aimPitch: -0.65 }],
@@ -106,6 +109,10 @@ const EXPECTED_CARRY = {
   lmg: 'support',
   boltsniper: 'precision', battlerifle: 'precision', dmr: 'precision',
   rpg: 'launcher', fuelrod: 'launcher', concussion: 'launcher',
+};
+const IDLE_PITCH_RANGE = {
+  pistol: [12, 25], compact: [22, 38], shotgun: [30, 45],
+  rifle: [30, 45], support: [20, 36], precision: [27, 42], launcher: [10, 28],
 };
 let failures = 0;
 let globalTorso = 0;
@@ -133,6 +140,17 @@ for (const def of firearms) {
     if (freshAttach) restRifleTransform(weapon);
     else applyRifleCarry(rig, weapon, aim, 1 / 60, options);
     body.updateMatrixWorld(true);
+
+    let soldierCarry = true;
+    let idlePitch = 0;
+    if (name === 'idle') {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(weapon.quaternion);
+      idlePitch = THREE.MathUtils.radToDeg(Math.asin(
+        THREE.MathUtils.clamp(forward.y, -1, 1),
+      ));
+      const [minPitch, maxPitch] = IDLE_PITCH_RANGE[actualCarry];
+      soldierCarry = idlePitch < -minPitch && idlePitch > -maxPitch;
+    }
 
     let torso = 0, shoulder = 0, rear = -Infinity;
     const p = new THREE.Vector3();
@@ -169,6 +187,7 @@ for (const def of firearms) {
     weaponSupport = Math.max(weaponSupport, supportError);
     const rearClear = rear === -Infinity || rear <= 0;
     const ok = torso <= MAX_PENETRATION && shoulder <= MAX_PENETRATION && rearClear
+      && soldierCarry
       && triggerError <= MAX_PENETRATION && supportError <= MAX_PENETRATION;
     if (!ok) {
       failures++;
@@ -178,7 +197,8 @@ for (const def of firearms) {
         + `torso=${(torso * 100).toFixed(1)}cm shoulder=${(shoulder * 100).toFixed(1)}cm `
         + `rear=${rear === -Infinity ? 'n/a' : `${(rear * 100).toFixed(1)}cm`} `
         + `trigger=${(triggerError * 100).toFixed(1)}cm `
-        + `support=${(supportError * 100).toFixed(1)}cm`,
+        + `support=${(supportError * 100).toFixed(1)}cm`
+        + `${name === 'idle' ? ` pitch=${idlePitch.toFixed(1)}deg` : ''}`,
       );
     }
     body.remove(weapon);
