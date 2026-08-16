@@ -98,6 +98,15 @@ const states = [
 ];
 
 const firearms = WEAPONS.filter((def) => def.kind !== 'melee');
+const EXPECTED_CARRY = {
+  m4: 'rifle', m16: 'rifle', rifle: 'rifle',
+  sidearm: 'pistol', magnum: 'pistol',
+  uzi: 'compact', needler: 'compact', plasmarifle: 'compact',
+  levershotgun: 'shotgun', energyshotgun: 'shotgun',
+  lmg: 'support',
+  boltsniper: 'precision', battlerifle: 'precision', dmr: 'precision',
+  rpg: 'launcher', fuelrod: 'launcher', concussion: 'launcher',
+};
 let failures = 0;
 let globalTorso = 0;
 let globalShoulder = 0;
@@ -105,6 +114,11 @@ let totalPoses = 0;
 for (const def of firearms) {
   if (!WEAPON_HAND_POSES[def.id]) {
     console.error(`FAIL ${def.id}: missing explicit hand-contact profile`);
+    failures++;
+  }
+  const actualCarry = weaponHandPose(def.id).carry;
+  if (actualCarry !== EXPECTED_CARRY[def.id]) {
+    console.error(`FAIL ${def.id}: carry=${actualCarry}, expected=${EXPECTED_CARRY[def.id]}`);
     failures++;
   }
   const body = buildHeroBody('vanguard');

@@ -342,21 +342,21 @@ The receiver-origin checks above were not sufficient to prove clearance for the 
 
 **Severity:** High
 
-**System:** Per-weapon loaded-Soldier carry families
+**System:** Per-weapon carry families across both production third-person rigs
 
 **Steps to reproduce:** Let `soldier.glb` load, then equip all 17 firearms in third person and compare their idle silhouettes. In particular compare sidearm/magnum, Uzi, M4/M16, shotguns, LMG, precision rifles, and the three launchers.
 
-**Expected behavior:** The loaded production model should handle each weapon by its real physical role: two-handed compressed-ready pistols; tight shouldered compact guns; stock-retained low-ready rifles and shotguns; a weight-bearing LMG hold; supported precision rifles; and shoulder-height launcher tubes. ADS, sprint, reload, recoil, and swap must retain both hands and body clearance.
+**Expected behavior:** Both the active connected ninja roster and the loaded Soldier should handle each weapon by its real physical role: two-handed compressed-ready pistols; tight shouldered compact guns; stock-retained low-ready rifles and shotguns; a weight-bearing LMG hold; supported precision rifles; and shoulder-height launcher tubes. ADS, sprint, reload, recoil, and swap must retain both hands and body clearance.
 
-**Observed behavior:** `HumanRifleCarry` applied one M4 transform and one pair of wrist targets to every firearm. Numerical IK stayed attached, but pistols looked stocked, launchers were dipped like rifles, and compact/heavy weapons shared the same receiver height and action pitch.
+**Observed behavior:** The two production rigs did not consume the same complete role mapping. Numerical IK stayed attached, but the active match roster still reused the generic rifle carry for compact guns, shotguns, the LMG, and precision rifles; the loaded Soldier had previously applied one M4 transform to every firearm.
 
-**Root cause:** The earlier per-weapon carry table was consumed by the connected fallback solver, while the asynchronously loaded Soldier path selected only scale overrides and a single rifle pose.
+**Root cause:** `HumanRifleCarry` and `RifleCarry` are separate animation paths. The first role-family fix covered the loaded Soldier, while normal Vanguard, Striker, and Phantom selections remain on `RifleCarry`; its shared contact table identified only pistols and launchers specially.
 
-**Files changed:** `src/player/HumanRifleCarry.js`, `tools/human_rifle_carry_check.mjs`, `human-weapon-gallery.html`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
+**Files changed:** `src/player/HumanRifleCarry.js`, `src/player/RifleCarry.js`, `src/weapons/WeaponHandPoses.js`, `tools/human_rifle_carry_check.mjs`, `tools/rifle_body_clearance_check.mjs`, `human-weapon-gallery.html`, `weapon-carry-gallery.html`, `QA_REPORT.md`, `EVIO_COMPARISON.md`
 
-**Fix:** Add seven loaded-Soldier carry families—pistol, compact, shotgun, rifle, support, precision, and launcher—and explicitly map every shipped firearm. Each family owns patrol/aim rotations, shoulder-relative receiver anchors, forward clearance, and action-tuck behavior while continuing to use the authoritative two-arm IK and level ADS tracking.
+**Fix:** Add seven carry families—pistol, compact, shotgun, rifle, support, precision, and launcher—to both production solvers and explicitly map every shipped firearm. Each active-roster family owns its patrol/aim rotations and shoulder-relative receiver anchors while continuing to use authoritative two-arm IK, per-model grip points, mesh-derived body clearance, and level ADS tracking.
 
-**Verification:** PASS locally. The carry gate asserts the required family for every firearm and passes all 17 weapons across 816 real-Soldier armor/locomotion/aim/reload/sprint states with 0.00 cm wrist error, 0.0 cm torso penetration, at most 0.3 cm shoulder-surface contact, at least 5.1 cm lateral receiver clearance, and at least 29.5 cm forward clearance. A browser gallery rendered and visually inspected all 17 production holds at the runtime 18% idle blend. Production verification is pending deployment.
+**Verification:** PASS. The loaded-Soldier gate passes all 17 weapons across 816 armor/locomotion/aim/reload/sprint states with 0.00 cm wrist error and 0.0 cm torso penetration. The active-roster gate asserts the required family for every firearm and passes 272 complete-mesh fresh/idle/walk/run/aim/flinch/reload/swap poses with 0.0 cm torso and shoulder penetration and at most 0.5 cm wrist error. Separate browser galleries render all 17 weapons through each real production rig at the runtime 18% idle blend.
 
 ## BUG-023
 

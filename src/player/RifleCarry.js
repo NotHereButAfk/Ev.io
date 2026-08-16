@@ -78,6 +78,43 @@ const AIM = {
   wp: onArm(0.390, 1.600, -0.230),
   wr: new THREE.Euler(-0.020, 0, 0),
 };
+// A soldier does not carry every firearm on the same line. Compact weapons
+// stay tighter to the ribs, shotguns and precision rifles retain a longer
+// shoulder pocket, support weapons sit a touch wider, and launchers ride high
+// enough for the tube/sights to clear the pauldron. The same IK solver still
+// lands both wrists on each weapon's authored grip points.
+const COMPACT_PATROL = {
+  wp: onArm(0.350, 1.520, -0.315),
+  wr: new THREE.Euler(-0.380, 0.200, 0.080),
+};
+const COMPACT_AIM = {
+  wp: onArm(0.350, 1.590, -0.280),
+  wr: new THREE.Euler(-0.020, 0, 0),
+};
+const SHOTGUN_PATROL = {
+  wp: onArm(0.405, 1.500, -0.275),
+  wr: new THREE.Euler(-0.520, 0.220, 0.080),
+};
+const SHOTGUN_AIM = {
+  wp: onArm(0.400, 1.600, -0.235),
+  wr: new THREE.Euler(-0.020, 0, 0),
+};
+const SUPPORT_PATROL = {
+  wp: onArm(0.425, 1.515, -0.285),
+  wr: new THREE.Euler(-0.360, 0.160, 0.060),
+};
+const SUPPORT_AIM = {
+  wp: onArm(0.390, 1.600, -0.230),
+  wr: new THREE.Euler(-0.020, 0, 0),
+};
+const PRECISION_PATROL = {
+  wp: onArm(0.405, 1.510, -0.285),
+  wr: new THREE.Euler(-0.440, 0.180, 0.080),
+};
+const PRECISION_AIM = {
+  wp: onArm(0.390, 1.600, -0.230),
+  wr: new THREE.Euler(-0.020, 0, 0),
+};
 // Pistols do not have a stock to pin to the firing shoulder. A soldier brings
 // both hands toward the centreline and extends the weapon in front of the
 // chest, while the patrol pose retracts it into a compact low-ready position.
@@ -88,6 +125,14 @@ const PISTOL_PATROL = {
 const PISTOL_AIM = {
   wp: onArm(0.075, 1.585, -0.690),
   wr: new THREE.Euler(-0.015, 0, 0),
+};
+const LAUNCHER_PATROL = {
+  wp: onArm(0.425, 1.590, -0.255),
+  wr: new THREE.Euler(-0.180, 0.120, 0.040),
+};
+const LAUNCHER_AIM = {
+  wp: onArm(0.390, 1.600, -0.230),
+  wr: new THREE.Euler(-0.020, 0, 0),
 };
 // Clearance belongs to the complete 1.14m rifle mesh, not just the receiver
 // origin above. These two offsets seat the rear of the stock on the visible
@@ -194,10 +239,21 @@ export const AIM_PITCH_LIMIT = Math.PI / 2 - 0.05;   // ~87.1°, Player.js's own
 // ribs and swing the support elbow out under the handguard.
 const SWIVEL_R = -0.82, SWIVEL_L = 0.70;
 
-const _qPatrol = new THREE.Quaternion().setFromEuler(PATROL.wr);
-const _qAim    = new THREE.Quaternion().setFromEuler(AIM.wr);
-const _qPistolPatrol = new THREE.Quaternion().setFromEuler(PISTOL_PATROL.wr);
-const _qPistolAim = new THREE.Quaternion().setFromEuler(PISTOL_AIM.wr);
+const carryProfile = (patrol, aim) => ({
+  patrol,
+  aim,
+  qPatrol: new THREE.Quaternion().setFromEuler(patrol.wr),
+  qAim: new THREE.Quaternion().setFromEuler(aim.wr),
+});
+const CARRY_PROFILES = {
+  rifle: carryProfile(PATROL, AIM),
+  compact: carryProfile(COMPACT_PATROL, COMPACT_AIM),
+  shotgun: carryProfile(SHOTGUN_PATROL, SHOTGUN_AIM),
+  support: carryProfile(SUPPORT_PATROL, SUPPORT_AIM),
+  precision: carryProfile(PRECISION_PATROL, PRECISION_AIM),
+  pistol: carryProfile(PISTOL_PATROL, PISTOL_AIM),
+  launcher: carryProfile(LAUNCHER_PATROL, LAUNCHER_AIM),
+};
 const _q       = new THREE.Quaternion();
 const _qSwing  = new THREE.Quaternion();
 const _qArm    = new THREE.Quaternion();
@@ -297,8 +353,9 @@ function slideToReach(T, sx) {
 export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   fitWeaponToWorldSize(weapon);
   const handPose = weaponHandPose(weapon);
-  const pistolCarry = handPose.carry === 'pistol';
-  const launcherCarry = handPose.carry === 'launcher';
+  const carryFamily = CARRY_PROFILES[handPose.carry] ? handPose.carry : 'rifle';
+  const profile = CARRY_PROFILES[carryFamily];
+  const pistolCarry = carryFamily === 'pistol';
   const a    = Math.max(0, Math.min(1, aim));
   const kick = o.kick || 0;
   const reload = o.reload || 0, swap = o.swap || 0, flinch = o.flinch || 0;
@@ -329,8 +386,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
     // Muzzle drops while the hands are busy, and again when hit.
     - 0.34 * reloadB - 0.55 * swapB - 0.30 * flinchB - 0.10 * rack;
 
-  _pos.lerpVectors(pistolCarry ? PISTOL_PATROL.wp : PATROL.wp,
-                   pistolCarry ? PISTOL_AIM.wp : AIM.wp, a);
+  _pos.lerpVectors(profile.patrol.wp, profile.aim.wp, a);
   // Bow the path forward through the middle of the blend so the buttstock
   // swings around the right pec rather than straight through it. Free to do
   // now that the hands are IK'd to wherever the rifle ends up.
@@ -338,11 +394,7 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
   _pos.z += kick * 0.03;                           // recoil shoves it back
   // Slerp (not euler-lerp) between the two carries — the patrol pose is a
   // large compound rotation and euler blending swings it through junk.
-  _q.slerpQuaternions(pistolCarry ? _qPistolPatrol : _qPatrol,
-                      pistolCarry ? _qPistolAim : _qAim, a);
-  // A launcher is shouldered slightly higher so the tube clears the pauldron
-  // and the sight line stays above the forearm instead of crossing through it.
-  if (launcherCarry) _pos.y += 0.035;
+  _q.slerpQuaternions(profile.qPatrol, profile.qAim, a);
 
   // Reload rolls the receiver up toward the body so the mag well faces the
   // support hand; a swap drops the whole weapon out of frame and brings it
@@ -486,17 +538,18 @@ export function applyRifleCarry(rig, weapon, aim, dt, o = {}) {
 export function restRifleTransform(weapon) {
   fitWeaponToWorldSize(weapon);
   const handPose = weaponHandPose(weapon);
-  if (handPose.carry === 'pistol') {
-    weapon.position.copy(PISTOL_PATROL.wp);
+  const carryFamily = CARRY_PROFILES[handPose.carry] ? handPose.carry : 'rifle';
+  const profile = CARRY_PROFILES[carryFamily];
+  if (carryFamily === 'pistol') {
+    weapon.position.copy(profile.patrol.wp);
     weapon.position.x += 0.048;
     weapon.position.z -= 0.075;
-    weapon.quaternion.copy(_qPistolPatrol);
+    weapon.quaternion.copy(profile.qPatrol);
     return;
   }
   const geometryClearance = weaponClearance(weapon);
-  weapon.position.copy(PATROL.wp);
-  if (handPose.carry === 'launcher') weapon.position.y += 0.035;
+  weapon.position.copy(profile.patrol.wp);
   weapon.position.x += BASE_OUTBOARD + geometryClearance.outboard;
   weapon.position.z -= BODY_FORWARD_CLEARANCE + geometryClearance.forward;
-  weapon.quaternion.copy(_qPatrol);
+  weapon.quaternion.copy(profile.qPatrol);
 }

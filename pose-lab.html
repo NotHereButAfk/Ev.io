@@ -34,7 +34,10 @@ const MODEL = Q.get('model') || 'vanguard';
 const WEAPON = Q.get('weapon') || 'm4';
 
 const W = 1200, H = 560, NV = ANG >= 0 ? 1 : 3;
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// Galleries capture each completed diagnostic canvas before releasing its
+// WebGL context, so retain the final frame for toDataURL(). This page is a QA
+// lab only; the production arena renderer remains unchanged.
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(W, H);
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
