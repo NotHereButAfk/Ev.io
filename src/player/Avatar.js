@@ -6,7 +6,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
-import { cameraYawToBodyYaw } from './Facing.js';
+import { cameraYawToBodyYaw, movementInBodySpace } from './Facing.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -234,13 +234,13 @@ export class Avatar {
       const ud = g.userData;
       g.position.copy(s.position);
       const viewYaw = g.rotation.y;
-      const cs = Math.cos(viewYaw), sn = Math.sin(viewYaw);
-      const dirF = speed > 0.2
-        ? (moveX * -sn + moveZ * -cs) / Math.max(0.01, speed) : 1;
-      const dirR = speed > 0.2
-        ? (moveX * cs + moveZ * -sn) / Math.max(0.01, speed) : 0;
+      const travel = movementInBodySpace(moveX, moveZ, viewYaw);
+      const dirF = speed > 0.2 ? travel.forward : 1;
+      const dirR = speed > 0.2 ? travel.right : 0;
       ud.setLocomotion?.(speed, grounded, !!s.sprint, -dirR, dirF, dirR);
-      ud.setAim?.(s.pitch || 0, 0);
+      let aimOffset = (s.aimYaw ?? s.yaw ?? 0) - g.rotation.y;
+      aimOffset = ((aimOffset + Math.PI) % (Math.PI * 2)) - Math.PI;
+      ud.setAim?.(s.pitch || 0, aimOffset);
       if (s.throwing && !this._wasThrowing) ud.triggerAction?.('throw');
       this._wasThrowing = !!s.throwing;
       if (s.hit && !this._wasHit) ud.triggerHit?.(0.7, 0.8);
@@ -275,14 +275,14 @@ export class Avatar {
     // backpedals, and the feet travel with the body instead of planting.
     // The body faces local -Z, so after its yaw forward is (-sin, -cos) and
     // right is (cos, -sin).
-    const sn = Math.sin(yaw), cs = Math.cos(yaw);
     let dirF = 1, dirR = 0;
     if (speed > 0.6) {
       _v.copy(s.position).sub(this._lastDirPos); _v.y = 0;
       const m = _v.length();
       if (m > 1e-5) {
-        dirF = (_v.x * -sn + _v.z * -cs) / m;
-        dirR = (_v.x *  cs + _v.z * -sn) / m;
+        const travel = movementInBodySpace(_v.x, _v.z, g.rotation.y);
+        dirF = travel.forward;
+        dirR = travel.right;
       }
     }
     this._lastDirPos.copy(s.position);
@@ -310,9 +310,9 @@ export class Avatar {
     });
     this._walkT = gait.phase;
     g.position.set(
-      s.position.x + Math.cos(yaw) * gait.sway,
+      s.position.x + Math.cos(g.rotation.y) * gait.sway,
       s.position.y + gait.bob,
-      s.position.z - Math.sin(yaw) * gait.sway,
+      s.position.z - Math.sin(g.rotation.y) * gait.sway,
     );
     g.rotation.x = gait.lean;                  // already eased, and bob assumes it
     g.rotation.z = gait.roll;

@@ -113,6 +113,7 @@ function loadArena(definition) {
       type: 'weapon', x: point.x, y: point.y, z: point.z, markerKind: point.markerKind,
     })),
     resolveState,
+    groundHeightAt,
     raycast,
   };
 }

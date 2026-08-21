@@ -38,6 +38,23 @@ ok('local correction smoothing is frame-rate independent',
 const safe = chooseSafeSpawn([[0, 0, 0], [12, 0, 0], [48, 0, 0]], [[1, 0, 0]], 0);
 ok('spawn selection avoids occupied combat space', safe[0] === 48);
 
+const rotationClient = new AuthClient('ws://invalid');
+rotationClient.mapId = 'rook';
+rotationClient.simWorld = { half: 100, killY: -25, noBaseFloor: false, platforms: [], boxes: [], gravLifts: [], teleporters: [] };
+rotationClient.sim = { px: 0, py: 2, pz: 0, vx: 0, vy: 0, vz: 0, eye: 1.7, onGround: true };
+rotationClient.pending = [{ seq: 41, inp: { f: 1, r: 0, jump: false, crouch: false, yaw: 0 } }];
+rotationClient._acc = 0.04;
+rotationClient._reconcile({
+  tick: 100, ack: 40, mapId: 'winter-graveyard', mapName: 'Winter Graveyard',
+  matchStart: Date.now(), matchDurationMs: 480000,
+  arena: { id: 'winter-graveyard', half: 100, killY: -25, noBaseFloor: false, platforms: [], boxes: [] },
+  you: { x: 24, y: 4, z: -12, vx: 0, vy: 0, vz: 0, health: 100, shield: 0, alive: true, mag: 30, reserve: 90, kills: 0, deaths: 0, score: 0 },
+  players: [], smokes: [],
+});
+ok('map rotation discards movement predicted against the previous arena',
+  rotationClient.pending.length === 0 && rotationClient._acc === 0
+  && rotationClient.sim.px === 24 && rotationClient.sim.py === 4 && rotationClient.sim.pz === -12);
+
 const bridge = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
 ok('authoritative enemies render a health bar', /np-bar-fg/.test(bridge) && /healthFg\.style\.width/.test(bridge));
 ok('authoritative bots are honestly labelled', /botBadge\.hidden = !r\.isBot/.test(bridge));

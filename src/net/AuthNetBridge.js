@@ -49,12 +49,17 @@ function hashId(id) {
 const MOUSE_SENS = 0.0024;
 
 export function authNetTarget() {
+  return authNetTargets()[0] || null;
+}
+
+export function authNetTargets() {
   try {
     const q = new URLSearchParams(location.search).get('authnet');
-    if (q) return q === '1' ? `ws://${location.hostname}:8788` : q;
-    if (localStorage.getItem('kx_authnet') === '1') return `ws://${location.hostname}:8788`;
+    if (q) return q === '1' ? [`ws://${location.hostname}:8788`] : q.split(',').map((s) => s.trim()).filter(Boolean);
+    if (localStorage.getItem('kx_authnet') === '1') return [`ws://${location.hostname}:8788`];
   } catch {}
-  return import.meta.env.VITE_AUTH_WS_URL || null;
+  return String(import.meta.env.VITE_AUTH_WS_URLS || import.meta.env.VITE_AUTH_WS_URL || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 export class AuthNetBridge {
@@ -84,6 +89,10 @@ export class AuthNetBridge {
     this._welcomed = false;
     this._starting = false;
     this._mapReady = Promise.resolve();
+    this.readyPromise = new Promise((resolve, reject) => {
+      this._resolveReady = resolve;
+      this._rejectReady = reject;
+    });
     this._nameLayer = this._makeNameLayer();
     this.client.postStep = (next, previous) => this._resolveRookCollision(next, previous);
     this.client.onWelcome = (arena, match) => {
@@ -100,10 +109,13 @@ export class AuthNetBridge {
     this.client.onSnapshot = () => {
       if (!this._welcomed || this.ready || this._starting) return;
       this._starting = true;
-      this._mapReady.catch((error) => console.error('[map] authoritative map load failed', error))
-        .finally(() => {
+      this._mapReady.then(() => {
           this.ready = true;
           game._finishServerJoining?.();
+          this._resolveReady?.(this);
+        }).catch((error) => {
+          console.error('[map] authoritative map load failed', error);
+          this._rejectReady?.(error);
         });
     };
     this.client.onMapChange = (mapId, match) => {
@@ -339,7 +351,7 @@ export class AuthNetBridge {
       // Derive cadence from rendered interpolation displacement, so a stalled
       // snapshot stream settles to idle rather than running in place.
       a.avatar.update(dt, {
-        position: a.pos, yaw: r.yaw, pitch: r.pitch || 0,
+        position: a.pos, yaw: r.yaw, aimYaw: r.aimYaw, pitch: r.pitch || 0,
         sprint: r.sprint, grounded: r.grounded, vy: r.vy || 0,
         crouch: r.crouch, sliding: r.sliding,
         aiming: r.aiming, firing: r.firing, alive: r.alive,

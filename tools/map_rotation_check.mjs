@@ -207,6 +207,13 @@ for (const arena of IMPORTED_ARENAS) {
     assert.equal(resolved.onGround, 1, `${arena.id} has an airborne/void spawn ${spawn}`);
     assert.ok(resolved.py > arena.killY, `${arena.id} spawn is below its kill plane ${spawn}`);
   }
+  const botRoom = new AuthRoom(arena, { targetPopulation: 8 });
+  let voidDeaths = 0;
+  for (let tick = 0; tick < 500; tick++) {
+    botRoom.update();
+    voidDeaths += botRoom.events.filter((event) => event.e === 'kill' && event.wid === 'void').length;
+  }
+  assert.equal(voidDeaths, 0, `${arena.id} bots walked off the map during navigation soak`);
 }
 
 console.log(

@@ -1,5 +1,7 @@
 import fs from 'node:fs';
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { stripRetargetedRootMotion } from '../src/player/UniversalAnimations.js';
 
 globalThis.ProgressEvent ??= class ProgressEvent {
   constructor(type, init = {}) { this.type = type; Object.assign(this, init); }
@@ -26,4 +28,28 @@ for (const name of ['root', 'DEF-hips', 'DEF-spine003', 'DEF-head',
   'DEF-thighL', 'DEF-shinL', 'DEF-footL', 'DEF-thighR', 'DEF-shinR', 'DEF-footR']) {
   if (!bones.has(name)) throw new Error(`animation library is missing bone ${name}`);
 }
-console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; locomotion, crouch, air and weapon actions present`);
+
+// The source's coordinate conversion is a quarter-turn on root. It must never
+// survive retargeting onto the already-upright in-game skeleton.
+const sourceRoot = gltf.animations.find((clip) => clip.name === 'Jog_Fwd_Loop')
+  ?.tracks.find((track) => track.name === 'root.quaternion');
+if (!sourceRoot || Math.abs(sourceRoot.values[0]) < 0.7) {
+  throw new Error('animation-library root-axis fixture changed; review upright retargeting');
+}
+const fixture = new THREE.AnimationClip('upright-retarget', 1, [
+  new THREE.QuaternionKeyframeTrack('.bones[root].quaternion', [0, 1], [
+    -Math.SQRT1_2, 0, 0, Math.SQRT1_2, -Math.SQRT1_2, 0, 0, Math.SQRT1_2,
+  ]),
+  new THREE.QuaternionKeyframeTrack('.bones[hips].quaternion', [0, 1], [
+    0, 0, 0, 1, 0.1, 0, 0, 0.995,
+  ]),
+]);
+stripRetargetedRootMotion(fixture);
+if (fixture.tracks.some((track) => track.name.includes('[root]'))) {
+  throw new Error('retargeted root rotation can still lay bots on the floor');
+}
+if (!fixture.tracks.some((track) => track.name.includes('[hips]'))) {
+  throw new Error('upright correction removed articulated locomotion');
+}
+
+console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; root-axis correction keeps bots upright while locomotion, crouch, air and weapon actions remain`);

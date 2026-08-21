@@ -30,6 +30,20 @@ let loading = false;
 let retargeted = null;
 const pending = new Set();
 
+// Quaternius' library is authored Z-up and carries that conversion as a
+// constant -90-degree X rotation on its skeleton root. HeroBody is already
+// Y-up. Retargeting that root track therefore lays the entire bot on its side
+// while the child bones continue playing a valid walk cycle. Root motion is
+// owned by the game simulation, so keep the target skeleton's upright rest
+// transform and retain only the articulated body tracks.
+export function stripRetargetedRootMotion(clip) {
+  if (!clip?.tracks) return clip;
+  clip.tracks = clip.tracks.filter((track) =>
+    !/^\.bones\[root\]\.(?:position|quaternion|scale)$/.test(track.name));
+  clip.resetDuration?.();
+  return clip;
+}
+
 function sourceSkeleton(scene) {
   const bones = [];
   scene.traverse((node) => { if (node.isBone) bones.push(node); });
@@ -45,14 +59,14 @@ function makeRetargeted(targetMesh) {
   for (const [state, clipName] of Object.entries(CLIPS)) {
     const clip = byName.get(clipName);
     if (!clip) continue;
-    retargeted[state] = retargetClip(targetMesh, skeleton, clip, {
+    retargeted[state] = stripRetargetedRootMotion(retargetClip(targetMesh, skeleton, clip, {
       names: BONE_MAP,
       hip: 'DEF-hips',
       hipInfluence: new THREE.Vector3(0, 0, 0),
       preserveBonePositions: true,
       useFirstFramePosition: false,
       fps: 30,
-    });
+    }));
   }
   targetMesh.skeleton.pose();
   return retargeted;

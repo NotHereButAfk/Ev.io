@@ -33,6 +33,24 @@ import { IMPORTED_ARENAS } from './rookarena.mjs';
 export const TICK_HZ = 20;
 export const TICK_MS = 1000 / TICK_HZ;
 
+export function botPresentationYaw(aimYaw, vx, vz) {
+  const speed = Math.hypot(vx, vz);
+  if (speed < 0.2) return aimYaw;
+
+  // The weapon/upper body receives `aimYaw` separately. Let the visible body
+  // follow resolved lateral travel so the pelvis is not twisted 90 degrees
+  // underneath a forward-facing torso while a bot changes cover or circles at
+  // close range. Keep facing the opponent only during a genuine retreat: that
+  // produces an ordinary backpedal instead of making the soldier turn its back
+  // on the fight.
+  const nx = vx / speed, nz = vz / speed;
+  const aimForwardX = -Math.sin(aimYaw);
+  const aimForwardZ = -Math.cos(aimYaw);
+  const forwardDot = nx * aimForwardX + nz * aimForwardZ;
+  if (forwardDot < -0.35) return aimYaw;
+  return Math.atan2(-nx, -nz);
+}
+
 const RESPAWN_TICKS = TICK_HZ * 3;          // 3s
 const SPAWN_PROTECTION_TICKS = Math.ceil(TICK_HZ * 1.5);
 const MAX_INPUT_QUEUE = 8;                  // drop floods; catch-up caps here
@@ -338,9 +356,28 @@ export class AuthRoom {
     );
     const phase = ((this.tick + p.id * 17) % 160) / 160;
     const strafe = phase < 0.5 ? 1 : -1;
+    const cp = Math.cos(pitch);
+    const laneDistance = rayVsBoxes(
+      this.simWorld,
+      p.state.px, p.state.py + HEAD_Y, p.state.pz,
+      -Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp,
+      distance,
+    );
+    const laneBlocked = laneDistance < distance - 0.6;
+    p._botLaneBlocked = laneBlocked;
+    let moveX = laneBlocked || distance < 4.5 ? strafe : 0;
+    let moveZ = distance > 7 ? 1 : distance < 4.5 ? -1 : 0;
+    if (!this._botGroundSafe(p, moveX, moveZ, yaw)) {
+      const alternatives = [[strafe, 0], [-strafe, 0], [0, -1], [0, 0]];
+      const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, yaw));
+      [moveX, moveZ] = safe || [0, 0];
+    }
     const inp = makeInput({
-      mx: distance < 32 ? strafe : 0,
-      mz: distance > 13 ? 1 : distance < 7 ? -1 : 0,
+      // A clear lane is ordinary forward/retreat movement. Sidestep only to
+      // solve an obstruction or make space at point-blank range; the old
+      // mid-range pure strafe made every bot visibly crab-walk around targets.
+      mx: moveX,
+      mz: moveZ,
       yaw, pitch,
       sprint: distance > 22,
       jumpJust: (this.tick + p.id * 29) % 173 === 0,
@@ -358,14 +395,7 @@ export class AuthRoom {
     // socket player. Geometry LOS is checked before they pull the trigger.
     const reacted = this.tick - (p._botTargetSince || 0) >= 5;
     if (reacted && distance < 105 && p.fireCooldown <= 0 && p.reloadUntil <= this.tick && p.mag > 0) {
-      const cp = Math.cos(pitch);
-      const rayDistance = rayVsBoxes(
-        this.simWorld,
-        p.state.px, p.state.py + HEAD_Y, p.state.pz,
-        -Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp,
-        distance,
-      );
-      if (rayDistance >= distance - 0.6) {
+      if (!laneBlocked) {
         this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw, pitch });
         // Movement is integrated before fire requests resolve. Remember the
         // chosen target so the authoritative shot can refresh its ray from the
@@ -373,7 +403,26 @@ export class AuthRoom {
         if (p.fireReq) p.fireReq.botTargetId = target.id;
       }
     }
-    return { seq, inp, wid: p.wid, aiming: distance < 55 };
+    return { seq, inp, wid: p.wid, aiming: distance < 55 && !laneBlocked };
+  }
+
+  _botGroundSafe(p, mx, mz, yaw) {
+    if ((!mx && !mz) || !this.arena.groundHeightAt) return true;
+    const length = Math.hypot(mx, mz) || 1;
+    const inputX = mx / length, inputZ = mz / length;
+    const worldX = Math.sin(yaw) * -inputZ + Math.sin(yaw + Math.PI / 2) * inputX;
+    const worldZ = Math.cos(yaw) * -inputZ + Math.cos(yaw + Math.PI / 2) * inputX;
+    // Look farther than one 20 Hz sprint step so a bot has time to brake before
+    // its capsule crosses an unsupported edge.
+    const probeDistance = 1.35;
+    const ground = this.arena.groundHeightAt(
+      p.state.px + worldX * probeDistance,
+      p.state.pz + worldZ * probeDistance,
+      p.state.py,
+      p.state.py,
+    );
+    return Number.isFinite(ground) && ground > this.arena.killY
+      && p.state.py - ground < 1.05;
   }
 
   _spawn(index = _pid, excludeId = null, safe = true) {
@@ -792,7 +841,10 @@ export class AuthRoom {
       publicList.push({
         id: p.id, name: p.name, isBot: p.isBot,
         x: p.state.px, y: p.state.py, z: p.state.pz,
-        yaw: p._lastYaw ?? 0, pitch: p._lastPitch ?? 0,
+        yaw: p.isBot
+          ? botPresentationYaw(p._lastYaw ?? 0, p._animVX, p._animVZ)
+          : (p._lastYaw ?? 0),
+        aimYaw: p._lastYaw ?? 0, pitch: p._lastPitch ?? 0,
         vx: p._animVX, vy: p.state.vy, vz: p._animVZ,
         onGround: p.state.onGround, crouch: p.state.crouch,
         slide: p.state.slide, sprint: !!p._lastSprint, wid: p.wid,

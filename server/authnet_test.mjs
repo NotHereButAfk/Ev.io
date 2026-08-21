@@ -9,7 +9,7 @@
 
 import { WebSocket } from 'ws';
 import { makeAuthServer } from './authserver.mjs';
-import { AuthRoom } from './authroom.mjs';
+import { AuthRoom, botPresentationYaw } from './authroom.mjs';
 
 const PORT = 8799;
 const { close, room } = makeAuthServer({ port: PORT });
@@ -282,6 +282,22 @@ duelHuman.state.px = 0; duelHuman.state.pz = -10;
 duelBot.state.px = 0; duelBot.state.pz = 0;
 duelHuman.invulnerableUntil = 0;
 duelBot.invulnerableUntil = 0;
+const clearLaneCommand = duelRoom._driveBot(duelBot);
+ok('bots: clear mid-range lanes use a forward soldier gait instead of crab-walking',
+   clearLaneCommand.inp.mz === 1 && clearLaneCommand.inp.mx === 0,
+   `mx=${clearLaneCommand.inp.mx}, mz=${clearLaneCommand.inp.mz}`);
+const coverYaw = botPresentationYaw(0, 5, 0, true);
+ok('bots: cover navigation turns the visible body into resolved travel',
+   Math.abs(Math.sin(coverYaw) + 1) < 1e-6,
+   `yaw=${coverYaw.toFixed(3)}`);
+const closeStrafeYaw = botPresentationYaw(0, -5, 0, false);
+ok('bots: close-range circling turns the body instead of crab-walking sideways',
+   Math.abs(Math.sin(closeStrafeYaw) - 1) < 1e-6,
+   `yaw=${closeStrafeYaw.toFixed(3)}`);
+const retreatYaw = botPresentationYaw(0, 0, 5, false);
+ok('bots: a genuine retreat remains a readable backpedal',
+   Math.abs(retreatYaw) < 1e-6,
+   `yaw=${retreatYaw.toFixed(3)}`);
 for (let i = 0; i < 200; i++) duelRoom.update();
 ok('bots: a public-match bot actively engages and can finish a human kill', duelHuman.deaths >= 1,
    `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);

@@ -14,6 +14,13 @@ async function check(name, condition) {
 }
 
 try {
+  const match = await fetch(`http://127.0.0.1:${PORT}/api/matchmake`);
+  const matchState = await match.json();
+  await check('matchmaker reports the authoritative arena before map loading',
+    match.status === 200 && matchState.available === true
+      && typeof matchState.mapId === 'string' && matchState.capacity === 8);
+  await check('matchmaker response cannot be cached', match.headers.get('cache-control') === 'no-store');
+
   const home = await fetch(`http://127.0.0.1:${PORT}/`);
   const html = await home.text();
   await check('serves the built game at /', home.status === 200 && /<!doctype html>/i.test(html));

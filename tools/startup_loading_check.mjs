@@ -63,6 +63,13 @@ try {
 
   const mapDuration = mapHiddenAt - mapSeenAt;
   if (mapDuration < 1750) throw new Error(`map loader was only visible for ${mapDuration}ms`);
+  const completedLoader = await page.evaluate(() => ({
+    phase: document.getElementById('ml-building')?.textContent,
+    progress: document.getElementById('ml-progress-fill')?.style.width,
+  }));
+  if (completedLoader.phase !== 'Arena ready' || completedLoader.progress !== '100%') {
+    throw new Error(`map loader did not finish truthfully: ${JSON.stringify(completedLoader)}`);
+  }
 
   // Exercise the actual post-match path, not just the map registry. A local
   // completed game must advance to a different arena, wait for that arena's

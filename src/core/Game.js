@@ -40,7 +40,8 @@ import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
-import { AuthNetBridge, authNetTarget } from '../net/AuthNetBridge.js';
+import { AuthNetBridge, authNetTarget, authNetTargets } from '../net/AuthNetBridge.js';
+import { findAvailableMatch } from '../net/Matchmaker.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { MobileControls } from '../ui/MobileControls.js';
 import { KILL_MULT_BONUS } from './RarityPerks.js';
@@ -310,12 +311,32 @@ export class Game {
   // sequence held both cards on unrelated multi-second timers.
   async _runConnectSequence() {
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
+    const targets = authNetTargets();
+    const matchPromise = targets.length ? findAvailableMatch(targets) : Promise.resolve(null);
+    if (targets.length) this._showServerJoining('deathmatch');
+    else this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
     const connectScreen = document.getElementById('connect-screen');
     await delay(950);
     connectScreen?.classList.add('fade-out');
     await delay(180);
     connectScreen?.classList.add('hidden');
+    try {
+      const match = await matchPromise;
+      if (match) {
+        this._selectedAuthNetUrl = match.url;
+        this._selectedMatch = match;
+        if (match.mapId) {
+          this._initialMapId = getImportedMap(match.mapId).id;
+          this.world._initialMapId = this._initialMapId;
+        }
+        this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
+      }
+    } catch (error) {
+      console.warn('[matchmaker]', error.message);
+      this._showServerJoinError(error.message);
+      // Keep the menu usable if every room is temporarily full. PLAY will run
+      // discovery again and will not enter gameplay until a room accepts us.
+    }
     const initialMapReady = this.world.startInitialLoad();
 
     try {
@@ -595,11 +616,25 @@ export class Game {
   }
 
   _wireMenu() {
-    this.menu.onPlay = (name, skinId, modeId, armorTypeId) => {
+    this.menu.onPlay = async (name, skinId, modeId, armorTypeId) => {
+      if (this._joinInFlight) return;
       if (!this.currentUsername || UserAccount.isGuest()) {
         if (!UserAccount.isGuest()) UserAccount.guest();
         this._onAuth('__guest__');
         name = UserAccount.getDisplayName('__guest__');
+      }
+      const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
+      if (publicMode && authNetTargets().length) {
+        this._joinInFlight = true;
+        try {
+          await this._prepareAuthoritativeMatch(name, modeId);
+        } catch (error) {
+          console.error('[matchmaker] join failed', error);
+          this._showServerJoinError(error.message);
+          return;
+        } finally {
+          this._joinInFlight = false;
+        }
       }
       this._startGame(name, skinId, modeId, armorTypeId);
     };
@@ -722,7 +757,7 @@ export class Game {
     // Mode-specific setup
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
     this._isSurvival = modeId === 'survival';
-    const expectsAuth = this._isDM && !!authNetTarget();
+    const expectsAuth = this._isDM && !!(this._selectedAuthNetUrl || authNetTarget());
 
     this.hud.hideDMTimer();
     this.hud.hideDowned();
@@ -1084,7 +1119,7 @@ export class Game {
     const name = el.querySelector('.ml-name');
     if (name) name.textContent = 'JOINING MATCH';
     const building = document.getElementById('ml-building');
-    if (building) building.textContent = 'Connecting to arena...';
+    if (building) building.textContent = 'Finding an available match...';
     const region = document.getElementById('ml-region');
     if (region) region.textContent = 'kryx.live';
     const mode = document.getElementById('ml-mode');
@@ -1096,7 +1131,48 @@ export class Game {
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
     this._serverJoinShownAt = performance.now();
-    el.classList.remove('hidden', 'ml-fade');
+    el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
+    this._setMapLoadingPhase('Finding an available match...', 12);
+  }
+
+  _showServerJoinError(message = 'No public server is available') {
+    const el = document.getElementById('map-loading');
+    if (!el) return;
+    const name = el.querySelector('.ml-name');
+    if (name) name.textContent = 'SERVER UNAVAILABLE';
+    const building = document.getElementById('ml-building');
+    if (building) building.textContent = 'Could not join a public match';
+    const region = document.getElementById('ml-region');
+    if (region) region.textContent = String(message).slice(0, 80);
+    const players = document.getElementById('ml-players');
+    if (players) players.textContent = 'Try again in a moment';
+    clearTimeout(this._serverJoinTimer);
+    el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
+    this._setMapLoadingPhase('Could not join a public match', 0);
+    this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), 3500);
+  }
+
+  async _prepareAuthoritativeMatch(name, modeId) {
+    this._showServerJoining(modeId);
+    const match = await findAvailableMatch(authNetTargets());
+    if (!match?.url) throw new Error('No public server is available');
+    this._selectedAuthNetUrl = match.url;
+    this._selectedMatch = match;
+    this.player.name = name;
+    this._authNet?.disconnect?.();
+    this._authNet = new AuthNetBridge(this, match.url);
+    const timeout = new Promise((_, reject) => {
+      this._authJoinTimer = setTimeout(() => reject(new Error('The selected server did not answer')), 10000);
+    });
+    try {
+      await Promise.race([this._authNet.readyPromise, timeout]);
+    } catch (error) {
+      this._authNet?.disconnect?.();
+      this._authNet = undefined;
+      throw error;
+    } finally {
+      clearTimeout(this._authJoinTimer);
+    }
   }
 
   _finishServerJoining() {
@@ -1110,7 +1186,7 @@ export class Game {
     if (!el) return;
     const map = getImportedMap(mapId);
     const building = document.getElementById('ml-building');
-    if (building) building.textContent = 'Building map...';
+    if (building) building.textContent = 'Loading arena geometry...';
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
@@ -1130,14 +1206,19 @@ export class Game {
     const mode = document.getElementById('ml-mode');
     if (mode) mode.textContent = modeNames[modeId] || 'Deathmatch';
     const players = document.getElementById('ml-players');
-    if (players) players.textContent = `${MAX_PLAYERS} players`;
+    if (players) {
+      const count = this._selectedMatch?.players;
+      const capacity = this._selectedMatch?.capacity || MAX_PLAYERS;
+      players.textContent = Number.isFinite(count) ? `${count} / ${capacity} players` : `${capacity} players`;
+    }
     const tip = document.getElementById('ml-tip');
     if (tip) tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
 
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     this._mapLoadingShownAt = performance.now();
-    el.classList.remove('hidden', 'ml-fade');
+    el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
+    this._setMapLoadingPhase('Loading arena geometry...', 46);
     if (autoHide) {
       this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
       this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
@@ -1148,6 +1229,7 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const sequence = this._mapLoadingSequence;
+    this._setMapLoadingPhase('Arena ready', 100, true);
     const elapsed = performance.now() - (this._mapLoadingShownAt || 0);
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await delay(Math.max(0, minimumDisplayMs - elapsed));
@@ -1162,6 +1244,15 @@ export class Game {
     clearTimeout(this._serverJoinTimer);
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     document.getElementById('map-loading')?.classList.add('hidden');
+  }
+
+  _setMapLoadingPhase(label, progress, ready = false) {
+    const el = document.getElementById('map-loading');
+    const status = document.getElementById('ml-building');
+    const fill = document.getElementById('ml-progress-fill');
+    if (status) status.textContent = label;
+    if (fill) fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    el?.classList.toggle('ml-arena-ready', ready);
   }
 
   _openMenu() {
@@ -1182,6 +1273,9 @@ export class Game {
     this.hud.hideLeaderboard();
     this.audio.stopAmbientCity();
     this.serverSim?.stop();
+    this._authNet?.disconnect?.();
+    this._authNet = undefined;
+    this._netDriven = false;
     this.hud.showServerPop(false);
     this._menuOpen = false;
     if (this._scopeOverlay) this._scopeOverlay.classList.remove('active');
@@ -1507,7 +1601,7 @@ export class Game {
     // movement + combat — the local player is client-predicted and other
     // players are real remotes. Falls back cleanly if the socket isn't up.
     if (this._authNet === undefined) {
-      const url = authNetTarget();
+      const url = this._selectedAuthNetUrl || authNetTarget();
       this._authNet = url ? new AuthNetBridge(this, url) : null;
     }
     // Dead players are frozen where they fell until the respawn timer fires —

@@ -44,6 +44,7 @@ export function interpolateRemoteSample(buf, renderT) {
     ...b,
     x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f), z: lerp(a.z, b.z, f),
     yaw: lerpYaw(a.yaw, b.yaw, f),
+    aimYaw: lerpYaw(a.aimYaw ?? a.yaw, b.aimYaw ?? b.yaw, f),
     pitch: lerp(a.pitch || 0, b.pitch || 0, f),
     vx: lerp(a.vx || 0, b.vx || 0, f),
     vy: lerp(a.vy || 0, b.vy || 0, f),
@@ -166,7 +167,15 @@ export class AuthClient {
         teleporters: [],
       };
     }
-    if (previousMapId && this.mapId !== previousMapId) {
+    const mapChanged = Boolean(previousMapId && this.mapId !== previousMapId);
+    if (mapChanged) {
+      // Inputs were predicted against the previous arena's collision. Replaying
+      // them from the new authoritative spawn can carry the player straight
+      // past a ledge before the new map is even presented. A rotation is a hard
+      // simulation boundary: accept the server spawn and begin a fresh queue.
+      this.pending.length = 0;
+      this._acc = 0;
+      this.sprinting = false;
       this.onMapChange?.(this.mapId, {
         name: snap.mapName,
         start: this.matchStart,
@@ -212,14 +221,14 @@ export class AuthClient {
       safeZ: y.safeZ ?? this.sim.safeZ };
     this.sprinting = !!y.sprint;
     // drop acked inputs, replay the rest
-    this.pending = this.pending.filter((c) => c.seq > snap.ack);
+    this.pending = mapChanged ? [] : this.pending.filter((c) => c.seq > snap.ack);
     for (const c of this.pending) this._predict(c.inp);
 
     const correctionX = before.x - this.sim.px;
     const correctionY = before.y - this.sim.py;
     const correctionZ = before.z - this.sim.pz;
     const correctionSq = correctionX ** 2 + correctionY ** 2 + correctionZ ** 2;
-    if (this.mapId !== previousMapId || correctionSq > TELEPORT_DISTANCE_SQ) {
+    if (mapChanged || correctionSq > TELEPORT_DISTANCE_SQ) {
       this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
     } else {
       this._visualOffset.x += correctionX;
@@ -257,6 +266,7 @@ export class AuthClient {
       );
       if (jumped) r.buf.length = 0;
       r.buf.push({ t: serverT, x: pl.x, y: pl.y, z: pl.z, yaw: pl.yaw, pitch: pl.pitch || 0,
+                   aimYaw: pl.aimYaw ?? pl.yaw,
                    vx: pl.vx || 0, vy: pl.vy || 0, vz: pl.vz || 0,
                    grounded: pl.onGround !== false, crouch: pl.crouch, slide: !!pl.slide,
                    sprint: !!pl.sprint, wid: pl.wid || 'm4', aiming: !!pl.aiming,
@@ -359,6 +369,7 @@ export class AuthClient {
         // Shortest-way-round on yaw, or an avatar spins the long way through
         // the whole circle every time someone crosses ±π.
         yaw: state.yaw,
+        aimYaw: state.aimYaw ?? state.yaw,
         pitch: state.pitch,
         vx: state.vx, vy: state.vy, vz: state.vz,
         grounded: state.grounded, crouch: state.crouch, sliding: state.slide,

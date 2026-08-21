@@ -4261,7 +4261,11 @@ html, body {
 #map-loading {
   position: absolute; inset: 0; z-index: 250; pointer-events: none;
   opacity: 1; transition: opacity 0.6s ease; overflow: hidden;
-  background: linear-gradient(90deg, rgba(5,8,14,.2), rgba(5,8,14,.02) 60%, rgba(5,8,14,.06));
+  background: #03070d;
+  transition: opacity 0.6s ease, background-color .32s ease;
+}
+#map-loading.ml-arena-ready {
+  background: linear-gradient(90deg, rgba(5,8,14,.68), rgba(5,8,14,.12) 60%, rgba(5,8,14,.18));
 }
 #map-loading.hidden { display: none; }
 #map-loading.ml-fade { opacity: 0; }
@@ -4273,7 +4277,7 @@ html, body {
   padding: 37vh 29px 0;
 }
 .ml-building {
-  position: absolute; top: 0; left: 0; z-index: 4;
+  position: absolute; top: 26px; left: 29px; z-index: 4;
   color: rgba(226,234,244,.72); font-size: 14px; letter-spacing: 0;
 }
 .ml-name {
@@ -4283,6 +4287,15 @@ html, body {
 }
 .ml-region { color: #d7e83e; font-size: 15px; font-weight: 600; margin-bottom: 7px; }
 .ml-mode, .ml-players { color: #edf1f5; font-size: 15px; margin-bottom: 5px; }
+.ml-progress {
+  width: min(270px, 72vw); height: 3px; margin-top: 18px; overflow: hidden;
+  background: rgba(255,255,255,.16);
+}
+.ml-progress > span {
+  display: block; width: 12%; height: 100%;
+  background: #d7e83e; box-shadow: 0 0 9px rgba(215,232,62,.6);
+  transition: width .3s ease;
+}
 .ml-tip {
   position: absolute; bottom: 25px; left: 20px; right: 20px; z-index: 4;
   color: #d9e83e; font-size: 11px; letter-spacing: 0.2px;

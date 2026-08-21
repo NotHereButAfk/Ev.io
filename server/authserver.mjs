@@ -123,12 +123,41 @@ function sanitizeName(n, usedNames = new Set()) {
 }
 
 export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 } = {}) {
-  const handler = staticRoot
+  const room = new AuthRoom(undefined, { targetPopulation });
+  const staticFallback = staticRoot
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
+  const handler = (req, res) => {
+    let pathname = '';
+    try { pathname = new URL(req.url || '/', 'http://localhost').pathname; } catch {}
+    if (req.method === 'GET' && pathname === '/api/matchmake') {
+      const humans = Array.from(room.players.values()).filter((player) => !player.isBot).length;
+      const capacity = room.targetPopulation || 8;
+      const remainingMs = Math.max(0, room.matchDurationMs - (Date.now() - room.matchStart));
+      const body = JSON.stringify({
+        available: humans < capacity,
+        humans, players: room.players.size, capacity,
+        mapId: room.arena.id, mapName: room.arena.name,
+        matchStart: room.matchStart, matchDurationMs: room.matchDurationMs,
+        remainingMs,
+      });
+      const origin = req.headers.origin;
+      const headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': Buffer.byteLength(body),
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      };
+      if (origin && originOk(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+        headers.Vary = 'Origin';
+      }
+      res.writeHead(200, headers); res.end(body); return;
+    }
+    staticFallback(req, res);
+  };
   const http = server || createServer(handler);
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MSG_BYTES });
-  const room = new AuthRoom(undefined, { targetPopulation });
 
   wss.on('connection', (ws, req) => {
     if (!originOk(req.headers.origin)) { ws.close(1008, 'origin'); return; }

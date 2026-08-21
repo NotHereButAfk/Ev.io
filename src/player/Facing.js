@@ -20,3 +20,16 @@ export function bodyForwardAtYaw(yaw = 0) {
     z: -Math.cos(yaw),
   };
 }
+
+// Project resolved world travel into the body's actual visible frame. Use the
+// smoothed body yaw (not a newly received target yaw) or a turning avatar can
+// plant a sideways stride for several frames while its mesh catches up.
+export function movementInBodySpace(dx = 0, dz = 0, bodyYaw = 0) {
+  const length = Math.hypot(dx, dz);
+  if (length < 1e-8) return { forward: 1, right: 0 };
+  const sin = Math.sin(bodyYaw), cos = Math.cos(bodyYaw);
+  return {
+    forward: (dx * -sin + dz * -cos) / length,
+    right: (dx * cos + dz * -sin) / length,
+  };
+}

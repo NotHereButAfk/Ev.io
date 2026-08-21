@@ -5,6 +5,7 @@ import {
   bodyForwardAtYaw,
   cameraYawToBodyYaw,
   directionToBodyYaw,
+  movementInBodySpace,
 } from '../src/player/Facing.js';
 
 const EPS = 1e-8;
@@ -21,6 +22,14 @@ for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
   assert(near(forward.x, -Math.sin(yaw)), `camera yaw ${yaw}: x inverted`);
   assert(near(forward.z, -Math.cos(yaw)), `camera yaw ${yaw}: z inverted`);
 }
+
+// During a smoothed turn, locomotion must use the yaw actually visible on the
+// mesh rather than the newer network target yaw.
+const turningTravel = movementInBodySpace(0, -1, 0);
+assert(near(turningTravel.forward, 1), 'visible forward travel became a sideways gait');
+assert(near(turningTravel.right, 0), 'visible forward travel has false strafe');
+const rightTravel = movementInBodySpace(1, 0, 0);
+assert(near(rightTravel.forward, 0) && near(rightTravel.right, 1), 'body-space strafe projection is inverted');
 
 // A movement-derived yaw starts from atan2(dx, dz), which describes local +Z.
 // directionToBodyYaw must rotate local -Z onto the requested world vector.
