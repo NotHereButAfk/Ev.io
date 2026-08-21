@@ -53,7 +53,7 @@ import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
 import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
-import { preloadWeaponModels, buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
+import { preloadWeaponModels, onWeaponModelsReady, buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
 import { countLocalMatchPlayers } from './Population.js';
@@ -268,6 +268,7 @@ export class Game {
     };
 
     this._rafId = requestAnimationFrame(() => this._loop());
+    document.getElementById('boot-retry')?.addEventListener('click', () => this._runConnectSequence());
     this._runConnectSequence();
   }
 
@@ -280,8 +281,8 @@ export class Game {
     this.zombieManager.clear();
   }
 
-  _startPresentationPreloads() {
-    if (this._presentationPreloadsStarted) return;
+  _startPresentationPreloads(onProgress = null) {
+    if (this._presentationPreloadsStarted) return this._presentationPreloadPromise || Promise.resolve();
     this._presentationPreloadsStarted = true;
     const swapPreview = () => {
       const wasVisible = this.previewCharacter?.visible ?? false;
@@ -297,11 +298,29 @@ export class Game {
         this._spawnMenuBots();
       }
     };
-    preloadHumanSoldier(swapPreview);
-    preloadPlayerModel(swapPreview);
-    preloadSpartanModel(swapPreview);
+    const jobs = [];
+    const track = (label, starter) => jobs.push(new Promise((resolve) => starter(() => {
+      swapPreview();
+      onProgress?.(label);
+      resolve();
+    })));
+    track('player', preloadHumanSoldier);
+    track('models', preloadPlayerModel);
+    track('armor', preloadSpartanModel);
+    track('animations', preloadUniversalAnimations);
+    jobs.push(new Promise((resolve) => onWeaponModelsReady(() => {
+      onProgress?.('weapons');
+      resolve();
+    })));
     preloadWeaponModels();
-    preloadUniversalAnimations();
+    // Authored models are optional because every category has a procedural
+    // fallback. Wait briefly for real completions without trapping startup on
+    // one unavailable cosmetic file.
+    this._presentationPreloadPromise = Promise.race([
+      Promise.allSettled(jobs),
+      new Promise((resolve) => setTimeout(resolve, 1800)),
+    ]);
+    return this._presentationPreloadPromise;
   }
 
   // ── Connect sequence ─────────────────────────────────────────────────────────
@@ -309,19 +328,49 @@ export class Game {
   // Match ev.io's cold-open handoff: a brief engine connection card gives way
   // to the arena card, which stays up until the real map is ready. The old
   // sequence held both cards on unrelated multi-second timers.
+  _setStartupProgress(status, progress, detail = status) {
+    const value = Math.max(0, Math.min(100, Math.round(progress)));
+    const screen = document.getElementById('connect-screen');
+    const statusEl = document.getElementById('boot-status');
+    const detailEl = document.getElementById('boot-detail');
+    const percentEl = document.getElementById('boot-percent');
+    const fill = document.getElementById('boot-progress-fill');
+    const bar = screen?.querySelector('.boot-progress');
+    if (statusEl) statusEl.textContent = status;
+    if (detailEl) detailEl.textContent = detail;
+    if (percentEl) percentEl.textContent = `${value}%`;
+    if (fill) fill.style.width = `${value}%`;
+    bar?.setAttribute('aria-valuenow', String(value));
+  }
+
+  _showStartupError(error) {
+    const screen = document.getElementById('connect-screen');
+    screen?.classList.remove('hidden', 'fade-out');
+    screen?.classList.add('boot-error');
+    this._setStartupProgress('CONNECTION FAILED', this._startupProgress || 0,
+      String(error?.message || error || 'Unable to finish loading').slice(0, 96));
+    document.getElementById('boot-retry')?.classList.remove('hidden');
+  }
+
   async _runConnectSequence() {
+    if (this._startupInFlight) return;
+    this._startupInFlight = true;
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const targets = authNetTargets();
-    const matchPromise = targets.length ? findAvailableMatch(targets) : Promise.resolve(null);
-    if (targets.length) this._showServerJoining('deathmatch');
-    else this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
     const connectScreen = document.getElementById('connect-screen');
-    await delay(950);
-    connectScreen?.classList.add('fade-out');
-    await delay(180);
-    connectScreen?.classList.add('hidden');
+    connectScreen?.classList.remove('hidden', 'fade-out', 'boot-error');
+    document.getElementById('boot-retry')?.classList.add('hidden');
+    this._startupProgress = 0;
+    this._setStartupProgress('INITIALIZING...', 0, 'Starting engine...');
     try {
-      const match = await matchPromise;
+      await delay(70); // guarantee the first-paint loader reaches the screen
+      this._startupProgress = 10;
+      this._setStartupProgress('LOADING GAME...', 10, 'Loading player session...');
+
+      const targets = authNetTargets();
+      this._startupProgress = 22;
+      this._setStartupProgress(targets.length ? 'CONNECTING...' : 'LOADING GAME...', 22,
+        targets.length ? 'Finding an available server...' : 'Preparing local match...');
+      const match = targets.length ? await findAvailableMatch(targets) : null;
       if (match) {
         this._selectedAuthNetUrl = match.url;
         this._selectedMatch = match;
@@ -329,31 +378,44 @@ export class Game {
           this._initialMapId = getImportedMap(match.mapId).id;
           this.world._initialMapId = this._initialMapId;
         }
-        this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
       }
-    } catch (error) {
-      console.warn('[matchmaker]', error.message);
-      this._showServerJoinError(error.message);
-      // Keep the menu usable if every room is temporarily full. PLAY will run
-      // discovery again and will not enter gameplay until a room accepts us.
-    }
-    const initialMapReady = this.world.startInitialLoad();
 
-    try {
-      const map = await initialMapReady;
+      this._startupProgress = 40;
+      this._setStartupProgress('LOADING GAME...', 40, 'Loading map geometry...');
+      const map = await this.world.startInitialLoad();
+      this._startupProgress = 62;
+      this._setStartupProgress('LOADING GAME...', 62, 'Loading player models...');
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
-      this._startPresentationPreloads();
-      // Keep the completed arena visible through the translucent map card for
-      // a beat, as ev.io does, instead of disappearing on the decode frame.
-      this._mapLoadingShownAt = performance.now();
-      await this._finishMapLoading(1200);
+      let assetSteps = 0;
+      await this._startPresentationPreloads((label) => {
+        assetSteps++;
+        const progress = Math.min(88, 62 + assetSteps * 5);
+        this._startupProgress = progress;
+        const labels = {
+          weapons: 'Loading weapons...', animations: 'Loading animations...',
+          player: 'Loading player...', models: 'Loading character models...', armor: 'Loading armor...',
+        };
+        this._setStartupProgress('LOADING GAME...', progress, labels[label] || 'Loading assets...');
+      });
+      this._startupProgress = 92;
+      this._setStartupProgress('PREPARING MATCH...', 92, 'Preparing menu and match systems...');
+      this._initAuth();
+      await delay(180);
+      this._startupProgress = 100;
+      this._setStartupProgress('READY', 100, 'All systems ready');
+      await delay(420);
+      connectScreen?.classList.add('fade-out');
+      await delay(600);
+      connectScreen?.classList.add('hidden');
     } catch (error) {
-      console.error('[map] imported map failed to load', error);
-      this._hideMapLoading();
-      return;
+      console.error('[startup] load failed', error);
+      // A rejected map promise must be cleared so RETRY performs a new fetch.
+      if (!this.world.currentMap) this.world.ready = null;
+      this._showStartupError(error);
+    } finally {
+      this._startupInFlight = false;
     }
-    this._initAuth();
   }
 
   _configureMapCamera(map) {
@@ -1889,10 +1951,8 @@ export class Game {
       grounded: p.onGround, vy: p.velocity.y,
       slide: p.isSliding ? 1 : 0,
     });
-    rig.universalAnimator?.update(dt, {
-      speed, moving, run, crouch: this._tpsCrouch,
-      grounded: p.onGround, vy: p.velocity.y,
-    });
+    // Do not stack the generic retargeted clip over the connected exosuit gait;
+    // its source hip height folds this rig and separates the hands from the gun.
     // Subtle side-to-side weight transfer makes the armored chassis feel
     // connected through the hips. Apply it in body-local +X so strafing and
     // turning do not make the visual body drift in an unrelated world axis.

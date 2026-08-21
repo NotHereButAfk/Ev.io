@@ -872,11 +872,11 @@ export class Bot {
         vy: this._velY,
         dt,
       });
-      this._rig.universalAnimator?.update(dt, {
-        speed: isMoving ? this._animSpeed : 0,
-        moving: isMoving, run, crouch: 0,
-        grounded: this._onGround, vy: this._velY,
-      });
+      // Do not run the generic retargeted clip after applyWalkCycle here. Its
+      // source rig has a different hip/rest height, so stacking both animators
+      // folds these exosuits into a seated gait and leaves the carried weapon
+      // floating above the torso. applyWalkCycle already owns a complete,
+      // ground-speed-synchronised soldier locomotion pose for bot rigs.
       this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so
       // you can hear someone coming up behind you.

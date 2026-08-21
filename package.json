@@ -40,6 +40,7 @@
     "test:tps-camera": "node tools/third_person_camera_check.mjs",
     "test:account": "node tools/user_account_check.mjs",
     "test:bots": "node tools/bot_combat_check.mjs",
+    "test:bot-visual": "node tools/bot_locomotion_visual_check.mjs",
     "test:population": "node tools/population_check.mjs",
     "test:spectator": "node tools/spectator_camera_check.mjs",
     "test:nameplates": "node tools/nameplate_occlusion_check.mjs",

@@ -65,8 +65,8 @@ requireMatch(privacy, /Privacy policy/i, 'privacy page');
 requireMatch(terms, /Terms of use/i, 'terms page');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
-requireMatch(index, /id=["']map-loading["'](?![^>]*class=["'][^"']*hidden)/,
-  'initial arena loader is visible in the server-rendered shell');
+requireMatch(index, /id=["']map-loading["'][^>]*class=["'][^"']*hidden/,
+  'match loader stays hidden beneath the first-paint startup shell');
 requireMatch(index, /id=["']connect-screen["'][\s\S]*?boot-connect-logo[\s\S]*?boot-connect-text/,
   'brief engine connection composition');
 for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner']) {
@@ -89,13 +89,15 @@ if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand/.test(index)) {
 requireMatch(index, /id=["']ml-progress-fill["']/, 'readiness-bound arena progress indicator');
 requireMatch(game, /new World\(this\._initialMapId,\s*\{\s*autoLoad:\s*false\s*\}\)/,
   'cold map decode begins after the connection handoff paints');
-requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?classList\.add\(['"]hidden['"]\)[\s\S]*?startInitialLoad\(\)[\s\S]*?_mapLoadingShownAt = performance\.now\(\)[\s\S]*?_finishMapLoading\(1200\)/,
-  'initial map loader owns startup and is readiness-bound');
-if (/boot-progress|boot-phase|boot-detail|boot-percent/.test(index + game)) {
-  failures.push('connection stage has no synthetic progress report');
+requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?findAvailableMatch[\s\S]*?startInitialLoad\(\)[\s\S]*?_startPresentationPreloads[\s\S]*?_setStartupProgress\(['"]READY['"],\s*100/,
+  'startup progress follows real matchmaking, map, presentation, and ready stages');
+for (const id of ['boot-progress-fill', 'boot-detail', 'boot-percent', 'boot-retry']) {
+  requireMatch(index, new RegExp(`id=["']${id}["']`), `startup loader control: ${id}`);
 }
-requireMatch(game, /_startPresentationPreloads\(\)[\s\S]*?preloadHumanSoldier[\s\S]*?preloadWeaponModels/,
-  'optional soldier and weapon art starts after arena readiness');
+requireMatch(game, /_showStartupError[\s\S]*?boot-retry[\s\S]*?_runConnectSequence/,
+  'startup loader exposes a recoverable retry path');
+requireMatch(game, /_startPresentationPreloads\(onProgress[\s\S]*?preloadHumanSoldier[\s\S]*?preloadWeaponModels/,
+  'soldier, animation, and weapon readiness contributes to startup progress');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
 requireMatch(index, /ability-page-key["']>Q<[\s\S]*?<strong>TELEPORT<\/strong>/,
   'abilities page advertises Q teleport');

@@ -25,7 +25,13 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
-import { botAimErrorMeters, combatTargetScore } from '../src/entities/BotCombat.js';
+import {
+  BOT_STATES,
+  botAimErrorMeters,
+  getBotDifficulty,
+  isInsideBotFov,
+  smoothBotAim,
+} from '../src/entities/BotCombat.js';
 import { randomBotName } from '../src/entities/BotNames.js';
 import { WEAPONS as CLIENT_WEAPONS } from '../src/weapons/weaponDefs.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
@@ -141,7 +147,11 @@ export function chooseSafeSpawn(spawns, occupants = [], seed = 0) {
 }
 
 export class AuthRoom {
-  constructor(arena = IMPORTED_ARENAS, { targetPopulation = 0 } = {}) {
+  constructor(arena = IMPORTED_ARENAS, {
+    targetPopulation = 0,
+    botDifficulty = 'normal',
+    botDifficultyOverrides = null,
+  } = {}) {
     this.arenas = Array.isArray(arena) ? arena : [arena];
     if (!this.arenas.length) throw new Error('AuthRoom requires at least one imported arena');
     this._arenaIndex = 0;
@@ -157,6 +167,8 @@ export class AuthRoom {
     this._arenaBroadcastUntilTick = -1;
     const requestedPopulation = Number.isFinite(targetPopulation) ? targetPopulation | 0 : 0;
     this.targetPopulation = clamp(requestedPopulation, 0, 8);
+    this.botDifficultyName = botDifficulty;
+    this.botDifficulty = getBotDifficulty(botDifficulty, botDifficultyOverrides);
     this._botSerial = 0;
     this._fillBotSlots();
   }
@@ -240,6 +252,7 @@ export class AuthRoom {
         impulse: ABILITIES.impulse.charges,
       };
       player.abilityCD = 0;
+      if (player.isBot) this._resetBotAI(player);
     }
     this.events.push({ e: 'map', id: this.arena.id, name: this.arena.name });
     return true;
@@ -248,8 +261,8 @@ export class AuthRoom {
   // Add a HUMAN-controlled player (a real socket).
   add(send, name) {
     // A real player always gets a seat. Remove one server bot first when the
-    // advertised room is full. Once four real people are present the match is
-    // human-only: guests are real socket players and count toward that limit.
+    // advertised room is full. Guests are real socket players and replace bots
+    // exactly like signed-in players.
     if (this.targetPopulation && this.players.size >= this.targetPopulation) {
       const bot = Array.from(this.players.values()).find((p) => p.isBot);
       if (bot) this._remove(bot.id, false);
@@ -272,7 +285,7 @@ export class AuthRoom {
   _rebalanceBots() {
     if (!this.targetPopulation) return;
     const humans = Array.from(this.players.values()).filter((player) => !player.isBot).length;
-    const desiredBots = humans >= 4 ? 0 : Math.max(0, this.targetPopulation - humans);
+    const desiredBots = Math.max(0, this.targetPopulation - humans);
     const bots = Array.from(this.players.values()).filter((player) => player.isBot);
     while (bots.length > desiredBots) {
       const bot = bots.pop();
@@ -310,6 +323,7 @@ export class AuthRoom {
       abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
     };
     this.players.set(id, p);
+    if (p.isBot) this._resetBotAI(p);
     this.events.push({ e: 'spawn', id, name, x: spawn[0], y: spawn[1], z: spawn[2] });
     p.send({
       t: 'welcome', you: id, tick: this.tick,
@@ -328,82 +342,261 @@ export class AuthRoom {
     if (refill) this._fillBotSlots();
   }
 
-  _driveBot(p) {
-    let target = null;
-    let bestScore = Infinity;
-    for (const other of this.players.values()) {
-      if (other === p || !other.alive || this.tick < (other.invulnerableUntil || 0)) continue;
-      const dx = other.state.px - p.state.px;
-      const dz = other.state.pz - p.state.pz;
-      const d2 = dx * dx + dz * dz;
-      const score = combatTargetScore({
-        distance: Math.sqrt(d2), isHuman: !other.isBot, botId: p.id,
-        sticky: other.id === p._botTargetId,
-      });
-      if (score < bestScore) { bestScore = score; target = other; }
+  _resetBotAI(p) {
+    p._botState = p.alive ? BOT_STATES.ROAM : BOT_STATES.DEAD;
+    p._botHostility = new Map();
+    p._botIgnoredUntil = new Map();
+    p._botTargetId = null;
+    p._botTargetSince = 0;
+    p._botLastSeenTick = -Infinity;
+    p._botLastSeen = null;
+    p._botReactionUntil = 0;
+    p._botNextScanTick = this.tick + (p.id % 5);
+    p._botNextDecisionTick = this.tick;
+    p._botNextLosTick = this.tick;
+    p._botLosTargetId = null;
+    p._botLosCache = false;
+    p._botStrafe = this._rand(p.id * 71 + this.tick) < 0.5 ? -1 : 1;
+    p._botRoamTarget = null;
+    p._botRoamUntil = 0;
+    p._botStuckTicks = 0;
+    p._botLastX = p.state.px;
+    p._botLastZ = p.state.pz;
+    p._botAimYaw = p._lastYaw ?? 0;
+    p._botAimPitch = p._lastPitch ?? 0;
+    p._botNextShotTick = this.tick;
+    p._botBurstRemaining = 2 + Math.floor(this._rand(p.id * 193 + this.tick) * 3);
+  }
+
+  _provokeBot(bot, attacker, forceSwitch = true) {
+    if (!bot?.isBot || !bot.alive || !attacker || attacker === bot || !attacker.alive) return;
+    const cfg = this.botDifficulty;
+    const memoryTicks = Math.ceil((cfg.focusDuration + cfg.searchDuration) * TICK_HZ);
+    bot._botHostility ||= new Map();
+    bot._botHostility.set(attacker.id, this.tick + memoryTicks);
+    bot._botLastSeen = { x: attacker.state.px, y: attacker.state.py, z: attacker.state.pz };
+    bot._botLastSeenTick = this.tick;
+
+    const current = this.players.get(bot._botTargetId);
+    const currentDistance = current
+      ? Math.hypot(current.state.px - bot.state.px, current.state.pz - bot.state.pz) : Infinity;
+    const attackerDistance = Math.hypot(attacker.state.px - bot.state.px, attacker.state.pz - bot.state.pz);
+    if (!current || forceSwitch || attackerDistance < currentDistance * cfg.targetSwitchRatio) {
+      bot._botTargetId = attacker.id;
+      bot._botTargetSince = this.tick;
+      bot._botReactionUntil = this.tick + this._botReactionTicks(bot);
+      bot._botState = BOT_STATES.REACT;
+      bot._botNextLosTick = this.tick;
     }
+  }
 
-    const seq = ++p.lastInputSeq;
-    if (!target) return { seq, inp: makeInput({ yaw: p._lastYaw ?? 0 }), wid: p.wid, aiming: false };
+  _botReactionTicks(p) {
+    const cfg = this.botDifficulty;
+    const r = this._rand(p.id * 421 + this.tick * 13);
+    return Math.ceil((cfg.reactionMin + (cfg.reactionMax - cfg.reactionMin) * r) * TICK_HZ);
+  }
 
+  _botCanSee(p, target, ignoreFov = false) {
+    if (!target?.alive || this.tick < (target.invulnerableUntil || 0)) return false;
+    const cfg = this.botDifficulty;
     const dx = target.state.px - p.state.px;
     const dz = target.state.pz - p.state.pz;
     const distance = Math.hypot(dx, dz);
-    const yaw = Math.atan2(-dx, -dz);
-    const pitch = Math.atan2(
-      (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y),
-      Math.max(0.001, distance),
-    );
-    const phase = ((this.tick + p.id * 17) % 160) / 160;
-    const strafe = phase < 0.5 ? 1 : -1;
-    const cp = Math.cos(pitch);
-    const laneDistance = rayVsBoxes(
-      this.simWorld,
-      p.state.px, p.state.py + HEAD_Y, p.state.pz,
-      -Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp,
-      distance,
-    );
-    const laneBlocked = laneDistance < distance - 0.6;
-    p._botLaneBlocked = laneBlocked;
-    let moveX = laneBlocked || distance < 4.5 ? strafe : 0;
-    let moveZ = distance > 7 ? 1 : distance < 4.5 ? -1 : 0;
-    if (!this._botGroundSafe(p, moveX, moveZ, yaw)) {
-      const alternatives = [[strafe, 0], [-strafe, 0], [0, -1], [0, 0]];
-      const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, yaw));
-      [moveX, moveZ] = safe || [0, 0];
-    }
-    const inp = makeInput({
-      // A clear lane is ordinary forward/retreat movement. Sidestep only to
-      // solve an obstruction or make space at point-blank range; the old
-      // mid-range pure strafe made every bot visibly crab-walk around targets.
-      mx: moveX,
-      mz: moveZ,
-      yaw, pitch,
-      sprint: distance > 22,
-      jumpJust: (this.tick + p.id * 29) % 173 === 0,
-    });
-    if (p._botTargetId !== target.id) {
-      p._botTargetId = target.id;
-      p._botTargetSince = this.tick;
-    }
+    if (distance > cfg.detectionDistance) return false;
+    if (!ignoreFov && !isInsideBotFov(p._botAimYaw ?? p._lastYaw ?? 0, dx, dz, cfg.fovDegrees)) return false;
+    const dy = (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y);
+    const length = Math.hypot(dx, dy, dz) || 1e-6;
+    return rayVsBoxes(
+      this.simWorld, p.state.px, p.state.py + HEAD_Y, p.state.pz,
+      dx / length, dy / length, dz / length, length,
+    ) >= length - 0.6;
+  }
 
-    if (p.mag <= 0) {
-      this._startReload(p, p.wid);
+  _pickBotRoamTarget(p) {
+    // Spawn markers carry authored floor height and are guaranteed-safe map
+    // anchors. Current imported callouts omit Y, which made upper-floor bots
+    // choose ground-floor points through ceilings.
+    const points = this.arena.spawns?.length
+      ? this.arena.spawns
+      : this.arena.callouts?.map((point) => [point.x, point.y ?? p.state.py, point.z]);
+    if (!points?.length) return [p.state.px, p.state.py, p.state.pz];
+    let best = null;
+    for (let i = 0; i < Math.min(10, points.length); i++) {
+      const index = Math.floor(this._rand(p.id * 997 + this.tick * 31 + i * 101) * points.length);
+      const point = points[index];
+      const distance = Math.hypot(point[0] - p.state.px, point[2] - p.state.pz);
+      if (distance < 6) continue;
+      if (!best || Math.abs(point[1] - p.state.py) < Math.abs(best[1] - p.state.py)) best = point;
+      if (Math.abs(point[1] - p.state.py) < 2.5) break;
     }
+    const chosen = best || points[Math.abs(p.id + this.tick) % points.length];
+    return [chosen[0], chosen[1] ?? p.state.py, chosen[2]];
+  }
 
-    // Bots use the exact same authoritative fire request and hitscan path as a
-    // socket player. Geometry LOS is checked before they pull the trigger.
-    const reacted = this.tick - (p._botTargetSince || 0) >= 5;
-    if (reacted && distance < 105 && p.fireCooldown <= 0 && p.reloadUntil <= this.tick && p.mag > 0) {
-      if (!laneBlocked) {
-        this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw, pitch });
-        // Movement is integrated before fire requests resolve. Remember the
-        // chosen target so the authoritative shot can refresh its ray from the
-        // bot's post-movement position instead of firing along a stale angle.
-        if (p.fireReq) p.fireReq.botTargetId = target.id;
+  _driveBot(p) {
+    const cfg = this.botDifficulty;
+    const seq = ++p.lastInputSeq;
+    const secondsToTicks = (seconds) => Math.max(1, Math.ceil(seconds * TICK_HZ));
+
+    // Expire grudges and focus cooldowns on the low-frequency scan cadence.
+    if (this.tick >= p._botNextScanTick) {
+      p._botNextScanTick = this.tick + secondsToTicks(cfg.scanInterval);
+      for (const [id, until] of p._botHostility) if (until <= this.tick) p._botHostility.delete(id);
+      for (const [id, until] of p._botIgnoredUntil) if (until <= this.tick) p._botIgnoredUntil.delete(id);
+
+      const focusExpired = p._botTargetId != null
+        && this.tick - p._botTargetSince >= secondsToTicks(cfg.focusDuration);
+      if (focusExpired) {
+        p._botIgnoredUntil.set(p._botTargetId, this.tick + secondsToTicks(2));
+        p._botTargetId = null;
+      }
+
+      const current = this.players.get(p._botTargetId);
+      const currentDistance = current?.alive
+        ? Math.hypot(current.state.px - p.state.px, current.state.pz - p.state.pz) : Infinity;
+      let best = null;
+      let bestDistance = Infinity;
+      for (const [id] of p._botHostility) {
+        if (p._botIgnoredUntil.has(id)) continue;
+        const candidate = this.players.get(id);
+        if (!candidate?.alive || candidate === p) continue;
+        const dx = candidate.state.px - p.state.px;
+        const dz = candidate.state.pz - p.state.pz;
+        const distance = Math.hypot(dx, dz);
+        if (distance >= bestDistance || distance > cfg.detectionDistance) continue;
+        if (!this._botCanSee(p, candidate, candidate.id === p._botTargetId)) continue;
+        best = candidate;
+        bestDistance = distance;
+      }
+      const shouldSwitch = best && (!current || best.id === current.id
+        || bestDistance < currentDistance * cfg.targetSwitchRatio);
+      if (shouldSwitch && best.id !== p._botTargetId) {
+        p._botTargetId = best.id;
+        p._botTargetSince = this.tick;
+        p._botReactionUntil = this.tick + this._botReactionTicks(p);
+        p._botState = BOT_STATES.REACT;
       }
     }
-    return { seq, inp, wid: p.wid, aiming: distance < 55 && !laneBlocked };
+
+    let target = this.players.get(p._botTargetId);
+    if (!target?.alive || !p._botHostility.has(target.id)) {
+      p._botTargetId = null;
+      target = null;
+    }
+
+    let hasVisual = false;
+    if (target && this.tick >= p._botNextLosTick) {
+      p._botNextLosTick = this.tick + secondsToTicks(cfg.losInterval);
+      p._botLosTargetId = target.id;
+      p._botLosCache = this._botCanSee(p, target, true);
+      if (p._botLosCache) {
+        p._botLastSeen = { x: target.state.px, y: target.state.py, z: target.state.pz };
+        p._botLastSeenTick = this.tick;
+        p._botHostility.set(target.id, this.tick + secondsToTicks(cfg.focusDuration + cfg.searchDuration));
+      }
+    }
+    hasVisual = !!target && p._botLosTargetId === target.id && p._botLosCache;
+
+    if (target && !hasVisual
+      && this.tick - p._botLastSeenTick > secondsToTicks(cfg.searchDuration)) {
+      p._botIgnoredUntil.set(target.id, this.tick + secondsToTicks(1.5));
+      p._botTargetId = null;
+      target = null;
+      p._botState = BOT_STATES.ROAM;
+    }
+
+    if (!target) {
+      p._botState = BOT_STATES.ROAM;
+      if (!p._botRoamTarget || this.tick >= p._botRoamUntil
+        || Math.hypot(p._botRoamTarget[0] - p.state.px, p._botRoamTarget[2] - p.state.pz) < 1.5) {
+        p._botRoamTarget = this._pickBotRoamTarget(p);
+        p._botRoamUntil = this.tick + secondsToTicks(4 + this._rand(p.id * 59 + this.tick) * 4);
+      }
+      const dx = p._botRoamTarget[0] - p.state.px;
+      const dz = p._botRoamTarget[2] - p.state.pz;
+      let yaw = Math.atan2(-dx, -dz);
+      const blocked = rayVsBoxes(
+        this.simWorld, p.state.px, p.state.py + 0.8, p.state.pz,
+        -Math.sin(yaw), 0, -Math.cos(yaw), 2.2,
+      ) < 2.0;
+      let moveX = blocked ? p._botStrafe : 0;
+      let moveZ = blocked ? 0.35 : 1;
+      if (!this._botGroundSafe(p, moveX, moveZ, yaw)) {
+        const alternatives = [[-p._botStrafe, 0], [p._botStrafe, 0], [0, -1]];
+        const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, yaw));
+        [moveX, moveZ] = safe || [0, 0];
+      }
+      if (this.tick >= p._botNextDecisionTick) {
+        p._botNextDecisionTick = this.tick + secondsToTicks(cfg.decisionInterval);
+        if (this._rand(p.id * 83 + this.tick) < 0.28) p._botStrafe *= -1;
+        const moved = Math.hypot(p.state.px - p._botLastX, p.state.pz - p._botLastZ);
+        p._botStuckTicks = moved < 0.2 ? p._botStuckTicks + 1 : 0;
+        p._botLastX = p.state.px; p._botLastZ = p.state.pz;
+        if (p._botStuckTicks >= 2) {
+          p._botRoamTarget = null;
+          p._botStuckTicks = 0;
+          moveX = p._botStrafe;
+        }
+      }
+      p._botAimYaw = smoothBotAim(p._botAimYaw, yaw, cfg.aimTurnSpeed * 0.75, 1 / TICK_HZ);
+      const sprintWindow = this._rand(p.id * 313 + Math.floor(this.tick / 30))
+        < cfg.roamSprintChance * cfg.movementSpeed;
+      const jump = p.state.onGround && (blocked || p._botStuckTicks > 0
+        || this._rand(p.id * 733 + this.tick) < cfg.jumpChance / TICK_HZ);
+      return { seq, inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, sprint: sprintWindow, jumpJust: jump }), wid: p.wid, aiming: false };
+    }
+
+    const aimPoint = hasVisual ? target.state : p._botLastSeen;
+    const targetX = aimPoint.px ?? aimPoint.x;
+    const targetY = aimPoint.py ?? aimPoint.y;
+    const targetZ = aimPoint.pz ?? aimPoint.z;
+    const realDx = targetX - p.state.px;
+    const realDz = targetZ - p.state.pz;
+    const distance = Math.hypot(realDx, realDz);
+    const desiredYaw = Math.atan2(-realDx, -realDz);
+    const desiredPitch = Math.atan2((targetY + HEAD_Y) - (p.state.py + HEAD_Y), Math.max(0.001, distance));
+    p._botAimYaw = smoothBotAim(p._botAimYaw, desiredYaw, cfg.aimTurnSpeed, 1 / TICK_HZ);
+    p._botAimPitch += (desiredPitch - p._botAimPitch) * (1 - Math.exp(-cfg.aimTurnSpeed / TICK_HZ));
+
+    if (this.tick < p._botReactionUntil) p._botState = BOT_STATES.REACT;
+    else p._botState = hasVisual ? BOT_STATES.ENGAGE : BOT_STATES.SEARCH;
+
+    if (this.tick >= p._botNextDecisionTick) {
+      p._botNextDecisionTick = this.tick + secondsToTicks(cfg.decisionInterval);
+      if (this._rand(p.id * 137 + this.tick) < cfg.strafeChance) p._botStrafe *= -1;
+    }
+    let moveX = hasVisual ? p._botStrafe : p._botStrafe * 0.18;
+    let moveZ = !hasVisual ? 1 : distance > 13 ? 1 : distance < 5 ? -1 : 0.15;
+    if (!this._botGroundSafe(p, moveX, moveZ, p._botAimYaw)) {
+      const alternatives = [[-p._botStrafe, 0], [0, -1], [0, 0]];
+      const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, p._botAimYaw));
+      [moveX, moveZ] = safe || [0, 0];
+    }
+
+    if (p.mag <= 0) this._startReload(p, p.wid);
+    const aimDelta = Math.abs(((desiredYaw - p._botAimYaw + Math.PI) % (Math.PI * 2)) - Math.PI);
+    const canFire = hasVisual && this.tick >= p._botReactionUntil && aimDelta < 0.28
+      && distance < cfg.detectionDistance && p.fireCooldown <= 0
+      && p.reloadUntil <= this.tick && p.mag > 0 && this.tick >= p._botNextShotTick;
+    if (canFire) {
+      this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw: p._botAimYaw, pitch: p._botAimPitch });
+      if (p.fireReq) p.fireReq.botTargetId = target.id;
+      p._botBurstRemaining--;
+      const weaponTicks = Math.max(1, Math.ceil((WEAPONS[p.wid]?.rate || 0.2) * TICK_HZ));
+      if (p._botBurstRemaining <= 0) {
+        p._botBurstRemaining = 2 + Math.floor(this._rand(p.id * 509 + this.tick) * 3);
+        p._botNextShotTick = this.tick + weaponTicks * (3 + Math.floor(this._rand(p.id * 557 + this.tick) * 3));
+      } else p._botNextShotTick = this.tick + weaponTicks;
+    }
+    const jump = p.state.onGround && hasVisual
+      && this._rand(p.id * 877 + this.tick) < cfg.jumpChance / TICK_HZ;
+    return {
+      seq,
+      inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, pitch: p._botAimPitch,
+        sprint: distance > cfg.combatSprintDistance / cfg.movementSpeed, jumpJust: jump }),
+      wid: p.wid,
+      aiming: hasVisual && distance < cfg.detectionDistance * 0.8,
+    };
   }
 
   _botGroundSafe(p, mx, mz, yaw) {
@@ -587,6 +780,7 @@ export class AuthRoom {
 
   _damage(target, shooter, dmg, head) {
     if (!target.alive || this.tick < (target.invulnerableUntil || 0)) return;
+    if (target.isBot && shooter && shooter !== target) this._provokeBot(target, shooter, true);
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
@@ -603,6 +797,7 @@ export class AuthRoom {
     target._animVX = target._animVZ = 0;
     target._firingTicks = 0;
     target.deadUntil = this.tick + RESPAWN_TICKS;
+    if (target.isBot) target._botState = BOT_STATES.DEAD;
     target.deaths++;
     if (shooter && target !== shooter) {
       shooter.kills++;
@@ -614,6 +809,25 @@ export class AuthRoom {
       head, wid: wid ?? shooter?.wid ?? 'void',
     });
     return true;
+  }
+
+  // A near miss aimed at a bot still counts as an attack. Only bots close to
+  // the unobstructed shot ray react, so spraying a wall cannot alert enemies on
+  // the other side of it.
+  _provokeBotsAlongShot(shooter, weapon, yaw, pitch) {
+    const cp = Math.cos(pitch);
+    const dx = -Math.sin(yaw) * cp, dy = Math.sin(pitch), dz = -Math.cos(yaw) * cp;
+    const ox = shooter.state.px, oy = shooter.state.py + HEAD_Y, oz = shooter.state.pz;
+    for (const bot of this.players.values()) {
+      if (!bot.isBot || bot === shooter || !bot.alive) continue;
+      const tx = bot.state.px - ox, ty = (bot.state.py + 1.05) - oy, tz = bot.state.pz - oz;
+      const along = tx * dx + ty * dy + tz * dz;
+      if (along <= 0 || along > weapon.range) continue;
+      const miss = Math.hypot(tx - dx * along, ty - dy * along, tz - dz * along);
+      if (miss > 1.35) continue;
+      if (rayVsBoxes(this.simWorld, ox, oy, oz, dx, dy, dz, along) < along - 0.1) continue;
+      this._provokeBot(bot, shooter, true);
+    }
   }
 
   // Server computes the detonation point (aim ray vs geometry, capped at the
@@ -732,6 +946,7 @@ export class AuthRoom {
           p.blindUntil = 0;
           p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
+          if (p.isBot) this._resetBotAI(p);
           this.events.push({ e: 'respawn', id: p.id, x: s[0], y: s[1], z: s[2] });
         }
         this._record(p);
@@ -795,7 +1010,8 @@ export class AuthRoom {
           const tx = target.state.px - p.state.px;
           const tz = target.state.pz - p.state.pz;
           const distance = Math.max(0.001, Math.hypot(tx, tz));
-          const error = botAimErrorMeters(distance, 1);
+          const personality = 0.9 + this._rand(p.id * 271) * 0.2;
+          const error = botAimErrorMeters(distance, this.botDifficulty.aimErrorScale * personality);
           const yawJitter = (this._rand(p.id * 811 + this.tick * 17) * 2 - 1) * error / distance;
           const pitchJitter = (this._rand(p.id * 619 + this.tick * 23) * 2 - 1) * error / distance;
           req.yaw = Math.atan2(-tx, -tz) + yawJitter;
@@ -813,6 +1029,7 @@ export class AuthRoom {
         p._swingUntil = this.tick + Math.max(1, Math.ceil(w.rate * TICK_HZ));
       }
       p.mag = ammo.mag;
+      this._provokeBotsAlongShot(p, w, req.yaw, req.pitch);
       this._hitscan(p, w, req.yaw, req.pitch, p._lastAim, req.viewTick);
       if (w.kind !== 'melee' && ammo.mag <= 0) this._startReload(p, req.wid);
       if (w.spreadMax != null) {
@@ -854,6 +1071,7 @@ export class AuthRoom {
         swing: p._swingUntil > now ? clamp((now - p._swingStart) / swingDuration, 0, 1) : 1,
         health: p.health, shield: p.shield,
         kills: p.kills, deaths: p.deaths, score: p.score,
+        botState: p.isBot ? p._botState : undefined,
       });
     }
     const smokeList = this.smokes.map((s) => ({ x: s.x, y: s.y, z: s.z, r: s.r }));

@@ -10,6 +10,66 @@ export const BOT_TACTICS = Object.freeze({
   meleeAttackDistance: 2.2,
 });
 
+export const BOT_STATES = Object.freeze({
+  ROAM: 'roam',
+  REACT: 'react',
+  ENGAGE: 'engage',
+  SEARCH: 'search',
+  DEAD: 'dead',
+});
+
+// Server and offline bots consume the same named presets. Values are expressed
+// in seconds/metres so designers can tune behavior without knowing the 20 Hz
+// authoritative tick rate. `aimErrorScale` is intentionally above zero even on
+// hard: these are casual arena players, never perfect aim locks.
+export const BOT_DIFFICULTIES = Object.freeze({
+  easy: Object.freeze({
+    reactionMin: 0.65, reactionMax: 1.05,
+    aimErrorScale: 1.75, detectionDistance: 30, fovDegrees: 92,
+    scanInterval: 0.55, decisionInterval: 0.65, losInterval: 0.25,
+    searchDuration: 2.0, focusDuration: 7.0, targetSwitchRatio: 0.62,
+    aimTurnSpeed: 3.2, strafeChance: 0.38, jumpChance: 0.025,
+    movementSpeed: 0.86, roamSprintChance: 0.12, combatSprintDistance: 28,
+  }),
+  normal: Object.freeze({
+    reactionMin: 0.32, reactionMax: 0.68,
+    aimErrorScale: 1.2, detectionDistance: 42, fovDegrees: 112,
+    scanInterval: 0.35, decisionInterval: 0.45, losInterval: 0.15,
+    searchDuration: 3.25, focusDuration: 10.0, targetSwitchRatio: 0.78,
+    aimTurnSpeed: 5.0, strafeChance: 0.62, jumpChance: 0.045,
+    movementSpeed: 1.0, roamSprintChance: 0.24, combatSprintDistance: 22,
+  }),
+  hard: Object.freeze({
+    reactionMin: 0.18, reactionMax: 0.42,
+    aimErrorScale: 0.88, detectionDistance: 52, fovDegrees: 132,
+    scanInterval: 0.22, decisionInterval: 0.32, losInterval: 0.10,
+    searchDuration: 4.5, focusDuration: 13.0, targetSwitchRatio: 0.9,
+    aimTurnSpeed: 7.0, strafeChance: 0.78, jumpChance: 0.065,
+    movementSpeed: 1.08, roamSprintChance: 0.38, combatSprintDistance: 17,
+  }),
+});
+
+export function getBotDifficulty(name = 'normal', overrides = null) {
+  const preset = BOT_DIFFICULTIES[name] || BOT_DIFFICULTIES.normal;
+  if (!overrides) return preset;
+  return Object.freeze({ ...preset, ...overrides });
+}
+
+export function isInsideBotFov(botYaw, dx, dz, fovDegrees) {
+  const length = Math.hypot(dx, dz);
+  if (length < 1e-6) return true;
+  const forwardX = -Math.sin(botYaw);
+  const forwardZ = -Math.cos(botYaw);
+  const dot = (dx * forwardX + dz * forwardZ) / length;
+  return dot >= Math.cos((fovDegrees * Math.PI / 180) * 0.5);
+}
+
+export function smoothBotAim(current, desired, turnSpeed, dt) {
+  let delta = desired - current;
+  delta = ((delta + Math.PI) % (Math.PI * 2)) - Math.PI;
+  return current + delta * (1 - Math.exp(-Math.max(0, turnSpeed) * Math.max(0, dt)));
+}
+
 // A public match should read as an arena full of players, not seven copies of
 // the same infinite-ammo rifleman. These are deliberately gentler bot versions
 // of the player weapons: the model, cadence, magazine and reload identity stay

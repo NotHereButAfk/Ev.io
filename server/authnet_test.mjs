@@ -283,9 +283,9 @@ duelBot.state.px = 0; duelBot.state.pz = 0;
 duelHuman.invulnerableUntil = 0;
 duelBot.invulnerableUntil = 0;
 const clearLaneCommand = duelRoom._driveBot(duelBot);
-ok('bots: clear mid-range lanes use a forward soldier gait instead of crab-walking',
-   clearLaneCommand.inp.mz === 1 && clearLaneCommand.inp.mx === 0,
-   `mx=${clearLaneCommand.inp.mx}, mz=${clearLaneCommand.inp.mz}`);
+ok('bots: unprovoked opponents leave the bot in a moving roam state',
+   duelBot._botState === 'roam' && Math.hypot(clearLaneCommand.inp.mx, clearLaneCommand.inp.mz) > 0,
+   `state=${duelBot._botState}, mx=${clearLaneCommand.inp.mx}, mz=${clearLaneCommand.inp.mz}`);
 const coverYaw = botPresentationYaw(0, 5, 0, true);
 ok('bots: cover navigation turns the visible body into resolved travel',
    Math.abs(Math.sin(coverYaw) + 1) < 1e-6,
@@ -298,8 +298,12 @@ const retreatYaw = botPresentationYaw(0, 0, 5, false);
 ok('bots: a genuine retreat remains a readable backpedal',
    Math.abs(retreatYaw) < 1e-6,
    `yaw=${retreatYaw.toFixed(3)}`);
-for (let i = 0; i < 200; i++) duelRoom.update();
-ok('bots: a public-match bot actively engages and can finish a human kill', duelHuman.deaths >= 1,
+for (let i = 0; i < 60; i++) duelRoom.update();
+ok('bots: neutral humans are not attacked on sight', duelHuman.health === 100 && duelHuman.deaths === 0,
+   `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
+duelRoom._damage(duelBot, duelHuman, 1, false);
+for (let i = 0; i < 260; i++) duelRoom.update();
+ok('bots: a provoked public-match bot retaliates and can finish a human kill', duelHuman.deaths >= 1,
    `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
 
 // Moving-target lag compensation must use the snapshot clock, not the input

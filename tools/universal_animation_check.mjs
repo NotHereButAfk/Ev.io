@@ -46,10 +46,17 @@ const fixture = new THREE.AnimationClip('upright-retarget', 1, [
 ]);
 stripRetargetedRootMotion(fixture);
 if (fixture.tracks.some((track) => track.name.includes('[root]'))) {
-  throw new Error('retargeted root rotation can still lay bots on the floor');
+  throw new Error('retargeted root rotation can still lay a character on the floor');
 }
 if (!fixture.tracks.some((track) => track.name.includes('[hips]'))) {
   throw new Error('upright correction removed articulated locomotion');
 }
 
-console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; root-axis correction keeps bots upright while locomotion, crouch, air and weapon actions remain`);
+for (const sourcePath of ['../src/entities/Bot.js', '../src/player/Avatar.js', '../src/core/Game.js']) {
+  const runtimeSource = fs.readFileSync(new URL(sourcePath, import.meta.url), 'utf8');
+  if (/universalAnimator\?\.update\s*\(/.test(runtimeSource)) {
+    throw new Error(`${sourcePath} stacks a retargeted locomotion clip over the ground-speed gait`);
+  }
+}
+
+console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; root-axis correction keeps player rigs upright while bot rigs use their ground-speed soldier gait`);

@@ -305,9 +305,10 @@ export class Avatar {
       speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
       grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
     });
-    this.rig.universalAnimator?.update(dt, {
-      speed, moving, run, crouch: this._crouch, grounded, vy: s.vy || 0,
-    });
+    // applyWalkCycle is the authoritative locomotion solver for this connected
+    // exosuit rig. Stacking the generic retargeted clip here changes hip/rest
+    // height after the weapon carry has been solved, producing the visible
+    // seated/sideways bot gait and a gun floating above the body.
     this._walkT = gait.phase;
     g.position.set(
       s.position.x + Math.cos(g.rotation.y) * gait.sway,

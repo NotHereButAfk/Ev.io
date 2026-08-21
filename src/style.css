@@ -4730,6 +4730,164 @@ a.profile-menu-item { text-decoration: none; }
   .boot-connect-text { font-size: 18px; }
 }
 
+/* Startup loader v2: one centered, real-progress cold-open that exists in the
+   initial HTML and therefore covers the renderer before the JS bundle runs. */
+#connect-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(53, 64, 122, .18), transparent 34%),
+    linear-gradient(145deg, #090b14 0%, #05060b 55%, #030409 100%);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .58s ease, visibility 0s linear .58s;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+#connect-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .2;
+  background-image:
+    linear-gradient(rgba(120, 144, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 144, 255, .035) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
+#connect-screen.fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
+#connect-screen.hidden { display: none; }
+.boot-shell {
+  position: relative;
+  z-index: 1;
+  width: min(420px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.boot-coin {
+  position: relative;
+  width: clamp(70px, 9vw, 92px);
+  aspect-ratio: 1;
+  margin-bottom: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(186, 203, 255, .72);
+  border-radius: 50%;
+  color: #f4f7ff;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.42), transparent 16%),
+    conic-gradient(from 35deg, #7c62e8, #37c7d9, #a4e65d, #6960dd, #7c62e8);
+  box-shadow: 0 0 18px rgba(80, 137, 255, .3), inset 0 0 0 7px rgba(5, 7, 17, .58);
+  transform-style: preserve-3d;
+  animation: boot-token-spin 2.4s linear infinite;
+  will-change: transform;
+}
+.boot-coin::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border: 1px solid rgba(255,255,255,.38);
+  border-radius: inherit;
+}
+.boot-coin-mark {
+  position: relative;
+  z-index: 1;
+  font: 700 clamp(24px, 4vw, 38px)/1 'Michroma', sans-serif;
+  text-shadow: 0 0 10px rgba(255,255,255,.7);
+}
+@keyframes boot-token-spin {
+  0% { transform: perspective(480px) rotateY(0deg) rotateX(8deg); }
+  50% { transform: perspective(480px) rotateY(180deg) rotateX(-8deg); }
+  100% { transform: perspective(480px) rotateY(360deg) rotateX(8deg); }
+}
+.boot-connect-logo {
+  position: static;
+  width: auto;
+  height: auto;
+  transform: none;
+  display: block;
+  color: #f6f8ff;
+  -webkit-text-stroke: 0;
+  filter: none;
+  animation: none;
+  font: 700 clamp(40px, 7vw, 68px)/1 'Michroma', 'Rajdhani', system-ui, sans-serif;
+  letter-spacing: -.075em;
+  text-transform: uppercase;
+  text-shadow: 0 0 28px rgba(95, 129, 255, .18);
+}
+.boot-connect-text {
+  position: static;
+  width: auto;
+  margin-top: 23px;
+  color: rgba(235, 240, 255, .88);
+  font: 700 13px/1.2 'Rajdhani', system-ui, sans-serif;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+.boot-progress {
+  width: 100%;
+  height: 3px;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(210, 220, 255, .11);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.035);
+}
+#boot-progress-fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7665e7, #4ac9e7, #a8e85e);
+  box-shadow: 0 0 13px rgba(80, 202, 232, .68);
+  transition: width .5s cubic-bezier(.22,.8,.28,1);
+}
+.boot-progress-copy {
+  width: 100%;
+  min-height: 18px;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: rgba(190, 200, 225, .6);
+  font: 600 11px/1.4 'Rajdhani', system-ui, sans-serif;
+  letter-spacing: .08em;
+}
+#boot-percent { color: rgba(222, 230, 250, .8); font-variant-numeric: tabular-nums; }
+.boot-retry {
+  margin-top: 22px;
+  min-width: 130px;
+  min-height: 42px;
+  border: 1px solid rgba(96, 205, 230, .65);
+  background: rgba(24, 39, 61, .72);
+  color: #eefbff;
+  font: 700 12px/1 'Rajdhani', sans-serif;
+  letter-spacing: .18em;
+  cursor: pointer;
+}
+.boot-retry:hover, .boot-retry:focus-visible { background: rgba(42, 74, 104, .88); outline: 1px solid #8deaff; }
+#connect-screen.boot-error .boot-coin { animation-play-state: paused; filter: grayscale(.45); }
+#connect-screen.boot-error .boot-connect-text { color: #ff8e8e; }
+@media (max-width: 620px) {
+  #connect-screen { padding: 20px; }
+  .boot-shell { width: min(340px, calc(100vw - 40px)); }
+  .boot-coin { margin-bottom: 23px; }
+  .boot-connect-logo { width: auto; height: auto; font-size: clamp(38px, 13vw, 56px); }
+  .boot-connect-text { margin-top: 20px; font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-coin { animation-duration: 5s; }
+  #boot-progress-fill { transition-duration: .12s; }
+}
+
 /* ============================================================================
    ================   KYX.IO  ev.io-EXACT MAIN GUI  (chrome)   ================
    Techno font, transparent right-aligned nav, vertical login/rankings/feedback/

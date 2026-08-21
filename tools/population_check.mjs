@@ -97,6 +97,12 @@ room.remove(humanId);
 assert.equal(room.players.size, 4, 'a vacated human slot must be backfilled by a bot');
 assert.equal([...room.players.values()].filter((p) => p.isBot).length, 1);
 
+const fullRoom = new AuthRoom(ROOK, { targetPopulation: 8 });
+for (let i = 0; i < 4; i++) fullRoom.add(() => {}, `Full Human ${i + 1}`);
+assert.equal(fullRoom.players.size, 8, 'configured maximum must remain fully occupied');
+assert.equal([...fullRoom.players.values()].filter((p) => p.isBot).length, 4,
+  'empty slots above four real players must still be bot-filled');
+
 const voidArena = {
   id: 'void-proof', name: 'Void Proof', region: 'test', half: 20,
   killY: -2, noBaseFloor: true, platforms: [], boxes: [],
