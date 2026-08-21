@@ -6516,3 +6516,102 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   #hud #weapon-slots { right: 12px !important; bottom: 72px !important; }
   #hud .weapon-slot { width: 58px !important; height: 29px !important; }
 }
+
+/* ========================================================================== */
+/* RESPONSIVE OVERFLOW + LIVE QA FIXES                                        */
+/* Keep every destination reachable on narrow screens without letting the     */
+/* desktop navigation run beyond the viewport. HUD rows get separate vertical */
+/* lanes and text boxes include the real font ascent/descent.                  */
+/* ========================================================================== */
+#nav-mobile-toggle { display: none; }
+
+#center-play .click-to-play {
+  min-height: 38px;
+  line-height: 38px !important;
+}
+
+#hud #weapon-wrap {
+  min-height: 54px;
+}
+#hud #ammo-text {
+  min-height: 41px;
+  line-height: 38px !important;
+}
+
+@media (max-width: 700px) {
+  #top-nav {
+    height: 58px !important;
+    padding: 0 10px !important;
+    overflow: visible !important;
+  }
+  #top-nav .nav-brand {
+    font-size: 28px !important;
+    letter-spacing: -2px !important;
+  }
+  #nav-mobile-toggle {
+    display: block;
+    margin-left: auto;
+    height: 36px;
+    min-width: 68px;
+    padding: 0 10px;
+    border: 1px solid rgba(255,255,255,.34);
+    background: rgba(4,7,10,.78);
+    color: #fff;
+    font: 600 13px/34px 'Rajdhani', sans-serif;
+    letter-spacing: 1px;
+  }
+  #top-nav .nav-items {
+    display: none;
+    position: absolute;
+    top: 58px;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: auto;
+    max-height: calc(100vh - 58px);
+    margin: 0 !important;
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    background: rgba(3,3,4,.97);
+    border-top: 1px solid rgba(255,255,255,.12);
+  }
+  #top-nav.mobile-open .nav-items { display: flex; }
+  #top-nav .nav-dd-wrap { width: 100%; }
+  #top-nav .nav-item,
+  #top-nav .nav-dd-btn {
+    display: block;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px !important;
+    font-size: 15px !important;
+    line-height: 44px;
+    text-align: left;
+  }
+  #top-nav .nav-dd {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 0 6px 14px !important;
+    box-sizing: border-box;
+    box-shadow: none !important;
+    background: rgba(255,255,255,.035) !important;
+  }
+  #top-nav.mobile-open + #nav-side {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #hud #score-wrap {
+    top: 44px !important;
+    right: 12px !important;
+    gap: 9px !important;
+  }
+  #hud #killfeed { top: 76px !important; }
+  #hud #weapon-wrap {
+    min-height: 48px;
+  }
+  #hud #ammo-text {
+    min-height: 34px;
+    line-height: 32px !important;
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { AuthClient, interpolateRemoteSample } from '../src/net/AuthClient.js';
+import { nearestSpawnYaw } from '../src/net/AuthNetBridge.js';
 import { chooseSafeSpawn } from '../server/authroom.mjs';
 
 let passed = 0;
@@ -37,6 +38,14 @@ ok('local correction smoothing is frame-rate independent',
 
 const safe = chooseSafeSpawn([[0, 0, 0], [12, 0, 0], [48, 0, 0]], [[1, 0, 0]], 0);
 ok('spawn selection avoids occupied combat space', safe[0] === 48);
+const authoredSpawns = [
+  { x: 80, y: 3, z: 40, spawnYaw: -1.2 },
+  { x: -12, y: 4, z: 9, spawnYaw: 0.65 },
+];
+ok('authoritative spawn adopts the matching authored camera direction',
+  nearestSpawnYaw(authoredSpawns, -11.8, 4, 9.1, Math.PI) === 0.65);
+ok('spawn-facing lookup does not turn a player who has already moved away',
+  nearestSpawnYaw(authoredSpawns, 200, 4, 200, Math.PI) === Math.PI);
 
 const rotationClient = new AuthClient('ws://invalid');
 rotationClient.mapId = 'rook';

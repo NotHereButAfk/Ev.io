@@ -80,9 +80,13 @@ requireMatch(css, /\.ml-tip[^}]*bottom:\s*25px/s, 'arena loading tip position');
 if (/adsbygoogle|data-ad-(?:client|slot)|boot-connect-ad|ml-ad|ad-slot/.test(index + css)) {
   failures.push('advertising placeholders remain disabled until production markup is supplied');
 }
-if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand|ml-progress/.test(index)) {
-  failures.push('loading screen has no extra branding or progress stripe');
+requireMatch(index, /id=["']nav-mobile-toggle["'][^>]*aria-expanded=["']false["']/,
+  'mobile navigation toggle');
+requireMatch(menu, /classList\.toggle\(['"]mobile-open['"]\)/, 'mobile navigation wiring');
+if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand/.test(index)) {
+  failures.push('loading screen has no duplicate branding or synthetic boot meter');
 }
+requireMatch(index, /id=["']ml-progress-fill["']/, 'readiness-bound arena progress indicator');
 requireMatch(game, /new World\(this\._initialMapId,\s*\{\s*autoLoad:\s*false\s*\}\)/,
   'cold map decode begins after the connection handoff paints');
 requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?classList\.add\(['"]hidden['"]\)[\s\S]*?startInitialLoad\(\)[\s\S]*?_mapLoadingShownAt = performance\.now\(\)[\s\S]*?_finishMapLoading\(1200\)/,

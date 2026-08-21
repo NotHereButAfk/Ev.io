@@ -52,6 +52,19 @@ export function authNetTarget() {
   return authNetTargets()[0] || null;
 }
 
+export function nearestSpawnYaw(spawns, x, y, z, fallback = Math.PI, maxDistanceSq = 64) {
+  let bestYaw = fallback;
+  let bestDistanceSq = maxDistanceSq;
+  for (const spawn of spawns || []) {
+    if (!Number.isFinite(spawn?.spawnYaw)) continue;
+    const distanceSq = (spawn.x - x) ** 2 + (spawn.y - y) ** 2 + (spawn.z - z) ** 2;
+    if (distanceSq >= bestDistanceSq) continue;
+    bestDistanceSq = distanceSq;
+    bestYaw = spawn.spawnYaw;
+  }
+  return bestYaw;
+}
+
 export function authNetTargets() {
   try {
     const q = new URLSearchParams(location.search).get('authnet');
@@ -85,6 +98,10 @@ export class AuthNetBridge {
     this._remoteSeen = new Set();
     this._edges = { jump: false, crouch: false, tele: false };
     this._wasAlive = true;
+    // The local preview chooses a random spawn before the authoritative room
+    // answers. Align the camera to the actual server spawn once its map is
+    // ready instead of inheriting an unrelated yaw and staring into a wall.
+    this._needsSpawnFacing = true;
     this.ready = false;
     this._welcomed = false;
     this._starting = false;
@@ -119,6 +136,7 @@ export class AuthNetBridge {
         });
     };
     this.client.onMapChange = (mapId, match) => {
+      this._needsSpawnFacing = true;
       game._onAuthoritativeMap?.(mapId, match, false);
     };
     this.client.connect();
@@ -177,7 +195,10 @@ export class AuthNetBridge {
 
     const alive = c.self.alive !== false;
     if (this._wasAlive && !alive) this.game._onAuthoritativeDeath?.(c.self);
-    if (!this._wasAlive && alive) this.game._onAuthoritativeRespawn?.(c.self);
+    if (!this._wasAlive && alive) {
+      this._needsSpawnFacing = true;
+      this.game._onAuthoritativeRespawn?.(c.self);
+    }
     this._wasAlive = alive;
     const canControl = alive && controlsEnabled && mapReady;
 
@@ -221,6 +242,11 @@ export class AuthNetBridge {
     c.advancePresentation(dt);
     const lp = mapReady ? c.localPos() : null;
     if (lp) { p.position.set(lp.x, lp.y, lp.z); }
+    if (lp && this._needsSpawnFacing) {
+      p.yaw = nearestSpawnYaw(this.game.world.spawnPoints, lp.x, lp.y, lp.z, p.yaw);
+      p.pitch = 0;
+      this._needsSpawnFacing = false;
+    }
     p.velocity.set(alive ? (c.sim.vx || 0) : 0, alive ? (c.sim.vy || 0) : 0, alive ? (c.sim.vz || 0) : 0);
     p.onGround = !!c.sim.onGround;
     p.isCrouching = !!c.sim.crouch;

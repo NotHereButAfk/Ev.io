@@ -53,6 +53,7 @@ export class MenuUI {
   constructor() {
     // Top-nav elements
     this.topNav      = document.getElementById('top-nav');
+    this.mobileNavToggle = document.getElementById('nav-mobile-toggle');
     this.centerPlay  = document.getElementById('center-play');
 
     // Panels
@@ -117,11 +118,25 @@ export class MenuUI {
   // ── Nav wiring ──────────────────────────────────────────────────────────────
 
   _wireNav() {
+    const closeMobileNav = () => {
+      this.topNav?.classList.remove('mobile-open');
+      this.mobileNavToggle?.setAttribute('aria-expanded', 'false');
+      if (this.mobileNavToggle) this.mobileNavToggle.textContent = 'MENU';
+    };
+    this.mobileNavToggle?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const open = this.topNav.classList.toggle('mobile-open');
+      this.mobileNavToggle.setAttribute('aria-expanded', String(open));
+      this.mobileNavToggle.textContent = open ? 'CLOSE' : 'MENU';
+      if (!open) this._closeAllDropdowns();
+    });
+
     const startGame = (modeId) => {
       const name = this.nameInput.value.trim() || 'Recruit';
       if (modeId) this.selectedModeId = modeId;
       this._closeAllPanels();
       this._closeAllDropdowns();
+      closeMobileNav();
       this.onPlay?.(name, this.selectedSkinId, this.selectedModeId, this.selectedArmorId);
     };
 
@@ -149,6 +164,7 @@ export class MenuUI {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         this._closeAllDropdowns();
+        closeMobileNav();
         startGame(btn.dataset.mode);
       });
     });
@@ -159,6 +175,7 @@ export class MenuUI {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         this._closeAllDropdowns();
+        closeMobileNav();
         if (btn.dataset.gated && !this._isRegistered()) {
           this.onLoginRequest?.();
           return;
@@ -243,6 +260,7 @@ export class MenuUI {
       const path = e.composedPath();
       const has = (sel) => path.some((n) => n.nodeType === 1 && n.matches?.(sel));
       if (!has('.nav-dd-wrap')) this._closeAllDropdowns();
+      if (!has('#top-nav')) closeMobileNav();
       if (this._activePanel && !has('.nav-panel') && !has('[data-panel]')) {
         this._closeAllPanels();
       }

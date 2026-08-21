@@ -17,7 +17,7 @@ const { QUATERNIUS_GUNS } = await import('../src/weapons/WeaponModels.js');
 
 const uniqueModels = [...new Set(Object.values(QUATERNIUS_GUNS))];
 for (const model of uniqueModels) {
-  const url = new URL(`../public/vendor/quaternius/scifi-guns/${model}.gltf`, import.meta.url);
+  const url = new URL(`../public/vendor/quaternius/scifi-weapons/${model}.gltf`, import.meta.url);
   if (!fs.existsSync(url)) throw new Error(`missing mapped gun ${model}.gltf`);
   const json = fs.readFileSync(url, 'utf8');
   const gltf = await new Promise((resolve, reject) => new GLTFLoader().parse(json, '', resolve, reject));

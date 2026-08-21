@@ -80,7 +80,7 @@ export function preloadWeaponModels() {
     ...AUTHORED_ATLASES.map((url) => [url, { kind: 'authored' }]),
     ...Object.entries(WEAPON_GLB_OVERRIDES).map(([id, url]) => [url, { kind: 'override', id }]),
     ...Object.entries(QUATERNIUS_GUNS).map(([id, model]) => [
-      `/vendor/quaternius/scifi-guns/${model}.gltf`, { kind: 'quaternius', id },
+      `/vendor/quaternius/scifi-weapons/${model}.gltf`, { kind: 'quaternius', id },
     ]),
   ];
   let pending = jobs.length;
