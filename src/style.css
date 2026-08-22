@@ -4281,9 +4281,10 @@ html, body {
   color: rgba(226,234,244,.72); font-size: 14px; letter-spacing: 0;
 }
 .ml-name {
-  color: #f8fafc; font-size: clamp(42px, 4.06vw, 58px); font-weight: 400; letter-spacing: 0;
+  color: #f8fafc; font-size: clamp(32px, 3vw, 42px); font-weight: 400; letter-spacing: 0;
   line-height: 1; text-transform: uppercase; margin-bottom: 20px;
-  white-space: nowrap; text-shadow: 0 2px 14px rgba(0,0,0,.6);
+  max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+  text-shadow: 0 2px 14px rgba(0,0,0,.6);
 }
 .ml-region { color: #d7e83e; font-size: 15px; font-weight: 600; margin-bottom: 7px; }
 .ml-mode, .ml-players { color: #edf1f5; font-size: 15px; margin-bottom: 5px; }
@@ -4308,7 +4309,7 @@ html, body {
 @keyframes ml-spin { to { transform: rotate(360deg); } }
 @media (max-width: 620px) {
   .ml-panel { width: min(78vw, 360px); padding: 34vh 22px 0; }
-  .ml-name { font-size: 39px; }
+  .ml-name { font-size: clamp(26px, 8vw, 34px); }
   .ml-spinner { right: 18px; }
 }
 
