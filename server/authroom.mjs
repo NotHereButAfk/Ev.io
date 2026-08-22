@@ -28,6 +28,7 @@ import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js
 import {
   BOT_STATES,
   botAimErrorMeters,
+  chooseReachableRoamPoint,
   getBotDifficulty,
   isInsideBotFov,
   smoothBotAim,
@@ -413,24 +414,14 @@ export class AuthRoom {
   }
 
   _pickBotRoamTarget(p) {
-    // Spawn markers carry authored floor height and are guaranteed-safe map
-    // anchors. Current imported callouts omit Y, which made upper-floor bots
-    // choose ground-floor points through ceilings.
-    const points = this.arena.spawns?.length
-      ? this.arena.spawns
-      : this.arena.callouts?.map((point) => [point.x, point.y ?? p.state.py, point.z]);
-    if (!points?.length) return [p.state.px, p.state.py, p.state.pz];
-    let best = null;
-    for (let i = 0; i < Math.min(10, points.length); i++) {
-      const index = Math.floor(this._rand(p.id * 997 + this.tick * 31 + i * 101) * points.length);
-      const point = points[index];
-      const distance = Math.hypot(point[0] - p.state.px, point[2] - p.state.pz);
-      if (distance < 6) continue;
-      if (!best || Math.abs(point[1] - p.state.py) < Math.abs(best[1] - p.state.py)) best = point;
-      if (Math.abs(point[1] - p.state.py) < 2.5) break;
-    }
-    const chosen = best || points[Math.abs(p.id + this.tick) % points.length];
-    return [chosen[0], chosen[1] ?? p.state.py, chosen[2]];
+    let sample = 0;
+    return chooseReachableRoamPoint({
+      x: p.state.px, y: p.state.py, z: p.state.pz,
+      half: this.arena.half, killY: this.arena.killY,
+      random: () => this._rand(p.id * 997 + this.tick * 31 + sample++ * 101),
+      groundHeightAt: this.arena.groundHeightAt,
+      raycast: this.arena.raycast,
+    }) || [p.state.px, p.state.py, p.state.pz];
   }
 
   _driveBot(p) {
@@ -456,9 +447,11 @@ export class AuthRoom {
         ? Math.hypot(current.state.px - p.state.px, current.state.pz - p.state.pz) : Infinity;
       let best = null;
       let bestDistance = Infinity;
-      for (const [id] of p._botHostility) {
+      for (const candidate of this.players.values()) {
+        const id = candidate.id;
+        const isArenaOpponent = candidate.isBot;
+        if (!isArenaOpponent && !p._botHostility.has(id)) continue;
         if (p._botIgnoredUntil.has(id)) continue;
-        const candidate = this.players.get(id);
         if (!candidate?.alive || candidate === p) continue;
         const dx = candidate.state.px - p.state.px;
         const dz = candidate.state.pz - p.state.pz;
@@ -471,6 +464,8 @@ export class AuthRoom {
       const shouldSwitch = best && (!current || best.id === current.id
         || bestDistance < currentDistance * cfg.targetSwitchRatio);
       if (shouldSwitch && best.id !== p._botTargetId) {
+        if (best.isBot) p._botHostility.set(best.id,
+          this.tick + secondsToTicks(cfg.focusDuration + cfg.searchDuration));
         p._botTargetId = best.id;
         p._botTargetSince = this.tick;
         p._botReactionUntil = this.tick + this._botReactionTicks(p);
@@ -510,7 +505,7 @@ export class AuthRoom {
       if (!p._botRoamTarget || this.tick >= p._botRoamUntil
         || Math.hypot(p._botRoamTarget[0] - p.state.px, p._botRoamTarget[2] - p.state.pz) < 1.5) {
         p._botRoamTarget = this._pickBotRoamTarget(p);
-        p._botRoamUntil = this.tick + secondsToTicks(4 + this._rand(p.id * 59 + this.tick) * 4);
+        p._botRoamUntil = this.tick + secondsToTicks(7 + this._rand(p.id * 59 + this.tick) * 5);
       }
       const dx = p._botRoamTarget[0] - p.state.px;
       const dz = p._botRoamTarget[2] - p.state.pz;
@@ -541,8 +536,10 @@ export class AuthRoom {
       p._botAimYaw = smoothBotAim(p._botAimYaw, yaw, cfg.aimTurnSpeed * 0.75, 1 / TICK_HZ);
       const sprintWindow = this._rand(p.id * 313 + Math.floor(this.tick / 30))
         < cfg.roamSprintChance * cfg.movementSpeed;
-      const jump = p.state.onGround && (blocked || p._botStuckTicks > 0
-        || this._rand(p.id * 733 + this.tick) < cfg.jumpChance / TICK_HZ);
+      // Roaming jumps are rare flourishes. Obstacles and stuck states are
+      // solved by selecting a new verified lane instead of bunny-hopping.
+      const jump = p.state.onGround && !blocked
+        && this._rand(p.id * 733 + this.tick) < (cfg.jumpChance * 0.12) / TICK_HZ;
       return { seq, inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, sprint: sprintWindow, jumpJust: jump }), wid: p.wid, aiming: false };
     }
 

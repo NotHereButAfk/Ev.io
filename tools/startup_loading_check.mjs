@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 
 const url = process.env.KYX_URL || 'http://127.0.0.1:5997/';
 const screenshot = process.env.KYX_STARTUP_SHOT || '';
+const mapScreenshot = process.env.KYX_MAP_LOADING_SHOT || '';
 const mobileScreenshot = process.env.KYX_STARTUP_MOBILE_SHOT || '';
 const browser = await chromium.launch({
   executablePath: process.env.CHROME || undefined,
@@ -43,6 +44,18 @@ try {
   });
   if (screenshot) await page.screenshot({ path: screenshot });
   await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
+    timeout: 60000, polling: 25,
+  });
+  const mapStage = await page.evaluate(() => ({
+    visible: !document.getElementById('map-loading')?.classList.contains('hidden'),
+    phase: document.getElementById('ml-building')?.textContent,
+    progress: document.getElementById('ml-progress-fill')?.style.width,
+  }));
+  if (!mapStage.visible || !/arena|collision|presentation/i.test(mapStage.phase || '')) {
+    throw new Error(`real map-loading stage was skipped: ${JSON.stringify(mapStage)}`);
+  }
+  if (mapScreenshot) await page.screenshot({ path: mapScreenshot });
+  await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null, {
     timeout: 60000, polling: 25,
   });
   const readyAt = Date.now();
@@ -125,7 +138,7 @@ try {
     ].join(' | ')}`);
   }
 
-  console.log(`startup loading passed: real progress reached READY in ${connectDuration}ms -> menu; completed game rotated ${rotation.before} -> ${rotation.after}`);
+  console.log(`startup loading passed: branded boot -> real ${mapStage.phase} -> menu in ${connectDuration}ms; completed game rotated ${rotation.before} -> ${rotation.after}`);
 } catch (error) {
   const state = await page.evaluate(() => ({
     map: document.getElementById('map-loading')?.className,

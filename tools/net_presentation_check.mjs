@@ -35,6 +35,13 @@ smoothClient.advancePresentation(1 / 120);
 smoothClient.advancePresentation(1 / 120);
 ok('local correction smoothing is frame-rate independent',
   Math.abs(smoothClient._visualOffset.x - sixtyHz) < 1e-9);
+smoothClient.sim.vx = 8;
+smoothClient.sim.vy = 0;
+smoothClient.sim.vz = -4;
+const betweenTicks = smoothClient.localPos(0.025);
+ok('local camera fills the render gap between 20Hz prediction ticks',
+  Math.abs(betweenTicks.x - (smoothClient.sim.px + 0.2 + smoothClient._visualOffset.x)) < 1e-9
+  && Math.abs(betweenTicks.z - (smoothClient.sim.pz - 0.1 + smoothClient._visualOffset.z)) < 1e-9);
 
 const safe = chooseSafeSpawn([[0, 0, 0], [12, 0, 0], [48, 0, 0]], [[1, 0, 0]], 0);
 ok('spawn selection avoids occupied combat space', safe[0] === 48);

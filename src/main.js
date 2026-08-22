@@ -59,6 +59,8 @@ if (qaRequested) {
         x: bot.position.x, y: bot.position.y, z: bot.position.z,
         pitch: bot.mesh.rotation.x, yaw: bot.mesh.rotation.y, roll: bot.mesh.rotation.z,
         speed: bot._animSpeed, engaged: bot._provoked,
+        grounded: bot._onGround, verticalSpeed: bot._velY, stuck: bot._stuckT,
+        roamX: bot.wanderTarget?.x, roamZ: bot.wanderTarget?.z,
       })),
     });
     qaState.value = snapshot;

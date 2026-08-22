@@ -80,12 +80,12 @@ export class BotManager {
           const candidates = [player, ...this.bots].filter((candidate) =>
             candidate && candidate !== bot && candidate.position &&
             !candidate.isDead && candidate.alive !== false &&
-            // Neutral combatants are observed but never selected for attack.
-            // Damage callbacks pin the attacker as _targetEntity, allowing
-            // bot-v-bot retaliation without starting an unprovoked arena brawl.
+            // Humans remain passive-until-attacked. Other bots are active
+            // arena opponents, so the match does not become seven patrols that
+            // never meet or fight.
             (candidate === player
               ? bot._provokedByPlayer
-              : (bot._provoked && candidate === bot._targetEntity))
+              : true)
           );
           let best = null;
           let bestScore = Infinity;

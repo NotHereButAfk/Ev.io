@@ -70,6 +70,73 @@ export function smoothBotAim(current, desired, turnSpeed, dt) {
   return current + delta * (1 - Math.exp(-Math.max(0, turnSpeed) * Math.max(0, dt)));
 }
 
+/**
+ * Pick a patrol point that a bot can actually reach in a straight run.
+ *
+ * Imported arenas do not ship a navigation mesh. Choosing a distant spawn and
+ * hoping collision resolution will find a route makes bots run into the same
+ * wall, jump, and repeat. This samples broad local destinations, verifies the
+ * floor along the complete lane, and rejects lanes blocked at chest height.
+ * Successive local legs let a bot cover the arena without expensive per-frame
+ * pathfinding.
+ */
+export function chooseReachableRoamPoint({
+  x, y, z,
+  half = 100,
+  killY = -25,
+  random = Math.random,
+  groundHeightAt,
+  raycast,
+  attempts = 18,
+  minDistance = 8,
+  maxDistance = 27,
+}) {
+  if (typeof groundHeightAt !== 'function') return null;
+  const safeHalf = Math.max(3, half - 2);
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const angle = random() * Math.PI * 2;
+    const distance = minDistance + (maxDistance - minDistance) * Math.sqrt(random());
+    const targetX = Math.max(-safeHalf, Math.min(safeHalf, x + Math.cos(angle) * distance));
+    const targetZ = Math.max(-safeHalf, Math.min(safeHalf, z + Math.sin(angle) * distance));
+    const laneDistance = Math.hypot(targetX - x, targetZ - z);
+    if (laneDistance < minDistance * 0.75) continue;
+
+    const dirX = (targetX - x) / laneDistance;
+    const dirZ = (targetZ - z) / laneDistance;
+    if (typeof raycast === 'function' && raycast(x, y + 0.82, z, dirX, 0, dirZ, laneDistance) < laneDistance - 0.6) {
+      continue;
+    }
+
+    let floorY = y;
+    let walkable = true;
+    const samples = Math.max(4, Math.ceil(laneDistance / 2.5));
+    for (let sample = 1; sample <= samples; sample++) {
+      const t = sample / samples;
+      const sampleX = x + (targetX - x) * t;
+      const sampleZ = z + (targetZ - z) * t;
+      const nextFloor = groundHeightAt(sampleX, sampleZ, floorY, floorY - 1.0);
+      if (!Number.isFinite(nextFloor) || nextFloor <= killY || Math.abs(nextFloor - floorY) > 0.7) {
+        walkable = false;
+        break;
+      }
+      floorY = nextFloor;
+    }
+    if (!walkable) continue;
+
+    // Prefer long lanes, but vary the winner so a squad does not converge on
+    // the same mathematically-farthest corridor.
+    const score = laneDistance * (0.84 + random() * 0.32);
+    if (score > bestScore) {
+      bestScore = score;
+      best = [targetX, floorY, targetZ];
+    }
+  }
+  return best;
+}
+
 // A public match should read as an arena full of players, not seven copies of
 // the same infinite-ammo rifleman. These are deliberately gentler bot versions
 // of the player weapons: the model, cadence, magazine and reload identity stay

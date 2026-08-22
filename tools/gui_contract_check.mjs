@@ -89,8 +89,8 @@ if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand/.test(index)) {
 requireMatch(index, /id=["']ml-progress-fill["']/, 'readiness-bound arena progress indicator');
 requireMatch(game, /new World\(this\._initialMapId,\s*\{\s*autoLoad:\s*false\s*\}\)/,
   'cold map decode begins after the connection handoff paints');
-requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?findAvailableMatch[\s\S]*?startInitialLoad\(\)[\s\S]*?_startPresentationPreloads[\s\S]*?_setStartupProgress\(['"]READY['"],\s*100/,
-  'startup progress follows real matchmaking, map, presentation, and ready stages');
+requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?findAvailableMatch[\s\S]*?_startPresentationPreloads[\s\S]*?_setStartupProgress\(['"]READY['"],\s*100[\s\S]*?_showMapLoading[\s\S]*?startInitialLoad\(\)[\s\S]*?_finishMapLoading/,
+  'startup progress hands off from real matchmaking/assets to real arena loading');
 for (const id of ['boot-progress-fill', 'boot-detail', 'boot-percent', 'boot-retry']) {
   requireMatch(index, new RegExp(`id=["']${id}["']`), `startup loader control: ${id}`);
 }

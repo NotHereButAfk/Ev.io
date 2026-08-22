@@ -381,16 +381,11 @@ export class Game {
       }
 
       this._startupProgress = 40;
-      this._setStartupProgress('LOADING GAME...', 40, 'Loading map geometry...');
-      const map = await this.world.startInitialLoad();
-      this._startupProgress = 62;
-      this._setStartupProgress('LOADING GAME...', 62, 'Loading player models...');
-      this.previewCharacter.position.copy(this.world.previewPedestalPos);
-      this._configureMapCamera(map);
+      this._setStartupProgress('LOADING GAME...', 40, 'Loading gameplay systems...');
       let assetSteps = 0;
       await this._startPresentationPreloads((label) => {
         assetSteps++;
-        const progress = Math.min(88, 62 + assetSteps * 5);
+        const progress = Math.min(88, 40 + assetSteps * 8);
         this._startupProgress = progress;
         const labels = {
           weapons: 'Loading weapons...', animations: 'Loading animations...',
@@ -403,15 +398,31 @@ export class Game {
       this._initAuth();
       await delay(180);
       this._startupProgress = 100;
-      this._setStartupProgress('READY', 100, 'All systems ready');
-      await delay(420);
+      this._setStartupProgress('READY', 100, 'Game systems ready');
+
+      // Startup and arena loading are two real stages. The branded shell owns
+      // scripts/session/models; the map card then owns the actual geometry
+      // decode. Keeping the card visible before starting the decode prevents a
+      // black canvas or an already-finished menu from flashing underneath.
+      this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
+      this._setMapLoadingPhase('Waiting for arena stream...', 8);
+      await delay(280);
       connectScreen?.classList.add('fade-out');
       await delay(600);
       connectScreen?.classList.add('hidden');
+
+      this._setMapLoadingPhase('Loading arena geometry...', 24);
+      const map = await this.world.startInitialLoad();
+      this._setMapLoadingPhase('Building collision and spawn data...', 76);
+      this.previewCharacter.position.copy(this.world.previewPedestalPos);
+      this._configureMapCamera(map);
+      this._setMapLoadingPhase('Preparing arena presentation...', 92);
+      await this._finishMapLoading(1400);
     } catch (error) {
       console.error('[startup] load failed', error);
       // A rejected map promise must be cleared so RETRY performs a new fetch.
       if (!this.world.currentMap) this.world.ready = null;
+      this._hideMapLoading();
       this._showStartupError(error);
     } finally {
       this._startupInFlight = false;

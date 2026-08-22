@@ -240,7 +240,7 @@ export class AuthNetBridge {
 
     // ── drive the local player from the predicted sim ──
     c.advancePresentation(dt);
-    const lp = mapReady ? c.localPos() : null;
+    const lp = mapReady ? c.localPos(this._acc) : null;
     if (lp) { p.position.set(lp.x, lp.y, lp.z); }
     if (lp && this._needsSpawnFacing) {
       p.yaw = nearestSpawnYaw(this.game.world.spawnPoints, lp.x, lp.y, lp.z, p.yaw);
@@ -252,7 +252,8 @@ export class AuthNetBridge {
     p.isCrouching = !!c.sim.crouch;
     p.isSliding = !!c.sim.slide;
     p.isSprinting = alive && !!c.sprinting;
-    p._eyeHeight = c.sim.eye;
+    p._eyeHeight += ((c.sim.eye ?? p._eyeHeight) - p._eyeHeight)
+      * (1 - Math.exp(-22 * Math.max(0, dt)));
     p.health = c.self.health;
     // Movement prediction and the HUD now consume the same authoritative
     // stamina/inventory snapshot, so sprint drain and grenade counts agree.

@@ -10,6 +10,7 @@ import {
   botLoadoutForId,
   combatTargetScore,
   chooseCombatSteering,
+  chooseReachableRoamPoint,
   getBotDifficulty,
   isInsideBotFov,
   smoothBotAim,
@@ -27,6 +28,23 @@ assert.equal(isInsideBotFov(0, 0, 10, 90), false);
 assert.ok(Math.abs(smoothBotAim(0, Math.PI, 4, 0.05)) < Math.PI,
   'aim smoothing must turn toward a target without snapping');
 console.log('ok   difficulty presets change reaction, accuracy, movement decisions, detection and aim speed');
+
+let roamSeed = 17;
+const reachableRoam = chooseReachableRoamPoint({
+  x: 0, y: 0, z: 0, half: 60, killY: -20,
+  random: () => ((roamSeed = (roamSeed * 16807) % 2147483647) - 1) / 2147483646,
+  groundHeightAt: () => 0,
+  raycast: (_ox, _oy, _oz, _dx, _dy, _dz, far) => far,
+});
+assert.ok(reachableRoam && Math.hypot(reachableRoam[0], reachableRoam[2]) >= 8,
+  'roam planner did not choose a meaningful running lane');
+const blockedRoam = chooseReachableRoamPoint({
+  x: 0, y: 0, z: 0, half: 60, killY: -20,
+  groundHeightAt: () => 0,
+  raycast: () => 0.5,
+});
+assert.equal(blockedRoam, null, 'roam planner selected a lane through a wall');
+console.log('ok   roaming selects long walkable lanes and rejects wall-blocked targets');
 
 const cases = [
   {
@@ -145,7 +163,7 @@ player.health = 100;
 const pressureManager = new BotManager(null, null);
 pressureManager.bots = [pressureBot, pressureRival];
 pressureManager.update(0.1, player, null, (damage) => { player.health -= damage; }, null);
-assert.equal(pressureBot.observedTarget, player, 'neutral bot should receive the harmless fallback observation target');
+assert.equal(pressureBot.observedTarget, pressureRival, 'arena bots should actively acquire one another');
 assert.equal(pressureRival.health, 100, 'unprovoked bot damaged another neutral bot');
 assert.equal(player.health, 100, 'unprovoked bot damaged the neutral human');
 pressureBot._provokedByPlayer = true;
@@ -162,6 +180,8 @@ const aiArena = {
   noBaseFloor: false, platforms: [], boxes: [], gravLifts: [], teleporters: [],
   spawns: [[0, 0, 0], [0, 0, -12], [8, 0, -10]],
   callouts: [{ x: -20, y: 0, z: -20 }, { x: 20, y: 0, z: 20 }],
+  groundHeightAt: () => 0,
+  raycast: (_ox, _oy, _oz, _dx, _dy, _dz, far) => far,
 };
 const aiRoom = new AuthRoom(aiArena, { botDifficulty: 'easy' });
 const humanId = aiRoom.add(() => {}, 'Human');
@@ -189,13 +209,27 @@ assert.equal(bot._botTargetId, null);
 assert.equal(bot._botHostility.size, 0, 'respawn reset retained hostility');
 console.log('ok   authoritative states enforce passive roam, reaction delay, attacker switching, and respawn reset');
 
+const roamRoom = new AuthRoom(aiArena, { targetPopulation: 1, botDifficulty: 'normal' });
+const roamingBot = [...roamRoom.players.values()][0];
+const roamStart = [roamingBot.state.px, roamingBot.state.pz];
+let roamingAirTicks = 0;
+for (let i = 0; i < TICK_HZ * 8; i++) {
+  roamRoom.update();
+  if (!roamingBot.state.onGround) roamingAirTicks++;
+}
+assert.ok(Math.hypot(roamingBot.state.px - roamStart[0], roamingBot.state.pz - roamStart[1]) > 12,
+  'single roaming bot remained trapped in its spawn area');
+assert.ok(roamingAirTicks < TICK_HZ * 2, 'roaming bot bunny-hopped instead of running');
+console.log('ok   an idle authoritative bot runs beyond its spawn area without repeated jumping');
+
 const loadRoom = new AuthRoom(aiArena, { targetPopulation: 8, botDifficulty: 'normal' });
 const loadStarted = performance.now();
 for (let i = 0; i < 1200; i++) loadRoom.update();
 const averageTickMs = (performance.now() - loadStarted) / 1200;
 assert.ok(averageTickMs < 5,
   `eight-bot decisions exceeded the server budget (${averageTickMs.toFixed(2)}ms/tick)`);
-assert.ok([...loadRoom.players.values()].every((entry) => entry.isBot && entry._botNextScanTick > loadRoom.tick - 20),
+assert.ok([...loadRoom.players.values()].every((entry) => entry.isBot
+  && (!entry.alive || entry._botNextScanTick > loadRoom.tick - 20)),
   'bot scans are not timer-throttled');
 console.log(`ok   eight bots throttle scans/LOS/decisions (${averageTickMs.toFixed(3)}ms per 20Hz tick)`);
 

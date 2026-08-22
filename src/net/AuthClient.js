@@ -346,11 +346,15 @@ export class AuthClient {
     this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
   }
 
-  localPos() {
+  localPos(presentationAhead = 0) {
+    const ahead = Math.max(0, Math.min(DT, presentationAhead));
     return this.sim ? {
-      x: this.sim.px + this._visualOffset.x,
-      y: this.sim.py + this._visualOffset.y,
-      z: this.sim.pz + this._visualOffset.z,
+      // Prediction is authoritative at 20 Hz. Fill the render-time gap with a
+      // bounded velocity projection so the camera moves every frame instead
+      // of holding for 50 ms and stepping forward in visible chunks.
+      x: this.sim.px + (this.sim.vx || 0) * ahead + this._visualOffset.x,
+      y: this.sim.py + (this.sim.vy || 0) * ahead + this._visualOffset.y,
+      z: this.sim.pz + (this.sim.vz || 0) * ahead + this._visualOffset.z,
     } : null;
   }
 

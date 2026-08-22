@@ -6,7 +6,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botLoadoutForId, chooseCombatSteering } from './BotCombat.js';
+import { BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
@@ -657,27 +657,25 @@ export class Bot {
     } else {
       this.wanderCooldown -= dt;
       if (this.wanderCooldown <= 0 || this.position.distanceTo(this.wanderTarget) < 1.5) {
-        // Authored spawns are known-clear locations and make much safer patrol
-        // anchors than arbitrary world coordinates inside Rook's solid geometry.
-        const points = this.world.spawnPoints || [];
-        let picked = null;
-        for (let i = 0; i < Math.min(8, points.length); i++) {
-          const p = points[Math.floor(Math.random() * points.length)];
-          if (!picked || Math.abs(p.y - this.position.y) < Math.abs(picked.y - this.position.y)) picked = p;
-          if (Math.abs(p.y - this.position.y) < 2.5) break;
-        }
-        if (picked) {
-          this.wanderTarget.set(picked.x, this.position.y, picked.z);
-        } else {
-          const roam = 18;
-          const half = Math.max(4, this.world.arenaHalf - 2);
-          this.wanderTarget.set(
-            THREE.MathUtils.clamp(this.position.x + (Math.random() * 2 - 1) * roam, -half, half),
-            this.position.y,
-            THREE.MathUtils.clamp(this.position.z + (Math.random() * 2 - 1) * roam, -half, half)
-          );
-        }
-        this.wanderCooldown = 2.4 + Math.random() * 2.8;
+        const picked = chooseReachableRoamPoint({
+          x: this.position.x, y: this.position.y, z: this.position.z,
+          half: this.world.arenaHalf, killY: this.world.killY,
+          groundHeightAt: (x, z, prevY, newY) => this.world.groundHeightAt(x, z, prevY, newY),
+          raycast: (ox, oy, oz, dx, dy, dz, far) => {
+            this._raycaster.near = 0.12;
+            this._raycaster.far = far;
+            this._shootFrom.set(ox, oy, oz);
+            this._shootDir.set(dx, dy, dz);
+            this._raycaster.set(this._shootFrom, this._shootDir);
+            const meshHit = this._raycaster.intersectObjects(this.world.raycastMeshes, true)[0];
+            this._bulletRay.set(this._shootFrom, this._shootDir);
+            const boxHit = this.world.raycastBoxHit(this._bulletRay, far);
+            return Math.min(meshHit?.distance ?? far, boxHit?.distance ?? far);
+          },
+        });
+        if (picked) this.wanderTarget.set(picked[0], picked[1], picked[2]);
+        else this.wanderTarget.copy(this.position);
+        this.wanderCooldown = picked ? 7 + Math.random() * 4 : 0.65;
       }
       this._wanderDir.subVectors(this.wanderTarget, this.position);
       this._wanderDir.y = 0;
@@ -742,7 +740,8 @@ export class Bot {
       if (this._stuckT > 0.38 && this._onGround) {
         this._stuckT = 0;
         this._strafeSign *= -1;
-        this._wantsJump = true;
+        // A blocked patrol lane needs a new reachable detour, not a repeated
+        // jump against the same wall.
         this.wanderCooldown = 0;
       }
     } else {
