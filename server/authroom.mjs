@@ -25,6 +25,7 @@
 // heartbeat/backpressure); this file enforces GAMEPLAY authority.
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
+import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import {
   BOT_STATES,
   botAimErrorMeters,
@@ -534,8 +535,10 @@ export class AuthRoom {
         }
       }
       p._botAimYaw = smoothBotAim(p._botAimYaw, yaw, cfg.aimTurnSpeed * 0.75, 1 / TICK_HZ);
-      const sprintWindow = this._rand(p.id * 313 + Math.floor(this.tick / 30))
-        < cfg.roamSprintChance * cfg.movementSpeed;
+      // Bots use sprint whenever a verified patrol lane points forward. Their
+      // difficulty still controls decisions and aim, not whether they cross
+      // the map at an active running pace.
+      const sprintWindow = moveZ > 0;
       // Roaming jumps are rare flourishes. Obstacles and stuck states are
       // solved by selecting a new verified lane instead of bunny-hopping.
       const jump = p.state.onGround && !blocked
@@ -956,9 +959,14 @@ export class AuthRoom {
         cmd = { seq: p.lastInputSeq, inp: makeInput({ yaw: p._lastYaw ?? 0 }) };
       }
       // reject inputs that claim to be too far in the future (schema guard)
+      // Bot stamina is not a tactical limiter. Refresh it around the shared
+      // movement step so bots can run for an entire match, while human players
+      // continue using the normal authoritative stamina contract.
+      if (p.isBot) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
       const previousState = p.state;
       const sprinting = isSprinting(previousState, cmd.inp);
       p.state = step(previousState, cmd.inp, this.simWorld);
+      if (p.isBot) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
       if (this.arena.resolveState) p.state = this.arena.resolveState(previousState, p.state);
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;

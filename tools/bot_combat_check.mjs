@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import {
   BOT_TACTICS,
   BOT_DIFFICULTIES,
@@ -213,14 +214,18 @@ const roamRoom = new AuthRoom(aiArena, { targetPopulation: 1, botDifficulty: 'no
 const roamingBot = [...roamRoom.players.values()][0];
 const roamStart = [roamingBot.state.px, roamingBot.state.pz];
 let roamingAirTicks = 0;
+let roamingSprintTicks = 0;
 for (let i = 0; i < TICK_HZ * 8; i++) {
   roamRoom.update();
   if (!roamingBot.state.onGround) roamingAirTicks++;
+  if (roamingBot._lastSprint) roamingSprintTicks++;
 }
 assert.ok(Math.hypot(roamingBot.state.px - roamStart[0], roamingBot.state.pz - roamStart[1]) > 12,
   'single roaming bot remained trapped in its spawn area');
 assert.ok(roamingAirTicks < TICK_HZ * 2, 'roaming bot bunny-hopped instead of running');
-console.log('ok   an idle authoritative bot runs beyond its spawn area without repeated jumping');
+assert.equal(roamingBot.state.stamina, STAMINA_MAX, 'roaming bot consumed stamina');
+assert.ok(roamingSprintTicks > TICK_HZ * 4, 'roaming bot did not sustain its run around the map');
+console.log('ok   an idle authoritative bot runs indefinitely beyond its spawn area without repeated jumping');
 
 const loadRoom = new AuthRoom(aiArena, { targetPopulation: 8, botDifficulty: 'normal' });
 const loadStarted = performance.now();

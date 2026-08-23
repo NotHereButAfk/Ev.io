@@ -92,25 +92,25 @@
     ]
   },
   "slide": {
-    "final": "e805a1fd",
+    "final": "fc779535",
     "hashes": [
-      "e045f888",
-      "f95c5de0",
-      "708cd173",
-      "2fef9a3d",
-      "e805a1fd"
+      "34449337",
+      "1aa88f2c",
+      "eeb90ef7",
+      "058dc169",
+      "fc779535"
     ]
   },
   "mobility": {
-    "final": "da446fa1",
+    "final": "b67bb508",
     "hashes": [
-      "93bbf6f1",
-      "fedb1f00",
-      "930fa7b6",
-      "052f3502",
-      "4940e152",
-      "f3022007",
-      "da446fa1"
+      "e15d5ed4",
+      "585dbee5",
+      "695c4a93",
+      "2ee74d86",
+      "b8f95176",
+      "aa576a61",
+      "b67bb508"
     ]
   },
   "teleport": {

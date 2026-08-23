@@ -25,6 +25,8 @@
 //     teleporters: [{x,z,r, dest:{x,z}}] }
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { STAMINA_DRAIN, STAMINA_MAX, STAMINA_REGEN, STAMINA_REGEN_DELAY } from './MovementConfig.js';
+
 export const TICK_RATE = 20;
 export const DT = 1 / TICK_RATE;
 
@@ -42,7 +44,6 @@ const SLIDE_BOOST = WALK_SPEED * SPRINT_MULT * 1.65;
 const COYOTE_TIME = 0.14;
 const STEP_UP = 0.55, GRACE = 0.06;      // platform support (matches World)
 const SNAP_DOWN = 0.12;                  // grounded hysteresis (defect fix)
-const STAMINA_MAX = 100, STAMINA_DRAIN = 28, STAMINA_REGEN = 14, STAMINA_DELAY = 1.2;
 const TELEPORT_RANGE = 22, TELEPORT_COOLDOWN = 5.0;
 const SAFE_TICKS = 3;                    // grounded ticks before a spot is "safe"
 
@@ -214,7 +215,7 @@ export function step(s, input, world) {
   // stamina
   if (sprinting) {
     n.stamina = q(Math.max(0, s.stamina - STAMINA_DRAIN * DT));
-    n.stamDelay = STAMINA_DELAY;
+    n.stamDelay = STAMINA_REGEN_DELAY;
   } else if (s.stamDelay > 0) {
     n.stamDelay = q(Math.max(0, s.stamDelay - DT));
   } else {

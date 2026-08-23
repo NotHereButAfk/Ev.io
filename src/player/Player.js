@@ -5,6 +5,12 @@ import {
   findThirdPersonObstruction,
 } from './ThirdPersonCamera.js';
 import { sprintRequested } from '../core/GameplayInput.js';
+import {
+  STAMINA_DRAIN,
+  STAMINA_MAX,
+  STAMINA_REGEN,
+  STAMINA_REGEN_DELAY,
+} from '../sim/MovementConfig.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
@@ -16,11 +22,6 @@ const MOUSE_SENSITIVITY = 0.0024;
 
 const TELEPORT_RANGE    = 22;
 const TELEPORT_COOLDOWN = 5.0;
-
-const MAX_STAMINA = 100;
-const STAMINA_DRAIN = 28;
-const STAMINA_REGEN = 14;
-const STAMINA_REGEN_DELAY = 1.2;
 
 const SHIELD_REGEN      = 6;    // per second
 const SHIELD_REGEN_DELAY = 3.0; // seconds before regen kicks in
@@ -50,8 +51,8 @@ export class Player {
 
     this.maxHealth = 100;
     this.health = this.maxHealth;
-    this.maxStamina = MAX_STAMINA;
-    this.stamina = MAX_STAMINA;
+    this.maxStamina = STAMINA_MAX;
+    this.stamina = STAMINA_MAX;
     this._staminaRegenDelay = 0;
     this.maxShield = 0;
     this.shield = 0;
