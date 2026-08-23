@@ -367,13 +367,13 @@ player.baseFov = 78;
 camera.fov = 78;
 tick(90);
 const referenceRifleBounds = projectedBounds(system.models.get('m4').group);
-assert(system.weaponMount.position.x >= 0.25 && system.weaponMount.position.x <= 0.35,
+assert(system.weaponMount.position.x >= 0.36 && system.weaponMount.position.x <= 0.44,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.35 && system.weaponMount.position.y <= -0.29,
+assert(system.weaponMount.position.y >= -0.43 && system.weaponMount.position.y <= -0.35,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
-assert(system.weaponMount.rotation.x >= 0.27 && system.weaponMount.rotation.x <= 0.33,
+assert(system.weaponMount.rotation.x >= 0.19 && system.weaponMount.rotation.x <= 0.25,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
-assert(system.weaponMount.rotation.y >= 0.18 && system.weaponMount.rotation.y <= 0.26,
+assert(system.weaponMount.rotation.y >= 0.28 && system.weaponMount.rotation.y <= 0.36,
   `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
 assert(referenceRifleBounds.maxX > 0.75,
   `EV.IO rifle butt does not own the lower-right quadrant (${JSON.stringify(referenceRifleBounds)})`);

@@ -60,13 +60,13 @@ const VIEWMODEL_Z = -0.80;
 // the bottom of the screen: its butt exits the lower-right corner while the
 // muzzle rises back toward the reticle.  The offset and three-axis cant are one
 // shared transform so the weapon and both gripping hands cannot drift apart.
-const VIEWMODEL_X = 0.30;
-const VIEWMODEL_Y = -0.32;
+const VIEWMODEL_X = 0.40;
+const VIEWMODEL_Y = -0.39;
 // Weapon-only first person: keep the gun large and readable like the reference
 // while world/player weapons retain their physical third-person scale.
-const VIEWMODEL_SCALE = 0.80;
-const VIEWMODEL_PITCH = 0.30;
-const VIEWMODEL_YAW = 0.22;
+const VIEWMODEL_SCALE = 0.96;
+const VIEWMODEL_PITCH = 0.22;
+const VIEWMODEL_YAW = 0.32;
 const VIEWMODEL_ROLL = -0.055;
 const REFERENCE_ASPECT = 16 / 9;
 
