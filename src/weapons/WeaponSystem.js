@@ -55,19 +55,19 @@ function createTracerMesh() {
 // the worst case), and recoil moves the whole gun back toward the eye. Keeping
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
-const VIEWMODEL_Z = -0.82;
+const VIEWMODEL_Z = -0.80;
 // EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
 // the bottom of the screen: its butt exits the lower-right corner while the
 // muzzle rises back toward the reticle.  The offset and three-axis cant are one
 // shared transform so the weapon and both gripping hands cannot drift apart.
-const VIEWMODEL_X = 0.40;
-const VIEWMODEL_Y = -0.37;
+const VIEWMODEL_X = 0.30;
+const VIEWMODEL_Y = -0.32;
 // Weapon-only first person: keep the gun large and readable like the reference
 // while world/player weapons retain their physical third-person scale.
-const VIEWMODEL_SCALE = 0.86;
-const VIEWMODEL_PITCH = 0.18;
-const VIEWMODEL_YAW = 0.31;
-const VIEWMODEL_ROLL = -0.10;
+const VIEWMODEL_SCALE = 0.80;
+const VIEWMODEL_PITCH = 0.30;
+const VIEWMODEL_YAW = 0.22;
+const VIEWMODEL_ROLL = -0.055;
 const REFERENCE_ASPECT = 16 / 9;
 
 // First-person hand targets in each weapon model's local coordinate system.
@@ -1521,7 +1521,7 @@ export class WeaponSystem {
     this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT, wantScope);
     // Aiming keeps a trace of organic motion, but removes enough viewmodel
     // travel that the physical sight and fixed scope overlay do not disagree.
-    const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.08 : 0.24, this.scopeT);
+    const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.05 : 0.10, this.scopeT);
     const sprintFovBoost = this._sprintT * 6;
     const aimedFov = def.scoped ? 28 : (def.adsFov ?? Math.max(54, player.baseFov - 14));
     const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, aimedFov, this.scopeT);
@@ -1634,12 +1634,12 @@ export class WeaponSystem {
     // (normalised by dt so it's framerate-independent, no jitter), then ease
     // the sway offset toward it — two stages of damping = buttery lag.
     const invDt = dt > 1e-4 ? 1 / dt : 0;
-    const mvX = THREE.MathUtils.clamp(-input.mouseDX * invDt * 0.00003, -0.06, 0.06);
-    const mvY = THREE.MathUtils.clamp(-input.mouseDY * invDt * 0.00003, -0.05, 0.05);
-    this._swayVelX = expDamp(this._swayVelX, mvX, 16, dt);
-    this._swayVelY = expDamp(this._swayVelY, mvY, 16, dt);
-    this._swayX = expDamp(this._swayX, this._swayVelX, 9, dt);
-    this._swayY = expDamp(this._swayY, this._swayVelY, 9, dt);
+    const mvX = THREE.MathUtils.clamp(-input.mouseDX * invDt * 0.000022, -0.045, 0.045);
+    const mvY = THREE.MathUtils.clamp(-input.mouseDY * invDt * 0.000022, -0.04, 0.04);
+    this._swayVelX = expDamp(this._swayVelX, mvX, 18, dt);
+    this._swayVelY = expDamp(this._swayVelY, mvY, 18, dt);
+    this._swayX = expDamp(this._swayX, this._swayVelX, 11, dt);
+    this._swayY = expDamp(this._swayY, this._swayVelY, 11, dt);
     this.swayGroup.rotation.y = this._swayX * adsMotionScale;
     this.swayGroup.rotation.x = this._swayY * adsMotionScale;
 
@@ -1649,7 +1649,7 @@ export class WeaponSystem {
     const bobHz = player.onGround ? (2.0 + moveSpeed * 0.9) : 0;
     this._bobPhase += bobHz * dt;
     const bobAmtTarget = (player.onGround && moveSpeed > 0.5)
-      ? (player.isSprinting ? 0.026 : 0.016) * adsMotionScale : 0.0;
+      ? (player.isSprinting ? 0.022 : 0.014) * adsMotionScale : 0.0;
     this._bobAmt = expDamp(this._bobAmt ?? 0, bobAmtTarget, 8, dt);   // fade bob in/out
     const bobV = Math.sin(this._bobPhase * 2) * this._bobAmt;
     const bobH = Math.sin(this._bobPhase) * this._bobAmt * 0.55;
@@ -1696,21 +1696,21 @@ export class WeaponSystem {
     const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV
       - 0.07 * framedBell - 0.015 * framedRack - landPulse * 0.055;
     const tgtZ = THREE.MathUtils.lerp(hipZ, adsZ, adsEase);
-    this._mountPos.x = expDamp(this._mountPos.x, tgtX, 18, dt);
-    this._mountPos.y = expDamp(this._mountPos.y, tgtY, 18, dt);
-    this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 18, dt);
+    this._mountPos.x = expDamp(this._mountPos.x, tgtX, 20, dt);
+    this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
+    this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
       THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, 0, adsEase)
         + 0.50 * framedBell
-        + 0.14 * framedRack + landPulse * 0.12, 14, dt);
+        + 0.14 * framedRack + landPulse * 0.12, 17, dt);
     this._mountRot.y = expDamp(this._mountRot.y,
-      THREE.MathUtils.lerp(VIEWMODEL_YAW, 0, adsEase), 14, dt);
+      THREE.MathUtils.lerp(VIEWMODEL_YAW, 0, adsEase), 17, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
       THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, 0, adsEase)
-        + 0.42 * framedBell, 14, dt);
+        + 0.42 * framedBell, 17, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, this._mountPos.z);

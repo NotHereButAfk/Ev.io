@@ -152,6 +152,9 @@ function activate(def) {
     system.switchTo(1);
   } else {
     system.setLoadout(def.id, 'sword');
+    // Power weapons are intentionally excluded from menu loadouts; exercise
+    // them through the same pickup path used by a live match.
+    if (system.currentDef.id !== def.id) system.addMapGun(def.id);
   }
   settle();
 }
@@ -364,6 +367,14 @@ player.baseFov = 78;
 camera.fov = 78;
 tick(90);
 const referenceRifleBounds = projectedBounds(system.models.get('m4').group);
+assert(system.weaponMount.position.x >= 0.25 && system.weaponMount.position.x <= 0.35,
+  `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
+assert(system.weaponMount.position.y >= -0.35 && system.weaponMount.position.y <= -0.29,
+  `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
+assert(system.weaponMount.rotation.x >= 0.27 && system.weaponMount.rotation.x <= 0.33,
+  `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
+assert(system.weaponMount.rotation.y >= 0.18 && system.weaponMount.rotation.y <= 0.26,
+  `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
 assert(referenceRifleBounds.maxX > 0.75,
   `EV.IO rifle butt does not own the lower-right quadrant (${JSON.stringify(referenceRifleBounds)})`);
 assert(referenceRifleBounds.minY < -1,
