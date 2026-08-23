@@ -15,7 +15,9 @@ const context2d = new Proxy({}, { get(target, key) {
 globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => context2d }) };
 const { QUATERNIUS_FORWARD_YAW, QUATERNIUS_GUNS } = await import('../src/weapons/WeaponModels.js');
 
-if (Math.abs(QUATERNIUS_FORWARD_YAW + Math.PI / 2) > 1e-9) {
+const packForward = new THREE.Vector3(1, 0, 0)
+  .applyAxisAngle(new THREE.Vector3(0, 1, 0), QUATERNIUS_FORWARD_YAW);
+if (packForward.z > -0.999 || Math.abs(packForward.x) > 1e-9) {
   throw new Error(`pack forward axis regressed: yaw=${QUATERNIUS_FORWARD_YAW}`);
 }
 

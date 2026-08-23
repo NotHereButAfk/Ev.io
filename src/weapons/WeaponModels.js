@@ -23,10 +23,10 @@ export const QUATERNIUS_GUNS = Object.freeze({
   dmr: 'Sniper_2', fuelrod: 'Grenade_1', concussion: 'Grenade_2',
   energyshotgun: 'Crossbow_2',
 });
-// The supplied pack's barrels point down local -X. Rotate that axis into the
-// game's camera/world forward direction (-Z). The previous +90 degree turn
-// put the stock toward the reticle and made every held pack gun read backward.
-export const QUATERNIUS_FORWARD_YAW = -Math.PI / 2;
+// The supplied pack's barrels point down local +X. Rotate that axis into the
+// game's camera/world forward direction (-Z). Fallback muzzle markers are added
+// after this transform so they cannot accidentally trigger a second 180° flip.
+export const QUATERNIUS_FORWARD_YAW = Math.PI / 2;
 const QUATERNIUS_LENGTH = Object.freeze({
   sidearm: 0.30, uzi: 0.44, levershotgun: 0.82, m4: 0.89, m16: 1.07,
   rifle: 0.87, lmg: 0.98, rpg: 1.00, boltsniper: 0.92, magnum: 0.34,
@@ -159,7 +159,7 @@ function _buildFromGLB(weaponDef) {
   const cloned = weaponRoot.clone(true);
   cloned.position.set(0, 0, 0);
 
-  // The supplied pack is authored with muzzle-forward -X and real metre-scale
+  // The supplied pack is authored with muzzle-forward +X and real metre-scale
   // proportions. Rotate it into the game's -Z convention, then scale each gun
   // to the established gameplay silhouette so sniper/launcher assets do not
   // become body-sized in first person or in a soldier's hands.
@@ -242,18 +242,23 @@ function _buildFromGLB(weaponDef) {
   let muzzle = null;
   cloned.traverse(obj => { if (!muzzle && /^muzzle_point/.test(obj.name)) muzzle = obj; });
 
-  if (!muzzle) {
+  if (!muzzle && !supplied) {
     muzzle = new THREE.Object3D();
-    muzzle.position.set(0, 0.062, supplied
-      ? -(QUATERNIUS_LENGTH[weaponDef.id] || 0.8) * 0.52
-      : -0.32);
+    muzzle.position.set(0, 0.062, -0.32);
     cloned.add(muzzle);
   }
 
-  orientWeaponModelForward(cloned, muzzle);
+  // Authored markers can safely determine an atlas model's orientation. The
+  // supplied pack has no marker, so its explicit +X→-Z transform is final.
+  if (muzzle) orientWeaponModelForward(cloned, muzzle);
 
   const group = new THREE.Group();
   group.add(cloned);
+  if (!muzzle) {
+    muzzle = new THREE.Object3D();
+    muzzle.position.set(0, 0.062, -(QUATERNIUS_LENGTH[weaponDef.id] || 0.8) * 0.52);
+    group.add(muzzle);
+  }
   group.userData.weaponId = weaponDef.id;
   group.userData.weaponKind = weaponDef.kind;
   group.userData.modelSource = supplied ? 'quaternius' : 'authored';
