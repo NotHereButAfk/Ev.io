@@ -9,6 +9,7 @@ import {
   scheduleNextShot,
   wantsTriggerShot,
 } from './FireControl.js';
+import { disposeExplosion, spawnExplosion, updateExplosion } from '../effects/ExplosionEffect.js';
 
 const FLASH_LIFE = 0.038;
 
@@ -784,8 +785,7 @@ export class WeaponSystem {
     }
     this.rockets.length = 0;
     for (const e of this.explosions) {
-      this.scene.remove(e.mesh);
-      this.scene.remove(e.light);
+      disposeExplosion(this.scene, e);
     }
     this.explosions.length = 0;
     for (const s of this.shells) {
@@ -1333,18 +1333,11 @@ export class WeaponSystem {
   }
 
   _explode(point, def, botManager) {
-    if (this.audio.playExplosion) this.audio.playExplosion();
-
-    const fireball = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 16, 12),
-      new THREE.MeshBasicMaterial({ color: 0xffa53a, transparent: true, opacity: 0.95 })
-    );
-    fireball.position.copy(point);
-    this.scene.add(fireball);
-    const light = new THREE.PointLight(0xff8a3a, 10, (def.splashRadius || 5) * 3.5, 2);
-    light.position.copy(point);
-    // (sky-only lighting) explosion light not added to scene
-    this.explosions.push({ mesh: fireball, light, t: 0, life: 0.45, radius: def.splashRadius || 5 });
+    if (this.audio.playExplosion) {
+      if (this.audio.playAt) this.audio.playAt(point, () => this.audio.playExplosion('rocket'));
+      else this.audio.playExplosion('rocket');
+    }
+    this.explosions.push(spawnExplosion(this.scene, point, def.splashRadius || 5, 'rocket'));
 
     const radius = def.splashRadius || 5;
     const minF = def.splashMin !== undefined ? def.splashMin : 0.25;
@@ -1362,20 +1355,10 @@ export class WeaponSystem {
   _updateExplosions(dt) {
     for (let i = this.explosions.length - 1; i >= 0; i--) {
       const e = this.explosions[i];
-      e.t += dt;
-      const p = e.t / e.life;
-      if (p >= 1) {
-        this.scene.remove(e.mesh);
-        e.mesh.geometry.dispose();
-        e.mesh.material.dispose();
-        this.scene.remove(e.light);
+      if (updateExplosion(e, dt)) {
+        disposeExplosion(this.scene, e);
         this.explosions.splice(i, 1);
-        continue;
       }
-      const visR = THREE.MathUtils.lerp(0.3, e.radius * 0.7, p);
-      e.mesh.scale.setScalar(visR / 0.3);
-      e.mesh.material.opacity = 0.95 * (1 - p);
-      e.light.intensity = 10 * (1 - p);
     }
   }
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeExplosion, spawnExplosion, updateExplosion } from '../effects/ExplosionEffect.js';
 
 const THROW_SPEED = 16;
 const THROW_ARC   = 4.5;
@@ -10,8 +11,9 @@ const FRAG_RADIUS = 5;
 const FRAG_DMG    = 80;
 
 export class GrenadeSystem {
-  constructor(scene) {
+  constructor(scene, audio = null) {
     this.scene       = scene;
+    this.audio       = audio;
     this.frags       = 2;
     this.smokes      = 2;
     this.throwables  = [];
@@ -146,19 +148,10 @@ export class GrenadeSystem {
     // frag explosions
     for (let i = this.explosions.length - 1; i >= 0; i--) {
       const e = this.explosions[i];
-      e.t += dt;
-      const p = e.t / e.life;
-      if (p >= 1) {
-        this.scene.remove(e.mesh);
-        e.mesh.geometry.dispose();
-        e.mesh.material.dispose();
-        this.scene.remove(e.light);
+      if (updateExplosion(e, dt)) {
+        disposeExplosion(this.scene, e);
         this.explosions.splice(i, 1);
-        continue;
       }
-      e.mesh.scale.setScalar(THREE.MathUtils.lerp(0.3, 4, p));
-      e.mesh.material.opacity = 0.9 * (1 - p);
-      e.light.intensity = 12 * (1 - p);
     }
   }
 
@@ -168,17 +161,11 @@ export class GrenadeSystem {
   }
 
   _fragExplode(point, player) {
-    const fireball = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 14, 10),
-      new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.92 })
-    );
-    fireball.position.copy(point);
-    this.scene.add(fireball);
-
-    const light = new THREE.PointLight(0xff8a3a, 12, FRAG_RADIUS * 3.5, 2);
-    light.position.copy(point);
-    // (sky-only lighting) explosion light not added to scene
-    this.explosions.push({ mesh: fireball, light, t: 0, life: 0.5 });
+    this.explosions.push(spawnExplosion(this.scene, point, FRAG_RADIUS, 'frag'));
+    if (this.audio?.playExplosion) {
+      if (this.audio.playAt) this.audio.playAt(point, () => this.audio.playExplosion('grenade'));
+      else this.audio.playExplosion('grenade');
+    }
 
     if (this.onExplode) this.onExplode(point, FRAG_RADIUS, FRAG_DMG);
 
@@ -245,8 +232,7 @@ export class GrenadeSystem {
     }
     this.smokeClouds.length = 0;
     for (const e of this.explosions) {
-      this.scene.remove(e.mesh); e.mesh.geometry.dispose(); e.mesh.material.dispose();
-      this.scene.remove(e.light);
+      disposeExplosion(this.scene, e);
     }
     this.explosions.length = 0;
     this.refillInventory();

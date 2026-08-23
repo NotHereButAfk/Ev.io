@@ -191,7 +191,7 @@ export class Game {
     this._scopeOverlay  = document.getElementById('scope-overlay');
     this._hudCrosshair  = document.getElementById('crosshair');
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
-    this.grenadeSystem  = new GrenadeSystem(this.world.scene);
+    this.grenadeSystem  = new GrenadeSystem(this.world.scene, this.audio);
     this.pickupSystem = null; // created on first play, cleared on restart
     this.menu           = new MenuUI();
 

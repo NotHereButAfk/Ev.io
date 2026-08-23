@@ -709,30 +709,31 @@ export class AudioManager {
     noise.start(t + 0.03); noise.stop(t + 0.24);
   }
 
-  playExplosion() {
+  playExplosion(kind = 'rocket') {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
+    const grenade = kind === 'grenade';
 
     const noise = this.ctx.createBufferSource();
-    noise.buffer = this._noiseBuffer(0.6);
+    noise.buffer = this._noiseBuffer(grenade ? 0.48 : 0.72);
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(900, t);
-    filter.frequency.exponentialRampToValueAtTime(70, t + 0.5);
-    const noiseGain = this._envGain(0.95, 0.005, 0.55, t);
+    filter.frequency.setValueAtTime(grenade ? 1450 : 900, t);
+    filter.frequency.exponentialRampToValueAtTime(grenade ? 110 : 58, t + (grenade ? 0.38 : 0.62));
+    const noiseGain = this._envGain(grenade ? 0.78 : 0.98, 0.003, grenade ? 0.44 : 0.68, t);
     noise.connect(filter).connect(noiseGain).connect(this.out);
 
     const osc = this.ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(130, t);
-    osc.frequency.exponentialRampToValueAtTime(38, t + 0.4);
-    const oscGain = this._envGain(0.8, 0.005, 0.42, t);
+    osc.frequency.setValueAtTime(grenade ? 165 : 118, t);
+    osc.frequency.exponentialRampToValueAtTime(grenade ? 48 : 32, t + (grenade ? 0.32 : 0.55));
+    const oscGain = this._envGain(grenade ? 0.62 : 0.88, 0.003, grenade ? 0.36 : 0.58, t);
     osc.connect(oscGain).connect(this.out);
 
     noise.start(t);
     osc.start(t);
-    noise.stop(t + 0.62);
-    osc.stop(t + 0.45);
+    noise.stop(t + (grenade ? 0.5 : 0.74));
+    osc.stop(t + (grenade ? 0.4 : 0.62));
   }
 
   playSwing() {
