@@ -13,7 +13,11 @@ const context2d = new Proxy({}, { get(target, key) {
   return target[key] ?? (target[key] = noop);
 } });
 globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => context2d }) };
-const { QUATERNIUS_GUNS } = await import('../src/weapons/WeaponModels.js');
+const { QUATERNIUS_FORWARD_YAW, QUATERNIUS_GUNS } = await import('../src/weapons/WeaponModels.js');
+
+if (Math.abs(QUATERNIUS_FORWARD_YAW + Math.PI / 2) > 1e-9) {
+  throw new Error(`pack forward axis regressed: yaw=${QUATERNIUS_FORWARD_YAW}`);
+}
 
 const uniqueModels = [...new Set(Object.values(QUATERNIUS_GUNS))];
 for (const model of uniqueModels) {

@@ -23,6 +23,10 @@ export const QUATERNIUS_GUNS = Object.freeze({
   dmr: 'Sniper_2', fuelrod: 'Grenade_1', concussion: 'Grenade_2',
   energyshotgun: 'Crossbow_2',
 });
+// The supplied pack's barrels point down local -X. Rotate that axis into the
+// game's camera/world forward direction (-Z). The previous +90 degree turn
+// put the stock toward the reticle and made every held pack gun read backward.
+export const QUATERNIUS_FORWARD_YAW = -Math.PI / 2;
 const QUATERNIUS_LENGTH = Object.freeze({
   sidearm: 0.30, uzi: 0.44, levershotgun: 0.82, m4: 0.89, m16: 1.07,
   rifle: 0.87, lmg: 0.98, rpg: 1.00, boltsniper: 0.92, magnum: 0.34,
@@ -155,12 +159,12 @@ function _buildFromGLB(weaponDef) {
   const cloned = weaponRoot.clone(true);
   cloned.position.set(0, 0, 0);
 
-  // The supplied pack is authored with muzzle-forward +X and real metre-scale
+  // The supplied pack is authored with muzzle-forward -X and real metre-scale
   // proportions. Rotate it into the game's -Z convention, then scale each gun
   // to the established gameplay silhouette so sniper/launcher assets do not
   // become body-sized in first person or in a soldier's hands.
   if (supplied) {
-    cloned.rotation.y = Math.PI / 2;
+    cloned.rotation.y = QUATERNIUS_FORWARD_YAW;
     cloned.updateMatrixWorld(true);
     const raw = new THREE.Box3().setFromObject(cloned);
     const rawSize = raw.getSize(new THREE.Vector3());
