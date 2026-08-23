@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WEAPONS } from './weaponDefs.js';
+import { WEAPONS, isMainWeaponId, isMatchPickupWeaponId } from './weaponDefs.js';
 import { weaponHandPose } from './WeaponHandPoses.js';
 import { buildWeaponModel, onWeaponModelsReady } from './WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
@@ -635,8 +635,8 @@ export class WeaponSystem {
 
   /** Set the active loadout to a single gun + single melee weapon. */
   setLoadout(gunId, meleeId) {
-    const gun = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee')
-             || this.allWeapons.find((w) => w.kind !== 'melee');
+    const gun = this.allWeapons.find((w) => w.id === gunId && isMainWeaponId(w.id))
+             || this.allWeapons.find((w) => isMainWeaponId(w.id));
     const melee = this.allWeapons.find((w) => w.id === meleeId && w.kind === 'melee')
                || this.allWeapons.find((w) => w.kind === 'melee');
     this.loadout = [gun, melee].filter(Boolean);
@@ -651,7 +651,7 @@ export class WeaponSystem {
   // the HUD shows [main gun, power gun, melee]. Switches to it and refills it.
   // Picking up a different power weapon replaces the power slot (you carry one).
   addMapGun(gunId) {
-    const def = this.allWeapons.find((w) => w.id === gunId && w.kind !== 'melee');
+    const def = this.allWeapons.find((w) => w.id === gunId && isMatchPickupWeaponId(w.id));
     if (!def) return null;
     const main  = this.allWeapons.find((w) => w.id === this._mainGunId && w.kind !== 'melee')
                || this.loadout.find((w) => w.kind !== 'melee');

@@ -35,7 +35,12 @@ import {
   smoothBotAim,
 } from '../src/entities/BotCombat.js';
 import { randomBotName } from '../src/entities/BotNames.js';
-import { WEAPONS as CLIENT_WEAPONS } from '../src/weapons/weaponDefs.js';
+import {
+  MAIN_WEAPON_IDS,
+  WEAPONS as CLIENT_WEAPONS,
+  isMatchPickupWeaponId,
+} from '../src/weapons/weaponDefs.js';
+import { AUTHORED_WEAPON_BY_KIND } from '../src/world/PickupLayout.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
@@ -86,7 +91,9 @@ const WEAPONS = Object.fromEntries(CLIENT_WEAPONS.map((weapon) => [weapon.id, {
   reserve: weapon.reserveMax || 0,
   arc: weapon.arc || 0,
 }]));
-const PRESENTATION_WEAPONS = new Set(Object.keys(WEAPONS));
+const BASE_WEAPONS = new Set([...MAIN_WEAPON_IDS, 'sword']);
+const WEAPON_COLLECT_RADIUS = 2.0;
+const WEAPON_COLLECT_HEIGHT = 2.2;
 const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 
 // Server-authoritative throwable abilities (Phase 10). The server owns charges,
@@ -235,8 +242,10 @@ export class AuthRoom {
       player.kills = 0;
       player.deaths = 0;
       player.score = 0;
-      player.mag = (WEAPONS[player.wid] || WEAPONS.m4).mag;
-      player.ammo = { [player.wid]: { mag: player.mag, reserve: (WEAPONS[player.wid] || WEAPONS.m4).reserve } };
+      player.wid = 'm4';
+      player.matchWeapons.clear();
+      player.mag = WEAPONS.m4.mag;
+      player.ammo = { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } };
       player.reloadUntil = 0;
       player.reloadWid = null;
       player.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
@@ -313,6 +322,7 @@ export class AuthRoom {
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
       wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
       ammo: { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } },
+      matchWeapons: new Set(),
       reloadUntil: 0, reloadWid: null,
       invulnerableUntil: this.tick + SPAWN_PROTECTION_TICKS,
       _swingStart: 0, _swingUntil: 0,
@@ -631,6 +641,27 @@ export class AuthRoom {
     return chooseSafeSpawn(this.arena.spawns, occupants, index);
   }
 
+  // Main guns and the standard blade are always legal. A special becomes legal
+  // only after the authoritative position reaches its authored map pad; that
+  // grant lasts until death or the round rotates.
+  _canEquipWeapon(p, wid) {
+    if (!WEAPONS[wid]) return false;
+    if (BASE_WEAPONS.has(wid) || p.matchWeapons?.has(wid)) return true;
+    if (!isMatchPickupWeaponId(wid)) return false;
+    for (const pickup of this.arena.pickups || []) {
+      const spec = AUTHORED_WEAPON_BY_KIND.get(pickup.markerKind);
+      if (spec?.id !== wid) continue;
+      const dx = p.state.px - pickup.x;
+      const dy = p.state.py - pickup.y;
+      const dz = p.state.pz - pickup.z;
+      if (Math.hypot(dx, dz) < WEAPON_COLLECT_RADIUS && Math.abs(dy) < WEAPON_COLLECT_HEIGHT) {
+        p.matchWeapons.add(wid);
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Validated input: the client proposes intent; the server owns the sim.
   onInput(id, msg) {
     const p = this.players.get(id);
@@ -645,7 +676,7 @@ export class AuthRoom {
       sprint: !!msg.sprint, crouch: !!msg.crouch,
       jumpJust: !!msg.jump, crouchJust: !!msg.crouchDown, teleJust: !!msg.tele,
     });
-    const wid = PRESENTATION_WEAPONS.has(msg.wid) ? msg.wid : p.wid;
+    const wid = this._canEquipWeapon(p, msg.wid) ? msg.wid : p.wid;
     p.queue.push({ seq: msg.seq, inp, wid, aiming: !!msg.aiming });
     p.lastInputSeq = msg.seq;
     if (p.queue.length > MAX_INPUT_QUEUE) p.queue.splice(0, p.queue.length - MAX_INPUT_QUEUE);
@@ -660,7 +691,7 @@ export class AuthRoom {
     if (!p || !p.alive) return;
     if (typeof msg.seq !== 'number' || msg.seq <= p.lastFireSeq) return;   // replay/dup
     p.lastFireSeq = msg.seq;
-    const requestedWid = WEAPONS[msg.wid] ? msg.wid : null;
+    const requestedWid = this._canEquipWeapon(p, msg.wid) ? msg.wid : null;
     if (!requestedWid) return;
     const requestedWeapon = WEAPONS[requestedWid];
     // Carry fractional tick debt only inside one continuous burst. Otherwise a
@@ -931,8 +962,10 @@ export class AuthRoom {
           const s = this._spawn(p.id, p.id, true);
           p.state = createState(s[0], s[1], s[2]);
           p.health = START_HEALTH; p.shield = p.maxShield;
-          p.mag = (WEAPONS[p.wid] || WEAPONS.m4).mag;
-          p.ammo = { [p.wid]: { mag: p.mag, reserve: (WEAPONS[p.wid] || WEAPONS.m4).reserve } };
+          p.wid = 'm4';
+          p.matchWeapons.clear();
+          p.mag = WEAPONS.m4.mag;
+          p.ammo = { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } };
           p.reloadUntil = 0; p.reloadWid = null;
           p.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
           p.alive = true; p.queue.length = 0;

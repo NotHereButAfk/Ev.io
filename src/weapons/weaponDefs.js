@@ -415,6 +415,22 @@ for (const w of WEAPONS) {
   w.category = w.kind === 'melee' ? 'melee' : (_MAIN.has(w.id) ? 'main' : 'extra');
 }
 
+// Permanent loadout guns versus weapons earned inside a live match. Keep this
+// contract beside the catalog so menus, viewmodels, pickups, and the authority
+// server cannot quietly drift into different arsenals.
+export const MATCH_PICKUP_WEAPON_IDS = WEAPONS
+  .filter((w) => w.kind !== 'melee' && !_MAIN.has(w.id))
+  .map((w) => w.id);
+const _MATCH_PICKUPS = new Set(MATCH_PICKUP_WEAPON_IDS);
+
+export function isMainWeaponId(id) {
+  return _MAIN.has(id);
+}
+
+export function isMatchPickupWeaponId(id) {
+  return _MATCH_PICKUPS.has(id);
+}
+
 export function getWeapon(id) {
   return WEAPONS.find((w) => w.id === id);
 }

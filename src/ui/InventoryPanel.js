@@ -9,7 +9,7 @@
  */
 import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
-import { WEAPONS, weaponsByCategory } from '../weapons/weaponDefs.js';
+import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId, weaponsByCategory } from '../weapons/weaponDefs.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
@@ -17,31 +17,22 @@ import { Shop } from '../core/Shop.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponThumbnails.js';
 
-// The 5 MAIN-weapon slots (ev.io-style labels). The rest of the arsenal is
-// shown under EXTRA, and the blades under MELEE — all browsable/equippable.
-export const MAIN_GUNS = [
-  { id: 'm4',            label: 'Auto Rifle' },
-  { id: 'magnum',        label: 'Hand Cannon' },
-  { id: 'battlerifle',   label: 'Burst Rifle' },
-  { id: 'energyshotgun', label: 'Sweeper' },
-  { id: 'plasmarifle',   label: 'Laser Rifle' },
-];
-// EXTRA guns + MELEE, derived from the weapon categories (labels = weapon names).
-const EXTRA_GUNS = weaponsByCategory('extra').map((w) => ({ id: w.id, label: w.name }));
+// The five permanent weapon choices. Specials and heavies are collected from
+// glowing pads during a live match, so they do not appear in this menu.
+export const MAIN_GUNS = MAIN_WEAPON_IDS.map((id) => {
+  const weapon = WEAPONS.find((w) => w.id === id);
+  return { id, label: weapon?.name || id };
+});
+// Melee remains a separate equipment slot.
 const MELEE      = weaponsByCategory('melee').map((w) => ({ id: w.id, label: w.name }));
 
 // Tab strip organised into labelled groups.
 const TAB_GROUPS = [
   { label: null,    tabs: [{ id: 'character', label: 'Character' }] },
   { label: 'MAIN',  tabs: MAIN_GUNS },
-  { label: 'EXTRA', tabs: EXTRA_GUNS },
   { label: 'MELEE', tabs: MELEE },
 ];
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
-// Every valid gun id (main + extra) — used to keep an equipped extra from being
-// snapped back to a main gun when the panel reopens.
-const ALL_GUN_IDS = new Set(WEAPONS.filter((w) => w.kind !== 'melee').map((w) => w.id));
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 const CHAR_SVG = `
   <svg viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
@@ -89,9 +80,8 @@ export class InventoryPanel {
     if (nameEl) {
       nameEl.textContent = (u && u !== '__guest__') ? UserAccount.getDisplayName(u) : (u === '__guest__' ? 'guest' : 'Recruit');
     }
-    // Snap only if the saved gun isn't a real gun at all (main OR extra are both
-    // valid now); keeps EQUIPPED pointing at an available tab.
-    if (!ALL_GUN_IDS.has(Loadout.getGun())) Loadout.setGun(MAIN_GUNS[0].id);
+    // Migrate older saves that equipped a special before those became pickups.
+    if (!isMainWeaponId(Loadout.getGun())) Loadout.setGun(MAIN_GUNS[0].id);
 
     this._renderMeta();
     this._renderTabs();
@@ -235,6 +225,7 @@ export class InventoryPanel {
     if (gun.kind === 'melee') {
       Loadout.setMelee(gun.id);
     } else {
+      if (!isMainWeaponId(gun.id)) return;
       Loadout.setGun(gun.id); // this becomes the player's main
     }
     if (skinId) Armory.equipSkin(gun.id, skinId);
