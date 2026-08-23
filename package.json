@@ -31,6 +31,7 @@
     "test:zombie-death": "node tools/zombie_death_check.mjs",
     "test:viewmodel": "node tools/viewmodel_check.mjs",
     "test:gun-models": "node tools/quaternius_gun_check.mjs",
+    "test:weapon-skins": "node tools/weapon_skin_sets_check.mjs",
     "test:gunfeel": "node tools/gunfeel_check.mjs",
     "test:loadout": "node tools/loadout_weapon_check.mjs",
     "test:audio": "node tools/audio_contract_check.mjs",

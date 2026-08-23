@@ -149,6 +149,34 @@ export const WEAPON_SKINS = [
     shootSound: 'prism' },   // crystalline chime per shot
 ];
 
+// Five curated finishes for each permanent main gun. A finish belongs to one
+// weapon so the Inventory never turns a skin selection into a model swap.
+// The underlying model remains untouched; these IDs only select materials.
+export const MAIN_GUN_SKIN_SETS = Object.freeze({
+  m4: Object.freeze(['ember', 'voltage', 'royalgold', 'fireball', 'overclock']),
+  magnum: Object.freeze(['venom', 'copper', 'biohazard', 'rosegold', 'k9unit']),
+  battlerifle: Object.freeze(['crimson', 'redprotocol', 'bloodmoon', 'shadowops', 'eventhorizon']),
+  energyshotgun: Object.freeze(['desert', 'hazard', 'tigerstrike', 'bonecrusher', 'magmalord']),
+  plasmarifle: Object.freeze(['arctic', 'permafrost', 'whiteout', 'neonparade', 'prismbreak']),
+});
+
+const _skinWeapon = new Map(
+  Object.entries(MAIN_GUN_SKIN_SETS).flatMap(([weaponId, ids]) => ids.map((id) => [id, weaponId])),
+);
+
+export function getWeaponSkinsFor(weaponId) {
+  const ids = MAIN_GUN_SKIN_SETS[weaponId] || [];
+  return ids.map(getWeaponSkin).filter(Boolean);
+}
+
+export function getWeaponIdForSkin(skinId) {
+  return _skinWeapon.get(skinId) || null;
+}
+
+export function isSkinForWeapon(weaponId, skinId) {
+  return _skinWeapon.get(skinId) === weaponId;
+}
+
 const _hsl = new THREE.Color();
 
 export function getWeaponSkin(id) {

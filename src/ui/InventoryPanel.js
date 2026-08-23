@@ -10,7 +10,7 @@
 import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId, weaponsByCategory } from '../weapons/weaponDefs.js';
-import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { WEAPON_SKINS, getWeaponSkinsFor } from '../weapons/WeaponSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
@@ -193,7 +193,7 @@ export class InventoryPanel {
     // Only the skins the player OWNS for this weapon. New accounts have
     // none — the tab shows just Default until skins are earned/bought.
     // ONE shared catalog: the sword wears the same 40 finishes as the guns.
-    const owned = WEAPON_SKINS.filter((s) => Armory.ownsSkin(s.id));
+    const owned = getWeaponSkinsFor(gun.id).filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
     for (const s of owned) {
       const card = this._weaponCard(gun, s, this._isEquipped(gun.id, s.id), () => {

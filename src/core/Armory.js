@@ -7,7 +7,7 @@
 // Everything else (extras, knife, hammer) always shows its default look.
 // Enforced here centrally so the UI, viewmodel and thumbnails all agree.
 
-import { getWeaponSkin } from '../weapons/WeaponSkins.js';
+import { getWeaponSkin, isSkinForWeapon } from '../weapons/WeaponSkins.js';
 import { getSwordSkin } from '../weapons/SwordSkins.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 
@@ -28,13 +28,15 @@ export const Armory = {
   getSkinId(weaponId, isSword = false) {
     // No catalog default any more — an unset weapon simply has no skin (null).
     if (!this.canSkin(weaponId)) return null;
-    return _load()[weaponId] || null;
+    const skinId = _load()[weaponId] || null;
+    if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return null;
+    return skinId;
   },
 
   // True only if the player has explicitly equipped a skin for this weapon
   // (vs. the implicit default) — used to decide whether to show it skinned.
   hasSkin(weaponId) {
-    return this.canSkin(weaponId) && !!_load()[weaponId];
+    return this.canSkin(weaponId) && !!this.getSkinId(weaponId);
   },
 
   // ── ownership (gun + sword skins) ────────────────────────────────────────
@@ -60,6 +62,7 @@ export const Armory = {
 
   equipSkin(weaponId, skinId) {
     if (!this.canSkin(weaponId)) return;   // extras/melee stay default
+    if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return;
     const d = _load();
     d[weaponId] = skinId;
     _save(d);
@@ -80,7 +83,8 @@ export const Armory = {
     const d = _load();
     const map = new Map();
     for (const w of weapons) {
-      const skinId = this.canSkin(w.id) ? (d[w.id] || null) : null;
+      const saved = this.canSkin(w.id) ? (d[w.id] || null) : null;
+      const skinId = w.category === 'main' && !isSkinForWeapon(w.id, saved) ? null : saved;
       map.set(w.id, { skin: skinId ? getWeaponSkin(skinId) : null, isSword: false });
     }
     return map;

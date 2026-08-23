@@ -1,7 +1,7 @@
 import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
-import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+import { WEAPON_SKINS, getWeaponIdForSkin } from '../weapons/WeaponSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Achievements } from '../core/Achievements.js';
 import { Shop } from '../core/Shop.js';
@@ -757,6 +757,8 @@ export class MenuUI {
   // but the Night Market card should still show *one* real weapon wearing it
   // (stable for the day, so it doesn't flicker between renders).
   _nightMarketGunFor(skinId) {
+    const assigned = getWeaponIdForSkin(skinId);
+    if (assigned) return MAIN_GUNS.find((gun) => gun.id === assigned) || null;
     const pool = [...MAIN_GUNS, { id: 'sword', label: 'Arc Blade' }];
     let h = this._nightMarketSeed();
     for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
@@ -974,7 +976,8 @@ export class MenuUI {
     // Stock = armor finishes + gun skins. Sword skins are NOT sold any more —
     // skins are a main-weapon feature, so melee finishes would be unusable.
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
-    const weaponItems    = WEAPON_SKINS.map(s => ({ ...s, _kind: 'weapon' }));
+    const weaponItems    = WEAPON_SKINS.filter((s) => getWeaponIdForSkin(s.id))
+      .map(s => ({ ...s, _kind: 'weapon' }));
     const allItems = [...characterItems, ...weaponItems];
     const isOwnedItem = (s) => s._kind === 'character' ? Shop.isOwned(s.id) : Armory.ownsSkin(s.id);
     const unowned = allItems.filter(s => !isOwnedItem(s));
