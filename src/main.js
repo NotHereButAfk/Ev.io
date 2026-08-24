@@ -13,6 +13,11 @@ if (import.meta.env?.DEV || qaRequested) {
   window.__game = game;
 }
 if (qaRequested) {
+  // EffectComposer normally resets renderer.info after each pass, which leaves
+  // only the final one-triangle output pass visible to QA. Accumulate the whole
+  // frame so draw-call/triangle measurements describe the actual workload.
+  game.renderer.info.autoReset = false;
+  game._qaFrameStats = { elapsed: 0, frames: 0, maxMs: 0, slow20: 0, last: null };
   const qaState = document.createElement('output');
   qaState.id = 'qa-runtime';
   qaState.hidden = true;
@@ -54,6 +59,16 @@ if (qaRequested) {
     if (qaFollowing) followFirstBot();
     const snapshot = JSON.stringify({
       state: game.state,
+      render: {
+        calls: game.renderer.info.render.calls,
+        triangles: game.renderer.info.render.triangles,
+        geometries: game.renderer.info.memory.geometries,
+        textures: game.renderer.info.memory.textures,
+        pixelRatio: game.renderer.getPixelRatio(),
+        bloom: !!game._bloomEnabled,
+        runtimeQuality: game._runtimeQuality,
+      },
+      frame: game._qaFrameStats.last,
       bots: game.botManager.bots.map((bot) => ({
         id: bot.id, name: bot.displayName, alive: bot.alive,
         x: bot.position.x, y: bot.position.y, z: bot.position.z,

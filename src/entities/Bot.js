@@ -23,6 +23,9 @@ const RESPAWN_DELAY = 4;
 const RADIUS = 0.5;
 const BOT_GRAVITY = -20;
 const BOT_JUMP_SPEED = 9.6;
+const OUTLINE_LOD_DISTANCE = 36;
+const MID_POSE_DISTANCE = 26;
+const FAR_POSE_DISTANCE = 48;
 // Aggro persists this long after losing sight of you, so breaking line of
 // sight buys you a few seconds rather than instantly erasing you.
 const PROVOKE_DURATION = BOT_TACTICS.memoryDuration;
@@ -141,6 +144,8 @@ export class Bot {
     this._targetScanT  = Math.random() * 0.35;
     this._botKills     = 0;
     this._botDeaths    = 0;
+    this._poseAcc      = 0;
+    this._outlineVisible = true;
 
     // Pre-allocated scratch vectors — avoids per-frame GC pressure
     this._toPlayer    = new THREE.Vector3();
@@ -576,6 +581,11 @@ export class Bot {
     this._toPlayer.set(player.position.x - this.position.x, 0, player.position.z - this.position.z);
     const toPlayer = this._toPlayer;
     const distToPlayer = toPlayer.length();
+    const outlineVisible = distToPlayer < OUTLINE_LOD_DISTANCE;
+    if (outlineVisible !== this._outlineVisible) {
+      this._outlineVisible = outlineVisible;
+      for (const outline of this.mesh.userData?.outlines || []) outline.visible = outlineVisible;
+    }
 
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
@@ -846,6 +856,20 @@ export class Bot {
       ? (actualDX * -bodySn + actualDZ * -bodyCs) / actualMoved : 1;
     const resolvedDirR = resolvedMoving
       ? (actualDX * bodyCs + actualDZ * -bodySn) / actualMoved : 0;
+
+    // Keep AI, collision, facing and movement at full rate, but small distant
+    // bodies do not need a 60Hz bone + two-hand IK solve. Accumulating dt keeps
+    // their gait speed correct when the presentation pose is sampled at 30/15Hz.
+    const poseInterval = distToPlayer >= FAR_POSE_DISTANCE ? 1 / 15
+      : distToPlayer >= MID_POSE_DISTANCE ? 1 / 30 : 0;
+    if (poseInterval > 0) {
+      this._poseAcc += dt;
+      if (this._poseAcc < poseInterval) return;
+      dt = Math.min(0.1, this._poseAcc);
+      this._poseAcc = 0;
+    } else {
+      this._poseAcc = 0;
+    }
 
     // ── Human soldier: drive its skeletal idle/walk/run animation ──────────────
     if (this._isHuman) {

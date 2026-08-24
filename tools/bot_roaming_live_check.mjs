@@ -18,9 +18,12 @@ await page.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.fulfill(
 
 try {
   await page.goto(url, { waitUntil: 'commit', timeout: 30000 });
-  await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null,
-    { timeout: 90000 });
-  await page.locator('#play-btn').click();
+  // map-loading starts hidden before startup has actually handed off to the
+  // menu, so waiting on it alone races the loading overlay. Wait for the play
+  // control itself to become visible, then use the same DOM click as the smoke
+  // test (pointer lock is not part of this roaming observation).
+  await page.locator('#play-btn').waitFor({ state: 'visible', timeout: 90000 });
+  await page.evaluate(() => document.getElementById('play-btn')?.click());
   await page.waitForFunction(() => JSON.parse(document.getElementById('qa-runtime')?.textContent || '{}').state === 'playing', null,
     { timeout: 30000 });
 

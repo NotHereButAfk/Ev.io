@@ -467,7 +467,10 @@ export function buildHeroBody(id = 'vanguard') {
     const mesh = new THREE.SkinnedMesh(geo, M[key]);
     mesh.name = 'body_' + key;
     mesh.castShadow = mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
+    // Every chassis buffer owns the generous animated bounding sphere created
+    // below. Let Three skip players behind the camera instead of skinning and
+    // drawing the whole lobby every frame.
+    mesh.frustumCulled = true;
     group.add(mesh);
     mesh.bind(skeleton);
     meshes.push(mesh);
@@ -475,7 +478,7 @@ export function buildHeroBody(id = 'vanguard') {
     const ol = new THREE.SkinnedMesh(outline, olMat);
     ol.name = 'outline';
     ol.castShadow = false;
-    ol.frustumCulled = false;
+    ol.frustumCulled = true;
     ol.raycast = () => {};
     group.add(ol);
     ol.bind(skeleton);

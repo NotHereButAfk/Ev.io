@@ -60,7 +60,10 @@ import { countLocalMatchPlayers } from './Population.js';
 import { consumeThrowable } from './GameplayInput.js';
 import { deathCameraPose, deathFallProgress } from '../player/DeathAnimation.js';
 import { buildLeaderboardRows, buildMatchRows } from './MatchRows.js';
-import { bloomEnabled, postFxPixelRatio, rendererPixelRatio } from './RenderQuality.js';
+import {
+  bloomEnabled, lowerRuntimeQuality, postFxPixelRatio, rendererPixelRatio,
+  shouldReduceRuntimeQuality,
+} from './RenderQuality.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
 // that opens on death is just something to look at while you wait.
@@ -527,8 +530,7 @@ export class Game {
     const vol = GameSettings.get('volume');
     this.audio.setVolume(vol);
     const q = GameSettings.get('quality');
-    this.renderer.setPixelRatio(rendererPixelRatio(q, window.devicePixelRatio));
-    this.composer?.setPixelRatio(postFxPixelRatio(q, window.devicePixelRatio));
+    this._setRuntimeQuality(q, true);
 
     // accessibility → runtime (visuals are CSS-driven; these are the 3D + audio bits)
     const rm = GameSettings.get('reduceMotion');
@@ -538,6 +540,38 @@ export class Game {
       this.hud.reduceFlashes = GameSettings.get('reduceFlashes');
       this.hud.hitSound      = GameSettings.get('hitSound');
     }
+  }
+
+  _setRuntimeQuality(quality, resetMonitor = false) {
+    this._runtimeQuality = quality;
+    this.renderer.setPixelRatio(rendererPixelRatio(quality, window.devicePixelRatio));
+    this.composer?.setPixelRatio(postFxPixelRatio(quality, window.devicePixelRatio));
+    this._bloomEnabled = bloomEnabled(quality);
+    if (resetMonitor || !this._perfMonitor) {
+      this._perfMonitor = { grace: 8, elapsed: 0, frames: 0, slow: 0 };
+    } else {
+      this._perfMonitor.grace = 5;
+      this._perfMonitor.elapsed = this._perfMonitor.frames = this._perfMonitor.slow = 0;
+    }
+  }
+
+  _sampleRuntimePerformance(rawDt) {
+    const monitor = this._perfMonitor;
+    if (!monitor || this.state !== 'playing' || this._authoritativeMapTransitioning
+      || rawDt <= 0 || rawDt >= 0.1 || this._runtimeQuality === 'low') return;
+    if (monitor.grace > 0) {
+      monitor.grace = Math.max(0, monitor.grace - rawDt);
+      return;
+    }
+    monitor.elapsed += rawDt;
+    monitor.frames += 1;
+    if (rawDt > 0.025) monitor.slow += 1;
+    if (monitor.elapsed < 3) return;
+    if (shouldReduceRuntimeQuality(monitor.elapsed, monitor.frames, monitor.slow)) {
+      this._setRuntimeQuality(lowerRuntimeQuality(this._runtimeQuality));
+      return;
+    }
+    monitor.elapsed = monitor.frames = monitor.slow = 0;
   }
 
   // ── Wire callbacks ──────────────────────────────────────────────────────────
@@ -733,12 +767,10 @@ export class Game {
         this.player.camera.updateProjectionMatrix();
       }
       this.audio.setVolume(s.volume);
-      this.renderer.setPixelRatio(rendererPixelRatio(s.quality, window.devicePixelRatio));
-      this.composer?.setPixelRatio(postFxPixelRatio(s.quality, window.devicePixelRatio));
+      this._setRuntimeQuality(s.quality, true);
       // Apply the heavy toggles live so a quality drop gives immediate relief
       // (bloom + shadows). The decorative light budget is baked at world build,
       // so the lighting part of the change takes full effect on the next reload.
-      this._bloomEnabled = bloomEnabled(s.quality);
       // shadows stay off — sky-only lighting has no shadow casters.
       // accessibility toggles apply live
       const rm = GameSettings.get('reduceMotion');
@@ -1770,7 +1802,6 @@ export class Game {
           auth?.sendAbility(throwable, this.player.yaw, this.player.pitch);
         }
       }
-      this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
     }
     this.grenadeSystem.update(dt, this.player);
 
@@ -2183,7 +2214,25 @@ export class Game {
   _loop() {
     this._rafId = requestAnimationFrame(() => this._loop());
     this.timer.update();
-    const dt = Math.min(0.05, this.timer.getDelta());
+    const rawDt = this.timer.getDelta();
+    const dt = Math.min(0.05, rawDt);
+    const qa = this._qaFrameStats;
+    if (qa && rawDt < 0.25) {
+      const ms = rawDt * 1000;
+      qa.elapsed += rawDt;
+      qa.frames += 1;
+      qa.maxMs = Math.max(qa.maxMs, ms);
+      if (ms > 20) qa.slow20 += 1;
+      if (qa.elapsed >= 1) {
+        qa.last = {
+          fps: Math.round((qa.frames / qa.elapsed) * 10) / 10,
+          avgMs: Math.round((qa.elapsed * 10000) / qa.frames) / 10,
+          maxMs: Math.round(qa.maxMs * 10) / 10,
+          slow20: qa.slow20,
+        };
+        qa.elapsed = qa.frames = qa.maxMs = qa.slow20 = 0;
+      }
+    }
 
     if (this.state === 'playing') {
       this._updatePlaying(dt);
@@ -2195,12 +2244,14 @@ export class Game {
     }
 
     const camera = this.state === 'playing' ? this.player.camera : this.menuCamera;
+    if (!this.renderer.info.autoReset) this.renderer.info.reset();
     if (this._bloomEnabled && this.composer) {
       this.renderPass.camera = camera;
       this.composer.render();
     } else {
       this.renderer.render(this.world.scene, camera);
     }
+    this._sampleRuntimePerformance(rawDt);
     this.input.endFrame();
   }
 }

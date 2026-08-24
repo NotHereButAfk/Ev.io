@@ -374,6 +374,7 @@ export class AuthNetBridge {
       a.avatar.group.visible = mapReady;
       if (!mapReady) { a.nameEl.style.display = 'none'; continue; }
       a.pos.set(r.x, r.y, r.z);
+      const avatarDistanceSq = this._nameOrigin.distanceToSquared(a.pos);
       a.avatar.setWeapon(r.wid || 'm4');
       // Derive cadence from rendered interpolation displacement, so a stalled
       // snapshot stream settles to idle rather than running in place.
@@ -383,6 +384,7 @@ export class AuthNetBridge {
         crouch: r.crouch, sliding: r.sliding,
         aiming: r.aiming, firing: r.firing, alive: r.alive,
         reload: r.reload || 0, swing: r.swing == null ? 1 : r.swing,
+        viewDistanceSq: avatarDistanceSq,
       });
       // Keep semantic plate state current even while it is off-screen or
       // occluded, so the first visible frame never flashes an empty bar/name.

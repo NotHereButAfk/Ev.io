@@ -123,7 +123,7 @@ if (/FLASH GRENADE|<span class="ability-page-key">E<\/span>|<strong>IMPULSE<\/st
   failures.push('abilities page has no stale unshipped bindings');
 }
 requireMatch(hud, /--xhair-size/, 'dynamic crosshair spread');
-requireMatch(hud, /classList\.toggle\(['"]ads/, 'ADS crosshair state');
+requireMatch(hud, /(?:classList\.toggle|toggleClass)\([^\n]*['"]ads['"]/, 'ADS crosshair state');
 requireMatch(css, /#hud #crosshair[^}]*--xhair-size/s, 'crosshair style contract');
 requireMatch(css, /\.auth-page \.login-submit[^}]*align-self:\s*flex-start/s, 'EV-style compact auth action');
 requireMatch(settings, /crosshairColor:\s*['"]white['"]/, 'neutral player-screen crosshair default');

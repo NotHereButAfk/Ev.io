@@ -1,5 +1,23 @@
 import { getWeaponHudThumb } from './WeaponThumbnails.js';
 
+function setText(el, value) {
+  if (!el) return;
+  const next = String(value);
+  if (el.textContent !== next) el.textContent = next;
+}
+
+function setStyle(el, property, value) {
+  if (el && el.style[property] !== value) el.style[property] = value;
+}
+
+function setCustomStyle(el, property, value) {
+  if (el && el.style.getPropertyValue(property) !== value) el.style.setProperty(property, value);
+}
+
+function toggleClass(el, name, enabled) {
+  if (el && el.classList.contains(name) !== enabled) el.classList.toggle(name, enabled);
+}
+
 export class HUD {
   constructor() {
     this.root        = document.getElementById('hud');
@@ -52,6 +70,9 @@ export class HUD {
     this._teleportFlashTimeout = null;
     this._joinNotifTimer      = null;
     this._joinFadeTimer       = null;
+    this._slotEls             = [];
+    this._slotAmmoEls         = [];
+    this._activeSlot          = -1;
   }
 
   show() { this.root?.classList.remove('hidden'); }
@@ -96,9 +117,9 @@ export class HUD {
 
   // Large centered deathmatch countdown timer
   showDMTimer(timeStr, isLow = false) {
-    this.dmTimer.textContent = timeStr;
+    setText(this.dmTimer, timeStr);
     this.dmTimer.classList.remove('hidden');
-    this.dmTimer.classList.toggle('dm-low', isLow);
+    toggleClass(this.dmTimer, 'dm-low', isLow);
   }
   hideDMTimer() { this.dmTimer.classList.add('hidden'); }
 
@@ -138,6 +159,9 @@ export class HUD {
 
   buildWeaponSlots(slots, activeIndex) {
     this.weaponSlots.innerHTML = '';
+    this._slotEls.length = 0;
+    this._slotAmmoEls.length = 0;
+    this._activeSlot = activeIndex;
     slots.forEach((slot, i) => {
       const key = (typeof slot === 'object') ? slot.key : slot;
       const id  = (typeof slot === 'object') ? slot.id  : null;
@@ -163,6 +187,8 @@ export class HUD {
       el.appendChild(k);
 
       this.weaponSlots.appendChild(el);
+      this._slotEls.push(el);
+      this._slotAmmoEls.push(ammo);
     });
   }
 
@@ -181,69 +207,69 @@ export class HUD {
   }
 
   setActiveSlot(index) {
-    this.weaponSlots.querySelectorAll('.weapon-slot').forEach((el, i) => {
-      el.classList.toggle('active', i === index);
-    });
+    if (this._activeSlot === index) return;
+    this._slotEls[this._activeSlot]?.classList.remove('active');
+    this._slotEls[index]?.classList.add('active');
+    this._activeSlot = index;
   }
 
   update(player, weaponInfo, kills, score) {
     const hpct = Math.max(0, (player.health / player.maxHealth) * 100);
-    this.healthBar.style.width  = `${hpct}%`;
-    this.healthText.textContent = Math.ceil(player.health);
+    setStyle(this.healthBar, 'width', `${hpct}%`);
+    setText(this.healthText, Math.ceil(player.health));
 
     if (player.maxShield > 0) {
       this.shieldWrap.classList.remove('hidden');
       const spct = Math.max(0, (player.shield / player.maxShield) * 100);
-      this.shieldBar.style.width  = `${spct}%`;
-      this.shieldText.textContent = Math.ceil(player.shield);
+      setStyle(this.shieldBar, 'width', `${spct}%`);
+      setText(this.shieldText, Math.ceil(player.shield));
     } else {
       this.shieldWrap.classList.add('hidden');
     }
 
     const spct = Math.max(0, (player.stamina / player.maxStamina) * 100);
-    this.staminaBar.style.width  = `${spct}%`;
-    this.staminaText.textContent = Math.ceil(player.stamina);
-    this.staminaBar.classList.toggle('stamina-low', player.stamina < 25);
+    setStyle(this.staminaBar, 'width', `${spct}%`);
+    setText(this.staminaText, Math.ceil(player.stamina));
+    toggleClass(this.staminaBar, 'stamina-low', player.stamina < 25);
 
-    this.weaponName.textContent = weaponInfo.name.toUpperCase();
-    this.ammoText.textContent = weaponInfo.isMelee
+    setText(this.weaponName, weaponInfo.name.toUpperCase());
+    setText(this.ammoText, weaponInfo.isMelee
       ? '∞'
-      : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
-    this.weaponWrap?.classList.toggle('melee-active', weaponInfo.isMelee);
-    this.weaponSlots?.querySelectorAll('.weapon-slot').forEach((el, i) => {
+      : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`);
+    toggleClass(this.weaponWrap, 'melee-active', weaponInfo.isMelee);
+    this._slotAmmoEls.forEach((ammo, i) => {
       const slot = weaponInfo.slots?.[i];
-      const ammo = el.querySelector('.ws-ammo');
       if (!slot || !ammo) return;
-      ammo.textContent = slot.isMelee ? '∞' : `${slot.magAmmo} / ${slot.reserveAmmo}`;
+      setText(ammo, slot.isMelee ? '∞' : `${slot.magAmmo} / ${slot.reserveAmmo}`);
     });
-    this.reloadText.classList.toggle('hidden', !weaponInfo.isReloading);
+    toggleClass(this.reloadText, 'hidden', !weaponInfo.isReloading);
     if (this.crosshair) {
       const bloom = Math.max(0, Math.min(1, weaponInfo.spreadRatio || 0));
       const aiming = Math.max(0, Math.min(1, weaponInfo.aiming || 0));
       // EV.IO-style readable cone: sustained hip fire opens the four bars;
       // ADS closes them into the optic without moving the centre dot.
       const gap = (4 + bloom * 8) * (1 - aiming * 0.78);
-      this.crosshair.style.setProperty('--xhair-size', `${12 + gap * 2}px`);
-      this.crosshair.style.setProperty('--xhair-opacity', `${1 - aiming * 0.42}`);
-      this.crosshair.classList.toggle('ads', aiming > 0.72);
+      setCustomStyle(this.crosshair, '--xhair-size', `${12 + gap * 2}px`);
+      setCustomStyle(this.crosshair, '--xhair-opacity', `${1 - aiming * 0.42}`);
+      toggleClass(this.crosshair, 'ads', aiming > 0.72);
     }
     if (this.reloadProgress) {
       const reloadPct = Math.max(0, Math.min(1, weaponInfo.reloadProgress || 0));
-      this.reloadProgress.style.width = `${reloadPct * 100}%`;
+      setStyle(this.reloadProgress, 'width', `${reloadPct * 100}%`);
     }
     if (this.reloadTime) {
-      this.reloadTime.textContent = `${Math.max(0, weaponInfo.reloadRemaining || 0).toFixed(1)}s`;
+      setText(this.reloadTime, `${Math.max(0, weaponInfo.reloadRemaining || 0).toFixed(1)}s`);
     }
 
-    this.killCount.textContent  = kills;
-    this.scoreCount.textContent = score;
+    setText(this.killCount, kills);
+    setText(this.scoreCount, score);
   }
 
   updateGrenades(frags, smokes) {
-    this.fragCount.textContent  = `${frags}`;
-    this.smokeCount.textContent = `${smokes}`;
-    this.fragCount.classList.toggle('grenade-empty',  frags  === 0);
-    this.smokeCount.classList.toggle('grenade-empty', smokes === 0);
+    setText(this.fragCount, frags);
+    setText(this.smokeCount, smokes);
+    toggleClass(this.fragCount, 'grenade-empty', frags === 0);
+    toggleClass(this.smokeCount, 'grenade-empty', smokes === 0);
   }
 
   flashHitmarker(headshot = false) {
@@ -289,8 +315,8 @@ export class HUD {
 
   updateTeleport(ratio) {
     if (!this._abilityQ) return;
-    this._abilityQ.style.setProperty('--ratio', Math.max(0, Math.min(1, ratio)));
-    this._abilityQ.classList.toggle('ready', ratio >= 1);
+    setCustomStyle(this._abilityQ, '--ratio', String(Math.max(0, Math.min(1, ratio))));
+    toggleClass(this._abilityQ, 'ready', ratio >= 1);
   }
 
   /**
@@ -325,10 +351,10 @@ export class HUD {
   updateBlind(secondsLeft) {
     if (!this.blindOverlay) return;
     const active = secondsLeft > 0;
-    this.blindOverlay.classList.toggle('active', active);
-    this.blindOverlay.style.opacity = active
+    toggleClass(this.blindOverlay, 'active', active);
+    setStyle(this.blindOverlay, 'opacity', active
       ? String(Math.max(0.18, Math.min(1, secondsLeft / 0.7)))
-      : '0';
+      : '0');
   }
 
   // Mid-match player join/leave toast — slides in from left, fades after 3s.
@@ -353,8 +379,8 @@ export class HUD {
 
   // Live server population indicator (you + remote players, out of capacity).
   setServerPop(count, max) {
-    if (this.serverPopCount) this.serverPopCount.textContent = count;
-    if (this.serverPopMax)   this.serverPopMax.textContent   = max;
+    setText(this.serverPopCount, count);
+    setText(this.serverPopMax, max);
   }
 
   showServerPop(show) {

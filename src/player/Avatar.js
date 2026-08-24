@@ -27,6 +27,9 @@ import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 // the normal sprint is 13.2 m/s, which is 0.22m per frame at 60Hz and still
 // under 0.6m on a badly stuttering one.
 const TELEPORT_STEP = 3.0;    // metres
+const OUTLINE_LOD_DISTANCE_SQ = 36 * 36;
+const MID_POSE_DISTANCE_SQ = 26 * 26;
+const FAR_POSE_DISTANCE_SQ = 48 * 48;
 // Shared frame-local scratch for resolved travel direction. Remote avatars are
 // updated sequentially, so one module vector avoids a per-avatar allocation
 // without leaking state between them.
@@ -69,6 +72,12 @@ export class Avatar {
     this._spawnT = 0;
     this._firePulseT = 0;
     this._animSpeed = 0;
+    this._poseAcc = 0;
+    this._outlineVisible = true;
+    this._gaitSway = 0;
+    this._gaitBob = 0;
+    this._gaitLean = 0;
+    this._gaitRoll = 0;
   }
 
   setWeapon(id, force = false) {
@@ -229,6 +238,38 @@ export class Avatar {
       g.rotation.y += d * Math.min(1, dt * 14);
     }
 
+    // Presentation LOD never touches network interpolation or position/yaw.
+    // It only lowers the expensive bone/carry solve for small distant bodies,
+    // and drops their second-pass outline. Nearby combat remains full-rate.
+    const viewDistanceSq = Number.isFinite(s.viewDistanceSq) ? s.viewDistanceSq : 0;
+    const outlineVisible = viewDistanceSq < OUTLINE_LOD_DISTANCE_SQ;
+    if (outlineVisible !== this._outlineVisible) {
+      this._outlineVisible = outlineVisible;
+      for (const outline of g.userData?.outlines || []) outline.visible = outlineVisible;
+    }
+    const poseInterval = viewDistanceSq >= FAR_POSE_DISTANCE_SQ ? 1 / 15
+      : viewDistanceSq >= MID_POSE_DISTANCE_SQ ? 1 / 30 : 0;
+    if (poseInterval > 0) {
+      this._poseAcc += dt;
+      if (this._poseAcc < poseInterval) {
+        if (this.isHuman) g.position.copy(s.position);
+        else {
+          g.position.set(
+            s.position.x + Math.cos(g.rotation.y) * this._gaitSway,
+            s.position.y + this._gaitBob,
+            s.position.z - Math.sin(g.rotation.y) * this._gaitSway,
+          );
+          g.rotation.x = this._gaitLean;
+          g.rotation.z = this._gaitRoll;
+        }
+        return;
+      }
+      dt = Math.min(0.1, this._poseAcc);
+      this._poseAcc = 0;
+    } else {
+      this._poseAcc = 0;
+    }
+
     // Rigged human bodies drive their own skeletal clips.
     if (this.isHuman) {
       const ud = g.userData;
@@ -310,6 +351,10 @@ export class Avatar {
     // height after the weapon carry has been solved, producing the visible
     // seated/sideways bot gait and a gun floating above the body.
     this._walkT = gait.phase;
+    this._gaitSway = gait.sway;
+    this._gaitBob = gait.bob;
+    this._gaitLean = gait.lean;
+    this._gaitRoll = gait.roll;
     g.position.set(
       s.position.x + Math.cos(g.rotation.y) * gait.sway,
       s.position.y + gait.bob,
