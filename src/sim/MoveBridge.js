@@ -78,6 +78,7 @@ export class MoveBridge {
     p.recoilYaw += p.recoilYawVel * dt;
 
     // shield regen (gameplay state the legacy update owned)
+    p.updateHealthRegen?.(dt);
     if (p._shieldRegenDelay > 0) p._shieldRegenDelay = Math.max(0, p._shieldRegenDelay - dt);
     else if (p.shield < p.maxShield) p.shield = Math.min(p.maxShield, p.shield + SHIELD_REGEN * dt);
 

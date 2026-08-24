@@ -194,7 +194,7 @@ export const FIXTURES = [
   },
   {
     id: 'mobility',
-    title: 'Mobility — sprint clears 10.5 m/s and jump rises above 4 metres',
+    title: 'Mobility — sprint clears 13 m/s and jump rises above 4 metres',
     world: W({}),
     spawn: [0, 0, 0],
     tape: [
@@ -210,7 +210,7 @@ export const FIXTURES = [
         topSpeed = Math.max(topSpeed, Math.hypot(s.vx, s.vz));
       }
       if (peak < 4) return `jump peak too low (${peak})`;
-      if (topSpeed < 10.5) return `sprint speed too low (${topSpeed})`;
+      if (topSpeed < 13) return `sprint speed too low (${topSpeed})`;
       const last = states[states.length - 1];
       if (!last.onGround || last.py !== 0) return 'did not land after mobility check';
       return null;

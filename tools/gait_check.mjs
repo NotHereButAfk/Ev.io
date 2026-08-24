@@ -110,7 +110,7 @@ let failures = 0;
 const check = (ok, msg) => { if (!ok) { failures++; console.log('   FAIL  ' + msg); } };
 
 console.log('planted-foot slip  (0 = plants, 1 = feet do nothing, 2 = runs backwards)\n');
-console.log('   direction          walk 6.6   sprint 11.88');
+console.log('   direction          walk 6.6   sprint 13.20');
 const DIRS = [[0, 'forward'], [180, 'backpedal'], [-90, 'strafe-left'], [90, 'strafe-right'],
               [135, 'back-right diag'], [45, 'fwd-right diag']];
 // At arena-scale travel speeds a 1.82m figure cannot both keep every foot
@@ -120,7 +120,7 @@ const DIRS = [[0, 'forward'], [180, 'backpedal'], [-90, 'strafe-left'], [90, 'st
 const LIMIT = 0.88;
 for (const [deg, name] of DIRS) {
   const w = measureSlip(6.6, deg, { run: 0 }).slip;
-  const s = measureSlip(11.88, deg, { run: 1 }).slip;
+  const s = measureSlip(13.2, deg, { run: 1 }).slip;
   const bad = Math.max(Math.abs(w), Math.abs(s)) > LIMIT;
   console.log('   %s %s     %s%s', name.padEnd(16),
     w.toFixed(2).padStart(6), s.toFixed(2).padStart(6), bad ? '   <— SKATING' : '');
@@ -137,7 +137,7 @@ const cadenceAt = (speed, run) => {
   return (rig._walkT - t0) / (Math.PI * 2);
 };
 const walkCadence = cadenceAt(6.6, 0.45);
-const sprintCadence = cadenceAt(11.88, 1);
+const sprintCadence = cadenceAt(13.2, 1);
 console.log('   walk %s cycles/s (%s steps/s), sprint %s cycles/s (%s steps/s)',
   walkCadence.toFixed(2), (walkCadence * 2).toFixed(2),
   sprintCadence.toFixed(2), (sprintCadence * 2).toFixed(2));

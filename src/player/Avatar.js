@@ -24,7 +24,7 @@ import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 // ═══════════════════════════════════════════════════════════════════════════
 
 // A position jump bigger than this in a single frame can't be running — the
-// the normal sprint is 11.88 m/s, which is 0.20m per frame at 60Hz and still
+// the normal sprint is 13.2 m/s, which is 0.22m per frame at 60Hz and still
 // under 0.6m on a badly stuttering one.
 const TELEPORT_STEP = 3.0;    // metres
 // Shared frame-local scratch for resolved travel direction. Remote avatars are

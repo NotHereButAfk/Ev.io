@@ -26,6 +26,7 @@
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
 import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
+import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../src/core/CombatConfig.js';
 import {
   BOT_STATES,
   botAimErrorMeters,
@@ -236,6 +237,7 @@ export class AuthRoom {
       player.queue.length = 0;
       player.history.length = 0;
       player.health = START_HEALTH;
+      player.healthRegenDelay = 0;
       player.shield = player.maxShield;
       player.alive = true;
       player.deadUntil = 0;
@@ -319,6 +321,7 @@ export class AuthRoom {
       lastInputSeq: 0, ackTick: 0,
       queue: [],
       health: START_HEALTH, shield: START_SHIELD, maxShield: START_SHIELD,
+      healthRegenDelay: 0,
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
       wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
       ammo: { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } },
@@ -815,6 +818,7 @@ export class AuthRoom {
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
+    target.healthRegenDelay = HEALTH_REGEN_DELAY;
     this.events.push({ e: 'hit', id: target.id, by: shooter.id, dmg: Math.round(dmg), head });
     if (target.health <= 0) this._kill(target, shooter, head);
   }
@@ -962,6 +966,7 @@ export class AuthRoom {
           const s = this._spawn(p.id, p.id, true);
           p.state = createState(s[0], s[1], s[2]);
           p.health = START_HEALTH; p.shield = p.maxShield;
+          p.healthRegenDelay = 0;
           p.wid = 'm4';
           p.matchWeapons.clear();
           p.mag = WEAPONS.m4.mag;
@@ -984,6 +989,16 @@ export class AuthRoom {
         }
         this._record(p);
         continue;
+      }
+
+      if (p.healthRegenDelay > 0) {
+        p.healthRegenDelay = Math.max(0, p.healthRegenDelay - 1 / TICK_HZ);
+        if (p.healthRegenDelay <= 1e-6 && p.health < START_HEALTH) {
+          p.healthRegenDelay = 0;
+          p.health = Math.min(START_HEALTH, p.health + HEALTH_REGEN_RATE / TICK_HZ);
+        }
+      } else if (p.health < START_HEALTH) {
+        p.health = Math.min(START_HEALTH, p.health + HEALTH_REGEN_RATE / TICK_HZ);
       }
 
       // consume the next queued input (or coast with zero-move if starved)

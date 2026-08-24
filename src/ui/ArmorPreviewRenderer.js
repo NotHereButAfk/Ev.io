@@ -104,6 +104,7 @@ export class ArmorPreviewRenderer {
     g.scale.setScalar(s);
 
     this._group = g;
+    this._baseYaw = g.rotation.y + Math.PI;
     this._scene.add(g);
 
     // frame the full body with a little headroom/legroom
@@ -119,7 +120,10 @@ export class ArmorPreviewRenderer {
       this._raf = requestAnimationFrame(loop);
       this._t += 0.016;
       if (this._group) {
-        this._group.rotation.y = this._t * 0.6;
+        // Keep the soldier facing the player like EV.IO's loadout mannequin;
+        // a restrained presentation sway shows the model without turning its
+        // back while the user is choosing a skin.
+        this._group.rotation.y = (this._baseYaw || 0) + Math.sin(this._t * 0.45) * 0.22;
         // Drive the rigged human soldier's idle animation on the turntable.
         const ud = this._group.userData;
         if (ud?.isHuman) { ud.setMotion('idle'); ud.mixer.update(0.016); ud.armorTick?.(0.016); }

@@ -11,11 +11,12 @@ import {
   STAMINA_REGEN,
   STAMINA_REGEN_DELAY,
 } from '../sim/MovementConfig.js';
+import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../core/CombatConfig.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
 const WALK_SPEED = 6.6;
-const SPRINT_MULT = 1.8;
+const SPRINT_MULT = 2.0;
 const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
 const MOUSE_SENSITIVITY = 0.0024;
@@ -51,6 +52,7 @@ export class Player {
 
     this.maxHealth = 100;
     this.health = this.maxHealth;
+    this._healthRegenDelay = 0;
     this.maxStamina = STAMINA_MAX;
     this.stamina = STAMINA_MAX;
     this._staminaRegenDelay = 0;
@@ -121,6 +123,7 @@ export class Player {
     this.shield   = this.maxShield;
     this._staminaRegenDelay = 0;
     this._shieldRegenDelay  = 0;
+    this._healthRegenDelay  = 0;
     this.position.copy(position);
     if (Number.isFinite(position.spawnYaw)) this.yaw = position.spawnYaw;
     this.velocity.set(0, 0, 0);
@@ -157,12 +160,23 @@ export class Player {
   }
 
   takeDamage(amount) {
+    this._healthRegenDelay = HEALTH_REGEN_DELAY;
     this._shieldRegenDelay = SHIELD_REGEN_DELAY;
     const absorbed = Math.min(this.shield, amount);
     this.shield = Math.max(0, this.shield - absorbed);
     const remaining = amount - absorbed;
     if (remaining > 0) this.health = Math.max(0, this.health - remaining);
     return this.health <= 0;
+  }
+
+  updateHealthRegen(dt) {
+    if (this.health <= 0 || this.health >= this.maxHealth) return;
+    if (this._healthRegenDelay > 0) {
+      this._healthRegenDelay = Math.max(0, this._healthRegenDelay - dt);
+      if (this._healthRegenDelay > 1e-6) return;
+      this._healthRegenDelay = 0;
+    }
+    this.health = Math.min(this.maxHealth, this.health + HEALTH_REGEN_RATE * dt);
   }
 
   applyRecoil(amount) {
@@ -175,6 +189,7 @@ export class Player {
   }
 
   update(dt, input, world) {
+    this.updateHealthRegen(dt);
     // Competitive view is first-person only. Scroll remains available to the
     // weapon system, but can no longer switch into a shoulder camera.
     this._camDist = 0;

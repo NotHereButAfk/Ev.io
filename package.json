@@ -36,6 +36,7 @@
     "test:loadout": "node tools/loadout_weapon_check.mjs",
     "test:audio": "node tools/audio_contract_check.mjs",
     "test:gui": "node tools/gui_contract_check.mjs",
+    "test:health-regen": "node tools/health_regen_check.mjs",
     "test:startup": "node tools/startup_loading_check.mjs",
     "test:adblock": "node tools/sponsor_block_check.mjs",
     "test:adblock-browser": "node tools/sponsor_block_browser_check.mjs",

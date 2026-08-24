@@ -119,7 +119,7 @@ function install(group) {
       // slow-body skating while preserving the authored jog and sprint shape.
       let targetPlayback = 1;
       if (activeName === 'jog') targetPlayback = THREE.MathUtils.clamp((o.speed || 0) / 6.6, 0.72, 1.18);
-      if (activeName === 'sprint') targetPlayback = THREE.MathUtils.clamp((o.speed || 0) / 11.88, 0.78, 1.16);
+      if (activeName === 'sprint') targetPlayback = THREE.MathUtils.clamp((o.speed || 0) / 13.2, 0.78, 1.16);
       if (activeName === 'crouchMove') targetPlayback = THREE.MathUtils.clamp((o.speed || 0) / 3.7, 0.7, 1.15);
       playback += (targetPlayback - playback) * (1 - Math.exp(-10 * dt));
       active.setEffectiveTimeScale(playback);
