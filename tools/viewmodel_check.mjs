@@ -632,9 +632,9 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
       const sightNdc = record.group.localToWorld(record.sight.clone()).project(camera);
-      assert(sightNdc.x > 0.035 && sightNdc.x < 0.18,
-        `${def.id} ADS sight does not settle right of the reticle (${sightNdc.x.toFixed(3)})`);
-      assert(sightNdc.y < -0.14 && sightNdc.y > -0.46,
+      assert(Math.abs(sightNdc.x) < 0.02,
+        `${def.id} ADS sight drifts sideways instead of only lowering (${sightNdc.x.toFixed(3)})`);
+      assert(sightNdc.y < -0.32 && sightNdc.y > -0.72,
         `${def.id} ADS sight does not clear below the reticle (${sightNdc.y.toFixed(3)})`);
       const aimRay = new THREE.Raycaster();
       aimRay.setFromCamera(new THREE.Vector2(0, 0), camera);

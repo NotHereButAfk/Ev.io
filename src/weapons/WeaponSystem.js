@@ -96,8 +96,8 @@ function viewmodelFovLift(fov) {
   return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
-// Normal EV-style ADS keeps the firearm on screen, but the sight settles just
-// below/right of the reticle instead of putting the camera inside the receiver.
+// Normal EV-style ADS keeps the firearm full-size on screen, but the sight
+// settles below the reticle instead of covering the target with the receiver.
 // The actual shot still follows the fixed centre reticle. This gives the player
 // a clear target picture while preserving the readable zoom/raise animation.
 // Only a magnified sniper optic hands off to the full-screen scope overlay, and
@@ -109,13 +109,10 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   return !!def?.scoped && scopeT > 0.68;
 }
 
-// Camera-local endpoint for the physical rear sight during ordinary ADS. At
-// the old (0, 0, -0.42) endpoint, the 48-64 degree zoom put the eye effectively
-// inside several supplied gun models: the receiver covered the reticle and the
-// magnum could cover most of the screen. A deeper, slightly low/right endpoint
-// keeps the complete model visible without letting it obstruct the aim ray.
-const ADS_SIGHT_DEPTH = -0.78;
-const ADS_SIGHT_X = 0.07;
+// EV.IO keeps the zoomed weapon large and lowers it instead of scaling it away.
+// Preserve the original eye depth so the supplied model keeps exactly the same
+// apparent size, then drop only its vertical endpoint to clear the aim ray.
+const ADS_SIGHT_DEPTH = -0.42;
 const ADS_SIGHT_Y = -0.11;
 
 const _adsBox = new THREE.Box3();
@@ -172,10 +169,9 @@ export function adsMountForSight(
   sight,
   scale = VIEWMODEL_SCALE,
   depth = ADS_SIGHT_DEPTH,
-  aspect = REFERENCE_ASPECT,
 ) {
   return new THREE.Vector3(
-    -sight.x * scale + ADS_SIGHT_X * viewmodelAspectScale(aspect),
+    -sight.x * scale,
     -sight.y * scale + ADS_SIGHT_Y,
     depth - sight.z * scale,
   );
@@ -326,7 +322,7 @@ export class WeaponSystem {
         group,
         muzzle,
         sight,
-        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect),
+        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH),
       });
     }
     this._setActiveModel(0);
@@ -351,7 +347,7 @@ export class WeaponSystem {
         group,
         muzzle,
         sight,
-        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect),
+        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH),
       });
     }
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
@@ -1705,10 +1701,8 @@ export class WeaponSystem {
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
     const modelRecord  = this.models.get(def.id);
-    // Recompute the endpoint so resizing between desktop, tablet and portrait
-    // keeps the same visual clearance instead of reusing the startup aspect.
     const adsPose      = modelRecord?.sight
-      ? adsMountForSight(modelRecord.sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect)
+      ? adsMountForSight(modelRecord.sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH)
       : modelRecord?.adsMount;
     const adsEase      = this.scopeT * this.scopeT * (3 - 2 * this.scopeT);
     // Sprint lowers the complete gun-and-hands rig. The old positive offset
