@@ -19,6 +19,9 @@ const settings = read('src/core/GameSettings.js');
 const css = read('src/style.css');
 
 const failures = [];
+if (!index.includes('class="inv-layout"')) failures.push('inventory exposes a two-region loadout layout');
+if (!index.includes('class="inv-sidebar"')) failures.push('inventory exposes the equipped loadout sidebar');
+if (!index.includes('class="inv-collection"')) failures.push('inventory exposes the filtered item collection');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };

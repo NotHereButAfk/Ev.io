@@ -21,7 +21,7 @@ export const HUMAN_PHASE_ORIGIN = Object.freeze({
 // omitted because it shortens that travel and pushes the toes through the floor.
 export const HUMAN_STRIDE_WARP = Object.freeze({
   walk: 0.50,
-  run: 0.64,
+  run: 0.72,
 });
 
 // Airborne motion is procedural, layered over the neutral clip. Leaving a
@@ -32,8 +32,8 @@ export function humanMotionTransitionSeconds(fromMotion, toMotion) {
   if (toMotion === 'air') return 0.055;
   if (fromMotion === 'air') return 0.12;
   const fades = {
-    idleToWalk: 0.22, walkToRun: 0.28, runToWalk: 0.30,
-    walkToIdle: 0.30, idleToRun: 0.30, runToIdle: 0.34,
+    idleToWalk: 0.22, walkToRun: 0.36, runToWalk: 0.34,
+    walkToIdle: 0.30, idleToRun: 0.38, runToIdle: 0.38,
   };
   const key = `${fromMotion}To${toMotion.charAt(0).toUpperCase()}${toMotion.slice(1)}`;
   return fades[key] ?? 0.2;
@@ -76,7 +76,7 @@ export function targetHumanTimeScale(motion, speed, characterScale = 1) {
     // A full ground-match at the 11.88 m/s sci-fi sprint would require 2.8x
     // playback and read like a cartoon. Cap cadence at a believable five-ish
     // steps/second; the remaining speed is expressed as a longer powered stride.
-    return characterScale * Math.max(0.72, Math.min(1.72, speed / HUMAN_CLIP_SPEED.run));
+    return characterScale * Math.max(0.72, Math.min(1.38, speed / HUMAN_CLIP_SPEED.run));
   }
   return characterScale;
 }
@@ -88,7 +88,8 @@ export function targetHumanStrideScale(motion, speed, timeScale, modelScale = 1)
   const clipSpeed = HUMAN_CLIP_SPEED[motion];
   if (!clipSpeed || speed <= 0) return 1;
   const delivered = clipSpeed * Math.abs(timeScale) * Math.max(0.01, modelScale);
-  return Math.max(1, Math.min(1.6, speed / Math.max(0.01, delivered)));
+  return Math.max(1, Math.min(motion === 'run' ? 1.82 : 1.6,
+    speed / Math.max(0.01, delivered)));
 }
 
 export function humanStrideWarpAngle(motion, strideScale, gaitPhase) {

@@ -695,7 +695,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
 
     // ── Layer 9: locomotion accent — a tiny head bob at foot cadence for weight ──
     if (_grounded && (_locName === 'walk' || _locName === 'run')) {
-      const bobY = Math.sin(gaitPhase * 2) * (_locName === 'run' ? 0.010 : 0.006);
+      // EV.IO-style sprint reads as forward glide: feet still cycle, but the
+      // head/visor does not bounce at the full running cadence.
+      const bobY = Math.sin(gaitPhase * 2) * (_locName === 'run' ? 0.003 : 0.006);
       if (B.head) B.head.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X, bobY));
     }
 
@@ -768,7 +770,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
         applyActionEuler(B.lFore, _actionPose.lForeX, 0, _actionPose.lForeZ);
       }
       const carrySway = _grounded && _locName !== 'idle'
-        ? Math.sin(gaitPhase * 2) * 0.035
+        ? Math.sin(gaitPhase * 2) * 0.015
         : Math.sin(t * 1.5) * 0.012;
       const landDip = _landT > 0
         ? Math.sin((1 - _landT / 0.24) * Math.PI) * 0.10 : 0;

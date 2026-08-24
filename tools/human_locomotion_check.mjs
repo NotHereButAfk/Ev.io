@@ -40,9 +40,9 @@ const runRate = targetHumanTimeScale('run', 6.2);
 const sprintRate = targetHumanTimeScale('run', 11.88);
 assert(walkRate > 1 && walkRate < 1.7, `walk rate is implausible (${walkRate})`);
 assert(runRate > 1.3 && runRate < 1.6, `run rate is implausible (${runRate})`);
-assert(sprintRate === 1.72, `sprint cadence cap changed (${sprintRate})`);
+assert(sprintRate === 1.38, `gliding sprint cadence cap changed (${sprintRate})`);
 const sprintStride = targetHumanStrideScale('run', 11.88, sprintRate);
-assert(sprintStride > 1.55 && sprintStride <= 1.6,
+assert(sprintStride > 1.8 && sprintStride <= 1.82,
   `sprint stride warp is implausible (${sprintStride})`);
 assert(Math.abs(targetHumanStrideScale('run', HUMAN_CLIP_SPEED.run, 1) - 1) < 1e-6,
   'native run speed should not warp the stride');
@@ -239,7 +239,7 @@ assert(
   warpedRun.minHeight >= nativeRun.minHeight - 0.01,
   `stride warp adds ${((nativeRun.minHeight - warpedRun.minHeight) * 100).toFixed(2)}cm toe penetration`
 );
-assert(HUMAN_STRIDE_WARP.run === 0.64, 'measured Run stride gain drifted');
+assert(HUMAN_STRIDE_WARP.run === 0.72, 'gliding Run stride gain drifted');
 
 console.log(
   `human locomotion passed: walk=${walkRate.toFixed(2)}x run=${runRate.toFixed(2)}x sprint=${sprintRate.toFixed(2)}x, delivery=${measuredSprint.toFixed(2)}m/s, toe floor delta=${((warpedRun.minHeight - nativeRun.minHeight) * 100).toFixed(2)}cm, floor spread=${(floorSpread * 100).toFixed(2)}cm, contact phase-matched`

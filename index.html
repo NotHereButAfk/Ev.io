@@ -217,27 +217,34 @@
     <div id="panel-loadout" class="nav-panel nav-panel-inv hidden">
       <button id="inv-close-btn" class="inv-close-btn" title="Close">[X]</button>
 
-      <div class="inv-header">
-        <div class="inv-avatar-big"><canvas id="armor-preview-canvas" width="360" height="360"></canvas></div>
-        <div class="inv-id">
-          <div class="inv-username" id="inv-username">Recruit</div>
-          <input id="player-name" type="hidden" value="Recruit" />
-          <div class="inv-meta">Balance:
-            <span class="inv-ecoin"></span>
-            <span id="inv-balance">500</span>
+      <div class="inv-page-title">INVENTORY</div>
+      <div class="inv-page-sub">SELECT A LOADOUT ITEM AND EQUIP A FINISH</div>
+      <div class="inv-layout">
+        <aside class="inv-sidebar">
+          <div class="inv-header">
+            <div class="inv-avatar-big"><canvas id="armor-preview-canvas" width="360" height="360"></canvas></div>
+            <div class="inv-id">
+              <div class="inv-username" id="inv-username">Recruit</div>
+              <input id="player-name" type="hidden" value="Recruit" />
+              <div class="inv-meta">Balance:
+                <span class="inv-ecoin"></span>
+                <span id="inv-balance">500</span>
+              </div>
+              <div class="inv-meta">Networth: <span id="inv-networth">0</span>
+                <span class="inv-tt" title="Total value of the skins you own">?</span>
+              </div>
+            </div>
           </div>
-          <div class="inv-meta">Networth: <span id="inv-networth">0</span>
-            <span class="inv-tt" title="Total value of the skins you own">?</span>
-          </div>
-        </div>
+          <div class="inv-section-label">EQUIPPED</div>
+          <div id="inv-equipped" class="inv-card-row"></div>
+        </aside>
+        <section class="inv-collection">
+          <div class="inv-section-label">ITEM TYPE</div>
+          <div id="inv-tabs" class="inv-tabs"></div>
+          <div class="inv-collection-head"><span>YOUR ITEMS</span><span class="inv-collection-hint">CLICK TO EQUIP</span></div>
+          <div id="inv-grid" class="inv-grid"></div>
+        </section>
       </div>
-
-      <div class="inv-section-label">EQUIPPED</div>
-      <div id="inv-equipped" class="inv-card-row"></div>
-
-      <div class="inv-section-label">INVENTORY</div>
-      <div id="inv-tabs" class="inv-tabs"></div>
-      <div id="inv-grid" class="inv-grid"></div>
     </div>
 
     <!-- ===================== PANEL: MODES ===================== -->
