@@ -19,12 +19,13 @@ import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponT
 
 // The five permanent weapon choices. Specials and heavies are collected from
 // glowing pads during a live match, so they do not appear in this menu.
-export const MAIN_GUNS = MAIN_WEAPON_IDS.map((id) => {
+const EV_INVENTORY_LABELS = ['Auto Rifle', 'Hand Cannon', 'Burst Rifle', 'Sweeper', 'Laser Rifle'];
+export const MAIN_GUNS = MAIN_WEAPON_IDS.map((id, index) => {
   const weapon = WEAPONS.find((w) => w.id === id);
-  return { id, label: weapon?.name || id };
+  return { id, label: EV_INVENTORY_LABELS[index] || weapon?.name || id };
 });
 // Melee remains a separate equipment slot.
-const MELEE      = weaponsByCategory('melee').map((w) => ({ id: w.id, label: w.name }));
+const MELEE = weaponsByCategory('melee').slice(0, 1).map((w) => ({ id: w.id, label: 'Sword' }));
 
 // Tab strip organised into labelled groups.
 const TAB_GROUPS = [
@@ -154,12 +155,13 @@ export class InventoryPanel {
       row.appendChild(this._defaultCharacterCard(playerSkin, /*equipped=*/true));
     }
 
-    // Main weapon card — the currently equipped gun + its skin.
-    const gunId  = Loadout.getGun();
-    const gunDef = WEAPONS.find((w) => w.id === gunId);
-    if (gunDef) {
-      const skinId = Armory.hasSkin(gunId) ? Armory.getSkinId(gunId, false) : null;
-      const skin   = skinId ? WEAPON_SKINS.find((s) => s.id === skinId) : null;
+    // Equipped skin for each EV-style weapon category.
+    for (const choice of [...MAIN_GUNS, ...MELEE]) {
+      const gunDef = WEAPONS.find((w) => w.id === choice.id);
+      if (!gunDef) continue;
+      const isMelee = gunDef.kind === 'melee';
+      const skinId = Armory.hasSkin(gunDef.id) ? Armory.getSkinId(gunDef.id, isMelee) : null;
+      const skin = skinId ? WEAPON_SKINS.find((s) => s.id === skinId) : null;
       row.appendChild(this._weaponCard(gunDef, skin, /*equipped=*/true));
     }
   }

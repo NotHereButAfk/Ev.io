@@ -16,6 +16,7 @@ const menu = read('src/ui/MainMenu.js');
 const hud = read('src/ui/HUD.js');
 const game = read('src/core/Game.js');
 const settings = read('src/core/GameSettings.js');
+const inventory = read('src/ui/InventoryPanel.js');
 const css = read('src/style.css');
 
 const failures = [];
@@ -23,6 +24,11 @@ if (!index.includes('class="inv-profile-head"')) failures.push('inventory expose
 if (!index.includes('class="inv-page-title inv-equipped-title"')) failures.push('inventory exposes one currently-equipped row');
 if (!index.includes('class="inv-page-title inv-inventory-title"')) failures.push('inventory exposes the owned-item section');
 if (!css.includes('flex: 0 0 110px')) failures.push('inventory preserves EV-style 110px item tiles');
+if (!index.includes('>Equipped</h2>') || !index.includes('>Inventory</h2>')) failures.push('inventory uses EV heading copy and casing');
+for (const label of ['Auto Rifle', 'Hand Cannon', 'Burst Rifle', 'Sweeper', 'Laser Rifle']) {
+  if (!inventory.includes(`'${label}'`)) failures.push(`inventory category: ${label}`);
+}
+if (!inventory.includes("label: 'Sword'")) failures.push('inventory category: Sword');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };
