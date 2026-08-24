@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WEAPONS } from '../src/weapons/weaponDefs.js';
+import { MAIN_WEAPON_IDS, WEAPONS } from '../src/weapons/weaponDefs.js';
 
 // WeaponTextures creates canvases while the procedural fallbacks are built.
 // Geometry is all this probe needs, so a no-op 2D context keeps the check
@@ -29,7 +29,12 @@ globalThis.ProgressEvent ??= class ProgressEvent {
   }
 };
 
-const { WeaponSystem, shouldHideAdsViewmodel } = await import('../src/weapons/WeaponSystem.js');
+const {
+  WeaponSystem,
+  adsMountForSight,
+  measureWeaponSight,
+  shouldHideAdsViewmodel,
+} = await import('../src/weapons/WeaponSystem.js');
 const { orientWeaponModelForward } = await import('../src/weapons/WeaponModels.js');
 
 const assert = (ok, message) => {
@@ -102,7 +107,13 @@ for (const def of WEAPONS) {
   group.add(clone);
   group.visible = wasVisible;
   system.kickGroup.add(group);
-  system.models.set(def.id, { group, muzzle: muzzle || record.muzzle });
+  const sight = measureWeaponSight(group);
+  system.models.set(def.id, {
+    group,
+    muzzle: muzzle || record.muzzle,
+    sight,
+    adsMount: adsMountForSight(sight),
+  });
 }
 
 const input = {
@@ -615,7 +626,22 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
     assert(Math.abs(system.weaponMount.rotation.x) < 0.012
       && Math.abs(system.weaponMount.rotation.y) < 0.012
       && Math.abs(system.weaponMount.rotation.z) < 0.012,
-    `${def.id} sight is not squared to the camera axis`);
+      `${def.id} sight is not squared to the camera axis`);
+    if (MAIN_WEAPON_IDS.includes(def.id)) {
+      const record = system.models.get(def.id);
+      camera.updateMatrixWorld(true);
+      record.group.updateWorldMatrix(true, true);
+      const sightNdc = record.group.localToWorld(record.sight.clone()).project(camera);
+      assert(sightNdc.x > 0.035 && sightNdc.x < 0.18,
+        `${def.id} ADS sight does not settle right of the reticle (${sightNdc.x.toFixed(3)})`);
+      assert(sightNdc.y < -0.14 && sightNdc.y > -0.46,
+        `${def.id} ADS sight does not clear below the reticle (${sightNdc.y.toFixed(3)})`);
+      const aimRay = new THREE.Raycaster();
+      aimRay.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const centerHits = aimRay.intersectObject(record.group, true);
+      assert(centerHits.length === 0,
+        `${def.id} ADS geometry still blocks the centre aim ray`);
+    }
   }
   input.rightMouseDown = false;
   advanceSeconds(0.2, 240);

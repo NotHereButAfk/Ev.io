@@ -96,15 +96,27 @@ function viewmodelFovLift(fov) {
   return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
 }
 
-// Normal EV-style ADS keeps the firearm on screen and brings its physical sight
-// onto the camera axis. Only a magnified sniper optic hands off to the full-screen
-// scope overlay, and only after the gun has travelled most of the way there.
+// Normal EV-style ADS keeps the firearm on screen, but the sight settles just
+// below/right of the reticle instead of putting the camera inside the receiver.
+// The actual shot still follows the fixed centre reticle. This gives the player
+// a clear target picture while preserving the readable zoom/raise animation.
+// Only a magnified sniper optic hands off to the full-screen scope overlay, and
+// only after the gun has travelled most of the way there.
 // This also gives scope-out a readable reverse animation instead of popping the
 // complete gun-and-hands rig in and out on right mouse down/up.
 export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   void aimHeld;
   return !!def?.scoped && scopeT > 0.68;
 }
+
+// Camera-local endpoint for the physical rear sight during ordinary ADS. At
+// the old (0, 0, -0.42) endpoint, the 48-64 degree zoom put the eye effectively
+// inside several supplied gun models: the receiver covered the reticle and the
+// magnum could cover most of the screen. A deeper, slightly low/right endpoint
+// keeps the complete model visible without letting it obstruct the aim ray.
+const ADS_SIGHT_DEPTH = -0.78;
+const ADS_SIGHT_X = 0.07;
+const ADS_SIGHT_Y = -0.11;
 
 const _adsBox = new THREE.Box3();
 const _adsSpecialBox = new THREE.Box3();
@@ -156,10 +168,15 @@ export function measureWeaponSight(group) {
   return new THREE.Vector3(_adsPoint.x, y, source.max.z - 0.015);
 }
 
-export function adsMountForSight(sight, scale = VIEWMODEL_SCALE, depth = -0.42) {
+export function adsMountForSight(
+  sight,
+  scale = VIEWMODEL_SCALE,
+  depth = ADS_SIGHT_DEPTH,
+  aspect = REFERENCE_ASPECT,
+) {
   return new THREE.Vector3(
-    -sight.x * scale,
-    -sight.y * scale,
+    -sight.x * scale + ADS_SIGHT_X * viewmodelAspectScale(aspect),
+    -sight.y * scale + ADS_SIGHT_Y,
     depth - sight.z * scale,
   );
 }
@@ -305,7 +322,12 @@ export class WeaponSystem {
       group.visible = false;
       this.kickGroup.add(group);
       const sight = measureWeaponSight(group);
-      this.models.set(w.id, { group, muzzle, sight, adsMount: adsMountForSight(sight) });
+      this.models.set(w.id, {
+        group,
+        muzzle,
+        sight,
+        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect),
+      });
     }
     this._setActiveModel(0);
     this._buildArm();
@@ -325,7 +347,12 @@ export class WeaponSystem {
       if (old) this.kickGroup.remove(old.group);
       this.kickGroup.add(group);
       const sight = measureWeaponSight(group);
-      this.models.set(w.id, { group, muzzle, sight, adsMount: adsMountForSight(sight) });
+      this.models.set(w.id, {
+        group,
+        muzzle,
+        sight,
+        adsMount: adsMountForSight(sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect),
+      });
     }
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
     if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
@@ -1677,7 +1704,12 @@ export class WeaponSystem {
     // start/stop sprint or scope in/out).
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
-    const adsPose      = this.models.get(def.id)?.adsMount;
+    const modelRecord  = this.models.get(def.id);
+    // Recompute the endpoint so resizing between desktop, tablet and portrait
+    // keeps the same visual clearance instead of reusing the startup aspect.
+    const adsPose      = modelRecord?.sight
+      ? adsMountForSight(modelRecord.sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH, this.camera.aspect)
+      : modelRecord?.adsMount;
     const adsEase      = this.scopeT * this.scopeT * (3 - 2 * this.scopeT);
     // Sprint lowers the complete gun-and-hands rig. The old positive offset
     // raised it 12cm, contradicting the intended carry and forcing implausibly
