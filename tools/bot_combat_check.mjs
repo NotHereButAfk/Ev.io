@@ -2,17 +2,20 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import {
+  BOT_DASH,
   BOT_TACTICS,
   BOT_DIFFICULTIES,
   BOT_STATES,
   advanceBotMagazine,
   advanceBurst,
   botAimErrorMeters,
+  botDashBonusSpeed,
   botLoadoutForId,
   combatTargetScore,
   chooseCombatSteering,
   chooseReachableRoamPoint,
   getBotDifficulty,
+  isBotDashLaneSafe,
   isInsideBotFov,
   smoothBotAim,
 } from '../src/entities/BotCombat.js';
@@ -46,6 +49,25 @@ const blockedRoam = chooseReachableRoamPoint({
 });
 assert.equal(blockedRoam, null, 'roam planner selected a lane through a wall');
 console.log('ok   roaming selects long walkable lanes and rejects wall-blocked targets');
+
+assert.ok(botDashBonusSpeed(BOT_DASH.duration) > botDashBonusSpeed(0.05),
+  'dash burst does not ease down from its initial acceleration');
+assert.equal(isBotDashLaneSafe({
+  x: 0, y: 0, z: 0, dx: 1, dz: 0,
+  groundHeightAt: () => 0,
+  raycast: (_ox, _oy, _oz, _dx, _dy, _dz, far) => far,
+}), true, 'clear grounded lane rejected a bot dash');
+assert.equal(isBotDashLaneSafe({
+  x: 0, y: 0, z: 0, dx: 1, dz: 0,
+  groundHeightAt: () => 0,
+  raycast: () => 1,
+}), false, 'wall-blocked lane allowed a bot dash');
+assert.equal(isBotDashLaneSafe({
+  x: 0, y: 0, z: 0, dx: 1, dz: 0,
+  groundHeightAt: (x) => x > 3 ? -100 : 0,
+  raycast: (_ox, _oy, _oz, _dx, _dy, _dz, far) => far,
+}), false, 'unsupported lane allowed a bot dash over an edge');
+console.log('ok   bot dashes accelerate on clear lanes and reject walls and ledges');
 
 const cases = [
   {
@@ -208,6 +230,7 @@ aiRoom._resetBotAI(bot);
 assert.equal(bot._botState, BOT_STATES.ROAM);
 assert.equal(bot._botTargetId, null);
 assert.equal(bot._botHostility.size, 0, 'respawn reset retained hostility');
+assert.equal(bot._botDashTicks, 0, 'respawn reset retained an active dash');
 console.log('ok   authoritative states enforce passive roam, reaction delay, attacker switching, and respawn reset');
 
 const roamRoom = new AuthRoom(aiArena, { targetPopulation: 1, botDifficulty: 'normal' });
@@ -215,17 +238,25 @@ const roamingBot = [...roamRoom.players.values()][0];
 const roamStart = [roamingBot.state.px, roamingBot.state.pz];
 let roamingAirTicks = 0;
 let roamingSprintTicks = 0;
+let roamingDashTicks = 0;
+let roamingPeakSpeed = 0;
 for (let i = 0; i < TICK_HZ * 8; i++) {
   roamRoom.update();
   if (!roamingBot.state.onGround) roamingAirTicks++;
   if (roamingBot._lastSprint) roamingSprintTicks++;
+  if (roamingBot._botDashTicks > 0) roamingDashTicks++;
+  roamingPeakSpeed = Math.max(roamingPeakSpeed, Math.hypot(roamingBot._animVX, roamingBot._animVZ));
 }
 assert.ok(Math.hypot(roamingBot.state.px - roamStart[0], roamingBot.state.pz - roamStart[1]) > 12,
   'single roaming bot remained trapped in its spawn area');
 assert.ok(roamingAirTicks < TICK_HZ * 2, 'roaming bot bunny-hopped instead of running');
 assert.equal(roamingBot.state.stamina, STAMINA_MAX, 'roaming bot consumed stamina');
 assert.ok(roamingSprintTicks > TICK_HZ * 4, 'roaming bot did not sustain its run around the map');
-console.log('ok   an idle authoritative bot runs indefinitely beyond its spawn area without repeated jumping');
+assert.ok(roamingBot._botDashStarts > 0 && roamingDashTicks > 0,
+  'roaming bot never started a dash burst');
+assert.ok(roamingPeakSpeed > 17,
+  `roaming bot dash was not visibly faster than sprint (${roamingPeakSpeed.toFixed(2)}m/s)`);
+console.log(`ok   an idle authoritative bot runs and dashes beyond spawn (peak ${roamingPeakSpeed.toFixed(2)}m/s)`);
 
 const loadRoom = new AuthRoom(aiArena, { targetPopulation: 8, botDifficulty: 'normal' });
 const loadStarted = performance.now();

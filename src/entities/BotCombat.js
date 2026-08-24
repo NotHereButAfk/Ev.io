@@ -10,6 +10,54 @@ export const BOT_TACTICS = Object.freeze({
   meleeAttackDistance: 2.2,
 });
 
+// Bots keep their ordinary sprint, then punctuate it with short readable bursts.
+// The extra speed is applied only after a full clear-lane/ground check, so this
+// feels like an arena dash without teleporting through cover or off a ledge.
+export const BOT_DASH = Object.freeze({
+  duration: 0.36,
+  bonusSpeed: 8.8,
+  cooldownMin: 1.9,
+  cooldownMax: 3.2,
+  laneDistance: 7.2,
+});
+
+export function botDashBonusSpeed(remaining, duration = BOT_DASH.duration) {
+  const t = Math.max(0, Math.min(1, remaining / Math.max(1e-6, duration)));
+  return BOT_DASH.bonusSpeed * (0.32 + 0.68 * t * t);
+}
+
+export function isBotDashLaneSafe({
+  x, y, z, dx, dz,
+  killY = -25,
+  laneDistance = BOT_DASH.laneDistance,
+  groundHeightAt,
+  raycast,
+}) {
+  const length = Math.hypot(dx, dz);
+  if (length < 1e-5 || typeof groundHeightAt !== 'function') return false;
+  const dirX = dx / length;
+  const dirZ = dz / length;
+  if (typeof raycast === 'function'
+      && raycast(x, y + 0.82, z, dirX, 0, dirZ, laneDistance) < laneDistance - 0.45) {
+    return false;
+  }
+
+  let floorY = y;
+  for (const distance of [laneDistance * 0.5, laneDistance]) {
+    const nextFloor = groundHeightAt(
+      x + dirX * distance,
+      z + dirZ * distance,
+      floorY,
+      floorY,
+    );
+    if (!Number.isFinite(nextFloor) || nextFloor <= killY || Math.abs(nextFloor - floorY) > 0.72) {
+      return false;
+    }
+    floorY = nextFloor;
+  }
+  return true;
+}
+
 export const BOT_STATES = Object.freeze({
   ROAM: 'roam',
   REACT: 'react',

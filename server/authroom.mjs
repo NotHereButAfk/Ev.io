@@ -28,10 +28,13 @@ import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js
 import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../src/core/CombatConfig.js';
 import {
+  BOT_DASH,
   BOT_STATES,
   botAimErrorMeters,
+  botDashBonusSpeed,
   chooseReachableRoamPoint,
   getBotDifficulty,
+  isBotDashLaneSafe,
   isInsideBotFov,
   smoothBotAim,
 } from '../src/entities/BotCombat.js';
@@ -381,6 +384,13 @@ export class AuthRoom {
     p._botAimPitch = p._lastPitch ?? 0;
     p._botNextShotTick = this.tick;
     p._botBurstRemaining = 2 + Math.floor(this._rand(p.id * 193 + this.tick) * 3);
+    p._botDashTicks = 0;
+    p._botDashX = 0;
+    p._botDashZ = 0;
+    p._botDashStarts = 0;
+    p._botNextDashTick = this.tick + Math.ceil(
+      (0.65 + this._rand(p.id * 239 + this.tick) * 0.75) * TICK_HZ,
+    );
   }
 
   _provokeBot(bot, attacker, forceSwitch = true) {
@@ -556,7 +566,8 @@ export class AuthRoom {
       // solved by selecting a new verified lane instead of bunny-hopping.
       const jump = p.state.onGround && !blocked
         && this._rand(p.id * 733 + this.tick) < (cfg.jumpChance * 0.12) / TICK_HZ;
-      return { seq, inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, sprint: sprintWindow, jumpJust: jump }), wid: p.wid, aiming: false };
+      const dashing = this._botDashCommand(p, moveX, moveZ, p._botAimYaw);
+      return { seq, inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, sprint: sprintWindow, jumpJust: jump }), wid: p.wid, aiming: false, botDash: dashing };
     }
 
     const aimPoint = hasVisual ? target.state : p._botLastSeen;
@@ -603,13 +614,70 @@ export class AuthRoom {
     }
     const jump = p.state.onGround && hasVisual
       && this._rand(p.id * 877 + this.tick) < cfg.jumpChance / TICK_HZ;
+    const dashing = this._botDashCommand(p, moveX, moveZ, p._botAimYaw);
     return {
       seq,
       inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, pitch: p._botAimPitch,
         sprint: distance > cfg.combatSprintDistance / cfg.movementSpeed, jumpJust: jump }),
       wid: p.wid,
       aiming: hasVisual && distance < cfg.detectionDistance * 0.8,
+      botDash: dashing,
     };
+  }
+
+  _botDashCommand(p, mx, mz, yaw) {
+    if (p._botDashTicks > 0) return true;
+    if (!p.state.onGround || this.tick < p._botNextDashTick || Math.hypot(mx, mz) < 0.25) return false;
+
+    const length = Math.hypot(mx, mz) || 1;
+    const inputX = mx / length;
+    const inputZ = mz / length;
+    const worldX = Math.sin(yaw) * -inputZ + Math.sin(yaw + Math.PI / 2) * inputX;
+    const worldZ = Math.cos(yaw) * -inputZ + Math.cos(yaw + Math.PI / 2) * inputX;
+    const safe = isBotDashLaneSafe({
+      x: p.state.px,
+      y: p.state.py,
+      z: p.state.pz,
+      dx: worldX,
+      dz: worldZ,
+      killY: this.arena.killY,
+      groundHeightAt: this.arena.groundHeightAt,
+      raycast: this.arena.raycast
+        || ((ox, oy, oz, dx, dy, dz, far) => rayVsBoxes(
+          this.simWorld, ox, oy, oz, dx, dy, dz, far,
+        )),
+    });
+    if (!safe) {
+      p._botNextDashTick = this.tick + Math.ceil(0.45 * TICK_HZ);
+      return false;
+    }
+
+    p._botDashX = worldX;
+    p._botDashZ = worldZ;
+    p._botDashTicks = Math.max(1, Math.ceil(BOT_DASH.duration * TICK_HZ));
+    p._botDashStarts++;
+    return true;
+  }
+
+  _advanceBotDash(p, state) {
+    if (p._botDashTicks <= 0 || !state.onGround) {
+      p._botDashTicks = 0;
+      return state;
+    }
+    const remaining = p._botDashTicks / TICK_HZ;
+    const bonusSpeed = botDashBonusSpeed(remaining);
+    state.px = Math.round((state.px + p._botDashX * bonusSpeed / TICK_HZ) * 1e6) / 1e6;
+    state.pz = Math.round((state.pz + p._botDashZ * bonusSpeed / TICK_HZ) * 1e6) / 1e6;
+    state.vx = Math.round((state.vx + p._botDashX * bonusSpeed) * 1e6) / 1e6;
+    state.vz = Math.round((state.vz + p._botDashZ * bonusSpeed) * 1e6) / 1e6;
+    p._botDashTicks--;
+    if (p._botDashTicks <= 0) {
+      const r = this._rand(p.id * 281 + this.tick * 17);
+      p._botNextDashTick = this.tick + Math.ceil(
+        (BOT_DASH.cooldownMin + (BOT_DASH.cooldownMax - BOT_DASH.cooldownMin) * r) * TICK_HZ,
+      );
+    }
+    return state;
   }
 
   _botGroundSafe(p, mx, mz, yaw) {
@@ -1015,6 +1083,7 @@ export class AuthRoom {
       const sprinting = isSprinting(previousState, cmd.inp);
       p.state = step(previousState, cmd.inp, this.simWorld);
       if (p.isBot) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
+      if (p.isBot && cmd.botDash) p.state = this._advanceBotDash(p, p.state);
       if (this.arena.resolveState) p.state = this.arena.resolveState(previousState, p.state);
       p.ackTick = cmd.seq;
       p._lastYaw = cmd.inp.yaw;
@@ -1040,7 +1109,7 @@ export class AuthRoom {
       const resolvedSpeed = distance * TICK_HZ;
       p._animVX = regularStep ? dx * TICK_HZ : 0;
       p._animVZ = regularStep ? dz * TICK_HZ : 0;
-      p._lastSprint = sprinting && regularStep && resolvedSpeed > 6.5;
+      p._lastSprint = (sprinting || !!cmd.botDash) && regularStep && resolvedSpeed > 6.5;
       // Pitch is client-owned look state — the sim doesn't use it, but remote
       // avatars need it or everyone renders as aiming flat at the horizon.
       if (Number.isFinite(cmd.inp.pitch)) p._lastPitch = cmd.inp.pitch;

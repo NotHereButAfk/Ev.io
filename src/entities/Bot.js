@@ -6,7 +6,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint } from './BotCombat.js';
+import { BOT_DASH, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
@@ -134,6 +134,8 @@ export class Bot {
     this._onGround     = true;
     this._animSpeed    = 0;
     this._stuckT       = 0;
+    this._dashT        = 0;
+    this._dashCooldown = 0.75 + Math.random() * 0.65;
     this._padTeleCD    = 0;
     this._targetEntity = null;
     this._targetScanT  = Math.random() * 0.35;
@@ -146,6 +148,7 @@ export class Bot {
     this._wanderDir   = new THREE.Vector3();
     this._combatDir   = new THREE.Vector3();
     this._strafeDir   = new THREE.Vector3();
+    this._dashDir     = new THREE.Vector3();
     this._lastSeenPos = spawnPoint.clone();
     this._lastSeenValid = false;
     this._shootFrom   = new THREE.Vector3();
@@ -329,6 +332,9 @@ export class Bot {
     this._jumpCooldown = 0.4 + Math.random() * 0.8;
     this._wantsJump = false;
     this._stuckT = 0;
+    this._dashT = 0;
+    this._dashCooldown = 0.75 + Math.random() * 0.65;
+    this._dashDir.set(0, 0, 0);
     this._lastSeenValid = false;
     this._provoked = false;
     this._provokedByPlayer = false;
@@ -378,6 +384,33 @@ export class Bot {
     if (this._raycaster.intersectObjects(world.raycastMeshes, true).length) return false;
     if (world.raycastBoxHit(this._raycaster.ray, this._raycaster.far)) return false;
     return true;
+  }
+
+  _dashLaneSafe(direction, world) {
+    return isBotDashLaneSafe({
+      x: this.position.x,
+      y: this.position.y,
+      z: this.position.z,
+      dx: direction.x,
+      dz: direction.z,
+      killY: world?.killY ?? -25,
+      groundHeightAt: world?.groundHeightAt
+        ? (x, z, prevY, nextY) => world.groundHeightAt(x, z, prevY, nextY)
+        : null,
+      raycast: (ox, oy, oz, dx, dy, dz, far) => {
+        this._raycaster.near = 0.12;
+        this._raycaster.far = far;
+        this._shootFrom.set(ox, oy, oz);
+        this._shootDir.set(dx, dy, dz);
+        this._raycaster.set(this._shootFrom, this._shootDir);
+        const meshHit = world?.raycastMeshes?.length
+          ? this._raycaster.intersectObjects(world.raycastMeshes, true)[0]
+          : null;
+        this._bulletRay.set(this._shootFrom, this._shootDir);
+        const boxHit = world?.raycastBoxHit?.(this._bulletRay, far);
+        return Math.min(meshHit?.distance ?? far, boxHit?.distance ?? far);
+      },
+    });
   }
 
   _shootAt(player, onAttack, world) {
@@ -537,6 +570,8 @@ export class Bot {
     // animation block) rather than a whole-body scale "puff", which also freed
     // mesh.scale for the respawn materialize.
     if (this.lungeTimer > 0) this.lungeTimer -= dt;
+    if (this._dashT > 0) this._dashT = Math.max(0, this._dashT - dt);
+    else this._dashCooldown = Math.max(0, this._dashCooldown - dt);
 
     this._toPlayer.set(player.position.x - this.position.x, 0, player.position.z - this.position.z);
     const toPlayer = this._toPlayer;
@@ -689,10 +724,25 @@ export class Bot {
       }
     }
 
+    if (moveTarget && this._dashT <= 0 && this._dashCooldown <= 0 && this._onGround) {
+      if (this._dashLaneSafe(moveTarget, world)) {
+        this._dashDir.copy(moveTarget).normalize();
+        this._dashT = BOT_DASH.duration;
+        this._dashCooldown = BOT_DASH.cooldownMin
+          + Math.random() * (BOT_DASH.cooldownMax - BOT_DASH.cooldownMin);
+      } else {
+        // Retry soon after turning onto a clear corridor instead of hammering a
+        // blocked dash check every frame.
+        this._dashCooldown = 0.4;
+      }
+    }
+    if (this._dashT > 0 && this._dashDir.lengthSq() > 0.5) moveTarget = this._dashDir;
+
     const beforeX = this.position.x;
     const beforeZ = this.position.z;
     if (moveTarget) {
-      this.position.addScaledVector(moveTarget, this.speed * dt);
+      const dashBonus = this._dashT > 0 ? botDashBonusSpeed(this._dashT) : 0;
+      this.position.addScaledVector(moveTarget, (this.speed + dashBonus) * dt);
     }
 
     // Arena movement: bots can hop during a duel, recover from low cover, use
@@ -851,10 +901,8 @@ export class Bot {
     // Runs BEFORE the weapon block so the rifle can ride this frame's stride
     // phase rather than last frame's.
     let gait = _STILL;
-    // Bots move at 2.6-3.8 m/s — a walk to a jog, nowhere near the player's
-    // 9.6 m/s sprint. Mapping that narrow band onto the full walk→sprint blend
-    // had every bot leaning into a full sprint while ambling. Hoisted out of
-    // the rig block because the melee carry below needs it too.
+    // Resolved speed drives the complete walk-to-sprint blend, including the
+    // short dash burst, so the feet accelerate with the body instead of skating.
     const run = THREE.MathUtils.clamp((this._animSpeed - 3.0) / 3.0, 0, 1);
     if (this._rig) {
       const isMoving = resolvedMoving;
