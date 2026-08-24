@@ -5300,6 +5300,7 @@ html, body { margin: 0; }
     linear-gradient(115deg, rgba(25,24,39,.96), rgba(44,39,57,.94)) !important;
   box-shadow: 0 30px 100px rgba(0,0,0,.72) !important;
 }
+
 .inv-page-title {
   color: #fff; font: italic 700 26px/1 'Michroma','Rajdhani',sans-serif;
   letter-spacing: 1px; text-align: center;
@@ -7005,4 +7006,77 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
     min-height: 34px;
     line-height: 32px !important;
   }
+}
+
+/* Final EV.IO weapon-inventory cascade. */
+#hud #weapon-slots {
+  position: fixed !important; left: auto !important; right: 10px !important;
+  bottom: 120px !important; width: 200px !important; max-width: none !important;
+  display: flex !important; flex-direction: column-reverse !important;
+  align-items: stretch !important; flex-wrap: nowrap !important; gap: 0 !important;
+  transform: scale(.9) !important; transform-origin: bottom right !important;
+  z-index: 11 !important;
+}
+#hud .weapon-slot {
+  position: relative !important; box-sizing: border-box !important;
+  flex: 0 0 84px !important; width: 100% !important; height: 84px !important;
+  margin: 0 !important; overflow: visible !important; display: block !important;
+  background: transparent !important; border: 0 !important;
+  border-right: 5px solid rgba(255,255,255,0) !important;
+  border-radius: 0 !important; box-shadow: none !important;
+  backdrop-filter: none !important; opacity: 1 !important;
+}
+#hud .weapon-slot.active {
+  background: transparent !important; border-right-color: #fff !important;
+  box-shadow: none !important;
+}
+#hud .weapon-slot .ws-thumb {
+  position: absolute !important; inset: 15px 12px auto auto !important;
+  width: 60% !important; height: 56px !important;
+  background-position: center !important; background-size: 100% auto !important;
+  opacity: .3 !important; filter: none !important;
+}
+#hud .weapon-slot.active .ws-thumb { width: 80% !important; opacity: 1 !important; }
+#hud .weapon-slot .ws-key {
+  top: 8px !important; right: 12px !important; bottom: auto !important;
+  padding: 2px 5px !important; color: #f2cd87 !important;
+  font: 500 25px/15px 'Rajdhani', sans-serif !important;
+  text-shadow: 0 0 2px #000 !important;
+}
+#hud .weapon-slot .ws-ammo {
+  left: 25px !important; bottom: 10px !important; width: 150px !important;
+  color: #fff !important; font: 500 21px/30px 'Rajdhani', sans-serif !important;
+  text-align: right !important; text-shadow: 0 0 2px #000 !important;
+}
+#hud .weapon-slot.active .ws-ammo { visibility: hidden !important; }
+#hud #weapon-wrap {
+  position: fixed !important; right: 160px !important; bottom: -7px !important;
+  width: 150px !important; min-width: 150px !important; min-height: 0 !important;
+  padding: 0 !important; display: block !important; z-index: 12 !important;
+}
+#hud #weapon-name { display: none !important; }
+#hud #ammo-text {
+  position: relative !important; min-height: 0 !important; color: #fff !important;
+  font: 500 40px/57px 'Rajdhani', sans-serif !important;
+  letter-spacing: 0 !important; text-align: left !important; white-space: nowrap !important;
+  text-shadow: 0 0 2px #000 !important;
+}
+#hud #ammo-text::before {
+  content: '';
+  position: absolute;
+  right: calc(100% + 7px);
+  bottom: 12px;
+  width: 30px;
+  height: 34px;
+  opacity: .3;
+  background:
+    linear-gradient(#fff,#fff) 1px 9px / 7px 25px no-repeat,
+    linear-gradient(#fff,#fff) 11px 4px / 7px 30px no-repeat,
+    linear-gradient(#fff,#fff) 21px 0 / 7px 34px no-repeat;
+  clip-path: polygon(12% 15%,35% 0,58% 15%,58% 100%,0 100%,0 15%,23% 0,46% 15%,46% 100%,35% 100%,35% 15%,58% 0,81% 15%,81% 100%,70% 100%,70% 15%,93% 0,100% 15%,100% 100%,82% 100%,82% 15%,58% 0,58% 100%,47% 100%,47% 15%,23% 0,23% 100%,12% 100%);
+}
+#hud #weapon-wrap.melee-active #ammo-text::before { display: none; }
+@media (max-width: 700px) {
+  #hud #weapon-slots { right: 5px !important; bottom: 78px !important; transform: scale(.64) !important; }
+  #hud #weapon-wrap { right: 104px !important; bottom: -5px !important; transform: scale(.72) !important; transform-origin: bottom right !important; }
 }

@@ -29,6 +29,10 @@ for (const label of ['Auto Rifle', 'Hand Cannon', 'Burst Rifle', 'Sweeper', 'Las
   if (!inventory.includes(`'${label}'`)) failures.push(`inventory category: ${label}`);
 }
 if (!inventory.includes("label: 'Sword'")) failures.push('inventory category: Sword');
+if (!hud.includes("ammo.className = 'ws-ammo'")) failures.push('weapon HUD exposes per-slot ammo');
+if (!hud.includes("slot.isMelee ? '∞'")) failures.push('weapon HUD exposes EV-style melee infinity');
+if (!css.includes('flex: 0 0 84px !important')) failures.push('weapon HUD preserves EV 200x84 slot geometry');
+if (!css.includes('border-right: 5px solid rgba(255,255,255,0)')) failures.push('weapon HUD preserves the EV active rail');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };

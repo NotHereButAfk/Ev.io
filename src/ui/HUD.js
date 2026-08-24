@@ -1,4 +1,4 @@
-import { getWeaponThumb } from './WeaponThumbnails.js';
+import { getWeaponHudThumb } from './WeaponThumbnails.js';
 
 export class HUD {
   constructor() {
@@ -14,6 +14,7 @@ export class HUD {
     this.smokeCount  = document.getElementById('smoke-count');
     this.weaponName  = document.getElementById('weapon-name');
     this.ammoText    = document.getElementById('ammo-text');
+    this.weaponWrap  = document.getElementById('weapon-wrap');
     this.reloadText  = document.getElementById('reload-text');
     this.reloadProgress = document.getElementById('reload-progress');
     this.reloadTime     = document.getElementById('reload-time');
@@ -143,14 +144,19 @@ export class HUD {
       const el = document.createElement('div');
       el.className = 'weapon-slot' + (i === activeIndex ? ' active' : '');
       el.dataset.index = i;
+      el.classList.toggle('melee-slot', Boolean(slot.isMelee));
 
-      const thumb = id ? getWeaponThumb(id) : null;
+      const thumb = id ? getWeaponHudThumb(id) : null;
       if (thumb) {
         const img = document.createElement('div');
         img.className = 'ws-thumb';
         img.style.backgroundImage = `url(${thumb})`;
         el.appendChild(img);
       }
+      const ammo = document.createElement('span');
+      ammo.className = 'ws-ammo';
+      ammo.textContent = slot.isMelee ? '∞' : `${slot.magAmmo ?? 0} / ${slot.reserveAmmo ?? 0}`;
+      el.appendChild(ammo);
       const k = document.createElement('span');
       k.className = 'ws-key';
       k.textContent = key;
@@ -203,6 +209,13 @@ export class HUD {
     this.ammoText.textContent = weaponInfo.isMelee
       ? '∞'
       : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`;
+    this.weaponWrap?.classList.toggle('melee-active', weaponInfo.isMelee);
+    this.weaponSlots?.querySelectorAll('.weapon-slot').forEach((el, i) => {
+      const slot = weaponInfo.slots?.[i];
+      const ammo = el.querySelector('.ws-ammo');
+      if (!slot || !ammo) return;
+      ammo.textContent = slot.isMelee ? '∞' : `${slot.magAmmo} / ${slot.reserveAmmo}`;
+    });
     this.reloadText.classList.toggle('hidden', !weaponInfo.isReloading);
     if (this.crosshair) {
       const bloom = Math.max(0, Math.min(1, weaponInfo.spreadRatio || 0));

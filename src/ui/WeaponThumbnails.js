@@ -37,10 +37,12 @@ function _fitCamera(camera) {
 }
 
 const _cache = new Map();
+const _hudCache = new Map();
 let _warmed = false;
 let _onReady = null;
 
 export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
+export function getWeaponHudThumb(id) { return _hudCache.get(id) ?? _cache.get(id) ?? null; }
 
 // Render a one-off larger thumbnail of a weapon wearing a specific skin (or raw
 // if skin is null). Returns a data-URL, or null if the weapon GLB isn't ready.
@@ -158,6 +160,22 @@ function _generate() {
     _fitCamera(camera);
     renderer.render(scene, camera);
     _cache.set(w.id, renderer.domElement.toDataURL('image/png'));
+
+    // The in-game inventory uses a clean side silhouette. Reset the model and
+    // capture it from +X so the barrel/stock axis reads across the HUD slot.
+    g.position.set(0, 0, 0);
+    g.rotation.set(0, 0, 0);
+    g.scale.setScalar(1);
+    const hudSize = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    const hudMaxDim = Math.max(hudSize.x, hudSize.y, hudSize.z) || 1;
+    g.scale.setScalar(0.94 / hudMaxDim);
+    const hudCenter = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+    g.position.sub(hudCenter);
+    const hudDistance = (0.5 * 0.94) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.18;
+    camera.position.set(hudDistance, hudDistance * 0.10, 0);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    _hudCache.set(w.id, renderer.domElement.toDataURL('image/png'));
 
     scene.remove(g);
     _disposeGroup(g);

@@ -628,9 +628,13 @@ export class WeaponSystem {
   }
 
   _rebuildKeyMap() {
-    // Active loadout maps to slots 1 (gun) and 2 (melee).
+    // EV.IO keeps guns on the number row and reserves Z for melee.
     this.keyMap = new Map();
-    this.loadout.forEach((w, i) => this.keyMap.set(`Digit${i + 1}`, i));
+    let gunSlot = 1;
+    this.loadout.forEach((w, i) => {
+      if (w.kind === 'melee') this.keyMap.set('KeyZ', i);
+      else this.keyMap.set(`Digit${gunSlot++}`, i);
+    });
   }
 
   /** Set the active loadout to a single gun + single melee weapon. */
@@ -1782,10 +1786,19 @@ export class WeaponSystem {
     const info = this._hudInfo ||= {};
     if (this._hudSlotsLoadout !== this.loadout) {
       this._hudSlotsLoadout = this.loadout;
-      this._hudSlots = this.loadout.map((w, i) => ({
-        key: String(i + 1), id: w.id, name: w.name, isMelee: w.kind === 'melee',
+      let gunSlot = 1;
+      this._hudSlots = this.loadout.map((w) => ({
+        key: w.kind === 'melee' ? 'Z' : String(gunSlot++),
+        id: w.id,
+        name: w.name,
+        isMelee: w.kind === 'melee',
       }));
     }
+    this._hudSlots.forEach((slot) => {
+      const slotState = this.state.get(slot.id);
+      slot.magAmmo = slotState?.magAmmo ?? 0;
+      slot.reserveAmmo = slotState?.reserveAmmo ?? 0;
+    });
     info.name = def.name;
     info.isMelee = def.kind === 'melee';
     info.magAmmo = st.magAmmo;
