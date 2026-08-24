@@ -19,11 +19,10 @@ const settings = read('src/core/GameSettings.js');
 const css = read('src/style.css');
 
 const failures = [];
-if (!index.includes('class="inv-layout"')) failures.push('inventory exposes a two-region loadout layout');
-if (!index.includes('class="inv-sidebar"')) failures.push('inventory exposes the equipped loadout sidebar');
-if (!index.includes('class="inv-collection"')) failures.push('inventory exposes the filtered item collection');
-if (!index.includes('class="inv-loadout-core"')) failures.push('inventory exposes the EV-style circular equipment stage');
-if (!index.includes('class="inv-soldier-meta"')) failures.push('inventory exposes the full-height soldier preview');
+if (!index.includes('class="inv-profile-head"')) failures.push('inventory exposes the compact EV profile header');
+if (!index.includes('class="inv-page-title inv-equipped-title"')) failures.push('inventory exposes one currently-equipped row');
+if (!index.includes('class="inv-page-title inv-inventory-title"')) failures.push('inventory exposes the owned-item section');
+if (!css.includes('flex: 0 0 110px')) failures.push('inventory preserves EV-style 110px item tiles');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };

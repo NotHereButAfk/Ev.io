@@ -217,36 +217,22 @@
     <div id="panel-loadout" class="nav-panel nav-panel-inv hidden">
       <button id="inv-close-btn" class="inv-close-btn" title="Close">[X]</button>
 
-      <div class="inv-page-title">LOADOUT</div>
-      <div class="inv-page-sub">SELECT AN EQUIPPED ITEM TO CHANGE ITS FINISH</div>
-      <div class="inv-layout">
-        <section class="inv-collection">
-          <div class="inv-loadout-help"><span class="inv-mouse-icon">L</span> SELECT ITEM <span class="inv-mouse-icon alt">R</span> PREVIEW</div>
-          <div class="inv-section-label">ITEM TYPE</div>
-          <div id="inv-tabs" class="inv-tabs"></div>
-          <div class="inv-loadout-core">
-            <div class="inv-ring inv-ring-a"></div>
-            <div class="inv-ring inv-ring-b"></div>
-            <div class="inv-section-label inv-equipped-label">EQUIPPED</div>
-            <div id="inv-equipped" class="inv-card-row"></div>
-          </div>
-          <div class="inv-collection-head"><span>YOUR ITEMS</span><span class="inv-collection-hint">CLICK TO EQUIP</span></div>
-          <div id="inv-grid" class="inv-grid"></div>
-        </section>
-        <aside class="inv-sidebar">
-          <div class="inv-header">
-            <div class="inv-id">
-              <div class="inv-username" id="inv-username">Recruit</div>
-              <input id="player-name" type="hidden" value="Recruit" />
-            </div>
-            <div class="inv-avatar-big"><canvas id="armor-preview-canvas" width="360" height="360"></canvas></div>
-            <div class="inv-soldier-meta">
-              <div class="inv-meta">BALANCE <span class="inv-ecoin"></span><span id="inv-balance">500</span></div>
-              <div class="inv-meta">NET WORTH <span id="inv-networth">0</span><span class="inv-tt" title="Total value of the skins you own">?</span></div>
-            </div>
-          </div>
-        </aside>
+      <div class="inv-profile-head">
+        <div class="inv-avatar-big"><canvas id="armor-preview-canvas" width="220" height="220"></canvas></div>
+        <div class="inv-id">
+          <div class="inv-username" id="inv-username">Recruit</div>
+          <input id="player-name" type="hidden" value="Recruit" />
+          <div class="inv-meta"><span class="inv-ecoin"></span><span id="inv-balance">500</span></div>
+          <div class="inv-meta inv-networth">Networth: <span id="inv-networth">0</span><span class="inv-tt" title="Total value of the skins you own">?</span></div>
+        </div>
       </div>
+
+      <h2 class="inv-page-title inv-equipped-title">CURRENTLY EQUIPPED</h2>
+      <div id="inv-equipped" class="inv-card-row"></div>
+
+      <h2 class="inv-page-title inv-inventory-title">INVENTORY</h2>
+      <div id="inv-tabs" class="inv-tabs"></div>
+      <div id="inv-grid" class="inv-grid"></div>
     </div>
 
     <!-- ===================== PANEL: MODES ===================== -->
