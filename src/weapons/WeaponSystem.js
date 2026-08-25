@@ -89,19 +89,6 @@ function viewmodelReloadScale(aspect) {
   return 0.30;
 }
 
-// A narrow world FOV would normally magnify a camera child. Move the viewmodel
-// away by the inverse projection ratio so zoom changes the arena view without
-// changing the gun's apparent size.
-function viewmodelProjectionScale(baseFov, currentFov) {
-  const base = THREE.MathUtils.degToRad(
-    THREE.MathUtils.clamp(baseFov || 78, 30, 110) * 0.5,
-  );
-  const current = THREE.MathUtils.degToRad(
-    THREE.MathUtils.clamp(currentFov || baseFov || 78, 20, 120) * 0.5,
-  );
-  return Math.tan(base) / Math.max(0.001, Math.tan(current));
-}
-
 // Normal EV-style zoom keeps the firearm full-size in its three-quarter carry
 // while the world FOV narrows. The actual shot still follows the fixed centre
 // reticle, so the weapon can sit lower without changing accuracy.
@@ -115,11 +102,23 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
 }
 
 // Retained for model/sight diagnostics and scoped-weapon calibration. Ordinary
-// EV-style zoom uses the projection-compensated lower-right carry in update().
+// EV-style zoom keeps the lower-right carry in update().
 const ADS_SIGHT_DEPTH = -0.42;
 const ADS_SIGHT_Y = -0.028;
 const DEFAULT_ADS_FOV = 30;
 const ADS_SCREEN_DROP_NDC = 0.14;
+// At 30 degrees the main camera naturally magnifies the viewmodel. Move the
+// mount inward instead of changing its scale/depth: the receiver remains
+// readable while the rear of the gun still crops out at the lower-right edge.
+const ADS_INWARD_X = 0.20;
+// Compact weapons do not have a rifle stock extending back into frame, so the
+// shared rifle drop can put their whole silhouette below the viewport. These
+// are position-only framing corrections; every gun retains the same scale and
+// camera depth.
+const ADS_VERTICAL_LIFT = Object.freeze({
+  magnum: 0.23,
+  plasmarifle: 0.05,
+});
 
 const _adsBox = new THREE.Box3();
 const _adsSpecialBox = new THREE.Box3();
@@ -1748,18 +1747,17 @@ export class WeaponSystem {
     const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
-    const projectionScale = viewmodelProjectionScale(player.baseFov, this.camera.fov);
     const hipX = baseX + sprintShiftX;
     const hipY = VIEWMODEL_Y + sprintDropY;
-    const hipZ = VIEWMODEL_Z * projectionScale;
+    const hipZ = VIEWMODEL_Z;
     // Current EV.IO zoom keeps the lower-right three-quarter carry instead of
-    // rotating the stock straight into the camera. Compensate for the narrower
-    // camera projection, preserve the weapon's apparent size, then lower it in
-    // screen space just enough to open the centre view.
+    // rotating the stock straight into the camera. The narrower FOV is allowed
+    // to enlarge and crop the weapon naturally; only lower it in screen space
+    // enough to keep the centre view open.
     const adsDrop = ADS_SCREEN_DROP_NDC * Math.abs(hipZ)
       * Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
-    const adsX = hipX;
-    const adsY = hipY - adsDrop;
+    const adsX = hipX - ADS_INWARD_X * aspectScale;
+    const adsY = hipY - adsDrop + (ADS_VERTICAL_LIFT[def.id] || 0);
     const adsZ = hipZ;
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;

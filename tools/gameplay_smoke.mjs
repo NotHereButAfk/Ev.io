@@ -189,8 +189,9 @@ try {
     rz:g.weaponSystem.weaponMount.rotation.z };`);
   assert(adsState.scopeT > 0.9 && adsState.visible
     && adsState.fov < 31
-    && adsState.z < hipCarry.z * 2
-    && Math.abs(adsState.rx - hipCarry.rx) < 0.02
+    && Math.abs(adsState.z - hipCarry.z) < 0.05
+    // Pitch can still carry the independent landing pulse from the jump probe.
+    && Math.abs(adsState.rx - hipCarry.rx) < 0.12
     && Math.abs(adsState.ry - hipCarry.ry) < 0.02
     && Math.abs(adsState.rz - hipCarry.rz) < 0.02,
   `zoom did not preserve the lower-right rifle carry: ${JSON.stringify({hipCarry,adsState})}`);

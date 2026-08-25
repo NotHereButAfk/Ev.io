@@ -628,13 +628,14 @@ assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
 // Exercise the complete transition at 240Hz. Ordinary guns stay visible in
-// their lower-right three-quarter carry and preserve their apparent framing;
+// their enlarged, partially cropped lower-right three-quarter carry;
 // true scoped optics disappear only after the overlay is established.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
   advanceSeconds(0.25, 240);
   const hipRotation = system.weaponMount.rotation.clone();
+  const hipDepth = system.weaponMount.position.z;
   camera.updateMatrixWorld(true);
   const hipMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
   input.rightMouseDown = true;
@@ -658,11 +659,12 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
       const adsMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
-      assert(Math.abs(adsMountNdc.x - hipMountNdc.x) < 0.035,
-        `${def.id} zoom changes the lower-right horizontal framing (${hipMountNdc.x.toFixed(3)} -> ${adsMountNdc.x.toFixed(3)})`);
-      const screenDrop = hipMountNdc.y - adsMountNdc.y;
-      assert(screenDrop > 0.08 && screenDrop < 0.22,
-        `${def.id} zoom screen drop is ${screenDrop.toFixed(3)} NDC`);
+      assert(Math.abs(system.weaponMount.position.z - hipDepth) < 0.02,
+        `${def.id} zoom pushes the gun away and makes it smaller`);
+      assert(adsMountNdc.x > hipMountNdc.x + 0.10,
+        `${def.id} zoom no longer fills the lower-right frame`);
+      assert(adsMountNdc.y < -0.50,
+        `${def.id} zoom does not keep the enlarged weapon below the reticle`);
       record.group.traverse((object) => {
         if (!object.isMesh) return;
         if (object.name === 'outline') {
