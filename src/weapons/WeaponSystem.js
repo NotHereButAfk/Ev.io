@@ -109,11 +109,14 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   return !!def?.scoped && scopeT > 0.68;
 }
 
-// EV.IO keeps the zoomed weapon large and lowers it instead of scaling it away.
-// Preserve the original eye depth so the supplied model keeps exactly the same
-// apparent size, then drop only its vertical endpoint to clear the aim ray.
+// EV.IO keeps the zoomed weapon large and places the sight just under the fixed
+// reticle.  Its default 30-degree zoom supplies the apparent enlargement; the
+// model itself never scales during the transition.  A tiny vertical clearance
+// leaves the target visible without turning the gun into a miniature at the
+// bottom of the screen.
 const ADS_SIGHT_DEPTH = -0.42;
-const ADS_SIGHT_Y = -0.11;
+const ADS_SIGHT_Y = -0.028;
+const DEFAULT_ADS_FOV = 30;
 
 const _adsBox = new THREE.Box3();
 const _adsSpecialBox = new THREE.Box3();
@@ -175,6 +178,27 @@ export function adsMountForSight(
     -sight.y * scale + ADS_SIGHT_Y,
     depth - sight.z * scale,
   );
+}
+
+// Camera children still participate in the world depth buffer in Three.js.
+// Without a dedicated viewmodel pass, a wall close to the player can therefore
+// erase most (or all) of the held gun. Clone the model materials so disabling
+// depth testing here never leaks to third-person guns, pickups, or thumbnails.
+export function prepareFirstPersonModel(group) {
+  group.traverse((object) => {
+    if (!object.isMesh) return;
+    object.material = Array.isArray(object.material)
+      ? object.material.map((material) => material.clone())
+      : object.material?.clone();
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (!material) continue;
+      material.depthTest = false;
+      material.depthWrite = false;
+    }
+    object.renderOrder = 1000;
+    object.frustumCulled = false;
+  });
 }
 
 export class WeaponSystem {
@@ -315,6 +339,7 @@ export class WeaponSystem {
     this.models = new Map();
     for (const w of this.allWeapons) {
       const { group, muzzle } = buildWeaponModel(w);
+      prepareFirstPersonModel(group);
       group.visible = false;
       this.kickGroup.add(group);
       const sight = measureWeaponSight(group);
@@ -339,6 +364,7 @@ export class WeaponSystem {
     for (const w of this.allWeapons) {
       const old = this.models.get(w.id);
       const { group, muzzle } = buildWeaponModel(w);
+      prepareFirstPersonModel(group);
       group.visible = old ? old.group.visible : false;
       if (old) this.kickGroup.remove(old.group);
       this.kickGroup.add(group);
@@ -1550,7 +1576,7 @@ export class WeaponSystem {
     // travel that the physical sight and fixed scope overlay do not disagree.
     const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.05 : 0.10, this.scopeT);
     const sprintFovBoost = this._sprintT * 6;
-    const aimedFov = def.scoped ? 28 : (def.adsFov ?? Math.max(54, player.baseFov - 14));
+    const aimedFov = def.scoped ? 28 : (def.adsFov ?? DEFAULT_ADS_FOV);
     const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, aimedFov, this.scopeT);
     if (Math.abs(this.camera.fov - targetFov) > 0.01) {
       this.camera.fov = targetFov;

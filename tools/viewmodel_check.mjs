@@ -33,6 +33,7 @@ const {
   WeaponSystem,
   adsMountForSight,
   measureWeaponSight,
+  prepareFirstPersonModel,
   shouldHideAdsViewmodel,
 } = await import('../src/weapons/WeaponSystem.js');
 const { orientWeaponModelForward } = await import('../src/weapons/WeaponModels.js');
@@ -105,6 +106,7 @@ for (const def of WEAPONS) {
     probeParent.remove(clone);
   }
   group.add(clone);
+  prepareFirstPersonModel(group);
   group.visible = wasVisible;
   system.kickGroup.add(group);
   const sight = measureWeaponSight(group);
@@ -629,13 +631,22 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       `${def.id} sight is not squared to the camera axis`);
     if (MAIN_WEAPON_IDS.includes(def.id)) {
       const record = system.models.get(def.id);
+      assert(Math.abs(camera.fov - 30) < 0.3,
+        `${def.id} does not settle at the EV-style 30-degree zoom (${camera.fov.toFixed(2)})`);
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
       const sightNdc = record.group.localToWorld(record.sight.clone()).project(camera);
       assert(Math.abs(sightNdc.x) < 0.02,
         `${def.id} ADS sight drifts sideways instead of only lowering (${sightNdc.x.toFixed(3)})`);
-      assert(sightNdc.y < -0.32 && sightNdc.y > -0.72,
-        `${def.id} ADS sight does not clear below the reticle (${sightNdc.y.toFixed(3)})`);
+      assert(sightNdc.y < -0.20 && sightNdc.y > -0.32,
+        `${def.id} ADS sight is not tucked just below the reticle (${sightNdc.y.toFixed(3)})`);
+      record.group.traverse((object) => {
+        if (!object.isMesh) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        assert(materials.every((material) => !material.depthTest && !material.depthWrite),
+          `${def.id} viewmodel can still be hidden by world geometry`);
+        assert(object.renderOrder >= 1000, `${def.id} viewmodel render order is not isolated`);
+      });
       const aimRay = new THREE.Raycaster();
       aimRay.setFromCamera(new THREE.Vector2(0, 0), camera);
       const centerHits = aimRay.intersectObject(record.group, true);
