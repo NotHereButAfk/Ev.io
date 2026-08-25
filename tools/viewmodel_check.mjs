@@ -627,17 +627,14 @@ assert(system.kickGroup.visible, 'viewmodel did not return after leaving the sco
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
-// Exercise the complete transition at 240Hz. Ordinary guns stay visible in
-// their enlarged, partially cropped lower-right three-quarter carry;
+// Exercise the complete transition at 240Hz. Ordinary guns move from the
+// cropped hip pose into EV.IO's partially shouldered top-of-gun picture;
 // true scoped optics disappear only after the overlay is established.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
   advanceSeconds(0.25, 240);
-  const hipRotation = system.weaponMount.rotation.clone();
   const hipDepth = system.weaponMount.position.z;
-  camera.updateMatrixWorld(true);
-  const hipMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
   input.rightMouseDown = true;
   advanceSeconds(1 / 240, 240);
   assert(system.kickGroup.visible, `${def.id} vanishes on the first ADS frame`);
@@ -646,12 +643,10 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   assert(system.kickGroup.visible === !def.scoped,
     `${def.id} uses the wrong full-ADS viewmodel mode`);
   if (!def.scoped) {
-    assert(Math.hypot(
-      system.weaponMount.rotation.x - hipRotation.x,
-      system.weaponMount.rotation.y - hipRotation.y,
-      system.weaponMount.rotation.z - hipRotation.z,
-    ) < 0.012,
-      `${def.id} zoom rotates out of the hip-fire carry`);
+    assert(Math.abs(system.weaponMount.rotation.x - 0.08) < 0.012
+      && Math.abs(system.weaponMount.rotation.y - 0.12) < 0.012
+      && Math.abs(system.weaponMount.rotation.z + 0.02) < 0.012,
+      `${def.id} zoom does not settle into the partial shoulder pose`);
     if (MAIN_WEAPON_IDS.includes(def.id)) {
       const record = system.models.get(def.id);
       assert(Math.abs(camera.fov - 30) < 0.3,
@@ -661,8 +656,8 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       const adsMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
       assert(Math.abs(system.weaponMount.position.z - hipDepth) < 0.02,
         `${def.id} zoom pushes the gun away and makes it smaller`);
-      assert(adsMountNdc.x > hipMountNdc.x + 0.10,
-        `${def.id} zoom no longer fills the lower-right frame`);
+      assert(adsMountNdc.x > 0.20 && adsMountNdc.x < 0.50,
+        `${def.id} zoom mount is outside the EV.IO shoulder lane (${adsMountNdc.x.toFixed(3)})`);
       assert(adsMountNdc.y < -0.50,
         `${def.id} zoom does not keep the enlarged weapon below the reticle`);
       record.group.traverse((object) => {

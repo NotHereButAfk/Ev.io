@@ -101,25 +101,25 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   return !!def?.scoped && scopeT > 0.68;
 }
 
-// Retained for model/sight diagnostics and scoped-weapon calibration. Ordinary
-// EV-style zoom keeps the lower-right carry in update().
+// Retained for scoped-weapon calibration and model diagnostics. Ordinary
+// right-click zoom uses the partially shouldered pose configured below.
 const ADS_SIGHT_DEPTH = -0.42;
 const ADS_SIGHT_Y = -0.028;
 const DEFAULT_ADS_FOV = 30;
+// EV.IO shoulders the gun toward the centre without presenting a perfectly
+// rear-on buttstock view. The muzzle sits near the reticle while the receiver
+// remains readable and the rear continues out through the lower-right edge.
+const ADS_INWARD_X = 0.28;
 const ADS_SCREEN_DROP_NDC = 0.14;
-// At 30 degrees the main camera naturally magnifies the viewmodel. Move the
-// mount inward instead of changing its scale/depth: the receiver remains
-// readable while the rear of the gun still crops out at the lower-right edge.
-const ADS_INWARD_X = 0.20;
-// Compact weapons do not have a rifle stock extending back into frame, so the
-// shared rifle drop can put their whole silhouette below the viewport. These
-// are position-only framing corrections; every gun retains the same scale and
-// camera depth.
+const ADS_PITCH = 0.08;
+const ADS_YAW = 0.12;
+const ADS_ROLL = -0.02;
 const ADS_VERTICAL_LIFT = Object.freeze({
-  m4: 0.10,
+  m4: 0.17,
   magnum: 0.23,
-  energyshotgun: 0.05,
-  plasmarifle: 0.10,
+  battlerifle: 0.04,
+  energyshotgun: 0.04,
+  plasmarifle: 0.12,
 });
 
 const _adsBox = new THREE.Box3();
@@ -161,15 +161,22 @@ export function measureWeaponSight(group) {
     }
   });
 
-  const source = !_adsSpecialBox.isEmpty() ? _adsSpecialBox : _adsBox;
+  const hasOptic = !_adsSpecialBox.isEmpty();
+  const source = hasOptic ? _adsSpecialBox : _adsBox;
   if (source.isEmpty()) return new THREE.Vector3(0, 0.14, 0.05);
   source.getCenter(_adsPoint);
   // Optic glass centres define the axis directly. With iron sights, sit just
   // below the weapon's highest point so the front post remains visible.
-  const y = !_adsSpecialBox.isEmpty()
+  const y = hasOptic
     ? _adsPoint.y
     : THREE.MathUtils.lerp(_adsPoint.y, source.max.y, 0.88);
-  return new THREE.Vector3(_adsPoint.x, y, source.max.z - 0.015);
+  // Imported pack models are a single mesh with no named optic. Their rear-most
+  // Z point is the buttstock, not a sight; using it makes ADS stare directly at
+  // the butt pad. Move the fallback anchor forward to the receiver/rail area.
+  const z = hasOptic
+    ? _adsPoint.z
+    : source.max.z - (source.max.z - source.min.z) * 0.38;
+  return new THREE.Vector3(_adsPoint.x, y, z);
 }
 
 export function adsMountForSight(
@@ -1752,10 +1759,6 @@ export class WeaponSystem {
     const hipX = baseX + sprintShiftX;
     const hipY = VIEWMODEL_Y + sprintDropY;
     const hipZ = VIEWMODEL_Z;
-    // Current EV.IO zoom keeps the lower-right three-quarter carry instead of
-    // rotating the stock straight into the camera. The narrower FOV is allowed
-    // to enlarge and crop the weapon naturally; only lower it in screen space
-    // enough to keep the centre view open.
     const adsDrop = ADS_SCREEN_DROP_NDC * Math.abs(hipZ)
       * Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
     const adsX = hipX - ADS_INWARD_X * aspectScale;
@@ -1770,16 +1773,16 @@ export class WeaponSystem {
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      VIEWMODEL_PITCH + this._sprintT * 0.22
+      THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, ADS_PITCH, adsEase)
         + 0.50 * framedBell
         + 0.14 * framedRack + landPulse * 0.12, 17, dt);
     this._mountRot.y = expDamp(this._mountRot.y,
-      VIEWMODEL_YAW, 17, dt);
+      THREE.MathUtils.lerp(VIEWMODEL_YAW, ADS_YAW, adsEase), 17, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
-      VIEWMODEL_ROLL + this._sprintT * -0.40
+      THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, ADS_ROLL, adsEase)
         + 0.42 * framedBell, 17, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
