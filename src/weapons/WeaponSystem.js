@@ -116,8 +116,10 @@ const ADS_INWARD_X = 0.20;
 // are position-only framing corrections; every gun retains the same scale and
 // camera depth.
 const ADS_VERTICAL_LIFT = Object.freeze({
+  m4: 0.10,
   magnum: 0.23,
-  plasmarifle: 0.05,
+  energyshotgun: 0.05,
+  plasmarifle: 0.10,
 });
 
 const _adsBox = new THREE.Box3();
