@@ -89,17 +89,22 @@ function viewmodelReloadScale(aspect) {
   return 0.30;
 }
 
-// A narrow FOV magnifies the same world-space offset. Lift the mount only at
-// sub-78° settings so the compact default pose stays low while 60° players do
-// not lose the trigger glove below the frame.
-function viewmodelFovLift(fov) {
-  return THREE.MathUtils.clamp((78 - (fov || 78)) * 0.0067, 0, 0.12);
+// A narrow world FOV would normally magnify a camera child. Move the viewmodel
+// away by the inverse projection ratio so zoom changes the arena view without
+// changing the gun's apparent size.
+function viewmodelProjectionScale(baseFov, currentFov) {
+  const base = THREE.MathUtils.degToRad(
+    THREE.MathUtils.clamp(baseFov || 78, 30, 110) * 0.5,
+  );
+  const current = THREE.MathUtils.degToRad(
+    THREE.MathUtils.clamp(currentFov || baseFov || 78, 20, 120) * 0.5,
+  );
+  return Math.tan(base) / Math.max(0.001, Math.tan(current));
 }
 
-// Normal EV-style ADS keeps the firearm full-size on screen, but the sight
-// settles below the reticle instead of covering the target with the receiver.
-// The actual shot still follows the fixed centre reticle. This gives the player
-// a clear target picture while preserving the readable zoom/raise animation.
+// Normal EV-style zoom keeps the firearm full-size in its three-quarter carry
+// while the world FOV narrows. The actual shot still follows the fixed centre
+// reticle, so the weapon can sit lower without changing accuracy.
 // Only a magnified sniper optic hands off to the full-screen scope overlay, and
 // only after the gun has travelled most of the way there.
 // This also gives scope-out a readable reverse animation instead of popping the
@@ -109,14 +114,12 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   return !!def?.scoped && scopeT > 0.68;
 }
 
-// EV.IO keeps the zoomed weapon large and places the sight just under the fixed
-// reticle.  Its default 30-degree zoom supplies the apparent enlargement; the
-// model itself never scales during the transition.  A tiny vertical clearance
-// leaves the target visible without turning the gun into a miniature at the
-// bottom of the screen.
+// Retained for model/sight diagnostics and scoped-weapon calibration. Ordinary
+// EV-style zoom uses the projection-compensated lower-right carry in update().
 const ADS_SIGHT_DEPTH = -0.42;
 const ADS_SIGHT_Y = -0.028;
 const DEFAULT_ADS_FOV = 30;
+const ADS_SCREEN_DROP_NDC = 0.14;
 
 const _adsBox = new THREE.Box3();
 const _adsSpecialBox = new THREE.Box3();
@@ -187,6 +190,14 @@ export function adsMountForSight(
 export function prepareFirstPersonModel(group) {
   group.traverse((object) => {
     if (!object.isMesh) return;
+    // Inverted-hull contours depend on world depth testing to reveal only the
+    // rim. In a depth-independent viewmodel pass the enlarged back faces cover
+    // the gun itself, producing the solid black slabs seen on the deployed GLBs.
+    // The underlying gun already has strong material separation at ADS scale.
+    if (object.name === 'outline') {
+      object.visible = false;
+      return;
+    }
     object.material = Array.isArray(object.material)
       ? object.material.map((material) => material.clone())
       : object.material?.clone();
@@ -1726,10 +1737,6 @@ export class WeaponSystem {
     // start/stop sprint or scope in/out).
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
-    const modelRecord  = this.models.get(def.id);
-    const adsPose      = modelRecord?.sight
-      ? adsMountForSight(modelRecord.sight, VIEWMODEL_SCALE, ADS_SIGHT_DEPTH)
-      : modelRecord?.adsMount;
     const adsEase      = this.scopeT * this.scopeT * (3 - 2 * this.scopeT);
     // Sprint lowers the complete gun-and-hands rig. The old positive offset
     // raised it 12cm, contradicting the intended carry and forcing implausibly
@@ -1741,12 +1748,19 @@ export class WeaponSystem {
     const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
+    const projectionScale = viewmodelProjectionScale(player.baseFov, this.camera.fov);
     const hipX = baseX + sprintShiftX;
-    const hipY = VIEWMODEL_Y + viewmodelFovLift(this.camera.fov) + sprintDropY;
-    const hipZ = VIEWMODEL_Z;
-    const adsX = adsPose?.x ?? 0;
-    const adsY = adsPose?.y ?? -0.12;
-    const adsZ = adsPose?.z ?? -0.46;
+    const hipY = VIEWMODEL_Y + sprintDropY;
+    const hipZ = VIEWMODEL_Z * projectionScale;
+    // Current EV.IO zoom keeps the lower-right three-quarter carry instead of
+    // rotating the stock straight into the camera. Compensate for the narrower
+    // camera projection, preserve the weapon's apparent size, then lower it in
+    // screen space just enough to open the centre view.
+    const adsDrop = ADS_SCREEN_DROP_NDC * Math.abs(hipZ)
+      * Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
+    const adsX = hipX;
+    const adsY = hipY - adsDrop;
+    const adsZ = hipZ;
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;
     const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV
@@ -1756,16 +1770,16 @@ export class WeaponSystem {
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     this._mountRot.x = expDamp(this._mountRot.x,
-      THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, 0, adsEase)
+      VIEWMODEL_PITCH + this._sprintT * 0.22
         + 0.50 * framedBell
         + 0.14 * framedRack + landPulse * 0.12, 17, dt);
     this._mountRot.y = expDamp(this._mountRot.y,
-      THREE.MathUtils.lerp(VIEWMODEL_YAW, 0, adsEase), 17, dt);
+      VIEWMODEL_YAW, 17, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
-      THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, 0, adsEase)
+      VIEWMODEL_ROLL + this._sprintT * -0.40
         + 0.42 * framedBell, 17, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.

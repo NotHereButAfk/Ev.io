@@ -71,6 +71,22 @@ scene.add(camera);
 const audio = new Proxy({}, { get: () => noop });
 const system = new WeaponSystem(camera, scene, audio);
 
+// The GLB pack uses an inverted-hull child named `outline`. That technique
+// cannot share a depth-independent first-person pass or its back faces cover
+// the colored receiver. Keep the base gun on top of the world and suppress only
+// the contour shell.
+const depthProbe = new THREE.Group();
+const depthProbeBody = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
+const depthProbeOutline = new THREE.Mesh(new THREE.BoxGeometry(1.01, 1.01, 1.01), new THREE.MeshBasicMaterial());
+depthProbeOutline.name = 'outline';
+depthProbeBody.add(depthProbeOutline);
+depthProbe.add(depthProbeBody);
+prepareFirstPersonModel(depthProbe);
+assert(!depthProbeBody.material.depthTest && !depthProbeBody.material.depthWrite,
+  'first-person body still shares the world depth buffer');
+assert(depthProbeOutline.visible === false,
+  'first-person inverted-hull outline still covers the colored gun');
+
 for (const [side, arm] of [
   ['trigger', system.armGroup],
   ['support', system.supportArmGroup],
@@ -611,12 +627,16 @@ assert(system.kickGroup.visible, 'viewmodel did not return after leaving the sco
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
-// Exercise the complete transition at 240Hz. Ordinary guns stay visible and
-// place their authored sight on the camera axis; true scoped optics disappear
-// only after the scope overlay is established, never on the first aim frame.
+// Exercise the complete transition at 240Hz. Ordinary guns stay visible in
+// their lower-right three-quarter carry and preserve their apparent framing;
+// true scoped optics disappear only after the overlay is established.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
+  advanceSeconds(0.25, 240);
+  const hipRotation = system.weaponMount.rotation.clone();
+  camera.updateMatrixWorld(true);
+  const hipMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
   input.rightMouseDown = true;
   advanceSeconds(1 / 240, 240);
   assert(system.kickGroup.visible, `${def.id} vanishes on the first ADS frame`);
@@ -625,23 +645,30 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   assert(system.kickGroup.visible === !def.scoped,
     `${def.id} uses the wrong full-ADS viewmodel mode`);
   if (!def.scoped) {
-    assert(Math.abs(system.weaponMount.rotation.x) < 0.012
-      && Math.abs(system.weaponMount.rotation.y) < 0.012
-      && Math.abs(system.weaponMount.rotation.z) < 0.012,
-      `${def.id} sight is not squared to the camera axis`);
+    assert(Math.hypot(
+      system.weaponMount.rotation.x - hipRotation.x,
+      system.weaponMount.rotation.y - hipRotation.y,
+      system.weaponMount.rotation.z - hipRotation.z,
+    ) < 0.012,
+      `${def.id} zoom rotates out of the hip-fire carry`);
     if (MAIN_WEAPON_IDS.includes(def.id)) {
       const record = system.models.get(def.id);
       assert(Math.abs(camera.fov - 30) < 0.3,
         `${def.id} does not settle at the EV-style 30-degree zoom (${camera.fov.toFixed(2)})`);
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
-      const sightNdc = record.group.localToWorld(record.sight.clone()).project(camera);
-      assert(Math.abs(sightNdc.x) < 0.02,
-        `${def.id} ADS sight drifts sideways instead of only lowering (${sightNdc.x.toFixed(3)})`);
-      assert(sightNdc.y < -0.20 && sightNdc.y > -0.32,
-        `${def.id} ADS sight is not tucked just below the reticle (${sightNdc.y.toFixed(3)})`);
+      const adsMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
+      assert(Math.abs(adsMountNdc.x - hipMountNdc.x) < 0.035,
+        `${def.id} zoom changes the lower-right horizontal framing (${hipMountNdc.x.toFixed(3)} -> ${adsMountNdc.x.toFixed(3)})`);
+      const screenDrop = hipMountNdc.y - adsMountNdc.y;
+      assert(screenDrop > 0.08 && screenDrop < 0.22,
+        `${def.id} zoom screen drop is ${screenDrop.toFixed(3)} NDC`);
       record.group.traverse((object) => {
         if (!object.isMesh) return;
+        if (object.name === 'outline') {
+          assert(object.visible === false, `${def.id} first-person contour covers the receiver`);
+          return;
+        }
         const materials = Array.isArray(object.material) ? object.material : [object.material];
         assert(materials.every((material) => !material.depthTest && !material.depthWrite),
           `${def.id} viewmodel can still be hidden by world geometry`);
@@ -660,7 +687,7 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   assert(system.kickGroup.visible, `${def.id} viewmodel did not return after ADS`);
 }
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'm4'), 1, true),
-  'ordinary rifle ADS must retain the aligned weapon and hands');
+  'ordinary rifle zoom must retain the lower-right weapon carry');
 assert(shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'boltsniper'), 0.8, true),
   'scoped rifle must clear only after the scope overlay is established');
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'knife'), 1),

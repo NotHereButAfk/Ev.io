@@ -166,22 +166,34 @@ try {
   assert(Number.isFinite(lookAfter.yaw) && Number.isFinite(lookAfter.pitch)
     && (Math.abs(lookAfter.yaw - lookBefore.yaw) > 0.05 || Math.abs(lookAfter.pitch - lookBefore.pitch) > 0.05),
   `rapid mouse look was lost or invalid: ${JSON.stringify({lookBefore,lookAfter})}`);
+  const hipCarry = await game(`return {
+    rx:g.weaponSystem.weaponMount.rotation.x,
+    ry:g.weaponSystem.weaponMount.rotation.y,
+    rz:g.weaponSystem.weaponMount.rotation.z,
+    z:g.weaponSystem.weaponMount.position.z
+  };`);
   await game(`g.input.rightMouseDown=true; return true;`);
   // Asset-heavy software WebGL may render well below real-time in CI. Wait on
   // the production blend itself instead of assuming 650 wall-clock ms yielded
   // enough animation frames.
   await page.waitForFunction(() => {
     const ws = (window.__game || window.game)?.weaponSystem;
-    return ws?.scopeT > 0.9 && Math.abs(ws.weaponMount.rotation.x) < 0.02
-      && Math.abs(ws.weaponMount.rotation.y) < 0.02;
+    return ws?.scopeT > 0.9 && ws.camera.fov < 31;
   }, null, { timeout: 8000 });
   const adsState = await game(`return { scopeT:g.weaponSystem.scopeT,
     visible:g.weaponSystem.kickGroup.visible,
+    fov:g.weaponSystem.camera.fov,
+    z:g.weaponSystem.weaponMount.position.z,
     rx:g.weaponSystem.weaponMount.rotation.x,
-    ry:g.weaponSystem.weaponMount.rotation.y };`);
+    ry:g.weaponSystem.weaponMount.rotation.y,
+    rz:g.weaponSystem.weaponMount.rotation.z };`);
   assert(adsState.scopeT > 0.9 && adsState.visible
-    && Math.abs(adsState.rx) < 0.02 && Math.abs(adsState.ry) < 0.02,
-  `ADS did not zoom and align the rifle sight to the camera: ${JSON.stringify(adsState)}`);
+    && adsState.fov < 31
+    && adsState.z < hipCarry.z * 2
+    && Math.abs(adsState.rx - hipCarry.rx) < 0.02
+    && Math.abs(adsState.ry - hipCarry.ry) < 0.02
+    && Math.abs(adsState.rz - hipCarry.rz) < 0.02,
+  `zoom did not preserve the lower-right rifle carry: ${JSON.stringify({hipCarry,adsState})}`);
   await game(`g.input.rightMouseDown=false; return true;`);
   await page.waitForFunction(() => {
     const g = window.__game || window.game;

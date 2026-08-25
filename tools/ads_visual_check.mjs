@@ -23,7 +23,7 @@ try {
   await page.waitForFunction(() => {
     const g = window.__game || window.game;
     return g && !document.getElementById('hud')?.classList.contains('hidden');
-  }, null, { timeout: 30000 });
+  }, null, { timeout: 60000 });
   await page.waitForTimeout(8000);
 
   for (const weaponId of MAIN_WEAPON_IDS) {
