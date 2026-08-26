@@ -102,10 +102,9 @@ export class MenuUI {
     this.onLoginRequest       = null; // () => void — open the login page
 
     this.inventory = new InventoryPanel(this);   // Inventory v3 (loadout hub)
-    // Warm the weapon-render pipeline so shop cards can drop in real skinned
-    // renders (same pipeline the inventory cards use). Re-render the shop
-    // when it's open at warm-up time.
-    warmWeaponThumbs(() => { if (this._activePanel === 'shop') this._renderShop(); });
+    // Weapon thumbnails are expensive WebGL renders. Defer their model fetches
+    // and PNG encoding until the player actually opens Inventory or Shop.
+    this._weaponThumbsRequested = false;
     this._buildModeCards();
     this._buildSettings();
     this._wireNav();
@@ -804,6 +803,11 @@ export class MenuUI {
     }
     authWall?.classList.add('hidden');
     content?.classList.remove('hidden');
+
+    if (!this._weaponThumbsRequested) {
+      this._weaponThumbsRequested = true;
+      warmWeaponThumbs(() => { if (this._activePanel === 'shop') this._renderShop(); });
+    }
 
     this._startNightMarketTimer();
     this._renderShopGrid(root);

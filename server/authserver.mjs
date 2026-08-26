@@ -14,7 +14,9 @@
 import { createServer } from 'http';
 import { createReadStream, statSync } from 'fs';
 import { extname, join, normalize, resolve, sep } from 'path';
+import { pipeline } from 'stream';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { createGzip, constants as zlibConstants } from 'zlib';
 import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
 
@@ -31,9 +33,11 @@ const MIME = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+  '.evmap': 'application/x-evmap',
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav',
   '.woff': 'font/woff', '.woff2': 'font/woff2',
 };
+const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.svg', '.gltf', '.evmap']);
 
 const CLEAN_HTML_ROUTES = new Map([
   ['/login', '/login.html'],
@@ -68,15 +72,36 @@ function staticHandler(root) {
 
     const ext = extname(file).toLowerCase();
     const immutable = pathname.startsWith('/assets/');
-    res.writeHead(200, {
+    const cacheControl = ext === '.html'
+      ? 'no-cache'
+      : immutable
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=86400, stale-while-revalidate=604800';
+    const etag = `W/"${stat.size.toString(16)}-${Math.trunc(stat.mtimeMs).toString(16)}"`;
+    const useGzip = stat.size >= 1024 && COMPRESSIBLE.has(ext)
+      && /(?:^|,)\s*gzip\s*(?:,|$)/i.test(req.headers['accept-encoding'] || '');
+    const headers = {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Content-Length': stat.size,
-      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'Cache-Control': cacheControl,
+      ETag: etag,
+      'Last-Modified': stat.mtime.toUTCString(),
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-    });
+    };
+    if (COMPRESSIBLE.has(ext)) headers.Vary = 'Accept-Encoding';
+    if (useGzip) headers['Content-Encoding'] = 'gzip';
+    else headers['Content-Length'] = stat.size;
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, headers); res.end(); return;
+    }
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') { res.end(); return; }
-    createReadStream(file).on('error', () => res.destroy()).pipe(res);
+    const source = createReadStream(file);
+    if (!useGzip) { source.on('error', () => res.destroy()).pipe(res); return; }
+    pipeline(source, createGzip({
+      level: zlibConstants.Z_BEST_SPEED,
+      chunkSize: 64 * 1024,
+    }), res, (error) => { if (error && !res.destroyed) res.destroy(error); });
   };
 }
 

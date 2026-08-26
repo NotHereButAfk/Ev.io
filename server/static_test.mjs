@@ -26,6 +26,27 @@ try {
   await check('serves the built game at /', home.status === 200 && /<!doctype html>/i.test(html));
   await check('sets the HTML content type', home.headers.get('content-type')?.startsWith('text/html'));
   await check('does not cache HTML indefinitely', home.headers.get('cache-control') === 'no-cache');
+  await check('compresses the HTML application shell', home.headers.get('content-encoding') === 'gzip');
+
+  const mapHead = await fetch(`http://127.0.0.1:${PORT}/maps/RookLit_0.evmap`, {
+    method: 'HEAD', headers: { 'Accept-Encoding': 'gzip' },
+  });
+  await check('serves EV maps with their own MIME type',
+    mapHead.headers.get('content-type') === 'application/x-evmap');
+  await check('compresses multi-megabyte EV maps', mapHead.headers.get('content-encoding') === 'gzip');
+  await check('caches version-stable game assets',
+    /max-age=86400/.test(mapHead.headers.get('cache-control') || '') && Boolean(mapHead.headers.get('etag')));
+  const cachedMap = await fetch(`http://127.0.0.1:${PORT}/maps/RookLit_0.evmap`, {
+    method: 'HEAD', headers: { 'If-None-Match': mapHead.headers.get('etag') || '' },
+  });
+  await check('revalidates cached game assets without retransmitting them', cachedMap.status === 304);
+  const compressedMap = await fetch(`http://127.0.0.1:${PORT}/maps/RookLit_0.evmap`, {
+    headers: { 'Accept-Encoding': 'gzip' },
+  });
+  const decodedMap = await compressedMap.arrayBuffer();
+  await check('streams a complete compressed EV map response',
+    compressedMap.status === 200 && compressedMap.headers.get('content-encoding') === 'gzip'
+      && decodedMap.byteLength > 1_000_000);
 
   for (const route of ['/login', '/register', '/privacy', '/terms']) {
     const page = await fetch(`http://127.0.0.1:${PORT}${route}`);

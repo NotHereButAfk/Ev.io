@@ -416,7 +416,38 @@ assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >=
 // EV.IO's sword is a separate first-person composition: a close right-side
 // guard whose grip and tip both leave the frame. It must not be centred over
 // the reticle or point down the camera's depth axis.
-activate(WEAPONS.find((def) => def.id === 'sword'));
+const swordDef = WEAPONS.find((def) => def.id === 'sword');
+assert(swordDef.damage === 75,
+  `sword body hit must deal 75 damage (${swordDef.damage})`);
+assert(Math.abs(swordDef.damage * swordDef.headshotMultiplier - 100) < 1e-9,
+  `sword head critical must deal exactly 100 damage (${swordDef.damage * swordDef.headshotMultiplier})`);
+activate(swordDef);
+const meleeTarget = {
+  alive: true,
+  position: new THREE.Vector3(0, 0, -2),
+  mesh: { userData: { headshotY: 1.55 } },
+};
+const meleeAttacker = { position: new THREE.Vector3(0, 0, 0) };
+const meleeManager = { bots: [meleeTarget] };
+let meleeHit = null;
+const previousOnHitBot = system.onHitBot;
+system.onHitBot = (bot, damage, point, meta) => { meleeHit = { bot, damage, point, meta }; };
+camera.position.set(0, 1.7, 0);
+camera.rotation.set(-0.50, 0, 0);
+camera.updateWorldMatrix(true, true);
+system._doMeleeSwing(meleeAttacker, world, meleeManager);
+assert(meleeHit?.damage === 75 && !meleeHit.meta.headshot,
+  `sword body sweep did not resolve one 75-damage hit (${JSON.stringify(meleeHit)})`);
+meleeHit = null;
+camera.rotation.set(-Math.atan2(0.15, 2), 0, 0);
+camera.updateWorldMatrix(true, true);
+system._doMeleeSwing(meleeAttacker, world, meleeManager);
+assert(Math.abs(meleeHit?.damage - 100) < 1e-9 && meleeHit.meta.headshot,
+  `sword deliberate head aim did not resolve one-hit critical (${JSON.stringify(meleeHit)})`);
+system.onHitBot = previousOnHitBot;
+camera.position.set(0, 0, 0);
+camera.rotation.set(0, 0, 0);
+camera.updateWorldMatrix(true, true);
 camera.aspect = 16 / 9;
 player.baseFov = 78;
 camera.fov = 78;
@@ -442,18 +473,20 @@ assert(swordGuardBounds.minX > 0.22 && swordGuardBounds.minX < 0.42
   `sword guard no longer enters from the close right edge (${JSON.stringify(swordGuardBounds)})`);
 
 system.swingPhase = 0;
-let widestSwordCut = 0;
+let greatestSwordDrop = 0;
+let greatestSwordSideShift = 0;
+const swordGuardCenterX = (swordGuardBounds.minX + swordGuardBounds.maxX) * 0.5;
 const swordFrames = Math.ceil(system.currentDef.fireRate * 60) + 2;
 for (let i = 0; i < swordFrames; i++) {
   tick(1);
   const bounds = projectedBounds(swordModel);
-  widestSwordCut = Math.max(widestSwordCut, bounds.maxX - bounds.minX);
+  const centerX = (bounds.minX + bounds.maxX) * 0.5;
+  greatestSwordDrop = Math.max(greatestSwordDrop, swordGuardBounds.maxY - bounds.maxY);
+  greatestSwordSideShift = Math.max(greatestSwordSideShift, Math.abs(centerX - swordGuardCenterX));
 }
 const swordRecoveredBounds = projectedBounds(swordModel);
-// 0.62 NDC is 31% of a 16:9 screen and matches the compact EV.IO slash;
-// demanding a full-screen arc would make the one-metre blade look oversized.
-assert(widestSwordCut > Math.max(0.62, swordGuardWidth * 1.8),
-  `sword strike does not make a readable diagonal cut (${widestSwordCut})`);
+assert(greatestSwordDrop > 0.70 && greatestSwordDrop > greatestSwordSideShift * 1.05,
+  `sword strike is not a dominant downward chop (drop=${greatestSwordDrop}, side=${greatestSwordSideShift})`);
 for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
   assert(Math.abs(swordRecoveredBounds[key] - swordGuardBounds[key]) < 0.035,
     `sword failed to recover its guard on ${key}`);

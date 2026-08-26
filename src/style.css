@@ -4260,9 +4260,9 @@ html, body {
    ============================================================================ */
 #map-loading {
   position: absolute; inset: 0; z-index: 250; pointer-events: auto;
-  opacity: 1; transition: opacity 0.6s ease; overflow: hidden;
+  opacity: 1; transition: opacity 0.28s ease; overflow: hidden;
   background: #03070d;
-  transition: opacity 0.6s ease, background-color .32s ease;
+  transition: opacity 0.28s ease, background-color .22s ease;
 }
 #map-loading.ml-arena-ready {
   background: linear-gradient(90deg, rgba(5,8,14,.68), rgba(5,8,14,.12) 60%, rgba(5,8,14,.18));

@@ -103,15 +103,15 @@ if (/boot-map-panel|boot-map-brand|boot-map-progress|ml-brand/.test(index)) {
 requireMatch(index, /id=["']ml-progress-fill["']/, 'readiness-bound arena progress indicator');
 requireMatch(game, /new World\(this\._initialMapId,\s*\{\s*autoLoad:\s*false\s*\}\)/,
   'cold map decode begins after the connection handoff paints');
-requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?findAvailableMatch[\s\S]*?_startPresentationPreloads[\s\S]*?_setStartupProgress\(['"]READY['"],\s*100[\s\S]*?_showMapLoading[\s\S]*?startInitialLoad\(\)[\s\S]*?_finishMapLoading/,
-  'startup progress hands off from real matchmaking/assets to real arena loading');
+requireMatch(game, /async _runConnectSequence\(\)[\s\S]*?findAvailableMatch[\s\S]*?_setStartupProgress\(['"]READY['"],\s*100[\s\S]*?_showMapLoading[\s\S]*?startInitialLoad\(\)[\s\S]*?_finishMapLoading[\s\S]*?_schedulePresentationPreloads/,
+  'startup progress hands off from matchmaking to real arena loading before optional presentation downloads');
 for (const id of ['boot-progress-fill', 'boot-detail', 'boot-percent', 'boot-retry']) {
   requireMatch(index, new RegExp(`id=["']${id}["']`), `startup loader control: ${id}`);
 }
 requireMatch(game, /_showStartupError[\s\S]*?boot-retry[\s\S]*?_runConnectSequence/,
   'startup loader exposes a recoverable retry path');
 requireMatch(game, /_startPresentationPreloads\(onProgress[\s\S]*?preloadHumanSoldier[\s\S]*?preloadWeaponModels/,
-  'soldier, animation, and weapon readiness contributes to startup progress');
+  'soldier, animation, and weapon presentation assets share the deferred preload path');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
 requireMatch(index, /ability-page-key["']>Q<[\s\S]*?<strong>TELEPORT<\/strong>/,
   'abilities page advertises Q teleport');

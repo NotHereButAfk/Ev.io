@@ -27,6 +27,10 @@ const zombie = readFileSync(join(root, 'src/entities/Zombie.js'), 'utf8');
 const game = readFileSync(join(root, 'src/core/Game.js'), 'utf8');
 const plates = readFileSync(join(root, 'src/ui/Nameplates.js'), 'utf8');
 const weapons = readFileSync(join(root, 'src/weapons/WeaponSystem.js'), 'utf8');
+const thumbnails = readFileSync(join(root, 'src/ui/WeaponThumbnails.js'), 'utf8');
+const menu = readFileSync(join(root, 'src/ui/MainMenu.js'), 'utf8');
+const inventory = readFileSync(join(root, 'src/ui/InventoryPanel.js'), 'utf8');
+const htaccess = readFileSync(join(root, 'public/.htaccess'), 'utf8');
 const authNet = readFileSync(join(root, 'src/net/AuthNetBridge.js'), 'utf8');
 const hero = readFileSync(join(root, 'src/player/HeroBody.js'), 'utf8');
 assert(!/quaternion\.clone\(\)\.invert\(\)/.test(bot), 'bot billboard allocates every frame');
@@ -42,5 +46,23 @@ assert(/this\._remoteSeen/.test(authNet) && /this\._remoteProject/.test(authNet)
   'remote-player sync must reuse frame scratch storage');
 assert(!/frustumCulled = false/.test(hero),
   'connected player bodies must retain camera frustum culling');
+assert(!/await this\._startPresentationPreloads\(\)/.test(game),
+  'optional presentation assets must not block startup');
+assert(/_schedulePresentationPreloads\(\)/.test(game),
+  'optional presentation assets must be scheduled after gameplay is ready');
+assert(/if \(bloomEnabled\(_q\)\) this\._buildPostFX\(\)/.test(game),
+  'post-processing buffers must be lazy on the default quality tier');
+const constructorBody = game.slice(game.indexOf('constructor(canvas)'), game.indexOf('\n  // Release all global'));
+assert(!/preloadZombieModel\(\)/.test(constructorBody),
+  'the survival-only zombie model must not compete with the first map request');
+assert(/onWeaponModelsReady\(_generate\)/.test(thumbnails)
+  && !/function _waitForGLB/.test(thumbnails),
+  'weapon thumbnails must wait for actual GLB readiness instead of probing fallbacks');
+const menuCtor = menu.slice(menu.indexOf('constructor('), menu.indexOf('// ── Nav wiring'));
+assert(!/warmWeaponThumbs\(/.test(menuCtor), 'menu construction must not render weapon thumbnails');
+const inventoryCtor = inventory.slice(inventory.indexOf('constructor('), inventory.indexOf('\n  open()'));
+assert(!/warmWeaponThumbs\(/.test(inventoryCtor), 'inventory construction must not render weapon thumbnails');
+assert(/application\/x-evmap/.test(htaccess) && /DEFLATE[^\n]*application\/x-evmap/.test(htaccess),
+  'large EV map payloads must be served compressed');
 
-console.log('client performance passed: medium gameplay bloom off, high post-FX 1.5x; player culling, allocation-free hot loops, and 10Hz nameplate LOS verified');
+console.log('client performance passed: startup is non-blocking, EV maps compress, thumbnails are lazy, medium bloom is off, and hot loops stay allocation-light');

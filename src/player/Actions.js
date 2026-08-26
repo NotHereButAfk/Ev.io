@@ -80,8 +80,8 @@ export const snap = (p) => {
 };
 
 // ── melee ───────────────────────────────────────────────────────────────────
-// Windup up and back over the shoulder, a fast diagonal slash down across the
-// body, then a slower recovery. Mirrors the shape of the first-person swing in
+// Wind up over the shoulder, chop straight down through the target, then make
+// a slower recovery. Mirrors the shape of the first-person swing in
 // WeaponSystem so the two views of the same blade agree.
 const SWING_WIND = 0.30, SWING_CUT = 0.55;
 

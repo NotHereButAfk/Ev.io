@@ -214,7 +214,8 @@ export const WEAPONS = [
     name: 'Arc Blade',
     key: 'V',
     kind: 'melee',
-    damage: 65,
+    damage: 75,             // 75% of a standard 100-health target
+    headshotMultiplier: 4 / 3, // exact 100-damage critical when aimed at the head
     fireRate: 0.45,
     range: 2.6,
     arc: 1.0,

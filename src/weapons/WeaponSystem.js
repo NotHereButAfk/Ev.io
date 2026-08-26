@@ -1220,8 +1220,9 @@ export class WeaponSystem {
     const def = this.currentDef;
     const camPos = new THREE.Vector3();
     this.camera.getWorldPosition(camPos);
-    const camDir = new THREE.Vector3();
-    this.camera.getWorldDirection(camDir);
+    const aimDir = new THREE.Vector3();
+    this.camera.getWorldDirection(aimDir);
+    const camDir = aimDir.clone();
     camDir.y = 0;
     camDir.normalize();
 
@@ -1233,7 +1234,24 @@ export class WeaponSystem {
       toBot.normalize();
       const dot = camDir.dot(toBot);
       if (dot > Math.cos(def.arc)) {
-        if (this.onHitBot) this.onHitBot(bot, def.damage, bot.position);
+        const meshData = bot.mesh?.userData;
+        const headY = typeof meshData?.headshotY === 'number'
+          ? meshData.headshotY
+          : (meshData?.isHuman ? 1.62 : 1.55);
+        const headPoint = new THREE.Vector3(bot.position.x, bot.position.y + headY, bot.position.z);
+        const toHead = headPoint.clone().sub(camPos).normalize();
+        // A sword critical still requires deliberate head aim; the broad body
+        // sweep remains 75 damage instead of turning the whole arc into a
+        // one-hit zone.
+        const isHead = Boolean(def.headshotMultiplier)
+          && aimDir.dot(toHead) > Math.cos(0.18);
+        const damage = def.damage * (isHead ? def.headshotMultiplier : 1);
+        if (this.onHitBot) this.onHitBot(
+          bot,
+          damage,
+          isHead ? headPoint : bot.position,
+          { headshot: isHead, melee: true },
+        );
       }
     }
   }
@@ -1636,7 +1654,7 @@ export class WeaponSystem {
     // add roll/yaw below, but those axes must never leak into the next weapon.
     this.kickGroup.rotation.set(this.kickRotX - raiseTilt, 0, 0);
 
-    // sword swing animation — windup → fast diagonal slash → recover
+    // sword swing animation — raise → fast overhand chop → recover
     if (def.kind === 'melee' && this.swingPhase < 1) {
       this.swingPhase = Math.min(1, this.swingPhase + dt / def.fireRate);
       const ph = this.swingPhase;
@@ -1649,45 +1667,45 @@ export class WeaponSystem {
           this.kickPos.y + e * 0.025,
           this.kickPos.z - e * 0.20,
         );
-      } else if (ph < 0.18) {
-        // Compact wind-up: tip moves to the upper-right, hilt stays low.
-        const w = ph / 0.18;
+      } else if (ph < 0.22) {
+        // Lift the hilt and cock the blade back without sweeping across the
+        // sightline before the attack begins.
+        const w = ph / 0.22;
         const e = w * w * (3 - 2 * w);
-        this.kickGroup.rotation.set(-0.10 * e, -0.65 * e, -0.10 * e);
+        this.kickGroup.rotation.set(-0.22 * e, -0.08 * e, -0.05 * e);
         this.kickGroup.position.set(
-          this.kickPos.x + 0.04 * e,
-          this.kickPos.y - 0.025 * e,
-          this.kickPos.z + 0.05 * e,
+          this.kickPos.x + 0.02 * e,
+          this.kickPos.y + 0.08 * e,
+          this.kickPos.z - 0.08 * e,
         );
-      } else if (ph < 0.52) {
-        // Fast right-to-left diagonal cut. Most of the visible sweep rotates
-        // laterally around the hilt; modest pitch/roll keep the blade from
-        // turning flat to the camera or covering the centre for the whole hit.
-        const s = (ph - 0.18) / 0.34;
+      } else if (ph < 0.58) {
+        // Drive the sword from above the shoulder down through the target.
+        // Pitch owns the motion; small yaw/roll only keep the blade readable.
+        const s = (ph - 0.22) / 0.36;
         const e = s * s * (3 - 2 * s);
         this.kickGroup.rotation.set(
-          THREE.MathUtils.lerp(-0.10, 0.45, e),
-          THREE.MathUtils.lerp(-0.65, 1.45, e),
-          THREE.MathUtils.lerp(-0.10, 0.25, e),
+          THREE.MathUtils.lerp(-0.22, 1.35, e),
+          THREE.MathUtils.lerp(-0.08, 0.10, e),
+          THREE.MathUtils.lerp(-0.05, 0.14, e),
         );
         this.kickGroup.position.set(
-          this.kickPos.x + THREE.MathUtils.lerp(0.04, -0.08, e),
-          this.kickPos.y - 0.025 + Math.sin(e * Math.PI) * 0.045,
-          this.kickPos.z + THREE.MathUtils.lerp(0.05, -0.12, e),
+          this.kickPos.x + THREE.MathUtils.lerp(0.02, -0.10, e),
+          this.kickPos.y + THREE.MathUtils.lerp(0.08, -0.22, e),
+          this.kickPos.z + THREE.MathUtils.lerp(-0.08, -0.16, e),
         );
       } else {
-        // Slower recovery settles precisely into the high guard.
-        const r = (ph - 0.52) / 0.48;
+        // Slower recovery lifts the blade precisely back into its right guard.
+        const r = (ph - 0.58) / 0.42;
         const e = r * r * (3 - 2 * r);
         this.kickGroup.rotation.set(
-          THREE.MathUtils.lerp(0.45, 0, e),
-          THREE.MathUtils.lerp(1.45, 0, e),
-          THREE.MathUtils.lerp(0.25, 0, e),
+          THREE.MathUtils.lerp(1.35, 0, e),
+          THREE.MathUtils.lerp(0.10, 0, e),
+          THREE.MathUtils.lerp(0.14, 0, e),
         );
         this.kickGroup.position.set(
-          this.kickPos.x + THREE.MathUtils.lerp(-0.08, 0, e),
-          this.kickPos.y + THREE.MathUtils.lerp(-0.025, 0, e),
-          this.kickPos.z + THREE.MathUtils.lerp(-0.12, 0, e),
+          this.kickPos.x + THREE.MathUtils.lerp(-0.10, 0, e),
+          this.kickPos.y + THREE.MathUtils.lerp(-0.22, 0, e),
+          this.kickPos.z + THREE.MathUtils.lerp(-0.16, 0, e),
         );
       }
     } else if (def.kind === 'melee') {

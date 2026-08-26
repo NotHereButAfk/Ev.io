@@ -50,9 +50,15 @@ try {
     visible: !document.getElementById('map-loading')?.classList.contains('hidden'),
     phase: document.getElementById('ml-building')?.textContent,
     progress: document.getElementById('ml-progress-fill')?.style.width,
+    earlyOptionalAssets: performance.getEntriesByType('resource')
+      .map((entry) => entry.name)
+      .filter((name) => /(?:soldier|player|spartan|zombie|weapons(?:_authored)?|sidearm)\.glb|universal-animation-library|vendor\/quaternius\/scifi-weapons/i.test(name)),
   }));
   if (!mapStage.visible || !/arena|collision|presentation/i.test(mapStage.phase || '')) {
     throw new Error(`real map-loading stage was skipped: ${JSON.stringify(mapStage)}`);
+  }
+  if (mapStage.earlyOptionalAssets.length) {
+    throw new Error(`optional presentation assets competed with the first map: ${JSON.stringify(mapStage.earlyOptionalAssets)}`);
   }
   if (mapScreenshot) await page.screenshot({ path: mapScreenshot });
   await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null, {

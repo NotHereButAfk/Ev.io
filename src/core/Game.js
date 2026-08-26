@@ -101,16 +101,22 @@ export class Game {
     // The cold .evmap decode starts after the connection card hands off.
     this.world        = new World(this._initialMapId, { autoLoad: false });
 
-    // IBL — makes every MeshStandardMaterial look physically accurate
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.35)).texture;
-    this.world.scene.environmentIntensity = 0.5; // keep IBL from washing surfaces to white
-    pmrem.dispose();
+    // PMREM compilation is one of the most expensive synchronous startup GPU
+    // tasks. The loading overlay hides the arena anyway, so build it after the
+    // real map arrives instead of delaying the loader's first paint.
+    this._environmentReady = false;
+    this.world.scene.environmentIntensity = 0.5;
 
     // ── HDR bloom post-processing ──────────────────────────────────────────
     // Makes every emissive surface — neon signs, lit windows, glowing weapon
     // skins, muzzle flashes, lamps — bleed light for a cinematic glow.
-    this._buildPostFX();
+    // Medium/low render directly and do not need several full-screen bloom
+    // targets. Allocate the composer lazily only when High quality requests it.
+    this.composer = null;
+    this.renderPass = null;
+    this.bloomPass = null;
+    this._bloomEnabled = false;
+    if (bloomEnabled(_q)) this._buildPostFX();
     this.player       = new Player(window.innerWidth / window.innerHeight);
     this.audio        = new AudioManager();
     this._listenPos   = new THREE.Vector3();   // scratch for the audio listener
@@ -136,7 +142,6 @@ export class Game {
     this.deathEffects = new DeathEffectManager(this.world.scene);
     this.botManager      = new BotManager(this.world, this.world.scene, this.audio);
     this.zombieManager   = new ZombieManager(this.world, this.world.scene, this.audio);
-    preloadZombieModel();   // start fetching zombie.glb during the 60s grace period
     this.survivalManager = new SurvivalManager();
     this.dmManager       = new DeathmatchManager();
     this.serverSim       = null; // built once the HUD exists (see below)
@@ -306,29 +311,76 @@ export class Game {
         this._spawnMenuBots();
       }
     };
-    const jobs = [];
-    const track = (label, starter) => jobs.push(new Promise((resolve) => starter(() => {
-      swapPreview();
-      onProgress?.(label);
-      resolve();
-    })));
-    track('player', preloadHumanSoldier);
-    track('models', preloadPlayerModel);
-    track('armor', preloadSpartanModel);
-    track('animations', preloadUniversalAnimations);
-    jobs.push(new Promise((resolve) => onWeaponModelsReady(() => {
-      onProgress?.('weapons');
-      resolve();
-    })));
-    preloadWeaponModels();
-    // Authored models are optional because every category has a procedural
-    // fallback. Wait briefly for real completions without trapping startup on
-    // one unavailable cosmetic file.
-    this._presentationPreloadPromise = Promise.race([
-      Promise.allSettled(jobs),
-      new Promise((resolve) => setTimeout(resolve, 1800)),
-    ]);
+    const idlePause = () => new Promise((resolve) => {
+      if ('requestIdleCallback' in window) window.requestIdleCallback(resolve, { timeout: 750 });
+      else setTimeout(resolve, 100);
+    });
+    const loadStage = (label, starter) => new Promise((resolve) => {
+      let advanced = false;
+      let applied = false;
+      const advance = () => {
+        if (advanced) return;
+        advanced = true;
+        resolve();
+      };
+      const ready = () => {
+        if (!applied) {
+          applied = true;
+          swapPreview();
+          onProgress?.(label);
+        }
+        advance();
+      };
+      // A missing optional asset must not prevent the remaining fallbacks from
+      // loading. A late success still applies even after this stage advances.
+      const timeout = setTimeout(advance, 8000);
+      try { starter(() => { clearTimeout(timeout); ready(); }); }
+      catch (error) {
+        clearTimeout(timeout);
+        console.warn(`[startup] optional ${label} preload failed`, error);
+        advance();
+      }
+    });
+    const stages = [
+      ['player', preloadHumanSoldier],
+      ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
+      ['animations', preloadUniversalAnimations],
+      ['models', preloadPlayerModel],
+      ['armor', preloadSpartanModel],
+    ];
+    // Loading every GLB and the 6 MB animation library simultaneously caused
+    // parse spikes while the menu/game was already rendering. One idle-paced
+    // stage at a time keeps bandwidth and main-thread work predictable.
+    this._presentationPreloadPromise = (async () => {
+      for (const [label, starter] of stages) {
+        await idlePause();
+        await loadStage(label, starter);
+      }
+    })();
     return this._presentationPreloadPromise;
+  }
+
+  _schedulePresentationPreloads() {
+    if (this._presentationPreloadsStarted || this._presentationPreloadScheduled) return;
+    this._presentationPreloadScheduled = true;
+    const start = () => {
+      this._presentationPreloadScheduled = false;
+      // These assets improve presentation, but every system has an immediate
+      // procedural fallback. Load them only after the menu is usable.
+      this._startPresentationPreloads().catch((error) => {
+        console.warn('[startup] optional presentation preload failed', error);
+      });
+    };
+    if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 2200 });
+    else setTimeout(start, 500);
+  }
+
+  _ensureEnvironment() {
+    if (this._environmentReady) return;
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.world.scene.environment = pmrem.fromScene(new RoomEnvironment(0.35)).texture;
+    pmrem.dispose();
+    this._environmentReady = true;
   }
 
   // ── Connect sequence ─────────────────────────────────────────────────────────
@@ -388,23 +440,12 @@ export class Game {
         }
       }
 
-      this._startupProgress = 40;
-      this._setStartupProgress('LOADING GAME...', 40, 'Loading gameplay systems...');
-      let assetSteps = 0;
-      await this._startPresentationPreloads((label) => {
-        assetSteps++;
-        const progress = Math.min(88, 40 + assetSteps * 8);
-        this._startupProgress = progress;
-        const labels = {
-          weapons: 'Loading weapons...', animations: 'Loading animations...',
-          player: 'Loading player...', models: 'Loading character models...', armor: 'Loading armor...',
-        };
-        this._setStartupProgress('LOADING GAME...', progress, labels[label] || 'Loading assets...');
-      });
+      this._startupProgress = 72;
+      this._setStartupProgress('LOADING GAME...', 72, 'Preparing gameplay systems...');
       this._startupProgress = 92;
       this._setStartupProgress('PREPARING MATCH...', 92, 'Preparing menu and match systems...');
       this._initAuth();
-      await delay(180);
+      await delay(80);
       this._startupProgress = 100;
       this._setStartupProgress('READY', 100, 'Game systems ready');
 
@@ -414,18 +455,20 @@ export class Game {
       // black canvas or an already-finished menu from flashing underneath.
       this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
       this._setMapLoadingPhase('Waiting for arena stream...', 8);
-      await delay(280);
+      await delay(80);
       connectScreen?.classList.add('fade-out');
-      await delay(600);
+      await delay(240);
       connectScreen?.classList.add('hidden');
 
       this._setMapLoadingPhase('Loading arena geometry...', 24);
       const map = await this.world.startInitialLoad();
       this._setMapLoadingPhase('Building collision and spawn data...', 76);
+      this._ensureEnvironment();
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
       this._setMapLoadingPhase('Preparing arena presentation...', 92);
-      await this._finishMapLoading(1400);
+      await this._finishMapLoading(650);
+      this._schedulePresentationPreloads();
     } catch (error) {
       console.error('[startup] load failed', error);
       // A rejected map promise must be cleared so RETRY performs a new fetch.
@@ -550,8 +593,10 @@ export class Game {
   _setRuntimeQuality(quality, resetMonitor = false) {
     this._runtimeQuality = quality;
     this.renderer.setPixelRatio(rendererPixelRatio(quality, window.devicePixelRatio));
+    const wantsBloom = bloomEnabled(quality);
+    if (wantsBloom && !this.composer) this._buildPostFX();
     this.composer?.setPixelRatio(postFxPixelRatio(quality, window.devicePixelRatio));
-    this._bloomEnabled = bloomEnabled(quality);
+    this._bloomEnabled = wantsBloom;
     if (resetMonitor || !this._perfMonitor) {
       this._perfMonitor = { grace: 8, elapsed: 0, frames: 0, slow: 0 };
     } else {
@@ -920,6 +965,9 @@ export class Game {
       const _mm = Math.floor(this._modeTimer / 60), _ss = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${_mm}:${String(_ss).padStart(2, '0')}`);
     } else if (this._isSurvival) {
+      // Firefight has a long opening grace period, so fetch its optional model
+      // only when that mode is selected instead of taxing every visitor.
+      preloadZombieModel();
       this._activeManager = this.zombieManager;
       this.botManager.clear();
       this.zombieManager.clear();
@@ -1348,7 +1396,7 @@ export class Game {
     await delay(Math.max(0, minimumDisplayMs - elapsed));
     if (sequence !== this._mapLoadingSequence) return;
     el.classList.add('ml-fade');
-    await delay(650);
+    await delay(320);
     if (sequence === this._mapLoadingSequence) el.classList.add('hidden');
   }
 
@@ -1650,6 +1698,7 @@ export class Game {
   // ── Post-processing (bloom) ──────────────────────────────────────────────
 
   _buildPostFX() {
+    if (this.composer) return;
     const w = window.innerWidth, h = window.innerHeight;
     this.composer = new EffectComposer(this.renderer);
     const quality = GameSettings.get('quality');

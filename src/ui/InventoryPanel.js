@@ -64,9 +64,7 @@ export class InventoryPanel {
     this._tab = 'character';        // which tab is active
     this._renderToken = 0;          // cancels in-flight thumb pumps
     this._open = false;
-
-    // Real skinned thumbnails; refresh once they're ready.
-    warmWeaponThumbs(() => { if (this._open) this._renderGrid(); });
+    this._thumbsRequested = false;
 
     document.getElementById('inv-close-btn')?.addEventListener('click', () => {
       this.host._closeAllPanels();
@@ -75,6 +73,10 @@ export class InventoryPanel {
 
   open() {
     this._open = true;
+    if (!this._thumbsRequested) {
+      this._thumbsRequested = true;
+      warmWeaponThumbs(() => { if (this._open) this._renderGrid(); });
+    }
     // Sync display name into the header.
     const nameEl = document.getElementById('inv-username');
     const u = this.host._currentUser;

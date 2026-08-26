@@ -10,7 +10,11 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
-import { buildWeaponModel, preloadWeaponModels } from '../weapons/WeaponModels.js';
+import {
+  buildWeaponModel,
+  onWeaponModelsReady,
+  preloadWeaponModels,
+} from '../weapons/WeaponModels.js';
 import { applyWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin } from '../weapons/SwordSkins.js';
 
@@ -19,11 +23,17 @@ import { applySwordSkin } from '../weapons/SwordSkins.js';
 // PMREM room environment is what makes the finishes actually read.
 function _studio(renderer, scene) {
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  const environment = pmrem.fromScene(new RoomEnvironment(), 0.04);
+  scene.environment = environment.texture;
+  pmrem.dispose();
   scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(2.5, 3, 4); scene.add(key);
   const fill = new THREE.DirectionalLight(0x88aaff, 0.5); fill.position.set(-3, 1, 2); scene.add(fill);
   const rim = new THREE.DirectionalLight(0xffe0b0, 0.45); rim.position.set(0, -2, -3); scene.add(rim);
+  return () => {
+    scene.environment = null;
+    environment.dispose();
+  };
 }
 
 
@@ -39,7 +49,9 @@ function _fitCamera(camera) {
 const _cache = new Map();
 const _hudCache = new Map();
 let _warmed = false;
-let _onReady = null;
+let _warming = false;
+let _generating = false;
+const _readyCallbacks = new Set();
 
 export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
 export function getWeaponHudThumb(id) { return _hudCache.get(id) ?? _cache.get(id) ?? null; }
@@ -104,22 +116,21 @@ export function renderWeaponSkinned(weaponDef, skin) {
 }
 
 export function warmWeaponThumbs(onReady) {
-  _onReady = onReady;
-  if (_warmed) { onReady?.(); return; }
-  _warmed = true;
-  preloadWeaponModels();
-  _waitForGLB(0);
-}
-
-// buildWeaponModel returns null until the weapon GLB has loaded — poll for it.
-function _waitForGLB(attempt) {
-  const probe = buildWeaponModel(WEAPONS.find((w) => w.id === 'm4') || WEAPONS[0]);
-  if (!probe) {
-    if (attempt < 50) setTimeout(() => _waitForGLB(attempt + 1), 400);
+  if (onReady) _readyCallbacks.add(onReady);
+  if (_warmed) {
+    queueMicrotask(() => {
+      _readyCallbacks.delete(onReady);
+      onReady?.();
+    });
     return;
   }
-  _disposeGroup(probe.group);
-  _generate();
+  if (_warming) return;
+  _warming = true;
+  // WeaponModels always has a procedural fallback, so probing
+  // buildWeaponModel() does not tell us whether the GLBs have loaded. Wait for
+  // the real loader signal and avoid rendering the whole armory during boot.
+  onWeaponModelsReady(_generate);
+  preloadWeaponModels();
 }
 
 function _disposeGroup(g) {
@@ -127,6 +138,8 @@ function _disposeGroup(g) {
 }
 
 function _generate() {
+  if (_generating || _warmed) return;
+  _generating = true;
   const SIZE = 144;
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setSize(SIZE, SIZE);
@@ -135,14 +148,15 @@ function _generate() {
   renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
-  _studio(renderer, scene);
+  const disposeStudio = _studio(renderer, scene);
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
+  let weaponIndex = 0;
 
-  for (const w of WEAPONS) {
+  const renderOne = (w) => {
     let built;
     try { built = buildWeaponModel(w); } catch { built = null; }
-    if (!built) continue;
+    if (!built) return;
     const g = built.group;
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     scene.add(g);
@@ -179,8 +193,38 @@ function _generate() {
 
     scene.remove(g);
     _disposeGroup(g);
-  }
+  };
 
-  renderer.dispose();
-  _onReady?.();
+  // PNG encoding is CPU-heavy. Generate a small slice at a time so opening
+  // the inventory cannot monopolize the main thread for a long frame.
+  const schedule = (fn) => {
+    if ('requestIdleCallback' in window) window.requestIdleCallback(fn, { timeout: 120 });
+    else setTimeout(() => fn(null), 0);
+  };
+  const pump = (deadline) => {
+    const sliceStart = performance.now();
+    do {
+      renderOne(WEAPONS[weaponIndex++]);
+    } while (
+      weaponIndex < WEAPONS.length
+      && (deadline?.timeRemaining?.() > 3 || performance.now() - sliceStart < 8)
+    );
+
+    if (weaponIndex < WEAPONS.length) {
+      schedule(pump);
+      return;
+    }
+
+    disposeStudio();
+    renderer.dispose();
+    _generating = false;
+    _warming = false;
+    _warmed = true;
+    const callbacks = [..._readyCallbacks];
+    _readyCallbacks.clear();
+    for (const cb of callbacks) {
+      try { cb(); } catch (error) { console.warn('[weapon thumbnails] ready callback failed', error); }
+    }
+  };
+  schedule(pump);
 }

@@ -83,15 +83,15 @@ const THROW_RELEASE = {
   lForeX: 0.18, lForeZ: 0.12,
 };
 const MELEE_WIND = {
-  torsoX: -0.08, torsoZ: -0.22,
-  rArmX: -1.14, rArmY: 0.12, rArmZ: 0.48,
-  rForeX: 0.72, rForeZ: 0.34,
+  torsoX: -0.08, torsoZ: -0.08,
+  rArmX: -1.14, rArmY: 0.08, rArmZ: 0.18,
+  rForeX: 0.72, rForeZ: 0.14,
   lArmX: 0.18, lArmZ: -0.16,
 };
 const MELEE_CUT = {
-  torsoX: 0.18, torsoZ: 0.24,
-  rArmX: 0.88, rArmY: -0.08, rArmZ: -0.58,
-  rForeX: -0.48, rForeZ: -0.32,
+  torsoX: 0.22, torsoZ: 0.08,
+  rArmX: 1.08, rArmY: -0.04, rArmZ: -0.18,
+  rForeX: -0.58, rForeZ: -0.14,
   lArmX: -0.22, lArmZ: 0.14,
 };
 

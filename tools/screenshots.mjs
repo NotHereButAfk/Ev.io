@@ -139,12 +139,22 @@ await pose(`
 await page.waitForTimeout(1200);
 await shot('first-person');
 if (CAPTURE_SWORD) {
-  await pose(`g.weaponSystem.swingPhase = 0;`);
-  await page.waitForTimeout(70);
+  // Freeze the action clock at authored phases. `shot()` deliberately waits
+  // 120ms for browser chrome to settle, which otherwise advances a 450ms
+  // sword attack far enough to mislabel recovery as the cut frame.
+  await pose(`
+    window.__kyxSwordCaptureRate = g.weaponSystem.currentDef.fireRate;
+    g.weaponSystem.currentDef.fireRate = 999;
+    g.weaponSystem.swingPhase = 0.12;
+  `);
   await shot('sword-windup');
-  await page.waitForTimeout(110);
+  await pose(`g.weaponSystem.swingPhase = 0.56;`);
   await shot('sword-cut');
-  await page.waitForTimeout(300);
+  await pose(`
+    g.weaponSystem.swingPhase = 1;
+    g.weaponSystem.currentDef.fireRate = window.__kyxSwordCaptureRate;
+    delete window.__kyxSwordCaptureRate;
+  `);
   await shot('sword-recovered');
 }
 
