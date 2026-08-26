@@ -73,11 +73,11 @@ const VIEWMODEL_ROLL = -0.055;
 // oversized blade rises almost vertically and leaves the top of the frame.
 // Keep this on the shared viewmodel root so skins and the complete blade move
 // as one rigid object while third-person/world weapons remain unchanged.
-const SWORD_VIEWMODEL_X = 0.22;
-const SWORD_VIEWMODEL_Y = -0.28;
+const SWORD_VIEWMODEL_X = 0.19;
+const SWORD_VIEWMODEL_Y = -0.26;
 const SWORD_VIEWMODEL_Z = -0.32;
 const SWORD_VIEWMODEL_PITCH = 1.28;
-const SWORD_VIEWMODEL_YAW = 0.02;
+const SWORD_VIEWMODEL_YAW = -0.14;
 const SWORD_VIEWMODEL_ROLL = -0.035;
 const REFERENCE_ASPECT = 16 / 9;
 

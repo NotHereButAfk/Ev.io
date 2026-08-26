@@ -425,15 +425,17 @@ const swordModel = system.models.get('sword').group;
 const swordGuardBounds = projectedBounds(swordModel);
 const swordGuardWidth = swordGuardBounds.maxX - swordGuardBounds.minX;
 const swordGuardHeight = swordGuardBounds.maxY - swordGuardBounds.minY;
-assert(system.weaponMount.position.x >= 0.20 && system.weaponMount.position.x <= 0.24,
+assert(system.weaponMount.position.x >= 0.17 && system.weaponMount.position.x <= 0.21,
   `EV.IO sword guard horizontal placement drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.31 && system.weaponMount.position.y <= -0.25,
+assert(system.weaponMount.position.y >= -0.29 && system.weaponMount.position.y <= -0.23,
   `EV.IO sword guard vertical placement drifted (${system.weaponMount.position.y})`);
 assert(system.weaponMount.rotation.x >= 1.23 && system.weaponMount.rotation.x <= 1.33,
   `EV.IO sword no longer rises vertically (${system.weaponMount.rotation.x})`);
+assert(system.weaponMount.rotation.y >= -0.18 && system.weaponMount.rotation.y <= -0.10,
+  `EV.IO sword guard no longer cancels its perspective lean (${system.weaponMount.rotation.y})`);
 assert(swordGuardBounds.minY < -0.82 && swordGuardBounds.maxY > 0.72,
   `sword guard must leave both the lower and upper frame (${JSON.stringify(swordGuardBounds)})`);
-assert(swordGuardHeight > 1.70 && swordGuardWidth < 1.10,
+assert(swordGuardHeight > 1.70 && swordGuardWidth < 1.22,
   `sword guard lost its tall silhouette (${JSON.stringify(swordGuardBounds)})`);
 assert(swordGuardBounds.minX > 0.22 && swordGuardBounds.minX < 0.42
   && swordGuardBounds.maxX > 1.05 && swordGuardBounds.maxX < 1.45,
