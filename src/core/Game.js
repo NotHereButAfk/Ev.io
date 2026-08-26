@@ -271,8 +271,13 @@ export class Game {
     };
 
     this._rafId = requestAnimationFrame(() => this._loop());
-    document.getElementById('boot-retry')?.addEventListener('click', () => this._runConnectSequence());
-    this._runConnectSequence();
+    document.getElementById('boot-retry')?.addEventListener('click', () => {
+      this._startupReadyPromise = this._runConnectSequence();
+    });
+    // Match entry awaits this exact promise. The menu is initialized before
+    // the arena decode so the fly-through can appear promptly, but a Play
+    // click must not spawn combatants from World's temporary origin fallback.
+    this._startupReadyPromise = this._runConnectSequence();
   }
 
   // Release all global event listeners and cancel the render loop.
@@ -725,25 +730,28 @@ export class Game {
   _wireMenu() {
     this.menu.onPlay = async (name, skinId, modeId, armorTypeId) => {
       if (this._joinInFlight) return;
-      if (!this.currentUsername || UserAccount.isGuest()) {
-        if (!UserAccount.isGuest()) UserAccount.guest();
-        this._onAuth('__guest__');
-        name = UserAccount.getDisplayName('__guest__');
-      }
-      const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
-      if (publicMode && authNetTargets().length) {
-        this._joinInFlight = true;
-        try {
-          await this._prepareAuthoritativeMatch(name, modeId);
-        } catch (error) {
-          console.error('[matchmaker] join failed', error);
-          this._showServerJoinError(error.message);
-          return;
-        } finally {
-          this._joinInFlight = false;
+      this._joinInFlight = true;
+      try {
+        await this._startupReadyPromise;
+        // A failed map load owns its visible RETRY state. Do not create a
+        // match against the one-point construction fallback underneath it.
+        if (!this.world.currentMap) return;
+        if (!this.currentUsername || UserAccount.isGuest()) {
+          if (!UserAccount.isGuest()) UserAccount.guest();
+          this._onAuth('__guest__');
+          name = UserAccount.getDisplayName('__guest__');
         }
+        const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
+        if (publicMode && authNetTargets().length) {
+          await this._prepareAuthoritativeMatch(name, modeId);
+        }
+        this._startGame(name, skinId, modeId, armorTypeId);
+      } catch (error) {
+        console.error('[matchmaker] join failed', error);
+        this._showServerJoinError(error.message);
+      } finally {
+        this._joinInFlight = false;
       }
-      this._startGame(name, skinId, modeId, armorTypeId);
     };
     this.menu.onResume        = () => this._resume();
     this.menu.onQuit          = () => this._quitToMenu();

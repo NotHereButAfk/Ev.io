@@ -24,8 +24,37 @@ try {
   // test (pointer lock is not part of this roaming observation).
   await page.locator('#play-btn').waitFor({ state: 'visible', timeout: 90000 });
   await page.evaluate(() => document.getElementById('play-btn')?.click());
-  await page.waitForFunction(() => JSON.parse(document.getElementById('qa-runtime')?.textContent || '{}').state === 'playing', null,
-    { timeout: 30000 });
+  try {
+    await page.waitForFunction(() => JSON.parse(document.getElementById('qa-runtime')?.textContent || '{}').state === 'playing', null,
+      { timeout: 30000 });
+  } catch (error) {
+    const state = await page.evaluate(() => {
+      const game = window.__game || window.game;
+      return {
+        state: game?.state,
+        mapId: game?.world?.currentMapId,
+        mapReady: !!game?.world?.currentMap,
+        startupInFlight: game?._startupInFlight,
+        joinInFlight: game?._joinInFlight,
+        mapLoader: document.getElementById('map-loading')?.className,
+      };
+    });
+    throw new Error(`${error.message}; runtime=${JSON.stringify(state)}`);
+  }
+
+  const entry = await page.evaluate(() => {
+    const game = window.__game || window.game;
+    const positions = game.botManager.bots.map((bot) =>
+      `${bot.position.x.toFixed(2)},${bot.position.z.toFixed(2)}`);
+    return {
+      mapReady: !!game.world.currentMap,
+      spawnCount: game.world.spawnPoints.length,
+      uniqueBotSpawns: new Set(positions).size,
+    };
+  });
+  if (!entry.mapReady || entry.spawnCount < 4 || entry.uniqueBotSpawns < 4) {
+    throw new Error(`Play entered before authored spawn data was ready: ${JSON.stringify(entry)}`);
+  }
 
   const samples = [];
   for (let sample = 0; sample < 20; sample++) {
@@ -61,6 +90,14 @@ try {
       displacement: Math.hypot(end.x - start.x, end.z - start.z),
       airborneStarts,
       stuckFrames,
+      start: {
+        x: start.x, z: start.z, speed: start.speed,
+        roamX: start.roamX, roamZ: start.roamZ, alive: start.alive,
+      },
+      end: {
+        x: end.x, z: end.z, speed: end.speed,
+        roamX: end.roamX, roamZ: end.roamZ, alive: end.alive,
+      },
     };
   });
 
