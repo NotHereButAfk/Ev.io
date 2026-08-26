@@ -106,20 +106,21 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
 const ADS_SIGHT_DEPTH = -0.42;
 const ADS_SIGHT_Y = -0.028;
 const DEFAULT_ADS_FOV = 30;
-// EV.IO shoulders the gun toward the centre without presenting a perfectly
-// rear-on buttstock view. The muzzle sits near the reticle while the receiver
-// remains readable and the rear continues out through the lower-right edge.
-const ADS_INWARD_X = 0.28;
-const ADS_SCREEN_DROP_NDC = 0.14;
+// Keep magnified combat readable: the gun remains full-size at the authored
+// depth, but only comes partway inward and settles lower in the right corner.
+// This preserves the shouldered EV.IO silhouette without letting a large
+// receiver cover the target area after the 30-degree camera zoom.
+const ADS_INWARD_X = 0.18;
+const ADS_SCREEN_DROP_NDC = 0.18;
 const ADS_PITCH = 0.08;
 const ADS_YAW = 0.12;
 const ADS_ROLL = -0.02;
 const ADS_VERTICAL_LIFT = Object.freeze({
-  m4: 0.17,
-  magnum: 0.23,
-  battlerifle: 0.04,
-  energyshotgun: 0.04,
-  plasmarifle: 0.12,
+  m4: 0.08,
+  magnum: 0.12,
+  battlerifle: -0.02,
+  energyshotgun: -0.04,
+  plasmarifle: 0.05,
 });
 
 const _adsBox = new THREE.Box3();

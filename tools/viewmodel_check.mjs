@@ -656,9 +656,9 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       const adsMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
       assert(Math.abs(system.weaponMount.position.z - hipDepth) < 0.02,
         `${def.id} zoom pushes the gun away and makes it smaller`);
-      assert(adsMountNdc.x > 0.20 && adsMountNdc.x < 0.50,
+      assert(adsMountNdc.x > 0.40 && adsMountNdc.x < 0.65,
         `${def.id} zoom mount is outside the EV.IO shoulder lane (${adsMountNdc.x.toFixed(3)})`);
-      assert(adsMountNdc.y < -0.50,
+      assert(adsMountNdc.y < -0.90,
         `${def.id} zoom does not keep the enlarged weapon below the reticle`);
       record.group.traverse((object) => {
         if (!object.isMesh) return;
