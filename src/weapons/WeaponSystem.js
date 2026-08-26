@@ -68,6 +68,17 @@ const VIEWMODEL_SCALE = 0.96;
 const VIEWMODEL_PITCH = 0.22;
 const VIEWMODEL_YAW = 0.32;
 const VIEWMODEL_ROLL = -0.055;
+// EV.IO's sword uses a dedicated centre-left high guard. It is not a rifle
+// rotated in the lower-right mount: the hilt enters through the bottom edge
+// and the blade rises almost vertically beside (not through) the reticle.
+// Keep this on the shared viewmodel root so skins and the complete blade move
+// as one rigid object while third-person/world weapons remain unchanged.
+const SWORD_VIEWMODEL_X = -0.10;
+const SWORD_VIEWMODEL_Y = -0.28;
+const SWORD_VIEWMODEL_Z = -0.68;
+const SWORD_VIEWMODEL_PITCH = 1.28;
+const SWORD_VIEWMODEL_YAW = 0.12;
+const SWORD_VIEWMODEL_ROLL = -0.035;
 const REFERENCE_ASPECT = 16 / 9;
 
 // First-person hand targets in each weapon model's local coordinate system.
@@ -1638,33 +1649,50 @@ export class WeaponSystem {
           this.kickPos.y + e * 0.025,
           this.kickPos.z - e * 0.20,
         );
-      } else if (ph < 0.22) {
-        // windup: raise blade up and back
-        const w = ph / 0.22;
-        this.kickGroup.rotation.y = -0.7 - w * 0.5;
-        this.kickGroup.rotation.x = w * 0.55;
-        this.kickGroup.rotation.z = -w * 0.4;
-        this.kickGroup.position.z = w * 0.12;
-      } else if (ph < 0.5) {
-        // slash: snap down-across fast
-        const s = (ph - 0.22) / 0.28;
-        const e = s * s * (3 - 2 * s); // smoothstep
-        this.kickGroup.rotation.y = -1.2 + e * 2.0;
-        this.kickGroup.rotation.x = 0.55 - e * 1.1;
-        this.kickGroup.rotation.z = -0.4 + e * 0.9;
-        this.kickGroup.position.z = 0.12 - e * 0.3;
+      } else if (ph < 0.18) {
+        // Compact wind-up: tip moves to the upper-right, hilt stays low.
+        const w = ph / 0.18;
+        const e = w * w * (3 - 2 * w);
+        this.kickGroup.rotation.set(-0.10 * e, -0.65 * e, -0.10 * e);
+        this.kickGroup.position.set(
+          this.kickPos.x + 0.04 * e,
+          this.kickPos.y - 0.025 * e,
+          this.kickPos.z + 0.05 * e,
+        );
+      } else if (ph < 0.52) {
+        // Fast right-to-left diagonal cut. Most of the visible sweep rotates
+        // laterally around the hilt; modest pitch/roll keep the blade from
+        // turning flat to the camera or covering the centre for the whole hit.
+        const s = (ph - 0.18) / 0.34;
+        const e = s * s * (3 - 2 * s);
+        this.kickGroup.rotation.set(
+          THREE.MathUtils.lerp(-0.10, 0.45, e),
+          THREE.MathUtils.lerp(-0.65, 1.45, e),
+          THREE.MathUtils.lerp(-0.10, 0.25, e),
+        );
+        this.kickGroup.position.set(
+          this.kickPos.x + THREE.MathUtils.lerp(0.04, -0.08, e),
+          this.kickPos.y - 0.025 + Math.sin(e * Math.PI) * 0.045,
+          this.kickPos.z + THREE.MathUtils.lerp(0.05, -0.12, e),
+        );
       } else {
-        // recover back to rest
-        const r = (ph - 0.5) / 0.5;
+        // Slower recovery settles precisely into the high guard.
+        const r = (ph - 0.52) / 0.48;
         const e = r * r * (3 - 2 * r);
-        this.kickGroup.rotation.y = 0.8 - e * 1.5;
-        this.kickGroup.rotation.x = -0.55 + e * 0.55;
-        this.kickGroup.rotation.z = 0.5 - e * 0.5;
-        this.kickGroup.position.z = -0.18 + e * 0.18;
+        this.kickGroup.rotation.set(
+          THREE.MathUtils.lerp(0.45, 0, e),
+          THREE.MathUtils.lerp(1.45, 0, e),
+          THREE.MathUtils.lerp(0.25, 0, e),
+        );
+        this.kickGroup.position.set(
+          this.kickPos.x + THREE.MathUtils.lerp(-0.08, 0, e),
+          this.kickPos.y + THREE.MathUtils.lerp(-0.025, 0, e),
+          this.kickPos.z + THREE.MathUtils.lerp(-0.12, 0, e),
+        );
       }
     } else if (def.kind === 'melee') {
       if (def.id === 'knife') this.kickGroup.rotation.set(-0.10, -0.28, 0.10);
-      else this.kickGroup.rotation.y = -0.7;
+      else this.kickGroup.rotation.set(0, 0, 0);
     }
 
     // idle breathing / weapon settle — fades out during sprint. Its own smooth
@@ -1746,6 +1774,7 @@ export class WeaponSystem {
     // start/stop sprint or scope in/out).
     const aspectScale  = viewmodelAspectScale(this.camera.aspect);
     const baseX        = VIEWMODEL_X * aspectScale;
+    const swordGuard   = def.id === 'sword';
     const adsEase      = this.scopeT * this.scopeT * (3 - 2 * this.scopeT);
     // Sprint lowers the complete gun-and-hands rig. The old positive offset
     // raised it 12cm, contradicting the intended carry and forcing implausibly
@@ -1757,9 +1786,14 @@ export class WeaponSystem {
     const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
-    const hipX = baseX + sprintShiftX;
-    const hipY = VIEWMODEL_Y + sprintDropY;
-    const hipZ = VIEWMODEL_Z;
+    const hipX = swordGuard
+      ? SWORD_VIEWMODEL_X * THREE.MathUtils.clamp(aspectScale, 0.72, 1.08)
+        - this._sprintT * 0.025 * aspectScale
+      : baseX + sprintShiftX;
+    const hipY = swordGuard
+      ? SWORD_VIEWMODEL_Y - this._sprintT * 0.075
+      : VIEWMODEL_Y + sprintDropY;
+    const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - this._sprintT * 0.025 : VIEWMODEL_Z;
     const adsDrop = ADS_SCREEN_DROP_NDC * Math.abs(hipZ)
       * Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
     const adsX = hipX - ADS_INWARD_X * aspectScale;
@@ -1773,18 +1807,23 @@ export class WeaponSystem {
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 20, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
-    this._mountRot.x = expDamp(this._mountRot.x,
-      THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, ADS_PITCH, adsEase)
-        + 0.50 * framedBell
-        + 0.14 * framedRack + landPulse * 0.12, 17, dt);
-    this._mountRot.y = expDamp(this._mountRot.y,
-      THREE.MathUtils.lerp(VIEWMODEL_YAW, ADS_YAW, adsEase), 17, dt);
+    const targetMountPitch = swordGuard
+      ? SWORD_VIEWMODEL_PITCH - this._sprintT * 0.055 + landPulse * 0.05
+      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, ADS_PITCH, adsEase)
+        + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12;
+    const targetMountYaw = swordGuard
+      ? SWORD_VIEWMODEL_YAW + this._sprintT * 0.025
+      : THREE.MathUtils.lerp(VIEWMODEL_YAW, ADS_YAW, adsEase);
+    this._mountRot.x = expDamp(this._mountRot.x, targetMountPitch, 17, dt);
+    this._mountRot.y = expDamp(this._mountRot.y, targetMountYaw, 17, dt);
     this._mountRot.z = expDamp(this._mountRot.z,
       // A compact 32° cant reads as a lowered sprint carry without rotating
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
-      THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, ADS_ROLL, adsEase)
-        + 0.42 * framedBell, 17, dt);
+      swordGuard
+        ? SWORD_VIEWMODEL_ROLL - this._sprintT * 0.06
+        : THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, ADS_ROLL, adsEase)
+          + 0.42 * framedBell, 17, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
     this.weaponMount.position.set(this._mountPos.x, this._mountPos.y, this._mountPos.z);

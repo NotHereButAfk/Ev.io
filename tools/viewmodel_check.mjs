@@ -412,6 +412,52 @@ assert(referenceRifleBounds.minX > -0.24,
   `EV.IO rifle crosses too far over the reticle (${JSON.stringify(referenceRifleBounds)})`);
 assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >= 0.11,
   `EV.IO rifle lacks its shouldered pitch/yaw (${system.weaponMount.rotation.x}, ${system.weaponMount.rotation.y})`);
+
+// EV.IO's sword is a separate first-person composition: a tall centre-left
+// guard with its hilt entering through the bottom edge. It must never fall back
+// to the rifle's lower-right mount or point down the camera's depth axis.
+activate(WEAPONS.find((def) => def.id === 'sword'));
+camera.aspect = 16 / 9;
+player.baseFov = 78;
+camera.fov = 78;
+tick(90);
+const swordModel = system.models.get('sword').group;
+const swordGuardBounds = projectedBounds(swordModel);
+const swordGuardWidth = swordGuardBounds.maxX - swordGuardBounds.minX;
+const swordGuardHeight = swordGuardBounds.maxY - swordGuardBounds.minY;
+const swordGuardCenterX = (swordGuardBounds.minX + swordGuardBounds.maxX) * 0.5;
+assert(system.weaponMount.position.x >= -0.13 && system.weaponMount.position.x <= -0.07,
+  `EV.IO sword guard horizontal placement drifted (${system.weaponMount.position.x})`);
+assert(system.weaponMount.position.y >= -0.31 && system.weaponMount.position.y <= -0.25,
+  `EV.IO sword guard vertical placement drifted (${system.weaponMount.position.y})`);
+assert(system.weaponMount.rotation.x >= 1.23 && system.weaponMount.rotation.x <= 1.33,
+  `EV.IO sword no longer rises vertically (${system.weaponMount.rotation.x})`);
+assert(swordGuardBounds.minY < -0.62 && swordGuardBounds.maxY > 0.34,
+  `sword guard must enter low and reach above the reticle (${JSON.stringify(swordGuardBounds)})`);
+assert(swordGuardHeight > 1.15 && swordGuardWidth < 0.72,
+  `sword guard lost its tall silhouette (${JSON.stringify(swordGuardBounds)})`);
+assert(swordGuardCenterX > -0.42 && swordGuardCenterX < 0.05,
+  `sword guard is not beside the centre-left reticle (${JSON.stringify(swordGuardBounds)})`);
+
+system.swingPhase = 0;
+let widestSwordCut = 0;
+const swordFrames = Math.ceil(system.currentDef.fireRate * 60) + 2;
+for (let i = 0; i < swordFrames; i++) {
+  tick(1);
+  const bounds = projectedBounds(swordModel);
+  widestSwordCut = Math.max(widestSwordCut, bounds.maxX - bounds.minX);
+}
+const swordRecoveredBounds = projectedBounds(swordModel);
+// 0.62 NDC is 31% of a 16:9 screen and matches the compact EV.IO slash;
+// demanding a full-screen arc would make the one-metre blade look oversized.
+assert(widestSwordCut > Math.max(0.62, swordGuardWidth * 1.8),
+  `sword strike does not make a readable diagonal cut (${widestSwordCut})`);
+for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
+  assert(Math.abs(swordRecoveredBounds[key] - swordGuardBounds[key]) < 0.035,
+    `sword failed to recover its guard on ${key}`);
+}
+
+activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: 0, label: 'weapon-only' };
 assert(!system.armGroup.visible && !system.supportArmGroup.visible,
   'first-person must not render hands or sleeves');

@@ -20,6 +20,7 @@ import { TPS_DEFAULT_DISTANCE } from '../src/player/ThirdPersonCamera.js';
 const URL = process.env.KYX_URL || 'http://127.0.0.1:5994/';
 const OUT = process.env.KYX_SCREENSHOT_OUT || 'docs/screenshots';
 const VIEW = { width: 1280, height: 720 };
+const CAPTURE_SWORD = process.env.KYX_FIRST_PERSON_WEAPON === 'sword';
 
 const HIDE = `(() => {
   ['top-nav','nav-side','share-game','social-icons','center-play']
@@ -127,6 +128,7 @@ await pose(`
   g.pickupSystem = null;
   g.botManager?.clear();
   g.weaponSystem.setLoadout('m4', 'sword');
+  g.weaponSystem.switchTo(${CAPTURE_SWORD ? 1 : 0});
   const spawn = (g.world.spawnPoints.find(p => p.y <= 3.1) || g.world.spawnPoints[0]).clone();
   spawn.spawnYaw = g.world.spawnPoints.find(p => p.y <= 3.1)?.spawnYaw
     ?? g.world.spawnPoints[0]?.spawnYaw;
@@ -136,6 +138,15 @@ await pose(`
 `);
 await page.waitForTimeout(1200);
 await shot('first-person');
+if (CAPTURE_SWORD) {
+  await pose(`g.weaponSystem.swingPhase = 0;`);
+  await page.waitForTimeout(70);
+  await shot('sword-windup');
+  await page.waitForTimeout(110);
+  await shot('sword-cut');
+  await page.waitForTimeout(300);
+  await shot('sword-recovered');
+}
 
 // Document the actual first third-person zoom notch. A stale 3.4m override made
 // the player look much smaller here than during normal gameplay.
