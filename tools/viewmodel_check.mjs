@@ -413,9 +413,9 @@ assert(referenceRifleBounds.minX > -0.24,
 assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >= 0.11,
   `EV.IO rifle lacks its shouldered pitch/yaw (${system.weaponMount.rotation.x}, ${system.weaponMount.rotation.y})`);
 
-// EV.IO's sword is a separate first-person composition: a tall centre-left
-// guard with its hilt entering through the bottom edge. It must never fall back
-// to the rifle's lower-right mount or point down the camera's depth axis.
+// EV.IO's sword is a separate first-person composition: a close right-side
+// guard whose grip and tip both leave the frame. It must not be centred over
+// the reticle or point down the camera's depth axis.
 activate(WEAPONS.find((def) => def.id === 'sword'));
 camera.aspect = 16 / 9;
 player.baseFov = 78;
@@ -425,19 +425,19 @@ const swordModel = system.models.get('sword').group;
 const swordGuardBounds = projectedBounds(swordModel);
 const swordGuardWidth = swordGuardBounds.maxX - swordGuardBounds.minX;
 const swordGuardHeight = swordGuardBounds.maxY - swordGuardBounds.minY;
-const swordGuardCenterX = (swordGuardBounds.minX + swordGuardBounds.maxX) * 0.5;
-assert(system.weaponMount.position.x >= -0.13 && system.weaponMount.position.x <= -0.07,
+assert(system.weaponMount.position.x >= 0.20 && system.weaponMount.position.x <= 0.24,
   `EV.IO sword guard horizontal placement drifted (${system.weaponMount.position.x})`);
 assert(system.weaponMount.position.y >= -0.31 && system.weaponMount.position.y <= -0.25,
   `EV.IO sword guard vertical placement drifted (${system.weaponMount.position.y})`);
 assert(system.weaponMount.rotation.x >= 1.23 && system.weaponMount.rotation.x <= 1.33,
   `EV.IO sword no longer rises vertically (${system.weaponMount.rotation.x})`);
-assert(swordGuardBounds.minY < -0.62 && swordGuardBounds.maxY > 0.34,
-  `sword guard must enter low and reach above the reticle (${JSON.stringify(swordGuardBounds)})`);
-assert(swordGuardHeight > 1.15 && swordGuardWidth < 0.72,
+assert(swordGuardBounds.minY < -0.82 && swordGuardBounds.maxY > 0.72,
+  `sword guard must leave both the lower and upper frame (${JSON.stringify(swordGuardBounds)})`);
+assert(swordGuardHeight > 1.70 && swordGuardWidth < 1.10,
   `sword guard lost its tall silhouette (${JSON.stringify(swordGuardBounds)})`);
-assert(swordGuardCenterX > -0.42 && swordGuardCenterX < 0.05,
-  `sword guard is not beside the centre-left reticle (${JSON.stringify(swordGuardBounds)})`);
+assert(swordGuardBounds.minX > 0.22 && swordGuardBounds.minX < 0.42
+  && swordGuardBounds.maxX > 1.05 && swordGuardBounds.maxX < 1.45,
+  `sword guard no longer enters from the close right edge (${JSON.stringify(swordGuardBounds)})`);
 
 system.swingPhase = 0;
 let widestSwordCut = 0;

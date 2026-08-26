@@ -68,16 +68,16 @@ const VIEWMODEL_SCALE = 0.96;
 const VIEWMODEL_PITCH = 0.22;
 const VIEWMODEL_YAW = 0.32;
 const VIEWMODEL_ROLL = -0.055;
-// EV.IO's sword uses a dedicated centre-left high guard. It is not a rifle
-// rotated in the lower-right mount: the hilt enters through the bottom edge
-// and the blade rises almost vertically beside (not through) the reticle.
+// EV.IO's sword uses a dedicated close right-side guard. It is not centred in
+// front of the reticle: the grip enters through the lower-right edge while the
+// oversized blade rises almost vertically and leaves the top of the frame.
 // Keep this on the shared viewmodel root so skins and the complete blade move
 // as one rigid object while third-person/world weapons remain unchanged.
-const SWORD_VIEWMODEL_X = -0.10;
+const SWORD_VIEWMODEL_X = 0.22;
 const SWORD_VIEWMODEL_Y = -0.28;
-const SWORD_VIEWMODEL_Z = -0.68;
+const SWORD_VIEWMODEL_Z = -0.32;
 const SWORD_VIEWMODEL_PITCH = 1.28;
-const SWORD_VIEWMODEL_YAW = 0.12;
+const SWORD_VIEWMODEL_YAW = 0.02;
 const SWORD_VIEWMODEL_ROLL = -0.035;
 const REFERENCE_ASPECT = 16 / 9;
 
@@ -1787,7 +1787,7 @@ export class WeaponSystem {
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const hipX = swordGuard
-      ? SWORD_VIEWMODEL_X * THREE.MathUtils.clamp(aspectScale, 0.72, 1.08)
+      ? SWORD_VIEWMODEL_X * THREE.MathUtils.clamp(aspectScale, 0.26, 1.08)
         - this._sprintT * 0.025 * aspectScale
       : baseX + sprintShiftX;
     const hipY = swordGuard
