@@ -30,3 +30,13 @@ export function shouldReduceRuntimeQuality(elapsed, frames, slowFrames) {
   const averageFrameSeconds = elapsed / frames;
   return averageFrameSeconds > 0.0215 || slowFrames / frames > 0.18;
 }
+
+export function shouldReduceMenuQuality(elapsed, frames, slowFrames) {
+  // The fly-through is the first interactive view, so do not leave a weak GPU
+  // struggling for the gameplay monitor's longer grace/sample window. Eight
+  // frames is still enough to reject an isolated map/model parse spike while
+  // reacting quickly when the spectator render is consistently slow.
+  if (elapsed < 1.5 || frames < 8) return false;
+  const averageFrameSeconds = elapsed / frames;
+  return averageFrameSeconds > 0.025 || slowFrames / frames > 0.28;
+}

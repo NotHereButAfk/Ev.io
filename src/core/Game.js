@@ -62,7 +62,7 @@ import { deathCameraPose, deathFallProgress } from '../player/DeathAnimation.js'
 import { buildLeaderboardRows, buildMatchRows } from './MatchRows.js';
 import {
   bloomEnabled, lowerRuntimeQuality, postFxPixelRatio, rendererPixelRatio,
-  shouldReduceRuntimeQuality,
+  shouldReduceMenuQuality, shouldReduceRuntimeQuality,
 } from './RenderQuality.js';
 
 // Seconds between dying and coming back. The respawn is automatic — the menu
@@ -597,27 +597,38 @@ export class Game {
     if (wantsBloom && !this.composer) this._buildPostFX();
     this.composer?.setPixelRatio(postFxPixelRatio(quality, window.devicePixelRatio));
     this._bloomEnabled = wantsBloom;
+    const monitorGrace = this.state === 'playing' ? 8 : 1.5;
     if (resetMonitor || !this._perfMonitor) {
-      this._perfMonitor = { grace: 8, elapsed: 0, frames: 0, slow: 0 };
+      this._perfMonitor = { grace: monitorGrace, elapsed: 0, frames: 0, slow: 0 };
     } else {
-      this._perfMonitor.grace = 5;
+      this._perfMonitor.grace = this.state === 'playing' ? 5 : 1;
       this._perfMonitor.elapsed = this._perfMonitor.frames = this._perfMonitor.slow = 0;
     }
   }
 
   _sampleRuntimePerformance(rawDt) {
     const monitor = this._perfMonitor;
-    if (!monitor || this.state !== 'playing' || this._authoritativeMapTransitioning
-      || rawDt <= 0 || rawDt >= 0.1 || this._runtimeQuality === 'low') return;
+    const isPlaying = this.state === 'playing';
+    const isSpectating = this.state === 'menu';
+    if (!monitor || (!isPlaying && !isSpectating) || this._authoritativeMapTransitioning
+      || rawDt <= 0 || rawDt >= 2 || this._runtimeQuality === 'low') return;
     if (monitor.grace > 0) {
       monitor.grace = Math.max(0, monitor.grace - rawDt);
       return;
     }
-    monitor.elapsed += rawDt;
+    // Cap a single parser/GC pause so one optional asset cannot lower quality,
+    // while sustained slow spectator frames still accumulate and react.
+    monitor.elapsed += Math.min(rawDt, 0.25);
     monitor.frames += 1;
     if (rawDt > 0.025) monitor.slow += 1;
-    if (monitor.elapsed < 3) return;
-    if (shouldReduceRuntimeQuality(monitor.elapsed, monitor.frames, monitor.slow)) {
+    const sampleReady = isPlaying
+      ? monitor.elapsed >= 3 && monitor.frames >= 30
+      : monitor.elapsed >= 1.5 && monitor.frames >= 8;
+    if (!sampleReady) return;
+    const shouldReduce = isPlaying
+      ? shouldReduceRuntimeQuality(monitor.elapsed, monitor.frames, monitor.slow)
+      : shouldReduceMenuQuality(monitor.elapsed, monitor.frames, monitor.slow);
+    if (shouldReduce) {
       this._setRuntimeQuality(lowerRuntimeQuality(this._runtimeQuality));
       return;
     }
@@ -1238,11 +1249,11 @@ export class Game {
     this.hud.updateLeaderboardCountdown(10, 10);
   }
 
-  _updateLeaderboard(dt) {
+  _updateLeaderboard(dt, cameraDt = dt) {
     // Bots and cinematic camera keep running during the scoreboard
     this._activeManager.update(dt, this.player, this.player.camera, () => {});
     this.deathEffects.update(dt);
-    this._updateMenuScene(dt);
+    this._updateMenuScene(dt, cameraDt);
 
     this._lbTimer -= dt;
     const secsLeft = Math.max(0, Math.ceil(this._lbTimer));
@@ -2204,6 +2215,9 @@ export class Game {
     for (const bot of this.botManager.bots) {
       bot._provoked = false;
       bot._provokeTimer = 0;
+      // Menu spectators do not need twelve always-on health-bar draw calls.
+      // The bodies and weapons remain visible and animate normally.
+      if (bot.healthBarGroup) bot.healthBarGroup.visible = false;
     }
   }
 
@@ -2213,7 +2227,7 @@ export class Game {
     this.botManager.clear();
   }
 
-  _updateMenuScene(dt) {
+  _updateMenuScene(dt, cameraDt = dt) {
     // Slowly rotate the preview character (only shown on PLAY tab)
     if (this.previewCharacter.visible) {
       this.previewCharacter.rotation.y += dt * 0.6;
@@ -2231,13 +2245,23 @@ export class Game {
       this.botManager.update(
         dt, this._menuDummyPlayer, this.menuCamera, this._noopCallback, this.world, false,
       );
+      // A void recovery calls Bot.respawnAt(), which restores its combat HUD.
+      // Keep those bars suppressed on the spectator presentation every frame.
+      for (const bot of this.botManager.bots) {
+        if (bot.healthBarGroup?.visible) bot.healthBarGroup.visible = false;
+      }
     }
 
     // Continuous map-wide spectator fly-through. getPointAt is arc-length
     // sampled, keeping travel speed stable even when waypoint spacing varies.
-    this._camTravelTime += dt;
+    // Gameplay simulation stays capped for stability, but camera travel uses
+    // real frame time. Otherwise a 90 ms render advances only 50 ms and the
+    // fly-through visibly crawls/freezes exactly when the browser is busy.
+    const cameraStep = THREE.MathUtils.clamp(cameraDt, 0, 0.25);
+    this._camTravelTime += cameraStep;
     const fadeWindow = 0.18;
     let cameraOpacity = 1;
+    let routeChanged = false;
     if (this._camRoutes.length > 1) {
       const remaining = this._camCycleDuration - this._camTravelTime;
       if (remaining < fadeWindow) cameraOpacity = THREE.MathUtils.clamp(remaining / fadeWindow, 0, 1);
@@ -2249,18 +2273,31 @@ export class Game {
         this._camWpts = this._camRoutes[this._camRouteIndex];
         this._rebuildSpectatorCurves();
         this._camFadeIn = fadeWindow;
+        routeChanged = true;
       }
     }
     if (this._camFadeIn > 0) {
-      this._camFadeIn = Math.max(0, this._camFadeIn - dt);
-      cameraOpacity = Math.min(cameraOpacity, 1 - this._camFadeIn / fadeWindow);
+      // Keep the route-change frame fully hidden. Decrementing immediately
+      // exposed the new lane at partial opacity and made the cut look like a
+      // camera hitch, especially below 60 fps.
+      if (routeChanged) cameraOpacity = 0;
+      else {
+        this._camFadeIn = Math.max(0, this._camFadeIn - cameraStep);
+        cameraOpacity = Math.min(cameraOpacity, 1 - this._camFadeIn / fadeWindow);
+      }
     }
-    this.canvas.style.opacity = String(cameraOpacity);
+    const opacityText = String(cameraOpacity);
+    if (this.canvas.style.opacity !== opacityText) this.canvas.style.opacity = opacityText;
     const u = this._camTravelTime / this._camCycleDuration;
     this._camPath.getPointAt(u, this._camPos);
     this._camLookPath.getPointAt(u, this._camLook);
     const movedSq = this._camPos.distanceToSquared(this._camPreviousPos);
-    this._camStallTime = movedSq < 0.0004 ? this._camStallTime + dt : 0;
+    // Detect actual speed, not a fixed distance per rendered frame. The old
+    // 2 cm threshold falsely fired at high refresh rates and skipped 6% of the
+    // route every 0.45 seconds, which looked exactly like spectator lag.
+    const minimumCameraStep = Math.max(cameraStep, 1 / 240) * 0.05;
+    this._camStallTime = movedSq < minimumCameraStep * minimumCameraStep
+      ? this._camStallTime + cameraStep : 0;
     if (this._camStallTime > 0.45) {
       this._camTravelTime = (this._camTravelTime + this._camCycleDuration * 0.06) % this._camCycleDuration;
       this._camStallTime = 0;
@@ -2298,10 +2335,10 @@ export class Game {
     if (this.state === 'playing') {
       this._updatePlaying(dt);
     } else if (this.state === 'leaderboard') {
-      this._updateLeaderboard(dt);
+      this._updateLeaderboard(dt, rawDt);
     } else {
       // Cinematic camera runs for every non-playing state (connecting, auth, menu, paused, gameover)
-      this._updateMenuScene(dt);
+      this._updateMenuScene(dt, rawDt);
     }
 
     const camera = this.state === 'playing' ? this.player.camera : this.menuCamera;

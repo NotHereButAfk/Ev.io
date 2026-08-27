@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   bloomEnabled, lowerRuntimeQuality, postFxPixelRatio, rendererPixelRatio,
-  shouldReduceRuntimeQuality,
+  shouldReduceMenuQuality, shouldReduceRuntimeQuality,
 } from '../src/core/RenderQuality.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,6 +21,10 @@ assert(lowerRuntimeQuality('high') === 'medium'
   && lowerRuntimeQuality('low') === 'low', 'runtime quality fallback order changed');
 assert(shouldReduceRuntimeQuality(3, 120, 40), 'sustained slow frames must reduce runtime quality');
 assert(!shouldReduceRuntimeQuality(3, 180, 0), 'steady 60fps must preserve requested quality');
+assert(shouldReduceMenuQuality(1.6, 40, 18),
+  'a persistently slow spectator must lower quality without waiting for gameplay');
+assert(!shouldReduceMenuQuality(1.6, 96, 0),
+  'a steady spectator must preserve requested quality');
 
 const bot = readFileSync(join(root, 'src/entities/Bot.js'), 'utf8');
 const zombie = readFileSync(join(root, 'src/entities/Zombie.js'), 'utf8');
@@ -52,6 +56,8 @@ assert(/_schedulePresentationPreloads\(\)/.test(game),
   'optional presentation assets must be scheduled after gameplay is ready');
 assert(/if \(bloomEnabled\(_q\)\) this\._buildPostFX\(\)/.test(game),
   'post-processing buffers must be lazy on the default quality tier');
+assert(/isSpectating[\s\S]*?shouldReduceMenuQuality/.test(game),
+  'dynamic resolution must monitor the spectator menu as well as gameplay');
 const constructorBody = game.slice(game.indexOf('constructor(canvas)'), game.indexOf('\n  // Release all global'));
 assert(!/preloadZombieModel\(\)/.test(constructorBody),
   'the survival-only zombie model must not compete with the first map request');

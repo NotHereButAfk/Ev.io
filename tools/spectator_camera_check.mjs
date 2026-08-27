@@ -15,10 +15,20 @@ assert.match(source, /map\.spectatorRoutes[\s\S]*?this\._camRouteIndex = \(this\
   'spectator must float through every authored arena viewpoint');
 assert.match(source, /THREE\.MathUtils\.clamp\(pathLength \/ 7, 32, 90\)/,
   'fallback orbit must float at a smooth map-touring speed');
-assert.match(source, /const fadeWindow = 0\.18[\s\S]*?this\.canvas\.style\.opacity = String\(cameraOpacity\)/,
+assert.match(source, /const fadeWindow = 0\.18[\s\S]*?this\.canvas\.style\.opacity = opacityText/,
   'spectator must hide safe-lane changes instead of exposing camera cuts');
 assert.match(source, /this\._camStallTime > 0\.45/,
   'spectator must recover from a degenerate route instead of staying still');
+assert.match(source, /_updateMenuScene\(dt, cameraDt = dt\)[\s\S]*?this\._camTravelTime \+= cameraStep/,
+  'spectator travel must use real frame time instead of the capped gameplay delta');
+assert.match(source, /const minimumCameraStep = Math\.max\(cameraStep, 1 \/ 240\) \* 0\.05/,
+  'spectator stall detection must be refresh-rate independent');
+assert.doesNotMatch(source, /movedSq < 0\.0004/,
+  'spectator must not use a fixed per-frame stall threshold');
+assert.match(source, /if \(routeChanged\) cameraOpacity = 0/,
+  'a spectator route cut must remain fully hidden for its first frame');
+assert.match(source, /bot\.healthBarGroup\.visible = false/,
+  'menu bots must not spend draw calls on combat-only health bars');
 assert.doesNotMatch(source, /Math\.max\(54, this\._camPath\.getLength\(\) \/ 6\.5\)/,
   'spectator must not retain the old nearly-static 54 second minimum');
 
@@ -38,4 +48,13 @@ const sampleB = curve.getPointAt(0.25 + 1 / duration);
 assert.ok(sampleA.distanceTo(sampleB) > 3 && sampleA.distanceTo(sampleB) < 10,
   'spectator must float visibly without racing around the arena');
 
-console.log('spectator camera passed: first-person POV floats continuously around the full map without cuts');
+// At 144 Hz a legitimate slow camera can move less than the old fixed 2 cm
+// threshold each frame. The new threshold describes a true near-zero speed,
+// so it cannot repeatedly mistake high-refresh motion for a stall.
+const highRefreshDt = 1 / 144;
+const legitimateStep = 1.5 * highRefreshDt;
+const minimumStep = Math.max(highRefreshDt, 1 / 240) * 0.05;
+assert.ok(legitimateStep < 0.02 && legitimateStep > minimumStep,
+  'high-refresh spectator motion must not trigger stall recovery');
+
+console.log('spectator camera passed: travel is real-time, high-refresh safe, and route cuts stay hidden');
