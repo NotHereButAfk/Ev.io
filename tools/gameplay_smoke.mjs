@@ -73,6 +73,9 @@ try {
   // bots active here makes a slow software-rendered browser kill the player at
   // arbitrary checkpoints before the input assertion can be sampled.
   await game(`
+    g._authNet?.disconnect?.();
+    g._authNet = null;
+    g._netDriven = false;
     g.botManager.clear();
     g.serverSim?.stop();
     g.weaponSystem.setLoadout('m4', 'sword');
