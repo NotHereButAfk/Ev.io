@@ -364,9 +364,10 @@ export function applyWalkCycle(rig, o = {}) {
   // A compact combat-ready base: knees unlocked, hips slightly forward and
   // ankles loaded. It removes the mannequin-straight idle while blending into
   // the exact same planted walk/run cycle.
-  const sThigh = 0.045 + cHip;
-  const sKnee = -0.15 + cKnee;
-  const sAnk = 0.055 + 0.5 * crouch;
+  const ready = rig.readyStance || 0;
+  const sThigh = 0.045 + ready * 0.055 + cHip;
+  const sKnee = -0.15 - ready * 0.11 + cKnee;
+  const sAnk = 0.055 + ready * 0.035 + 0.5 * crouch;
   const wThighL =  amp * Math.sin(t) + cHip;
   const wThighR = -amp * Math.sin(t) + cHip;
   const wKneeL  = -kAmp * Math.max(0,  Math.cos(t)) - 0.10 + cKnee;
@@ -502,7 +503,8 @@ export function applyWalkCycle(rig, o = {}) {
   // a rigid mannequin: pitch into the compression on touchdown, and tip back a
   // little over the drive off the floor. Not eased — both are already smooth
   // curves of their own, and easing them would lag the legs they belong to.
-  const leanTarget = (-(0.03 + 0.13 * run) * mb * (moving ? dirF : 1)) - 0.10 * crouch;
+  const leanTarget = -0.065 * ready
+    + (-(0.03 + 0.13 * run) * mb * (moving ? dirF : 1)) - 0.10 * crouch;
   rig._lean = (rig._lean || 0) + (leanTarget - (rig._lean || 0)) * Math.min(1, dt * 6);
   // Slide tips the torso BACK over the trailing leg (positive = back here).
   const lean = rig._lean - 0.16 * absorb + 0.09 * air * rig._airPush + 0.30 * slide;

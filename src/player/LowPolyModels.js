@@ -144,7 +144,7 @@ const PALETTES = {
   // undersuit, with cool alloy at the joints. This is the visual hierarchy of
   // EV.IO's default silhouette, rebuilt on our own connected/skinned geometry.
   vanguard: { armor: 0xe87924, armor2: 0xcbd3d6, frame: 0x252d31, joint: 0x11171a,
-              steel: 0x4c5960, bone: 0x939fa4, glow: 0x63e5ee, bulk: 0.94 },  // default arena exosuit
+              steel: 0x4c5960, bone: 0x939fa4, glow: 0x63e5ee, bulk: 1.08 },  // compact arena exosuit
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
   phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
