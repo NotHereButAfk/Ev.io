@@ -208,6 +208,14 @@ export function adsMountForSight(
 // erase most (or all) of the held gun. Clone the model materials so disabling
 // depth testing here never leaks to third-person guns, pickups, or thumbnails.
 export function prepareFirstPersonModel(group) {
+  // Quaternius firearms are authored for a left-side showcase render. In the
+  // lower-right first-person carry that exposes the far side of the receiver,
+  // making the whole gun read as backwards even though its muzzle still points
+  // down -Z. Mirror only the lateral axis at the viewmodel boundary: forward,
+  // scale, third-person carry, pickups and muzzle placement remain unchanged.
+  if (group.userData.modelSource === 'quaternius') {
+    group.scale.x = -Math.abs(group.scale.x || 1);
+  }
   group.traverse((object) => {
     if (!object.isMesh) return;
     // Inverted-hull contours depend on world depth testing to reveal only the

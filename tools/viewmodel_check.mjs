@@ -86,6 +86,15 @@ assert(!depthProbeBody.material.depthTest && !depthProbeBody.material.depthWrite
   'first-person body still shares the world depth buffer');
 assert(depthProbeOutline.visible === false,
   'first-person inverted-hull outline still covers the colored gun');
+assert(depthProbe.scale.x === 1,
+  'procedural first-person weapon was incorrectly mirrored');
+
+const importedSideProbe = new THREE.Group();
+importedSideProbe.userData.modelSource = 'quaternius';
+prepareFirstPersonModel(importedSideProbe);
+prepareFirstPersonModel(importedSideProbe);
+assert(importedSideProbe.scale.x === -1,
+  'imported first-person gun does not expose the near receiver side');
 
 for (const [side, arm] of [
   ['trigger', system.armGroup],
