@@ -404,6 +404,16 @@ camera.aspect = 16 / 9;
 player.baseFov = 78;
 camera.fov = 78;
 tick(90);
+// Reproduce the deployed failure: an async model/match transition left every
+// group hidden even though the HUD still showed a loaded rifle. The next frame
+// must recover the equipped gun and hide any stale non-equipped model.
+const activeM4 = system.models.get('m4').group;
+const staleSidearm = system.models.get('sidearm').group;
+activeM4.visible = false;
+staleSidearm.visible = true;
+tick(1);
+assert(activeM4.visible && !staleSidearm.visible,
+  'equipped firearm did not recover from a stale hidden viewmodel state');
 const referenceRifleBounds = projectedBounds(system.models.get('m4').group);
 assert(system.weaponMount.position.x >= 0.36 && system.weaponMount.position.x <= 0.44,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);

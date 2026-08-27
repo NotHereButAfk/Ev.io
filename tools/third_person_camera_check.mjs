@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import {
   TPS_DEFAULT_DISTANCE,
   TPS_MAX_DISTANCE,
@@ -18,6 +19,9 @@ for (const [distance, wheel] of [[0, 1], [TPS_DEFAULT_DISTANCE, -1],
   assert(nextThirdPersonDistance(distance, wheel) === 0,
     `player camera must stay first-person (${distance}, ${wheel})`);
 }
+const gameSource = readFileSync(new URL('../src/core/Game.js', import.meta.url), 'utf8');
+assert(/player\._camDist = 0;[\s\S]*?weaponMount\.visible = !dead/.test(gameSource),
+  'gameplay frame does not recover stale POV state and restore the held gun');
 assert(Math.abs(safeThirdPersonObstructionDistance(2) - 1.45) < 1e-9,
   'wall collision must keep the camera near plane clear of the surface');
 assert(safeThirdPersonObstructionDistance(0.6) === 0.35,

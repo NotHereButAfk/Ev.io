@@ -1813,8 +1813,12 @@ export class Game {
     // Animate the living sci-fi city (flying traffic, pulsing energy).
     this.world.update(dt);
 
-    // Sync third-person body mesh and hide/show viewmodel
-    const inTPS = this.player._camDist > 0 && !this.player._tpsObstructed;
+    // Gameplay is first-person-only. Clear stale camera state as an invariant,
+    // not merely when a wheel event arrives: an older session/save or an
+    // interrupted map transition must never hide the held gun again.
+    this.player._camDist = 0;
+    this.player._tpsObstructed = false;
+    const inTPS = false;
     if (this._playerBody) {
       this._playerBody.visible = inTPS;
       this._playerBody.position.copy(this.player.position);
@@ -1831,7 +1835,7 @@ export class Game {
       this._syncTpsWeapon();
       this._animatePlayerBody(dt);
     }
-    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !inTPS && !dead;
+    if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = !dead;
 
     // While the menu is open, downed, or dead-and-awaiting-respawn, block
     // weapon/grenade input — the match still runs.

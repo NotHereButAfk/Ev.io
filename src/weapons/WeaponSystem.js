@@ -436,6 +436,11 @@ export class WeaponSystem {
     if (this._armoryMap) this.applyArmoryMap(this._armoryMap);
     if (this.weaponSkin) this.setWeaponSkin(this.weaponSkin);
     if (this.swordSkin) this.setSwordSkin(this.swordSkin);
+    // A late GLB swap must finish with exactly the equipped model visible.
+    // Preserving each old group's flag was vulnerable to transient hidden
+    // states (map transition, respawn, or a model refresh during a switch),
+    // which could leave every replacement hidden for the rest of the match.
+    this._ensureActiveModelVisibility();
   }
 
   _buildArm() {
@@ -804,6 +809,18 @@ export class WeaponSystem {
     this._applyViewmodelHandPose();
     // Kick off the raise animation — the new gun eases up from lowered.
     this._raiseT = 0;
+  }
+
+  _ensureActiveModelVisibility() {
+    const active = this.currentDef;
+    if (!active) return;
+    const knifeInFlight = active.kind === 'melee'
+      && active.throwable && this._knifeCooldown > 0;
+    for (const weapon of this.allWeapons) {
+      const model = this.models.get(weapon.id)?.group;
+      if (!model) continue;
+      model.visible = weapon.id === active.id && !knifeInFlight;
+    }
   }
 
   get currentDef() {
@@ -1605,6 +1622,10 @@ export class WeaponSystem {
     }
 
     const def = this.currentDef;
+    // Keep first-person presentation self-healing. Network reconciliation and
+    // asynchronous model replacement may happen between rendered frames, but
+    // neither is allowed to strand the equipped firearm in a hidden state.
+    this._ensureActiveModelVisibility();
     // A quick dip on touchdown gives jumps and grav-lifts visible weight in
     // first person. It is intentionally small—the camera already has its own
     // head motion—and only the viewmodel receives this impulse.
