@@ -26,6 +26,15 @@ try {
   }, null, { timeout: 60000 });
   await page.waitForTimeout(8000);
 
+  const hudSlots = await page.evaluate(() => ({
+    total: document.querySelectorAll('#weapon-slots .weapon-slot').length,
+    withThumb: document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb').length,
+  }));
+  if (!hudSlots.total || hudSlots.withThumb !== hudSlots.total) {
+    throw new Error(`in-match weapon inventory is incomplete: ${JSON.stringify(hudSlots)}`);
+  }
+  await page.screenshot({ path: path.join(OUT, 'inventory-hud.png') });
+
   for (const weaponId of MAIN_WEAPON_IDS) {
     await page.evaluate((id) => {
       const g = window.__game || window.game;
@@ -43,10 +52,14 @@ try {
     await page.screenshot({ path: path.join(OUT, `${weaponId}.png`) });
     const state = await page.evaluate(() => {
       const ws = (window.__game || window.game).weaponSystem;
+      const record = ws.models.get(ws.currentDef.id);
+      record.group.updateWorldMatrix(true, true);
+      const sightNdc = record.sight.clone().applyMatrix4(record.group.matrixWorld).project(ws.camera);
       return {
         fov: ws.camera.fov,
         mount: ws.weaponMount.position.toArray(),
         scale: ws.weaponMount.scale.x,
+        sightNdc: sightNdc.toArray(),
       };
     });
     console.log(`${weaponId}: ${JSON.stringify(state)}`);

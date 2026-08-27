@@ -85,7 +85,7 @@ export const WEAPONS = [
     range: 150,
     recoil: 0.014,
     cameraRecoil: 0.007,
-    adsFov: 30,
+    adsFov: 46,
     adsSpeed: 13,
     muzzleFlashScale: 0.68,
     muzzleSmoke: true,

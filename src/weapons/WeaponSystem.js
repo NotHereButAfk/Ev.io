@@ -130,27 +130,16 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
   return !!def?.scoped && scopeT > 0.68;
 }
 
-// Retained for scoped-weapon calibration and model diagnostics. Ordinary
-// right-click zoom uses the partially shouldered pose configured below.
-const ADS_SIGHT_DEPTH = -0.42;
-const ADS_SIGHT_Y = -0.028;
-const DEFAULT_ADS_FOV = 30;
-// Keep magnified combat readable: the gun remains full-size at the authored
-// depth, but only comes partway inward and settles lower in the right corner.
-// This preserves the shouldered EV.IO silhouette without letting a large
-// receiver cover the target area after the 30-degree camera zoom.
-const ADS_INWARD_X = 0.18;
-const ADS_SCREEN_DROP_NDC = 0.18;
-const ADS_PITCH = 0.08;
-const ADS_YAW = 0.12;
-const ADS_ROLL = -0.02;
-const ADS_VERTICAL_LIFT = Object.freeze({
-  m4: 0.08,
-  magnum: 0.12,
-  battlerifle: -0.02,
-  energyshotgun: -0.04,
-  plasmarifle: 0.05,
-});
+// Ordinary right-click aim aligns each weapon's measured rear sight with the
+// fixed centre reticle.  The sight stays far enough from the camera that the
+// receiver does not fill the screen, while the wider FOV preserves peripheral
+// awareness.  True sniper scopes still use their dedicated 28-degree overlay.
+const ADS_SIGHT_DEPTH = -0.70;
+const ADS_SIGHT_Y = -0.018;
+const DEFAULT_ADS_FOV = 46;
+const ADS_PITCH = 0;
+const ADS_YAW = 0;
+const ADS_ROLL = 0;
 
 const _adsBox = new THREE.Box3();
 const _adsSpecialBox = new THREE.Box3();
@@ -1874,11 +1863,13 @@ export class WeaponSystem {
       ? SWORD_VIEWMODEL_Y - this._sprintT * 0.075
       : VIEWMODEL_Y + sprintDropY;
     const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - this._sprintT * 0.025 : VIEWMODEL_Z;
-    const adsDrop = ADS_SCREEN_DROP_NDC * Math.abs(hipZ)
-      * Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5));
-    const adsX = hipX - ADS_INWARD_X * aspectScale;
-    const adsY = hipY - adsDrop + (ADS_VERTICAL_LIFT[def.id] || 0);
-    const adsZ = hipZ;
+    // The mount was solved from the actual model bounds at construction time.
+    // Using that physical sight anchor here keeps every gun centred without a
+    // per-weapon screen-offset table or changing third-person weapon scale.
+    const measuredAdsMount = this.models.get(def.id)?.adsMount;
+    const adsX = measuredAdsMount?.x ?? 0;
+    const adsY = measuredAdsMount?.y ?? ADS_SIGHT_Y;
+    const adsZ = measuredAdsMount?.z ?? ADS_SIGHT_DEPTH;
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;
     const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV

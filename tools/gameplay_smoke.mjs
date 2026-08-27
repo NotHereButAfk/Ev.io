@@ -181,7 +181,7 @@ try {
   // enough animation frames.
   await page.waitForFunction(() => {
     const ws = (window.__game || window.game)?.weaponSystem;
-    return ws?.scopeT > 0.9 && ws.camera.fov < 31;
+    return ws?.scopeT > 0.9 && ws.camera.fov < 47;
   }, null, { timeout: 8000 });
   const adsState = await game(`return { scopeT:g.weaponSystem.scopeT,
     visible:g.weaponSystem.kickGroup.visible,
@@ -191,13 +191,13 @@ try {
     ry:g.weaponSystem.weaponMount.rotation.y,
     rz:g.weaponSystem.weaponMount.rotation.z };`);
   assert(adsState.scopeT > 0.9 && adsState.visible
-    && adsState.fov < 31
-    && Math.abs(adsState.z - hipCarry.z) < 0.05
+    && adsState.fov > 44 && adsState.fov < 47
+    && adsState.z < -0.35
     // Pitch can still carry the independent landing pulse from the jump probe.
-    && Math.abs(adsState.rx - 0.08) < 0.12
-    && Math.abs(adsState.ry - 0.12) < 0.02
-    && Math.abs(adsState.rz + 0.02) < 0.02,
-  `zoom did not settle into the EV.IO shoulder pose: ${JSON.stringify({hipCarry,adsState})}`);
+    && Math.abs(adsState.rx) < 0.12
+    && Math.abs(adsState.ry) < 0.02
+    && Math.abs(adsState.rz) < 0.02,
+  `zoom did not settle onto the sight axis: ${JSON.stringify({hipCarry,adsState})}`);
   const adsMarker = await game(`
     g.hud.flashHitmarker();
     return {

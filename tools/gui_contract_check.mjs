@@ -17,6 +17,7 @@ const hud = read('src/ui/HUD.js');
 const game = read('src/core/Game.js');
 const settings = read('src/core/GameSettings.js');
 const inventory = read('src/ui/InventoryPanel.js');
+const thumbnails = read('src/ui/WeaponThumbnails.js');
 const css = read('src/style.css');
 
 const failures = [];
@@ -33,6 +34,10 @@ if (!hud.includes("ammo.className = 'ws-ammo'")) failures.push('weapon HUD expos
 if (!hud.includes("slot.isMelee ? '∞'")) failures.push('weapon HUD exposes EV-style melee infinity');
 if (!css.includes('flex: 0 0 84px !important')) failures.push('weapon HUD preserves EV 200x84 slot geometry');
 if (!css.includes('border-right: 5px solid rgba(255,255,255,0)')) failures.push('weapon HUD preserves the EV active rail');
+if (!thumbnails.includes("data:image/svg+xml,")) failures.push('weapon HUD has an immediate pre-render silhouette');
+if (!thumbnails.includes("_hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThumb(id)")) {
+  failures.push('weapon HUD never returns null while optional 3D thumbnails warm');
+}
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };

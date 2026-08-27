@@ -727,14 +727,13 @@ assert(system.kickGroup.visible, 'viewmodel did not return after leaving the sco
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
 
-// Exercise the complete transition at 240Hz. Ordinary guns move from the
-// cropped hip pose into EV.IO's partially shouldered top-of-gun picture;
-// true scoped optics disappear only after the overlay is established.
+// Exercise the complete transition at 240Hz. Ordinary guns bring their actual
+// measured rear sight onto the centre axis; true scoped optics disappear only
+// after the overlay is established.
 for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   activate(def);
   resetMotionState();
   advanceSeconds(0.25, 240);
-  const hipDepth = system.weaponMount.position.z;
   input.rightMouseDown = true;
   advanceSeconds(1 / 240, 240);
   assert(system.kickGroup.visible, `${def.id} vanishes on the first ADS frame`);
@@ -743,23 +742,23 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   assert(system.kickGroup.visible === !def.scoped,
     `${def.id} uses the wrong full-ADS viewmodel mode`);
   if (!def.scoped) {
-    assert(Math.abs(system.weaponMount.rotation.x - 0.08) < 0.012
-      && Math.abs(system.weaponMount.rotation.y - 0.12) < 0.012
-      && Math.abs(system.weaponMount.rotation.z + 0.02) < 0.012,
-      `${def.id} zoom does not settle into the partial shoulder pose`);
+    assert(Math.abs(system.weaponMount.rotation.x) < 0.012
+      && Math.abs(system.weaponMount.rotation.y) < 0.012
+      && Math.abs(system.weaponMount.rotation.z) < 0.012,
+      `${def.id} zoom does not settle squarely onto its sight axis`);
     if (MAIN_WEAPON_IDS.includes(def.id)) {
       const record = system.models.get(def.id);
-      assert(Math.abs(camera.fov - 30) < 0.3,
-        `${def.id} does not settle at the EV-style 30-degree zoom (${camera.fov.toFixed(2)})`);
+      assert(Math.abs(camera.fov - 46) < 0.3,
+        `${def.id} zoom is too tight or too weak (${camera.fov.toFixed(2)})`);
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
-      const adsMountNdc = system.weaponMount.getWorldPosition(new THREE.Vector3()).project(camera);
-      assert(Math.abs(system.weaponMount.position.z - hipDepth) < 0.02,
-        `${def.id} zoom pushes the gun away and makes it smaller`);
-      assert(adsMountNdc.x > 0.40 && adsMountNdc.x < 0.65,
-        `${def.id} zoom mount is outside the EV.IO shoulder lane (${adsMountNdc.x.toFixed(3)})`);
-      assert(adsMountNdc.y < -0.90,
-        `${def.id} zoom does not keep the enlarged weapon below the reticle`);
+      const sightNdc = record.sight.clone().applyMatrix4(record.group.matrixWorld).project(camera);
+      assert(Math.abs(sightNdc.x) < 0.025,
+        `${def.id} rear sight misses horizontal screen centre (${sightNdc.x.toFixed(3)})`);
+      assert(sightNdc.y < 0.02 && sightNdc.y > -0.13,
+        `${def.id} rear sight is not just below the reticle (${sightNdc.y.toFixed(3)})`);
+      assert(system.weaponMount.position.z < -0.35 && system.weaponMount.position.z > -1.15,
+        `${def.id} ADS depth over-crops or loses the gun (${system.weaponMount.position.z.toFixed(3)})`);
       record.group.traverse((object) => {
         if (!object.isMesh) return;
         if (object.name === 'outline') {
@@ -771,11 +770,6 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
           `${def.id} viewmodel can still be hidden by world geometry`);
         assert(object.renderOrder >= 1000, `${def.id} viewmodel render order is not isolated`);
       });
-      const aimRay = new THREE.Raycaster();
-      aimRay.setFromCamera(new THREE.Vector2(0, 0), camera);
-      const centerHits = aimRay.intersectObject(record.group, true);
-      assert(centerHits.length === 0,
-        `${def.id} ADS geometry still blocks the centre aim ray`);
     }
   }
   input.rightMouseDown = false;
@@ -784,7 +778,7 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
   assert(system.kickGroup.visible, `${def.id} viewmodel did not return after ADS`);
 }
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'm4'), 1, true),
-  'ordinary rifle zoom must retain the lower-right weapon carry');
+  'ordinary rifle zoom must retain the centred physical sight picture');
 assert(shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'boltsniper'), 0.8, true),
   'scoped rifle must clear only after the scope overlay is established');
 assert(!shouldHideAdsViewmodel(WEAPONS.find((def) => def.id === 'knife'), 1),

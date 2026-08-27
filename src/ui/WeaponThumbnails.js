@@ -48,13 +48,47 @@ function _fitCamera(camera) {
 
 const _cache = new Map();
 const _hudCache = new Map();
+const _hudFallbackCache = new Map();
 let _warmed = false;
 let _warming = false;
 let _generating = false;
 const _readyCallbacks = new Set();
 
 export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
-export function getWeaponHudThumb(id) { return _hudCache.get(id) ?? _cache.get(id) ?? null; }
+
+// The match HUD is available before the optional 3D inventory renderer has
+// warmed its WebGL thumbnails.  Returning null here used to omit the image
+// node entirely, leaving only ammo and slot keys on a player's first match.
+// These tiny inline silhouettes are immediate and allocation-cached; the real
+// model render automatically wins whenever it has been generated.
+function _hudFallbackThumb(id) {
+  if (_hudFallbackCache.has(id)) return _hudFallbackCache.get(id);
+  const def = WEAPONS.find((weapon) => weapon.id === id);
+  const isMelee = def?.kind === 'melee';
+  const isPistol = /magnum|pistol|sidearm/i.test(`${id} ${def?.name || ''}`);
+  const isLauncher = def?.kind === 'rocket' || /launcher|cannon|fuel|concussion/i.test(`${id} ${def?.name || ''}`);
+  const isShotgun = /shotgun|scatter|sweeper/i.test(`${id} ${def?.name || ''}`);
+  let shape;
+  if (isMelee) {
+    shape = '<path d="M25 50 112 13l22 2-16 16-88 27z"/><path d="m103 21 10-10 28 12-9 10z"/><path d="m23 43 14 14-9 7-14-14z"/>';
+  } else if (isPistol) {
+    shape = '<path d="M30 19h92l14 10-9 12H78L66 56H47l8-17H30z"/><path d="M78 39h22L88 62H66z"/>';
+  } else if (isLauncher) {
+    shape = '<path d="M13 20h121l14 10-14 12H13L4 31z"/><path d="M34 42h28L49 61H27z"/><rect x="117" y="14" width="25" height="34" rx="5"/>';
+  } else if (isShotgun) {
+    shape = '<path d="M7 23h137l10 8-10 8H50L37 51H16L28 39H7z"/><path d="M67 39h27L83 60H61z"/><rect x="104" y="18" width="42" height="6" rx="3"/>';
+  } else {
+    shape = '<path d="M7 20h118l28 11-28 11H61L43 54H17l13-12H7z"/><path d="M68 42h27L83 61H61z"/><path d="m117 20 13-10h18l-8 16z"/>';
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64"><g fill="#f4f6f8" stroke="#111820" stroke-width="2" stroke-linejoin="round">${shape}</g><path d="M8 58h144" stroke="#d9782e" stroke-width="2" opacity=".9"/></svg>`;
+  const url = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  _hudFallbackCache.set(id, url);
+  return url;
+}
+
+export function getWeaponHudThumb(id) {
+  return _hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThumb(id);
+}
 
 // Render a one-off larger thumbnail of a weapon wearing a specific skin (or raw
 // if skin is null). Returns a data-URL, or null if the weapon GLB isn't ready.
