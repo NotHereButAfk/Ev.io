@@ -6,7 +6,7 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_DASH, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
+import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
@@ -285,6 +285,13 @@ export class Bot {
     // damage passes the attacking bot explicitly and must not make this bot
     // hostile toward the human later.
     if (!attacker) this._provokedByPlayer = true;
+    if (!attacker) {
+      // Player-provoked ranged bots stop on the spot and return inaccurate
+      // fire instead of dashing or strafing away from the shot.
+      this._dashT = 0;
+      this._dashDir.set(0, 0, 0);
+      this._wantsJump = false;
+    }
     this._provokeTimer = PROVOKE_DURATION;
     this.health = Math.max(0, this.health - amount);
     this.flashTimer = 0.12;
@@ -442,7 +449,8 @@ export class Bot {
     // is the whole point: cover blocks it, distance widens the cone's footprint,
     // and strafing makes it miss — none of which a probability roll can express.
     // Scatter radius in metres at the target, converted to an angle.
-    const spread = botAimErrorMeters(dist, this._aimSkill) / Math.max(1, dist);
+    const retaliationScale = this._provokedByPlayer ? BOT_RETALIATION_AIM_SCALE : 1;
+    const spread = botAimErrorMeters(dist, this._aimSkill * retaliationScale) / Math.max(1, dist);
     _tmpA.set(-this._shootDir.z, 0, this._shootDir.x);              // horizontal ⊥
     if (_tmpA.lengthSq() < 1e-6) _tmpA.set(1, 0, 0);
     _tmpA.normalize();
@@ -647,22 +655,31 @@ export class Bot {
             && Math.random() < 0.10));
       }
 
-      const steering = chooseCombatSteering({
-        distance: targetDistance,
-        hasLineOfSight: hasVisual,
-        strafeSign: this._strafeSign,
-        melee: this._isSwordBot,
-      });
-      this._strafeDir.set(targetDir.z, 0, -targetDir.x);
-      this._combatDir
-        .copy(targetDir)
-        .multiplyScalar(steering.forward)
-        .addScaledVector(this._strafeDir, steering.strafe);
-      const steerLen = Math.hypot(steering.forward, steering.strafe);
-      if (this._combatDir.lengthSq() > 1e-5) {
-        moveTarget = this._combatDir.normalize();
-        gaitDirF = steering.forward / Math.max(1, steerLen);
-        gaitDirR = steering.strafe / Math.max(1, steerLen);
+      const holdGround = this._provokedByPlayer && !this._isSwordBot;
+      if (holdGround) {
+        // Keep gravity/collision active below, but provide no horizontal input.
+        // A sword bot is exempt because it cannot retaliate without closing.
+        this._dashT = 0;
+        this._dashDir.set(0, 0, 0);
+        this._wantsJump = false;
+      } else {
+        const steering = chooseCombatSteering({
+          distance: targetDistance,
+          hasLineOfSight: hasVisual,
+          strafeSign: this._strafeSign,
+          melee: this._isSwordBot,
+        });
+        this._strafeDir.set(targetDir.z, 0, -targetDir.x);
+        this._combatDir
+          .copy(targetDir)
+          .multiplyScalar(steering.forward)
+          .addScaledVector(this._strafeDir, steering.strafe);
+        const steerLen = Math.hypot(steering.forward, steering.strafe);
+        if (this._combatDir.lengthSq() > 1e-5) {
+          moveTarget = this._combatDir.normalize();
+          gaitDirF = steering.forward / Math.max(1, steerLen);
+          gaitDirR = steering.strafe / Math.max(1, steerLen);
+        }
       }
 
       // Face the live target while circling/retreating. With no visual, face

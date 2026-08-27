@@ -66,6 +66,12 @@ export const BOT_STATES = Object.freeze({
   DEAD: 'dead',
 });
 
+// A bot that has just been attacked plants its feet and returns deliberately
+// sloppy fire. This multiplier is applied to the existing world-space miss
+// radius, so cover still blocks bullets and the bot remains less accurate at
+// distance without turning shots into fake probability rolls.
+export const BOT_RETALIATION_AIM_SCALE = 4.0;
+
 // Server and offline bots consume the same named presets. Values are expressed
 // in seconds/metres so designers can tune behavior without knowing the 20 Hz
 // authoritative tick rate. `aimErrorScale` is intentionally above zero even on

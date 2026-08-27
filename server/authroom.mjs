@@ -29,6 +29,7 @@ import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../src/core/CombatConfig.js';
 import {
   BOT_DASH,
+  BOT_RETALIATION_AIM_SCALE,
   BOT_STATES,
   botAimErrorMeters,
   botDashBonusSpeed,
@@ -388,6 +389,7 @@ export class AuthRoom {
     p._botDashX = 0;
     p._botDashZ = 0;
     p._botDashStarts = 0;
+    p._botHoldGroundTargetId = null;
     p._botNextDashTick = this.tick + Math.ceil(
       (0.65 + this._rand(p.id * 239 + this.tick) * 0.75) * TICK_HZ,
     );
@@ -401,6 +403,10 @@ export class AuthRoom {
     bot._botHostility.set(attacker.id, this.tick + memoryTicks);
     bot._botLastSeen = { x: attacker.state.px, y: attacker.state.py, z: attacker.state.pz };
     bot._botLastSeenTick = this.tick;
+    bot._botHoldGroundTargetId = attacker.id;
+    bot._botDashTicks = 0;
+    bot._botDashX = 0;
+    bot._botDashZ = 0;
 
     const current = this.players.get(bot._botTargetId);
     const currentDistance = current
@@ -462,6 +468,7 @@ export class AuthRoom {
       const focusExpired = p._botTargetId != null
         && this.tick - p._botTargetSince >= secondsToTicks(cfg.focusDuration);
       if (focusExpired) {
+        if (p._botHoldGroundTargetId === p._botTargetId) p._botHoldGroundTargetId = null;
         p._botIgnoredUntil.set(p._botTargetId, this.tick + secondsToTicks(2));
         p._botTargetId = null;
       }
@@ -491,6 +498,7 @@ export class AuthRoom {
         if (best.isBot) p._botHostility.set(best.id,
           this.tick + secondsToTicks(cfg.focusDuration + cfg.searchDuration));
         p._botTargetId = best.id;
+        p._botHoldGroundTargetId = null;
         p._botTargetSince = this.tick;
         p._botReactionUntil = this.tick + this._botReactionTicks(p);
         p._botState = BOT_STATES.REACT;
@@ -499,6 +507,7 @@ export class AuthRoom {
 
     let target = this.players.get(p._botTargetId);
     if (!target?.alive || !p._botHostility.has(target.id)) {
+      if (p._botHoldGroundTargetId === p._botTargetId) p._botHoldGroundTargetId = null;
       p._botTargetId = null;
       target = null;
     }
@@ -525,6 +534,7 @@ export class AuthRoom {
     }
 
     if (!target) {
+      p._botHoldGroundTargetId = null;
       p._botState = BOT_STATES.ROAM;
       if (!p._botRoamTarget || this.tick >= p._botRoamUntil
         || Math.hypot(p._botRoamTarget[0] - p.state.px, p._botRoamTarget[2] - p.state.pz) < 1.5) {
@@ -585,13 +595,15 @@ export class AuthRoom {
     if (this.tick < p._botReactionUntil) p._botState = BOT_STATES.REACT;
     else p._botState = hasVisual ? BOT_STATES.ENGAGE : BOT_STATES.SEARCH;
 
+    const holdGround = p._botHoldGroundTargetId === target.id;
+
     if (this.tick >= p._botNextDecisionTick) {
       p._botNextDecisionTick = this.tick + secondsToTicks(cfg.decisionInterval);
       if (this._rand(p.id * 137 + this.tick) < cfg.strafeChance) p._botStrafe *= -1;
     }
-    let moveX = hasVisual ? p._botStrafe : p._botStrafe * 0.18;
-    let moveZ = !hasVisual ? 1 : distance > 13 ? 1 : distance < 5 ? -1 : 0.15;
-    if (!this._botGroundSafe(p, moveX, moveZ, p._botAimYaw)) {
+    let moveX = holdGround ? 0 : (hasVisual ? p._botStrafe : p._botStrafe * 0.18);
+    let moveZ = holdGround ? 0 : (!hasVisual ? 1 : distance > 13 ? 1 : distance < 5 ? -1 : 0.15);
+    if (!holdGround && !this._botGroundSafe(p, moveX, moveZ, p._botAimYaw)) {
       const alternatives = [[-p._botStrafe, 0], [0, -1], [0, 0]];
       const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, p._botAimYaw));
       [moveX, moveZ] = safe || [0, 0];
@@ -604,7 +616,10 @@ export class AuthRoom {
       && p.reloadUntil <= this.tick && p.mag > 0 && this.tick >= p._botNextShotTick;
     if (canFire) {
       this.onFire(p.id, { seq: p.lastFireSeq + 1, wid: p.wid, yaw: p._botAimYaw, pitch: p._botAimPitch });
-      if (p.fireReq) p.fireReq.botTargetId = target.id;
+      if (p.fireReq) {
+        p.fireReq.botTargetId = target.id;
+        p.fireReq.botRetaliating = holdGround;
+      }
       p._botBurstRemaining--;
       const weaponTicks = Math.max(1, Math.ceil((WEAPONS[p.wid]?.rate || 0.2) * TICK_HZ));
       if (p._botBurstRemaining <= 0) {
@@ -612,13 +627,13 @@ export class AuthRoom {
         p._botNextShotTick = this.tick + weaponTicks * (3 + Math.floor(this._rand(p.id * 557 + this.tick) * 3));
       } else p._botNextShotTick = this.tick + weaponTicks;
     }
-    const jump = p.state.onGround && hasVisual
+    const jump = !holdGround && p.state.onGround && hasVisual
       && this._rand(p.id * 877 + this.tick) < cfg.jumpChance / TICK_HZ;
-    const dashing = this._botDashCommand(p, moveX, moveZ, p._botAimYaw);
+    const dashing = holdGround ? false : this._botDashCommand(p, moveX, moveZ, p._botAimYaw);
     return {
       seq,
       inp: makeInput({ mx: moveX, mz: moveZ, yaw: p._botAimYaw, pitch: p._botAimPitch,
-        sprint: distance > cfg.combatSprintDistance / cfg.movementSpeed, jumpJust: jump }),
+        sprint: !holdGround && distance > cfg.combatSprintDistance / cfg.movementSpeed, jumpJust: jump }),
       wid: p.wid,
       aiming: hasVisual && distance < cfg.detectionDistance * 0.8,
       botDash: dashing,
@@ -1133,7 +1148,11 @@ export class AuthRoom {
           const tz = target.state.pz - p.state.pz;
           const distance = Math.max(0.001, Math.hypot(tx, tz));
           const personality = 0.9 + this._rand(p.id * 271) * 0.2;
-          const error = botAimErrorMeters(distance, this.botDifficulty.aimErrorScale * personality);
+          const retaliationScale = req.botRetaliating ? BOT_RETALIATION_AIM_SCALE : 1;
+          const error = botAimErrorMeters(
+            distance,
+            this.botDifficulty.aimErrorScale * personality * retaliationScale,
+          );
           const yawJitter = (this._rand(p.id * 811 + this.tick * 17) * 2 - 1) * error / distance;
           const pitchJitter = (this._rand(p.id * 619 + this.tick * 23) * 2 - 1) * error / distance;
           req.yaw = Math.atan2(-tx, -tz) + yawJitter;

@@ -62,6 +62,7 @@ export class HUD {
     this._teleportFlash    = document.getElementById('teleport-flash');
     this._abilityQ         = document.getElementById('ability-q');
     this._joinNotification = document.getElementById('join-notification');
+    this._adsActive           = false;
     this._hitmarkerTimeout    = null;
     this._killConfirmTimeout  = null;
     this._damageTimeout       = null;
@@ -246,12 +247,17 @@ export class HUD {
     if (this.crosshair) {
       const bloom = Math.max(0, Math.min(1, weaponInfo.spreadRatio || 0));
       const aiming = Math.max(0, Math.min(1, weaponInfo.aiming || 0));
+      this._adsActive = aiming > 0.72;
       // EV.IO-style readable cone: sustained hip fire opens the four bars;
       // ADS closes them into the optic without moving the centre dot.
       const gap = (4 + bloom * 8) * (1 - aiming * 0.78);
       setCustomStyle(this.crosshair, '--xhair-size', `${12 + gap * 2}px`);
       setCustomStyle(this.crosshair, '--xhair-opacity', `${1 - aiming * 0.42}`);
-      toggleClass(this.crosshair, 'ads', aiming > 0.72);
+      toggleClass(this.crosshair, 'ads', this._adsActive);
+      if (this._adsActive && this.hitmarker?.classList.contains('show')) {
+        clearTimeout(this._hitmarkerTimeout);
+        this.hitmarker.classList.remove('show', 'headshot');
+      }
     }
     if (this.reloadProgress) {
       const reloadPct = Math.max(0, Math.min(1, weaponInfo.reloadProgress || 0));
@@ -273,6 +279,10 @@ export class HUD {
   }
 
   flashHitmarker(headshot = false) {
+    // The marker is a rotated X at screen centre. During ADS that places it
+    // directly over the target and reads as a broken aim indicator. Scoped
+    // hits retain their sound, damage number and elimination confirmation.
+    if (this._adsActive || !this.hitmarker) return;
     this.hitmarker.classList.remove('show', 'headshot');
     void this.hitmarker.offsetWidth;
     this.hitmarker.classList.add('show');

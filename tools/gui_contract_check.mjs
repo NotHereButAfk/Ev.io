@@ -124,6 +124,8 @@ if (/FLASH GRENADE|<span class="ability-page-key">E<\/span>|<strong>IMPULSE<\/st
 }
 requireMatch(hud, /--xhair-size/, 'dynamic crosshair spread');
 requireMatch(hud, /(?:classList\.toggle|toggleClass)\([^\n]*['"]ads['"]/, 'ADS crosshair state');
+requireMatch(hud, /flashHitmarker[\s\S]*?if \(this\._adsActive \|\| !this\.hitmarker\) return/,
+  'ADS suppresses the center-screen X hit marker');
 requireMatch(css, /#hud #crosshair[^}]*--xhair-size/s, 'crosshair style contract');
 requireMatch(css, /\.auth-page \.login-submit[^}]*align-self:\s*flex-start/s, 'EV-style compact auth action');
 requireMatch(settings, /crosshairColor:\s*['"]white['"]/, 'neutral player-screen crosshair default');

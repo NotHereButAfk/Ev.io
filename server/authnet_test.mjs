@@ -301,13 +301,20 @@ ok('bots: a genuine retreat remains a readable backpedal',
 for (let i = 0; i < 60; i++) duelRoom.update();
 ok('bots: neutral humans are not attacked on sight', duelHuman.health === 100 && duelHuman.deaths === 0,
    `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
+// Roaming moved the bot during the neutral proof. Restore a clear ten-metre
+// firing lane so this assertion isolates retaliation instead of search range.
+Object.assign(duelHuman.state, { px: 0, py: 0, pz: -10, vx: 0, vz: 0 });
+Object.assign(duelBot.state, { px: 0, py: 0, pz: 0, vx: 0, vz: 0 });
 duelRoom._damage(duelBot, duelHuman, 1, false);
-// A casual bot may lose focus long enough for the new five-second regeneration
-// to recover the target; the contract here is believable retaliation, not a
-// guaranteed aimbot kill.
-for (let i = 0; i < 260; i++) duelRoom.update();
-ok('bots: a provoked public-match bot retaliates and lands real damage', duelHuman.health < 100 || duelHuman.deaths >= 1,
-   `deaths=${duelHuman.deaths}, health=${duelHuman.health}`);
+const retaliationStart = [duelBot.state.px, duelBot.state.pz];
+const retaliationMag = duelBot.mag;
+for (let i = 0; i < 100; i++) duelRoom.update();
+const retaliationTravel = Math.hypot(
+  duelBot.state.px - retaliationStart[0], duelBot.state.pz - retaliationStart[1],
+);
+ok('bots: a provoked public-match bot plants and returns deliberately inaccurate fire',
+   retaliationTravel < 0.35 && duelBot.mag < retaliationMag,
+   `travel=${retaliationTravel.toFixed(2)}, mag=${retaliationMag}->${duelBot.mag}, humanHealth=${duelHuman.health}`);
 
 // Moving-target lag compensation must use the snapshot clock, not the input
 // sequence clock. At tick 40 the target has crossed three metres sideways, but

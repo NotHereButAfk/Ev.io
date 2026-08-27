@@ -4,6 +4,7 @@ import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import {
   BOT_DASH,
   BOT_TACTICS,
+  BOT_RETALIATION_AIM_SCALE,
   BOT_DIFFICULTIES,
   BOT_STATES,
   advanceBotMagazine,
@@ -141,6 +142,8 @@ console.log('ok   finite bot magazines block fire until weapon-specific reload c
 assert.ok(botAimErrorMeters(20, 1.15) < 0.8, '20m bot scatter is still too inaccurate');
 assert.ok(botAimErrorMeters(40, 1.15) < 1.25, '40m bot scatter is still too inaccurate');
 assert.ok(botAimErrorMeters(20, 0.8) > 0.4, 'bots became perfect aim-locks');
+assert.ok(botAimErrorMeters(20, BOT_DIFFICULTIES.normal.aimErrorScale * BOT_RETALIATION_AIM_SCALE) > 3,
+  'provoked return fire is not inaccurate enough');
 console.log('ok   bot aim is lethal but retains real world-space scatter');
 
 const player = {
@@ -224,13 +227,21 @@ aiRoom._damage(bot, human, 1, false);
 assert.equal(bot._botTargetId, human.id, 'damage did not immediately select the attacker');
 assert.equal(bot._botState, BOT_STATES.REACT);
 assert.ok(bot._botReactionUntil > aiRoom.tick, 'difficulty reaction delay was skipped');
+const retaliationCommand = aiRoom._driveBot(bot);
+assert.equal(retaliationCommand.inp.mx, 0, 'provoked bot strafed instead of holding ground');
+assert.equal(retaliationCommand.inp.mz, 0, 'provoked bot chased instead of holding ground');
+assert.ok(!retaliationCommand.inp.sprint, 'provoked bot sprinted while holding ground');
+assert.ok(!retaliationCommand.inp.jumpJust, 'provoked bot jumped while holding ground');
+assert.equal(retaliationCommand.botDash, false, 'provoked bot dashed while holding ground');
 aiRoom._damage(bot, rival, 1, false);
 assert.equal(bot._botTargetId, rival.id, 'a new attacker did not force a target switch');
+assert.equal(bot._botHoldGroundTargetId, rival.id, 'new attacker did not become the stationary retaliation target');
 aiRoom._resetBotAI(bot);
 assert.equal(bot._botState, BOT_STATES.ROAM);
 assert.equal(bot._botTargetId, null);
 assert.equal(bot._botHostility.size, 0, 'respawn reset retained hostility');
 assert.equal(bot._botDashTicks, 0, 'respawn reset retained an active dash');
+assert.equal(bot._botHoldGroundTargetId, null, 'respawn reset retained stationary retaliation');
 console.log('ok   authoritative states enforce passive roam, reaction delay, attacker switching, and respawn reset');
 
 const roamRoom = new AuthRoom(aiArena, { targetPopulation: 1, botDifficulty: 'normal' });

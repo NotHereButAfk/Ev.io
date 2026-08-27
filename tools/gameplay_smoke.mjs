@@ -195,6 +195,15 @@ try {
     && Math.abs(adsState.ry - 0.12) < 0.02
     && Math.abs(adsState.rz + 0.02) < 0.02,
   `zoom did not settle into the EV.IO shoulder pose: ${JSON.stringify({hipCarry,adsState})}`);
+  const adsMarker = await game(`
+    g.hud.flashHitmarker();
+    return {
+      adsActive: g.hud._adsActive,
+      markerShown: g.hud.hitmarker.classList.contains('show'),
+    };
+  `);
+  assert(adsMarker.adsActive && !adsMarker.markerShown,
+    `ADS displayed the center-screen X hit marker: ${JSON.stringify(adsMarker)}`);
   await game(`g.input.rightMouseDown=false; return true;`);
   await page.waitForFunction(() => {
     const g = window.__game || window.game;
