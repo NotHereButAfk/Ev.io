@@ -339,6 +339,10 @@ rewindRoom._hitscan(rewindShooter, rewindProbeWeapon, 0, 0, true, 32);
 ok('hitscan: moving target is hit at the snapshot position the shooter saw',
    currentTickHealth === 100 && rewindTarget.health === 80,
    `health ${currentTickHealth}→${rewindTarget.health}`);
+const replicatedShot = rewindRoom.events.find((event) => event.e === 'shot');
+ok('hitscan: every visible bullet replicates a finite tracer segment',
+   replicatedShot && Number.isFinite(replicatedShot.tx)
+   && Number.isFinite(replicatedShot.ty) && Number.isFinite(replicatedShot.tz));
 rewindRoom.onFire(rewindShooterId, { seq: 1, wid: 'm4', yaw: 0, pitch: 0, viewTick: -99999 });
 const clampedOldTick = rewindShooter.fireReq?.viewTick;
 rewindRoom.onFire(rewindShooterId, { seq: 2, wid: 'm4', yaw: 0, pitch: 0, viewTick: 99999 });
@@ -356,11 +360,33 @@ fragTarget.state.px = 0; fragTarget.state.pz = -24;
 fragRoom.onAbility(throwerId, { seq: 1, kind: 'frag', yaw: 0, pitch: 0 });
 fragRoom.update();
 const fragChargeAfterThrow = thrower.abilities.frag;
-for (let i = 0; i < 52; i++) fragRoom.update();
+let sawFragExplosion = false;
+for (let i = 0; i < 52; i++) {
+  fragRoom.update();
+  sawFragExplosion ||= fragRoom.events.some((event) => event.e === 'explosion' && event.kind === 'frag');
+}
 ok('frag: authoritative request spends exactly one charge', fragChargeAfterThrow === 1,
    `charges=${fragChargeAfterThrow}`);
 ok('frag: fuse resolves into server-owned radial damage', fragTarget.health < 100,
    `health=${fragTarget.health}`);
+ok('frag: detonation replicates a visible explosion event', sawFragExplosion);
+
+const rocketRoom = new AuthRoom(duelArena);
+const rocketeerId = rocketRoom.add(() => {}, 'Rocketeer');
+const rocketTargetId = rocketRoom.add(() => {}, 'Rocket Target');
+const rocketeer = rocketRoom.players.get(rocketeerId);
+const rocketTarget = rocketRoom.players.get(rocketTargetId);
+Object.assign(rocketeer.state, { px: 0, py: 0, pz: 0 });
+Object.assign(rocketTarget.state, { px: 0, py: 0, pz: -6 });
+rocketeer.matchWeapons.add('rpg');
+rocketeer.wid = 'rpg';
+rocketTarget.invulnerableUntil = 0;
+rocketRoom.onFire(rocketeerId, { seq: 1, wid: 'rpg', yaw: 0, pitch: 0 });
+rocketRoom.update();
+ok('rocket: impact applies authoritative splash damage', rocketTarget.health < 100,
+   `health=${rocketTarget.health}`);
+ok('rocket: impact replicates a visible explosion event',
+   rocketRoom.events.some((event) => event.e === 'explosion' && event.kind === 'rocket'));
 
 const reloadRoom = new AuthRoom(duelArena);
 const reloadId = reloadRoom.add(() => {}, 'Reload Probe');

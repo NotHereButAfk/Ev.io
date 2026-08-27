@@ -91,6 +91,9 @@ const WEAPONS = Object.fromEntries(CLIENT_WEAPONS.map((weapon) => [weapon.id, {
   pellets: weapon.pellets || 1,
   range: weapon.range,
   hs: weapon.headshotMultiplier || 1,
+  splashRadius: weapon.splashRadius || 0,
+  splashMin: weapon.splashMin ?? 0.25,
+  rocketSpeed: weapon.rocketSpeed || 0,
   reload: weapon.reloadTime || 0,
   mag: weapon.magSize || 0,
   reserve: weapon.reserveMax || 0,
@@ -878,12 +881,72 @@ export class AuthRoom {
         const body = this._raySphere(ox, oy, oz, rx, ry, rz, pos.x, pos.y + bodyY, pos.z, bodyR, bestT);
         if (body && body.t < bestT) { best = { t, head: false, t2: body.t }; bestT = body.t; }
       }
+      const wallT = rayVsBoxes(this.simWorld, ox, oy, oz, rx, ry, rz, w.range);
+      let impactT = Math.min(bestT, wallT);
       // smoke occlusion: if the ray to the hit passes through an active smoke
       // volume, the shot is blocked (server-authoritative vision denial).
-      if (best && this._raySmoked(ox, oy, oz, rx, ry, rz, best.t2)) continue;
-      if (best && rayVsBoxes(this.simWorld, ox, oy, oz, rx, ry, rz, best.t2) < best.t2 - 0.05) continue;
+      if (best && this._raySmoked(ox, oy, oz, rx, ry, rz, best.t2)) best = null;
+      if (best && wallT < best.t2 - 0.05) best = null;
       if (best) this._damage(best.t, shooter, w.dmg * (best.head ? w.hs : 1), best.head);
+      if (w.kind !== 'melee' && w.kind !== 'rocket') {
+        // Replicate the presentation segment to every client. Damage remains
+        // instantaneous and authoritative; clients animate a bright tracer
+        // along this exact unobstructed path.
+        this.events.push({
+          e: 'shot', by: shooter.id, wid: shooter.wid,
+          x: ox, y: oy, z: oz,
+          tx: ox + rx * impactT, ty: oy + ry * impactT, tz: oz + rz * impactT,
+        });
+      }
     }
+  }
+
+  _resolveRocket(shooter, w, yaw, pitch) {
+    const ox = shooter.state.px, oy = shooter.state.py + HEAD_Y, oz = shooter.state.pz;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const dx = -Math.sin(yaw) * cp, dy = sp, dz = -Math.cos(yaw) * cp;
+    let impactT = rayVsBoxes(this.simWorld, ox, oy, oz, dx, dy, dz, w.range);
+    for (const target of this.players.values()) {
+      if (target === shooter || !target.alive) continue;
+      const head = this._raySphere(
+        ox, oy, oz, dx, dy, dz,
+        target.state.px, target.state.py + HEAD_Y, target.state.pz,
+        HEAD_R, impactT,
+      );
+      const body = this._raySphere(
+        ox, oy, oz, dx, dy, dz,
+        target.state.px, target.state.py + 0.9, target.state.pz,
+        BODY_R, impactT,
+      );
+      const hitT = Math.min(head?.t ?? impactT, body?.t ?? impactT);
+      if (hitT < impactT) impactT = hitT;
+    }
+
+    const bx = ox + dx * impactT;
+    const by = oy + dy * impactT;
+    const bz = oz + dz * impactT;
+    const radius = w.splashRadius || 5;
+    for (const target of this.players.values()) {
+      if (!target.alive) continue;
+      const tx = target.state.px - bx;
+      const ty = target.state.py + 0.9 - by;
+      const tz = target.state.pz - bz;
+      const distance = Math.hypot(tx, ty, tz);
+      if (distance > radius) continue;
+      const length = distance || 1e-6;
+      const blocked = rayVsBoxes(
+        this.simWorld,
+        bx - dx * 0.12, by - dy * 0.12, bz - dz * 0.12,
+        tx / length, ty / length, tz / length, length,
+      ) < length - 0.1;
+      if (blocked) continue;
+      const falloff = 1 - (1 - w.splashMin) * clamp(distance / radius, 0, 1);
+      this._damage(target, shooter, w.dmg * falloff, false);
+    }
+    this.events.push({
+      e: 'explosion', kind: 'rocket', by: shooter.id,
+      x: bx, y: by, z: bz, r: radius,
+    });
   }
 
   // Does the ray segment [0, maxT] pass within any active smoke sphere?
@@ -1171,7 +1234,8 @@ export class AuthRoom {
       }
       p.mag = ammo.mag;
       this._provokeBotsAlongShot(p, w, req.yaw, req.pitch);
-      this._hitscan(p, w, req.yaw, req.pitch, p._lastAim, req.viewTick);
+      if (w.kind === 'rocket') this._resolveRocket(p, w, req.yaw, req.pitch);
+      else this._hitscan(p, w, req.yaw, req.pitch, p._lastAim, req.viewTick);
       if (w.kind !== 'melee' && ammo.mag <= 0) this._startReload(p, req.wid);
       if (w.spreadMax != null) {
         p.gunBloom = Math.min(w.spreadMax, (p.gunBloom || 0) + (w.bloomShot || 0));

@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { getWeapon } from '../src/weapons/weaponDefs.js';
 import {
   advanceFireCooldown,
@@ -28,6 +29,15 @@ assert.equal(ar.zoomSpreadMod, 0, 'aiming must remove Auto Rifle bloom');
 assert.equal(ar.muzzleSmoke, true, 'Auto Rifle must emit muzzle smoke');
 assert.equal(ar.spawnShells, true, 'Auto Rifle must eject shells');
 
+const weaponSystemSource = readFileSync(new URL('../src/weapons/WeaponSystem.js', import.meta.url), 'utf8');
+const tracerRadius = Number(weaponSystemSource.match(/CylinderGeometry\((0\.\d+),\s*\1,\s*1,\s*6/)?.[1]);
+const tracerSpeed = Number(weaponSystemSource.match(/TRACER_VISUAL_SPEED\s*=\s*(\d+)/)?.[1]);
+const tracerFadeMs = Number(weaponSystemSource.match(/TRACER_END_FADE\s*=\s*(0\.\d+)/)?.[1]) * 1000;
+assert.ok(tracerRadius >= 0.012, 'bullet tracer is too thin to remain visible in motion');
+assert.ok(tracerSpeed <= 360, 'presentation tracer can still skip across the screen between frames');
+assert.ok(tracerFadeMs >= 75, 'bullet tracer must linger briefly at its impact point');
+assert.match(weaponSystemSource, /AdditiveBlending/, 'bullet tracer must use a readable glow blend');
+
 let bloom = ar.spreadMin;
 for (let shot = 0; shot < 12; shot++) {
   bloom = Math.max(ar.spreadMin, bloom - ar.spreadRecovery * ar.fireRate);
@@ -52,4 +62,4 @@ for (const fps of [30, 60, 144]) {
 let cd = scheduleNextShot(-0.18, ar.fireRate);
 assert.ok(cd <= 0.001, 'hitch timing debt was discarded');
 
-console.log(`gunfeel passed: ${expected} AR rounds/s; ADS, bloom, smoke, shell and trigger rules verified`);
+console.log(`gunfeel passed: ${expected} AR rounds/s; visible tracers, ADS, bloom, smoke, shell and trigger rules verified`);

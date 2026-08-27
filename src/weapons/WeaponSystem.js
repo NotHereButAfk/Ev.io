@@ -42,12 +42,30 @@ const CUTE_SOUNDS = new Set(['anime', 'waifu', 'meow', 'uwu', 'bark', 'sparkle']
 // Fire-sound skins get an orange/red muzzle flash + ember burst.
 const FIRE_SOUNDS = new Set(['fire']);
 
+const TRACER_OPACITY = 0.96;
+const TRACER_VISUAL_SPEED = 330;
+const TRACER_LENGTH = 1.45;
+const TRACER_END_FADE = 0.085;
+
 function createTracerMesh() {
-  const geo = new THREE.CylinderGeometry(0.0035, 0.0035, 1, 5, 1, true);
+  // This is a tracer streak, not the physical bullet diameter.  The previous
+  // 7 mm-wide line routinely covered less than one pixel and a fast round
+  // could cross the screen between two rendered frames.  A slim additive
+  // streak remains readable without looking like a laser beam.
+  const geo = new THREE.CylinderGeometry(0.014, 0.014, 1, 6, 1, true);
   geo.translate(0, 0.5, 0);
   geo.rotateX(Math.PI / 2);
-  const mat = new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.84 });
-  return new THREE.Mesh(geo, mat);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xfff3c4,
+    transparent: true,
+    opacity: TRACER_OPACITY,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 4;
+  return mesh;
 }
 
 // How far in front of the eye the viewmodel sits. The asynchronously loaded
@@ -921,7 +939,7 @@ export class WeaponSystem {
     st.isReloading = false;
   }
 
-  _spawnTracer(from, to) {
+  _spawnTracer(from, to, weaponDef = this.currentDef) {
     const mesh = createTracerMesh();
     const direction = to.clone().sub(from);
     const distance = direction.length();
@@ -931,12 +949,15 @@ export class WeaponSystem {
       return;
     }
     direction.multiplyScalar(1 / distance);
-    const speed = this.currentDef.tracerSpeed || 720;
-    const trailLength = Math.min(0.7, distance);
+    // Cap presentation speed independently from simulation. Damage is still
+    // instantaneous; this only guarantees the streak survives long enough for
+    // a 30/60/144 Hz display to show it.
+    const speed = Math.min(weaponDef?.tracerSpeed || TRACER_VISUAL_SPEED, TRACER_VISUAL_SPEED);
+    const trailLength = Math.min(TRACER_LENGTH, distance);
     mesh.position.copy(from);
     mesh.scale.set(1, 1, trailLength);
     mesh.lookAt(to);
-    if (this.currentDef.energyColor) mesh.material.color.setHex(this.currentDef.energyColor);
+    if (weaponDef?.energyColor) mesh.material.color.setHex(weaponDef.energyColor);
     this.scene.add(mesh);
     this.tracers.push({
       mesh,
@@ -948,7 +969,14 @@ export class WeaponSystem {
       speed,
       trailLength,
       fade: 1,
+      endAge: 0,
     });
+  }
+
+  /** Render a replicated shot without changing local ammo or applying damage. */
+  showAuthoritativeTracer(weaponId, from, to) {
+    const def = this.allWeapons.find((weapon) => weapon.id === weaponId) || this.currentDef;
+    this._spawnTracer(from, to, def);
   }
 
   _flash() {
@@ -1443,11 +1471,7 @@ export class WeaponSystem {
   }
 
   _explode(point, def, botManager) {
-    if (this.audio.playExplosion) {
-      if (this.audio.playAt) this.audio.playAt(point, () => this.audio.playExplosion('rocket'));
-      else this.audio.playExplosion('rocket');
-    }
-    this.explosions.push(spawnExplosion(this.scene, point, def.splashRadius || 5, 'rocket'));
+    this.showAuthoritativeExplosion(point, def.splashRadius || 5, 'rocket');
 
     const radius = def.splashRadius || 5;
     const minF = def.splashMin !== undefined ? def.splashMin : 0.25;
@@ -1460,6 +1484,15 @@ export class WeaponSystem {
         if (this.onHitBot) this.onHitBot(bot, def.damage * f, point);
       }
     }
+  }
+
+  /** Play a server-replicated blast without applying client-side damage. */
+  showAuthoritativeExplosion(point, radius = 5, kind = 'rocket') {
+    if (this.audio.playExplosion) {
+      if (this.audio.playAt) this.audio.playAt(point, () => this.audio.playExplosion(kind));
+      else this.audio.playExplosion(kind);
+    }
+    this.explosions.push(spawnExplosion(this.scene, point, radius, kind));
   }
 
   _updateExplosions(dt) {
@@ -1872,15 +1905,15 @@ export class WeaponSystem {
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tr = this.tracers[i];
       tr.travelled += tr.speed * dt;
-      const tail = Math.min(tr.distance, Math.max(0, tr.travelled - tr.trailLength));
-      const head = Math.min(tr.distance, Math.max(tr.trailLength, tr.travelled));
+      const progress = Math.min(tr.distance, tr.travelled);
+      const tail = Math.max(0, progress - tr.trailLength);
+      const head = Math.min(tr.distance, Math.max(tr.trailLength, progress));
       const visibleLength = Math.max(0.001, head - tail);
       tr.mesh.position.copy(tr.from).addScaledVector(tr.direction, tail);
       tr.mesh.scale.z = visibleLength;
-      tr.fade = tr.travelled > tr.distance
-        ? Math.max(0, 1 - (tr.travelled - tr.distance) / tr.trailLength)
-        : 1;
-      tr.mesh.material.opacity = tr.fade * 0.84;
+      if (tr.travelled >= tr.distance) tr.endAge += dt;
+      tr.fade = Math.max(0, 1 - tr.endAge / TRACER_END_FADE);
+      tr.mesh.material.opacity = tr.fade * TRACER_OPACITY;
       if (tr.fade <= 0) {
         this.scene.remove(tr.mesh);
         tr.mesh.geometry.dispose();

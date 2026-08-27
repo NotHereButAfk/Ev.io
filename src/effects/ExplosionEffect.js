@@ -20,16 +20,20 @@ export function spawnExplosion(scene, point, radius = 5, kind = 'rocket') {
   const scale = Math.max(0.65, radius / 5);
   const root = new THREE.Group();
   root.position.copy(point);
+  // Keep the hottest part above the contact plane instead of burying half the
+  // burst inside floors or platforms.
+  root.position.y += 0.16;
   root.userData.explosionKind = kind;
 
-  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 8), material(0xfff4bd));
-  const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.48, 2), material(kind === 'frag' ? 0xff6b18 : 0xff9a24, 0.96));
-  const smoke = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 1), material(0x332b29, 0.62, THREE.NormalBlending));
-  const shockwave = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.39, 36), material(0xffc56d, 0.76));
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.48, 12, 8), material(0xfff4bd));
+  const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 2), material(kind === 'frag' ? 0xff5a12 : 0xff931f, 0.98));
+  const smoke = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1), material(0x332b29, 0.67, THREE.NormalBlending));
+  const shockwave = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.5, 36), material(0xffd17c, 0.88));
   shockwave.rotation.x = -Math.PI / 2;
-  root.add(smoke, fire, flash, shockwave);
+  const blast = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 7), material(0xff7c18, 0.44));
+  root.add(smoke, blast, fire, flash, shockwave);
 
-  const count = kind === 'frag' ? 26 : 34;
+  const count = kind === 'frag' ? 38 : 48;
   const positions = new Float32Array(count * 3);
   const velocities = new Float32Array(count * 3);
   const direction = new THREE.Vector3();
@@ -53,8 +57,8 @@ export function spawnExplosion(scene, point, radius = 5, kind = 'rocket') {
   const light = new THREE.PointLight(0xff8a32, kind === 'frag' ? 18 : 24, radius * 3.2, 2);
   light.position.copy(point).addScaledVector(UP, 0.25);
   scene.add(root, light);
-  return { root, light, flash, fire, smoke, shockwave, sparks, velocities, t: 0,
-    life: kind === 'frag' ? 0.9 : 1.05, radius, kind };
+  return { root, light, flash, blast, fire, smoke, shockwave, sparks, velocities, t: 0,
+    life: kind === 'frag' ? 1.25 : 1.4, radius, kind };
 }
 
 export function updateExplosion(effect, dt) {
@@ -64,6 +68,8 @@ export function updateExplosion(effect, dt) {
   const radiusScale = Math.max(0.01, effect.radius / 5);
   effect.flash.scale.setScalar(radiusScale * (0.5 + burst * 4.4));
   effect.flash.material.opacity = Math.max(0, 1 - p * 6);
+  effect.blast.scale.setScalar(radiusScale * (0.4 + burst * 4.8));
+  effect.blast.material.opacity = Math.max(0, 0.46 * (1 - p * 2.6));
   effect.fire.scale.setScalar(radiusScale * (0.35 + burst * 3.1));
   effect.fire.rotation.y += dt * 3.2;
   effect.fire.rotation.z -= dt * 2.1;

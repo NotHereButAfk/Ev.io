@@ -74,6 +74,10 @@ ok('map rotation discards movement predicted against the previous arena',
 const bridge = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
 ok('authoritative enemies render a health bar', /np-bar-fg/.test(bridge) && /healthFg\.style\.width/.test(bridge));
 ok('authoritative bots are honestly labelled', /botBadge\.hidden = !r\.isBot/.test(bridge));
+ok('remote gunfire renders replicated bullet tracers',
+  /e\.e === 'shot'[\s\S]*?showAuthoritativeTracer/.test(bridge));
+ok('remote rockets render replicated explosion effects',
+  /e\.kind === 'rocket'[\s\S]*?showAuthoritativeExplosion/.test(bridge));
 
 const avatar = readFileSync(new URL('../src/player/Avatar.js', import.meta.url), 'utf8');
 ok('remote directional animation owns its scratch vector',

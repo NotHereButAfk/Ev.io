@@ -440,6 +440,20 @@ export class AuthNetBridge {
       else if (e.e === 'explosion' && e.kind === 'frag') {
         this.game.grenadeSystem?.showAuthoritativeExplosion?.(new THREE.Vector3(e.x, e.y, e.z));
       }
+      else if (e.e === 'shot' && e.by !== me) {
+        const from = new THREE.Vector3(e.x, e.y, e.z);
+        const to = new THREE.Vector3(e.tx, e.ty, e.tz);
+        const direction = to.clone().sub(from).normalize();
+        // Start just outside the remote avatar so the streak does not glow
+        // through the shooter's face/chest before entering the firing lane.
+        from.addScaledVector(direction, 0.42);
+        this.game.weaponSystem?.showAuthoritativeTracer?.(e.wid, from, to);
+      }
+      else if (e.e === 'explosion' && e.kind === 'rocket' && e.by !== me) {
+        this.game.weaponSystem?.showAuthoritativeExplosion?.(
+          new THREE.Vector3(e.x, e.y, e.z), e.r || 5, 'rocket',
+        );
+      }
     }
   }
 
