@@ -21,6 +21,58 @@ export const BOT_DASH = Object.freeze({
   laneDistance: 7.2,
 });
 
+// Personal space prevents a squad from collapsing into one moving pile when
+// several bots choose the same corridor or target. The browser and server both
+// consume this pure helper so they cannot drift into different behavior.
+export const BOT_SEPARATION_RADIUS = 4.2;
+
+export function botSeparationVector({
+  x, z, id = 0, neighbors = [], radius = BOT_SEPARATION_RADIUS, botsOnly = false,
+}) {
+  let repelX = 0;
+  let repelZ = 0;
+  let pressure = 0;
+  const radiusSq = radius * radius;
+
+  for (const neighbor of neighbors) {
+    if (!neighbor || neighbor.alive === false || neighbor.isDead) continue;
+    if (botsOnly && !neighbor.isBot) continue;
+    const neighborId = neighbor.id ?? 0;
+    if (neighborId === id && id !== 0) continue;
+    const nx = neighbor.state?.px ?? neighbor.position?.x;
+    const nz = neighbor.state?.pz ?? neighbor.position?.z;
+    if (!Number.isFinite(nx) || !Number.isFinite(nz)) continue;
+
+    let dx = x - nx;
+    let dz = z - nz;
+    let distanceSq = dx * dx + dz * dz;
+    if (distanceSq >= radiusSq) continue;
+
+    if (distanceSq < 1e-6) {
+      // Stable escape directions split coincident spawns without introducing
+      // frame-to-frame random jitter.
+      const angle = ((Math.abs(id * 37 + neighborId * 17) % 360) * Math.PI) / 180;
+      dx = Math.cos(angle);
+      dz = Math.sin(angle);
+      distanceSq = 1;
+    }
+    const distance = Math.sqrt(distanceSq);
+    const weight = 1 - Math.min(1, distance / radius);
+    const push = weight * weight;
+    repelX += (dx / distance) * push;
+    repelZ += (dz / distance) * push;
+    pressure += weight;
+  }
+
+  const length = Math.hypot(repelX, repelZ);
+  if (length < 1e-6) return { x: 0, z: 0, strength: 0 };
+  return {
+    x: repelX / length,
+    z: repelZ / length,
+    strength: Math.min(1.35, pressure),
+  };
+}
+
 export function botDashBonusSpeed(remaining, duration = BOT_DASH.duration) {
   const t = Math.max(0, Math.min(1, remaining / Math.max(1e-6, duration)));
   return BOT_DASH.bonusSpeed * (0.32 + 0.68 * t * t);

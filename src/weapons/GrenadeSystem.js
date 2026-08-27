@@ -7,7 +7,7 @@ const GRAVITY     = -18;
 const BOUNCE_DAMP = 0.40;
 const FRAG_FUSE   = 2.5;
 const SMOKE_FUSE  = 1.2;
-const FRAG_RADIUS = 5;
+const FRAG_RADIUS = 6.5;
 const FRAG_DMG    = 80;
 
 export class GrenadeSystem {
@@ -19,6 +19,11 @@ export class GrenadeSystem {
     this.throwables  = [];
     this.smokeClouds = [];
     this.explosions  = [];
+    this._previous = new THREE.Vector3();
+    this._travel = new THREE.Vector3();
+    this._travelDir = new THREE.Vector3();
+    this._surfaceNormal = new THREE.Vector3(0, 1, 0);
+    this._travelRay = new THREE.Ray();
 
     this.onExplode = null; // (point, radius, damage) => void
     this.onSelfDamage = null; // (damage, point) => void; Game owns death flow
@@ -97,23 +102,47 @@ export class GrenadeSystem {
     return g;
   }
 
-  update(dt, player) {
+  update(dt, player, world = null) {
     // in-flight throwables
     for (let i = this.throwables.length - 1; i >= 0; i--) {
       const t = this.throwables[i];
+      this._previous.copy(t.pos);
       t.vel.y += GRAVITY * dt;
       t.pos.addScaledVector(t.vel, dt);
       t.life -= dt;
-      t.mesh.position.copy(t.pos);
-      t.mesh.rotation.x += dt * 5;
-      t.mesh.rotation.z += dt * 3.5;
 
-      if (t.pos.y <= 0.07 && t.vel.y < 0) {
+      // Sweep the entire travel segment through the collision octree. Checking
+      // only y=0 made grenades fall through every elevated platform and let a
+      // low-frame-rate throw tunnel through thin geometry.
+      const travelLength = this._travel.subVectors(t.pos, this._previous).length();
+      let collision = null;
+      if (world?.raycastCollisionHit && travelLength > 1e-6) {
+        this._travelDir.copy(this._travel).multiplyScalar(1 / travelLength);
+        this._travelRay.set(this._previous, this._travelDir);
+        collision = world.raycastCollisionHit(this._travelRay, travelLength + 0.08);
+      }
+      if (collision) {
+        this._surfaceNormal.copy(collision.normal || THREE.Object3D.DEFAULT_UP).normalize();
+        t.pos.copy(collision.point).addScaledVector(this._surfaceNormal, 0.075);
+        const intoSurface = t.vel.dot(this._surfaceNormal);
+        if (intoSurface < 0) {
+          t.vel.addScaledVector(this._surfaceNormal, -(1 + BOUNCE_DAMP) * intoSurface);
+        }
+        if (this._surfaceNormal.y > 0.35) {
+          t.vel.x *= 0.72;
+          t.vel.z *= 0.72;
+        }
+      } else if (!world && t.pos.y <= 0.07 && t.vel.y < 0) {
+        // Flat-world fallback retained for isolated unit/tooling scenes.
         t.pos.y = 0.07;
         t.vel.y *= -BOUNCE_DAMP;
         t.vel.x *= 0.72;
         t.vel.z *= 0.72;
       }
+
+      t.mesh.position.copy(t.pos);
+      t.mesh.rotation.x += dt * 5;
+      t.mesh.rotation.z += dt * 3.5;
 
       if (t.life <= 0) {
         this._detonate(t, player);

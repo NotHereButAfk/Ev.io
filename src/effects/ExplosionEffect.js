@@ -65,7 +65,9 @@ export function updateExplosion(effect, dt) {
   effect.t += dt;
   const p = Math.min(1, effect.t / effect.life);
   const burst = 1 - Math.pow(1 - Math.min(1, p * 2.7), 3);
-  const radiusScale = Math.max(0.01, effect.radius / 5);
+  // The bright fireball should read all the way across the damage footprint,
+  // not as a small spark at the middle of a large invisible splash sphere.
+  const radiusScale = Math.max(0.01, effect.radius / 5) * 1.18;
   effect.flash.scale.setScalar(radiusScale * (0.5 + burst * 4.4));
   effect.flash.material.opacity = Math.max(0, 1 - p * 6);
   effect.blast.scale.setScalar(radiusScale * (0.4 + burst * 4.8));

@@ -33,6 +33,7 @@ import {
   BOT_STATES,
   botAimErrorMeters,
   botDashBonusSpeed,
+  botSeparationVector,
   chooseReachableRoamPoint,
   getBotDifficulty,
   isBotDashLaneSafe,
@@ -110,7 +111,7 @@ const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 //   smoke:   a vision volume that blocks hitscan for its lifetime
 //   impulse: radial knockback velocity (clamped so it can't launch to infinity)
 const ABILITIES = {
-  frag:    { cd: 1.5, charges: 2, throwRange: 24, radius: 5, damage: 80, fuseSec: 2.5 },
+  frag:    { cd: 1.5, charges: 2, throwRange: 24, radius: 6.5, damage: 80, fuseSec: 2.5 },
   flash:   { cd: 1.5, charges: 2, throwRange: 24, radius: 8,  blindSec: 2.2 },
   smoke:   { cd: 1.5, charges: 2, throwRange: 22, radius: 5,  lifeSec: 8 },
   impulse: { cd: 2.0, charges: 2, throwRange: 18, radius: 6,  power: 11 },
@@ -159,8 +160,12 @@ export function chooseSafeSpawn(spawns, occupants = [], seed = 0) {
     }
     return { spawn, index, nearest };
   }).sort((a, b) => b.nearest - a.nearest || a.index - b.index);
-  const tierSize = Math.max(1, Math.ceil(scored.length / 3));
-  return [...scored[Math.abs(seed) % tierSize].spawn];
+  const best = scored[0]?.nearest ?? 0;
+  const threshold = Math.max(12 * 12, best * 0.72);
+  let tier = scored.filter((entry) => entry.nearest >= threshold);
+  if (!tier.length) tier = scored.slice(0, 1);
+  tier = tier.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
+  return [...tier[Math.abs(seed) % tier.length].spawn];
 }
 
 export class AuthRoom {
@@ -457,6 +462,34 @@ export class AuthRoom {
     }) || [p.state.px, p.state.py, p.state.pz];
   }
 
+  _separateBotMove(p, moveX, moveZ, yaw) {
+    const separation = botSeparationVector({
+      x: p.state.px,
+      z: p.state.pz,
+      id: p.id,
+      neighbors: this.players.values(),
+      botsOnly: true,
+    });
+    if (separation.strength <= 0.01) return [moveX, moveZ];
+
+    const length = Math.hypot(moveX, moveZ) || 1;
+    let worldX = Math.sin(yaw) * -(moveZ / length)
+      + Math.sin(yaw + Math.PI / 2) * (moveX / length);
+    let worldZ = Math.cos(yaw) * -(moveZ / length)
+      + Math.cos(yaw + Math.PI / 2) * (moveX / length);
+    const influence = 0.72 + separation.strength * 0.92;
+    worldX += separation.x * influence;
+    worldZ += separation.z * influence;
+    const worldLength = Math.hypot(worldX, worldZ) || 1;
+    worldX /= worldLength;
+    worldZ /= worldLength;
+
+    return [
+      Math.cos(yaw) * worldX - Math.sin(yaw) * worldZ,
+      -Math.sin(yaw) * worldX - Math.cos(yaw) * worldZ,
+    ];
+  }
+
   _driveBot(p) {
     const cfg = this.botDifficulty;
     const seq = ++p.lastInputSeq;
@@ -553,6 +586,7 @@ export class AuthRoom {
       ) < 2.0;
       let moveX = blocked ? p._botStrafe : 0;
       let moveZ = blocked ? 0.35 : 1;
+      [moveX, moveZ] = this._separateBotMove(p, moveX, moveZ, yaw);
       if (!this._botGroundSafe(p, moveX, moveZ, yaw)) {
         const alternatives = [[-p._botStrafe, 0], [p._botStrafe, 0], [0, -1]];
         const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, yaw));
@@ -606,6 +640,7 @@ export class AuthRoom {
     }
     let moveX = holdGround ? 0 : (hasVisual ? p._botStrafe : p._botStrafe * 0.18);
     let moveZ = holdGround ? 0 : (!hasVisual ? 1 : distance > 13 ? 1 : distance < 5 ? -1 : 0.15);
+    if (!holdGround) [moveX, moveZ] = this._separateBotMove(p, moveX, moveZ, p._botAimYaw);
     if (!holdGround && !this._botGroundSafe(p, moveX, moveZ, p._botAimYaw)) {
       const alternatives = [[-p._botStrafe, 0], [0, -1], [0, 0]];
       const safe = alternatives.find(([mx, mz]) => this._botGroundSafe(p, mx, mz, p._botAimYaw));

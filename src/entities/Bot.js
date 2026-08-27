@@ -154,6 +154,9 @@ export class Bot {
     this._combatDir   = new THREE.Vector3();
     this._strafeDir   = new THREE.Vector3();
     this._dashDir     = new THREE.Vector3();
+    this._separationDir = new THREE.Vector3();
+    this._separationSteer = new THREE.Vector3();
+    this._separationStrength = 0;
     this._lastSeenPos = spawnPoint.clone();
     this._lastSeenValid = false;
     this._shootFrom   = new THREE.Vector3();
@@ -164,6 +167,7 @@ export class Bot {
     this._sphere      = new THREE.Sphere();
     this._hitPt       = new THREE.Vector3();
     this._healthQuat  = new THREE.Quaternion();
+    this._worldContact = { grounded: false, normalY: -1, depth: 0, verticalCorrection: 0 };
 
     this.position = spawnPoint.clone();
 
@@ -539,7 +543,9 @@ export class Bot {
     if (!this.alive) {
       if (!this.noRespawn) {
         this.respawnTimer -= dt;
-        if (this.respawnTimer <= 0) this.respawnAt(this.world.randomSpawnPoint());
+        if (this.respawnTimer <= 0) {
+          this.respawnAt(this._chooseRespawnPoint?.() || this.world.randomSpawnPoint());
+        }
       }
       return;
     }
@@ -751,6 +757,16 @@ export class Bot {
       }
     }
 
+    // Blend personal space into patrol/combat steering so several bots cannot
+    // collapse into one lane. Stationary player-retaliation remains stationary.
+    const holdingGround = engaged && this._provokedByPlayer && !this._isSwordBot;
+    if (moveTarget && !holdingGround && this._separationStrength > 0.01) {
+      this._separationSteer
+        .copy(moveTarget)
+        .addScaledVector(this._separationDir, 0.75 + this._separationStrength * 0.95);
+      if (this._separationSteer.lengthSq() > 1e-5) moveTarget = this._separationSteer.normalize();
+    }
+
     if (moveTarget && this._dashT <= 0 && this._dashCooldown <= 0 && this._onGround) {
       if (this._dashLaneSafe(moveTarget, world)) {
         this._dashDir.copy(moveTarget).normalize();
@@ -802,7 +818,11 @@ export class Bot {
     } else {
       this._onGround = false;
     }
-    this.world.resolveCollisions(this.position, RADIUS);
+    this.world.resolveCollisions(this.position, RADIUS, this._worldContact);
+    if (this._worldContact.grounded && this._velY <= 0.001) {
+      this._velY = 0;
+      this._onGround = true;
+    }
 
     const actualDX = this.position.x - beforeX;
     const actualDZ = this.position.z - beforeZ;
@@ -838,8 +858,10 @@ export class Bot {
       }
     }
 
-    if (this.position.y < -35) {
-      this.respawnAt(this.world.safeSpawnPoint?.([player]) || this.world.randomSpawnPoint());
+    if (this.position.y < (this.world.killY ?? -25)) {
+      this.respawnAt(this._chooseRespawnPoint?.()
+        || this.world.safeSpawnPoint?.([player])
+        || this.world.randomSpawnPoint());
       return;
     }
 

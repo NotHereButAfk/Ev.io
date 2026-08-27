@@ -1,5 +1,5 @@
 import { Bot } from './Bot.js';
-import { combatTargetScore } from './BotCombat.js';
+import { botSeparationVector, combatTargetScore } from './BotCombat.js';
 import { randomBotName } from './BotNames.js';
 
 // Gamertag pool for simulated remote players and named bots, so the kill feed
@@ -25,8 +25,7 @@ export class BotManager {
   }
 
   _spawnOne(noRespawn, healthMult, isHumanSlot) {
-    const idx   = this.bots.length;
-    const point = this.world.spawnPoints[idx % this.world.spawnPoints.length].clone();
+    const point = this.world.safeSpawnPoint(this.bots);
     const bot   = new Bot(this.world, point);
     bot.audio       = this.audio;
     bot.noRespawn   = noRespawn;
@@ -35,6 +34,10 @@ export class BotManager {
     bot.isHumanSlot = isHumanSlot;
     bot.isBot       = true;   // every combatant here is a bot — labelled as one
     bot.displayName = randomBotName(this._usedTags);
+    bot._chooseRespawnPoint = () => this.world.safeSpawnPoint([
+      this._livePlayer,
+      ...this.bots.filter((candidate) => candidate !== bot),
+    ]);
     this.scene.add(bot.mesh);
     this.bots.push(bot);
     return bot;
@@ -66,7 +69,18 @@ export class BotManager {
   }
 
   update(dt, player, camera, onPlayerDamaged, world, allowBotCombat = true) {
+    this._livePlayer = player;
     for (const bot of this.bots) {
+      const separation = botSeparationVector({
+        x: bot.position.x,
+        z: bot.position.z,
+        id: bot.id,
+        neighbors: this.bots,
+      });
+      if (bot._separationDir) {
+        bot._separationDir.set(separation.x, 0, separation.z);
+        bot._separationStrength = separation.strength;
+      }
       let target = player;
 
       if (allowBotCombat && bot.alive) {

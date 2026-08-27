@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { countAuthoritativePlayers, countLocalMatchPlayers } from '../src/core/Population.js';
 import { ServerSim } from '../src/core/ServerSim.js';
-import { AuthRoom } from '../server/authroom.mjs';
+import { AuthRoom, chooseSafeSpawn } from '../server/authroom.mjs';
 import { randomGuestName } from '../server/authserver.mjs';
 import { ROOK } from '../server/rookarena.mjs';
 import { AuthClient } from '../src/net/AuthClient.js';
@@ -25,6 +25,12 @@ assert.equal(countAuthoritativePlayers([
   { id: 3, isBot: true },
 ]), 3, 'authoritative bots must count exactly like authoritative humans');
 assert.equal(countAuthoritativePlayers([]), 1, 'the pre-snapshot HUD must retain the local player');
+
+assert.deepEqual(
+  chooseSafeSpawn([[0, 0, 0], [4, 0, 0], [30, 0, 0]], [[1, 0, 0]], 0),
+  [30, 0, 0],
+  'safe spawning must prefer an empty part of the map over an occupied cluster',
+);
 
 let displayed = null;
 const sim = new ServerSim({

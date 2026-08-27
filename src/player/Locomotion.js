@@ -361,7 +361,12 @@ export function applyWalkCycle(rig, o = {}) {
   const mb = rig._moveBlend;
   const mix = (a, b) => a + (b - a) * mb;
 
-  const sThigh = cHip, sKnee = -0.07 + cKnee, sAnk = 0.02 + 0.5 * crouch;
+  // A compact combat-ready base: knees unlocked, hips slightly forward and
+  // ankles loaded. It removes the mannequin-straight idle while blending into
+  // the exact same planted walk/run cycle.
+  const sThigh = 0.045 + cHip;
+  const sKnee = -0.15 + cKnee;
+  const sAnk = 0.055 + 0.5 * crouch;
   const wThighL =  amp * Math.sin(t) + cHip;
   const wThighR = -amp * Math.sin(t) + cHip;
   const wKneeL  = -kAmp * Math.max(0,  Math.cos(t)) - 0.10 + cKnee;

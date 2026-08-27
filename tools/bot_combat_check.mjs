@@ -12,6 +12,7 @@ import {
   botAimErrorMeters,
   botDashBonusSpeed,
   botLoadoutForId,
+  botSeparationVector,
   combatTargetScore,
   chooseCombatSteering,
   chooseReachableRoamPoint,
@@ -69,6 +70,16 @@ assert.equal(isBotDashLaneSafe({
   raycast: (_ox, _oy, _oz, _dx, _dy, _dz, far) => far,
 }), false, 'unsupported lane allowed a bot dash over an edge');
 console.log('ok   bot dashes accelerate on clear lanes and reject walls and ledges');
+
+const personalSpace = botSeparationVector({
+  x: 0, z: 0, id: 1,
+  neighbors: [{ id: 2, isBot: true, alive: true, position: { x: 1, z: 0 } }],
+});
+assert.ok(personalSpace.x < -0.95 && Math.abs(personalSpace.z) < 0.05,
+  'personal-space steering did not push away from a nearby bot');
+assert.ok(personalSpace.strength > 0.5,
+  'personal-space steering was too weak to split a close bot cluster');
+console.log('ok   nearby bots receive stable personal-space steering');
 
 const cases = [
   {
@@ -243,6 +254,19 @@ assert.equal(bot._botHostility.size, 0, 'respawn reset retained hostility');
 assert.equal(bot._botDashTicks, 0, 'respawn reset retained an active dash');
 assert.equal(bot._botHoldGroundTargetId, null, 'respawn reset retained stationary retaliation');
 console.log('ok   authoritative states enforce passive roam, reaction delay, attacker switching, and respawn reset');
+
+const spacingRoom = new AuthRoom(aiArena, { botDifficulty: 'normal' });
+const spacingLeftId = spacingRoom.addBot('Spacing Left');
+const spacingRightId = spacingRoom.addBot('Spacing Right');
+const spacingLeft = spacingRoom.players.get(spacingLeftId);
+const spacingRight = spacingRoom.players.get(spacingRightId);
+Object.assign(spacingLeft.state, { px: -0.25, py: 0, pz: 0 });
+Object.assign(spacingRight.state, { px: 0.25, py: 0, pz: 0 });
+const leftMove = spacingRoom._separateBotMove(spacingLeft, 0, 1, 0);
+const rightMove = spacingRoom._separateBotMove(spacingRight, 0, 1, 0);
+assert.ok(leftMove[0] < -0.35 && rightMove[0] > 0.35,
+  'authoritative bots did not steer to opposite sides of a cluster');
+console.log('ok   authoritative bot pairs split apart instead of sharing a lane');
 
 const roamRoom = new AuthRoom(aiArena, { targetPopulation: 1, botDifficulty: 'normal' });
 const roamingBot = [...roamRoom.players.values()][0];

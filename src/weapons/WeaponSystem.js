@@ -1434,7 +1434,6 @@ export class WeaponSystem {
 
   _updateRockets(dt, world, botManager) {
     if (!this.rockets.length) return;
-    const worldMeshes = world.raycastMeshes;
     const botMeshes = botManager.getRaycastTargets();
     const ray = new THREE.Raycaster();
 
@@ -1446,22 +1445,32 @@ export class WeaponSystem {
       r.life -= dt;
 
       let hitPoint = null;
+      let hitDistance = Infinity;
       ray.set(prev, r.dir);
       ray.far = stepLen + 0.15;
       const hits = ray
-        .intersectObjects([...worldMeshes, ...botMeshes], true)
+        .intersectObjects(botMeshes, true)
         .filter((h) => !h.object.userData.noHit);
-      if (hits.length) hitPoint = hits[0].point;
-      // Bare box colliders detonate the rocket too (nearest hit wins).
-      const rBox = world.raycastBoxHit(ray.ray, ray.far);
-      if (rBox && (!hitPoint || rBox.distance < hits[0].distance)) hitPoint = rBox.point;
+      if (hits.length) {
+        hitPoint = hits[0].point;
+        hitDistance = hits[0].distance;
+      }
+      // Use collision geometry for the world impact. This catches thin floors,
+      // elevated platforms, and invisible gameplay hulls even when the visible
+      // map mesh is simplified.
+      const worldHit = world.raycastCollisionHit?.(ray.ray, ray.far)
+        || world.raycastBoxHit(ray.ray, ray.far);
+      if (worldHit && worldHit.distance < hitDistance) {
+        hitPoint = worldHit.point;
+        hitDistance = worldHit.distance;
+      }
 
       const outOfBounds = Math.abs(r.pos.x) > world.arenaHalf || Math.abs(r.pos.z) > world.arenaHalf;
       if (!hitPoint && (r.pos.y <= 0.05 || outOfBounds)) hitPoint = r.pos.clone();
       if (!hitPoint && r.life <= 0) hitPoint = r.pos.clone();
 
       if (hitPoint) {
-        this._explode(hitPoint, r.def, botManager);
+        this._explode(hitPoint, r.def, botManager, world);
         this.scene.remove(r.mesh);
         r.mesh.traverse((o) => {
           if (o.isMesh) {
@@ -1476,7 +1485,7 @@ export class WeaponSystem {
     }
   }
 
-  _explode(point, def, botManager) {
+  _explode(point, def, botManager, world = null) {
     this.showAuthoritativeExplosion(point, def.splashRadius || 5, 'rocket');
 
     const radius = def.splashRadius || 5;
@@ -1486,6 +1495,13 @@ export class WeaponSystem {
       const bc = new THREE.Vector3(bot.position.x, bot.position.y + 0.9, bot.position.z);
       const d = bc.distanceTo(point);
       if (d <= radius) {
+        // A blast expands through open space, not through solid walls.
+        if (world?.raycastCollisionHit && d > 0.2) {
+          const blastDir = bc.clone().sub(point).multiplyScalar(1 / d);
+          const blastRay = new THREE.Ray(point.clone().addScaledVector(blastDir, 0.12), blastDir);
+          const blocked = world.raycastCollisionHit(blastRay, Math.max(0, d - 0.18));
+          if (blocked) continue;
+        }
         const f = THREE.MathUtils.lerp(1, minF, THREE.MathUtils.clamp(d / radius, 0, 1));
         if (this.onHitBot) this.onHitBot(bot, def.damage * f, point);
       }

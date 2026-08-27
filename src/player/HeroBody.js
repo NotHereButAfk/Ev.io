@@ -487,7 +487,8 @@ export function buildHeroBody(id = 'vanguard') {
 
   group.userData = {
     isLowPoly: true, isHero: true, isNinjaInspired: true,
-    silhouetteStyle: 'shinobi-operative', armorTypeId: id,
+    silhouetteStyle: id === 'vanguard' ? 'compact-arena-exosuit' : 'shinobi-operative',
+    armorTypeId: id,
     // Headshots resolve by hit height, the way they already do for the rigged
     // human: a skinned body is a handful of merged meshes, so there is no
     // per-part head mesh left to tag. Measured off this skeleton — the skull
@@ -690,8 +691,10 @@ function buildHeroBuffers(id) {
     const px = ax * 0.945;
     const pa = out > 0 ? 0 : Math.PI;
     const lame = (st, half, t) => {
-      const T = xf(lightPlate(st), mapArm);
-      addPlate(buf('bone'), T, px, B.chest,
+      const arenaShell = id === 'vanguard';
+      const T = xf(lightPlate(st, arenaShell ? 1.10 : 0.86,
+        arenaShell ? 0.98 : 0.91), mapArm);
+      addPlate(buf(arenaShell ? 'armor' : 'bone'), T, px, B.chest,
                { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11, hard: 4.0 });
       addPlate(buf('armor2'), edgeStrip(T, 0.34, false), px, B.chest,
                { a0: pa - out * half, a1: pa + out * half,
@@ -777,9 +780,10 @@ function buildHeroBuffers(id) {
                t: 0.024, seg: 7, hard: 4.0 });
   }
 
-  for (let i = 0; i < 3; i++) {
+  const abdomenBands = id === 'vanguard' ? 2 : 3;
+  for (let i = 0; i < abdomenBands; i++) {
     const y = 1.255 + i * 0.072;
-    addPlate(buf('armor'), xf(scaled([
+    addPlate(buf(id === 'vanguard' ? 'frame' : 'armor'), xf(scaled([
       { y: y - 0.034, rx: 0.116, rz: 0.090, n: 2.6 },
       { y: y - 0.014, rx: 0.122, rz: 0.094, n: 2.6 },
       { y: y + 0.014, rx: 0.123, rz: 0.095, n: 2.6 },
@@ -793,13 +797,23 @@ function buildHeroBuffers(id) {
   // grows the trunk and leaves its own chest plates buried inside it — the plate
   // is still there, it is just under the skin, and the chest reads as bare
   // underframe from every angle.
-  const CHEST = xf(lightPlate(scaled([
+  const chestShape = id === 'vanguard' ? [
+    // Narrow lower point → broad upper shell gives the default suit its compact
+    // triangular ribcage instead of a human torso wearing rectangular plates.
+    { y: 1.450, rx: 0.120, rz: 0.106, n: 3.6 },
+    { y: 1.505, rx: 0.158, rz: 0.119, n: 3.8 },
+    { y: 1.565, rx: 0.194, rz: 0.130, n: 4.0 },
+    { y: 1.618, rx: 0.202, rz: 0.130, n: 4.1 },
+    { y: 1.660, rx: 0.186, rz: 0.120, n: 4.0 },
+  ] : [
     { y: 1.450, rx: 0.148, rz: 0.107, n: 2.8 },
     { y: 1.505, rx: 0.164, rz: 0.115, n: 2.8 },
     { y: 1.565, rx: 0.176, rz: 0.119, n: 2.9 },
     { y: 1.618, rx: 0.176, rz: 0.117, n: 2.9 },
     { y: 1.660, rx: 0.164, rz: 0.110, n: 2.9 },
-  ], bulk), 0.92, 0.94), mapTorso);
+  ];
+  const CHEST = xf(lightPlate(scaled(chestShape, bulk),
+    id === 'vanguard' ? 1.03 : 0.92, id === 'vanguard' ? 0.98 : 0.94), mapTorso);
   for (const s of [-1, 1]) {
     addPlate(buf('armor'), CHEST, 0, B.chest,
              { a0: FRONT + s * 0.13, a1: FRONT + s * 1.34,
@@ -864,9 +878,9 @@ function buildHeroBuffers(id) {
       addBox(buf('armor2'), 0.056, 0.040, 0.052, s * 0.088, 1.452, 0.072, B.chest);
   }
 
-  // ── head: wrapped tactical hood and mask ───────────────────────────────────
-  // The dark shell reads as cloth/undersuit rather than a glossy sci-fi helmet.
-  // A close crown wrap and narrow luminous eye slit retain distant readability.
+  // ── head: compact arena helmet / wrapped tactical hood ─────────────────────
+  // Vanguard is a small plated exosuit helmet; the alternate chassis retain
+  // the wrapped ninja treatment. Both share the same head/eye hit contract.
   loftSkinned(place(domed(skullT, 0.55), 0, () => [[B.head, 1]]), 22, buf('joint'));
   // Crown plate, hard-faced so the helm has flats and a temple corner rather
   // than being a bowl. Its trim is a band at the BROW, where a helmet's seam

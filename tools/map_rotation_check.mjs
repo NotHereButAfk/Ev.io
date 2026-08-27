@@ -124,6 +124,26 @@ for (let lap = 0; lap < 3; lap++) {
     };
     if (!baselines.has(definition.id)) baselines.set(definition.id, snapshot);
     else assert.deepEqual(snapshot, baselines.get(definition.id), `${definition.id} leaked across laps`);
+    if (lap === 0) {
+      const spawn = world.spawnPoints[0];
+      const groundRay = new THREE.Ray(
+        spawn.clone().add(new THREE.Vector3(0, 1.2, 0)),
+        new THREE.Vector3(0, -1, 0),
+      );
+      const surface = world.raycastCollisionHit(groundRay, 4);
+      assert.ok(surface && surface.normal.y > 0.35,
+        `${definition.id} collision ray missed the authored spawn floor`);
+      const embedded = spawn.clone();
+      embedded.y = surface.point.y - 0.08;
+      const contact = {
+        grounded: false, normalY: -1, depth: 0, verticalCorrection: 0,
+      };
+      world.resolveCollisions(embedded, 0.5, contact);
+      assert.equal(contact.grounded, true,
+        `${definition.id} capsule pushout did not report floor contact`);
+      assert.ok(embedded.y >= surface.point.y - 0.02,
+        `${definition.id} capsule remained buried below the spawn floor`);
+    }
     previousRoot = world._mapRoot;
   }
 }

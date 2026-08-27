@@ -38,7 +38,7 @@ const _v = new THREE.Vector3();
 export class Avatar {
   /**
    * @param {THREE.Scene} scene
-   * @param {object} [opts] { skin, armorTypeId, weaponId, allowHuman }
+   * @param {object} [opts] { skin, armorTypeId, weaponId, allowHuman, modelScale }
    */
   constructor(scene, opts = {}) {
     this.scene = scene;
@@ -47,6 +47,9 @@ export class Avatar {
       { allowHuman: opts.allowHuman ?? false });
     this.isHuman = !!this.group.userData?.isHuman;
     this.rig = this.isHuman ? null : rigCharacterLimbs(this.group);
+    const modelScale = Number.isFinite(opts.modelScale) ? opts.modelScale : 1;
+    this.group.scale.multiplyScalar(modelScale);
+    this.group.userData.worldModelScale = modelScale;
     // Yaw-first, so the run lean pitches about the body's own axis.
     this.group.rotation.order = 'YXZ';
     scene.add(this.group);

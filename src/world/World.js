@@ -48,6 +48,7 @@ export class World {
     this._loadToken = 0;
     this._groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
     this._playerCapsule = new Capsule(new THREE.Vector3(), new THREE.Vector3(), 0.45);
+    this._collisionPush = new THREE.Vector3();
 
     this._buildLighting();
     // Game startup can explicitly begin the CPU-heavy .evmap decode after its
@@ -196,10 +197,19 @@ export class World {
     if (!live.length) return this.randomSpawnPoint();
     const scored = this.spawnPoints.map((point) => {
       let nearest = Infinity;
-      for (const occupant of live) nearest = Math.min(nearest, point.distanceTo(occupant.position));
+      for (const occupant of live) {
+        const dx = point.x - occupant.position.x;
+        const dy = point.y - occupant.position.y;
+        const dz = point.z - occupant.position.z;
+        nearest = Math.min(nearest, dx * dx + dz * dz + dy * dy * 0.2);
+      }
       return { point, nearest };
     }).sort((a, b) => b.nearest - a.nearest);
-    const top = scored.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
+    const best = scored[0]?.nearest ?? 0;
+    const threshold = Math.max(12 * 12, best * 0.72);
+    let top = scored.filter((entry) => entry.nearest >= threshold);
+    if (!top.length) top = scored.slice(0, 1);
+    top = top.slice(0, Math.max(1, Math.ceil(scored.length / 3)));
     return this._cloneSpawn(top[Math.floor(Math.random() * top.length)].point);
   }
 
@@ -219,20 +229,83 @@ export class World {
       if (!point) continue;
       const distance = ray.origin.distanceTo(point);
       if (distance <= far && (!best || distance < best.distance)) {
-        best = { point: point.clone(), distance };
+        best = { point: point.clone(), distance, box };
       }
     }
     return best;
   }
 
-  resolveCollisions(position, radius) {
+  /**
+   * Raycast against the collision scene rather than the decorative render
+   * meshes. Fast rockets and tiny grenades cannot tunnel through a thin floor
+   * merely because its visible mesh was simplified or tagged noHit.
+   */
+  raycastCollisionHit(ray, far = Infinity) {
+    let best = null;
+    if (this._mapOctree) {
+      const hit = this._mapOctree.rayIntersect(ray);
+      if (hit && hit.distance > 0.015 && hit.distance <= far) {
+        best = {
+          point: hit.position.clone(),
+          distance: hit.distance,
+          normal: hit.triangle.getNormal(new THREE.Vector3()),
+        };
+      }
+    }
+
+    const boxHit = this.raycastBoxHit(ray, far);
+    if (boxHit && (!best || boxHit.distance < best.distance)) {
+      const p = boxHit.point;
+      const b = boxHit.box;
+      const distances = [
+        [Math.abs(p.x - b.min.x), -1, 0, 0], [Math.abs(p.x - b.max.x), 1, 0, 0],
+        [Math.abs(p.y - b.min.y), 0, -1, 0], [Math.abs(p.y - b.max.y), 0, 1, 0],
+        [Math.abs(p.z - b.min.z), 0, 0, -1], [Math.abs(p.z - b.max.z), 0, 0, 1],
+      ].sort((a, b2) => a[0] - b2[0]);
+      best = {
+        point: p.clone(), distance: boxHit.distance,
+        normal: new THREE.Vector3(distances[0][1], distances[0][2], distances[0][3]),
+      };
+    }
+    return best;
+  }
+
+  /**
+   * Resolve a character capsule and optionally report walkable contact.
+   * Position-only pushout used to leave bots permanently marked airborne: the
+   * floor held their mesh up while gravity and the falling animation continued.
+   */
+  resolveCollisions(position, radius, contact = null, height = 1.7) {
+    const inputY = position.y;
+    if (contact) {
+      contact.grounded = false;
+      contact.normalY = -1;
+      contact.depth = 0;
+      contact.verticalCorrection = 0;
+    }
     if (!this._mapOctree) return position;
     const capsule = this._playerCapsule;
     capsule.radius = radius;
     capsule.start.set(position.x, position.y + radius, position.z);
-    capsule.end.set(position.x, position.y + 1.7 - radius, position.z);
-    const hit = this._mapOctree.capsuleIntersect(capsule);
-    if (hit) position.addScaledVector(hit.normal, hit.depth);
+    capsule.end.set(position.x, position.y + Math.max(radius, height - radius), position.z);
+    for (let iteration = 0; iteration < 3; iteration++) {
+      const hit = this._mapOctree.capsuleIntersect(capsule);
+      if (!hit) break;
+      capsule.translate(this._collisionPush.copy(hit.normal).multiplyScalar(hit.depth));
+      if (contact && hit.normal.y > contact.normalY) {
+        contact.normalY = hit.normal.y;
+        contact.depth = Math.max(contact.depth, hit.depth);
+        if (hit.normal.y > 0.35) contact.grounded = true;
+      }
+    }
+    position.set(capsule.start.x, capsule.start.y - radius, capsule.start.z);
+    if (contact) {
+      contact.verticalCorrection = position.y - inputY;
+      // Bevelled/imported floors can report a shallow triangle normal even
+      // though their capsule correction is holding the character up. An
+      // actual upward correction is support; a wall-only push has zero Y.
+      if (contact.verticalCorrection > 0.002) contact.grounded = true;
+    }
     return position;
   }
 }

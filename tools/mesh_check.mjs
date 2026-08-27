@@ -71,8 +71,9 @@ for (const id of LOWPOLY_IDS) {
   const { meshes, bones } = g.userData;
 
   ok(!!rig && rig.legL && rig.armR, 'the body arrives already rigged');
-  ok(g.userData?.isNinjaInspired && g.userData?.silhouetteStyle === 'shinobi-operative',
-    'the live connected body carries the shinobi silhouette contract');
+  const expectedSilhouette = id === 'vanguard' ? 'compact-arena-exosuit' : 'shinobi-operative';
+  ok(g.userData?.isNinjaInspired && g.userData?.silhouetteStyle === expectedSilhouette,
+    'the live connected body carries its authored silhouette contract');
 
   // ── the contract ───────────────────────────────────────────────────────────
   const hip = P(rig.legL), knee = P(rig.kneeL), ankle = P(rig.ankleL);

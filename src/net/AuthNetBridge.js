@@ -9,9 +9,10 @@
 // ServerSim path is completely untouched when no target is configured.
 
 import * as THREE from 'three';
-import { STATURE } from '../player/Proportions.js';
-// Just above the crown. Was a flat 2.0, from when the body stood 2.2m.
-const NAMEPLATE_Y = STATURE + 0.16;
+import { PLAYER_WORLD_MODEL_SCALE, STATURE } from '../player/Proportions.js';
+// Just above each rendered crown. Human avatars use a slightly smaller world
+// scale than full-size bots, so their plate follows that actual silhouette.
+const nameplateY = (avatar) => STATURE * (avatar.group.userData?.worldModelScale || 1) + 0.16;
 import { AuthClient } from './AuthClient.js';
 import { DT } from '../sim/MoveSim.js';
 import { Avatar } from '../player/Avatar.js';
@@ -95,6 +96,9 @@ export class AuthNetBridge {
     this._nameTarget = new THREE.Vector3();
     this._remoteProject = new THREE.Vector3();
     this._collisionPosition = new THREE.Vector3();
+    this._collisionContact = {
+      grounded: false, normalY: -1, depth: 0, verticalCorrection: 0,
+    };
     this._remoteSeen = new Set();
     this._edges = { jump: false, crouch: false, tele: false };
     this._wasAlive = true;
@@ -164,6 +168,9 @@ export class AuthNetBridge {
       // Network peers must render from the same connected exosuit roster as
       // local players and bots; the legacy Soldier is tooling-only.
       allowHuman: false,
+      // Bots remain the full readable combat silhouette. Human-controlled
+      // avatars use the slightly smaller player presentation scale.
+      modelScale: isBot ? 1 : PLAYER_WORLD_MODEL_SCALE,
     });
     const nameEl = document.createElement('div');
     nameEl.className = 'nameplate';
@@ -353,7 +360,15 @@ export class AuthNetBridge {
       next.nX = 0; next.nY = 1; next.nZ = 0;
     }
     const position = this._collisionPosition.set(next.px, next.py, next.pz);
-    world.resolveCollisions(position, 0.45);
+    world.resolveCollisions(position, 0.45, this._collisionContact,
+      (next.crouch || next.slide) ? 1.0 : 1.7);
+    if (this._collisionContact.grounded && next.vy <= 0.001) {
+      next.vy = 0;
+      next.onGround = 1;
+      next.nX = 0;
+      next.nY = 1;
+      next.nZ = 0;
+    }
     next.px = Math.round(position.x * 1e6) / 1e6;
     next.py = Math.round(position.y * 1e6) / 1e6;
     next.pz = Math.round(position.z * 1e6) / 1e6;
@@ -393,7 +408,7 @@ export class AuthNetBridge {
       const healthWidth = `${THREE.MathUtils.clamp(r.health || 0, 0, 100)}%`;
       if (a.healthFg.style.width !== healthWidth) a.healthFg.style.width = healthWidth;
       // nameplate
-      this._nameTarget.set(r.x, r.y + NAMEPLATE_Y, r.z);
+      this._nameTarget.set(r.x, r.y + nameplateY(a.avatar), r.z);
       v.copy(this._nameTarget).project(cam);
       const distanceSq = this._nameOrigin.distanceToSquared(this._nameTarget);
       const drawable = v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1

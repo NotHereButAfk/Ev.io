@@ -8,6 +8,7 @@ import {
   saveArmorType,
 } from '../src/player/ArmorTypes.js';
 import { buildPreviewCharacter } from '../src/player/PreviewCharacter.js';
+import { PLAYER_WORLD_MODEL_SCALE } from '../src/player/Proportions.js';
 
 const expected = ['vanguard', 'striker', 'phantom'];
 assert.deepEqual(PLAYABLE_ARMOR_IDS, expected,
@@ -41,6 +42,12 @@ for (const id of PLAYABLE_ARMOR_IDS) {
   assert.equal(body.userData?.isHero, true, `${id} did not build the connected weighted body`);
   assert.notEqual(body.userData?.isHuman, true, `${id} unexpectedly built the retired Soldier body`);
 }
+
+assert.ok(PLAYER_WORLD_MODEL_SCALE < 1 && PLAYER_WORLD_MODEL_SCALE >= 0.9,
+  'human-controlled world model scale must be smaller without becoming toy-sized');
+const bridgeSource = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
+assert.match(bridgeSource, /modelScale:\s*isBot\s*\?\s*1\s*:\s*PLAYER_WORLD_MODEL_SCALE/,
+  'network humans and bots do not apply their intended relative scales');
 
 for (const path of ['../src/entities/Bot.js', '../src/net/AuthNetBridge.js']) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');

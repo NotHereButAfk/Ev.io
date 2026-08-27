@@ -33,6 +33,7 @@ import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.j
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { isLowPolyId } from '../player/LowPolyModels.js';
 import { cameraYawToBodyYaw } from '../player/Facing.js';
+import { PLAYER_WORLD_MODEL_SCALE } from '../player/Proportions.js';
 import { GrenadeSystem } from '../weapons/GrenadeSystem.js';
 import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
@@ -875,6 +876,8 @@ export class Game {
     // The human Soldier animates through its skeleton; connected arena bodies
     // use the shared limb-pivot rig and full-mesh RifleCarry solver.
     if (!this._playerBody.userData?.isHuman) rigCharacterLimbs(this._playerBody);
+    this._playerBody.scale.setScalar(PLAYER_WORLD_MODEL_SCALE);
+    this._playerBody.userData.worldModelScale = PLAYER_WORLD_MODEL_SCALE;
     this._playerBody.rotation.order = 'YXZ';
     this._playerBody.visible = wasVisible;
     this._tpsWeaponId = null;
@@ -1875,7 +1878,7 @@ export class Game {
         }
       }
     }
-    this.grenadeSystem.update(dt, this.player);
+    this.grenadeSystem.update(dt, this.player, this.world);
 
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
     this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);

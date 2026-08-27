@@ -379,7 +379,16 @@ export class Player {
     }
     this._wasOnGround = this.onGround;
 
-    world.resolveCollisions(this.position, RADIUS);
+    this._worldContact ||= {
+      grounded: false, normalY: -1, depth: 0, verticalCorrection: 0,
+    };
+    world.resolveCollisions(this.position, RADIUS, this._worldContact,
+      (this.isSliding || this.isCrouching) ? 1.0 : 1.7);
+    if (this._worldContact.grounded && this.velocity.y <= 0.001) {
+      this.velocity.y = 0;
+      this.onGround = true;
+      this._wasOnGround = true;
+    }
 
     // --- teleporter pads: step on one, drop out of its linked partner ---
     if (world.queryTeleport) {

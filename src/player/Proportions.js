@@ -33,6 +33,15 @@ export const EYE_HEIGHT = 1.70;
 /** Stature: eye height is 0.936 of it. */
 export const STATURE = +(EYE_HEIGHT / 0.936).toFixed(3);   // 1.816
 
+/**
+ * World presentation scale for human-controlled characters.
+ *
+ * Bots keep the full 1.816m chassis so they remain easy to read in combat.
+ * Human players render a little shorter, matching the smaller arena-player
+ * silhouette without changing the controller capsule or first-person camera.
+ */
+export const PLAYER_WORLD_MODEL_SCALE = 0.95;
+
 const at = (frac) => +(frac * STATURE).toFixed(4);
 
 // ── vertical landmarks ───────────────────────────────────────────────────────
