@@ -7034,7 +7034,11 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   position: absolute !important; inset: 15px 12px auto auto !important;
   width: 60% !important; height: 56px !important;
   background-position: center !important; background-size: 100% auto !important;
-  opacity: .3 !important; filter: none !important;
+  opacity: .68 !important; filter: none !important;
+}
+#hud .weapon-slot.melee-slot .ws-thumb {
+  inset: 8px 8px auto auto !important;
+  width: 88% !important; height: 64px !important; opacity: 1 !important;
 }
 #hud .weapon-slot.active .ws-thumb { width: 80% !important; opacity: 1 !important; }
 #hud .weapon-slot .ws-key {

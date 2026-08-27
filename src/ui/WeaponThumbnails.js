@@ -257,7 +257,11 @@ function _generateHudThumbs() {
     const center = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
     g.position.sub(center);
     const distance = (0.5 * 0.94) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.18;
-    camera.position.set(distance, distance * 0.10, 0);
+    // Blades are broad on their X/Z face; the firearm +X profile sees only a
+    // sword's 11mm edge and reduces it to a faint line. Give melee a near-top
+    // three-quarter view so its blade, guard and hilt all read in the HUD.
+    if (weapon.kind === 'melee') camera.position.set(distance * 0.12, distance, distance * 0.08);
+    else                         camera.position.set(distance, distance * 0.10, 0);
     camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
     _hudCache.set(id, renderer.domElement.toDataURL('image/png'));
@@ -355,7 +359,8 @@ function _generate() {
     const hudCenter = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
     g.position.sub(hudCenter);
     const hudDistance = (0.5 * 0.94) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.18;
-    camera.position.set(hudDistance, hudDistance * 0.10, 0);
+    if (w.kind === 'melee') camera.position.set(hudDistance * 0.12, hudDistance, hudDistance * 0.08);
+    else                    camera.position.set(hudDistance, hudDistance * 0.10, 0);
     camera.lookAt(0, 0, 0);
     renderer.render(scene, camera);
     _hudCache.set(w.id, renderer.domElement.toDataURL('image/png'));

@@ -40,6 +40,7 @@ if (!thumbnails.includes("_hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThu
 }
 if (!hud.includes('warmWeaponHudThumbs(slots.map')) failures.push('weapon HUD requests real equipped-model renders');
 if (!hud.includes('this._weaponSlotBuildToken !== buildToken')) failures.push('stale HUD thumbnail work cannot replace a newer loadout');
+if (!css.includes('#hud .weapon-slot.melee-slot .ws-thumb')) failures.push('melee HUD thumbnail has readable sizing and opacity');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };
