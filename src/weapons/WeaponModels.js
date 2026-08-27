@@ -43,6 +43,18 @@ const _authoredTemplates = [];
 // procedural viewmodels for the detailed Blender guns once it arrives).
 let _readyCallbacks = [];
 let _allReady = false;
+const _readyWeaponIds = new Set();
+const _weaponReadyCallbacks = new Map();
+
+function _fireWeaponReady(id) {
+  if (!id || _readyWeaponIds.has(id)) return;
+  _readyWeaponIds.add(id);
+  const callbacks = _weaponReadyCallbacks.get(id) || [];
+  _weaponReadyCallbacks.delete(id);
+  for (const cb of callbacks) {
+    try { cb(); } catch (error) { console.warn(`[WeaponGLB] ${id} ready cb failed:`, error); }
+  }
+}
 
 // Procedural viewmodels and the camera both use -Z as "forward". Some Blender
 // exports were authored down +Z; normalize that convention once at the asset
@@ -69,6 +81,19 @@ export function onWeaponModelsReady(cb) {
   _readyCallbacks.push(cb);
 }
 
+// HUD thumbnails only need the equipped model, not the entire armory. Guns
+// supplied by the external pack signal as soon as their own request settles;
+// procedural melee/utility weapons are already canonical and can render now.
+export function onWeaponModelReady(id, cb) {
+  if (!QUATERNIUS_GUNS[id] || _readyWeaponIds.has(id) || _allReady) {
+    cb();
+    return;
+  }
+  const callbacks = _weaponReadyCallbacks.get(id) || [];
+  callbacks.push(cb);
+  _weaponReadyCallbacks.set(id, callbacks);
+}
+
 export function hasLoadedWeaponModel(id) {
   return _quaterniusTemplates.has(id);
 }
@@ -88,7 +113,10 @@ export function preloadWeaponModels() {
     ]),
   ];
   let pending = jobs.length;
-  const done = () => { if (--pending === 0) { _weaponLoading = false; _fireReady(); } };
+  const done = (tag) => {
+    if (tag.kind === 'quaternius') _fireWeaponReady(tag.id);
+    if (--pending === 0) { _weaponLoading = false; _fireReady(); }
+  };
   for (const [url, tag] of jobs) {
     loader.load(url,
       (gltf) => {
@@ -96,10 +124,10 @@ export function preloadWeaponModels() {
         else if (tag.kind === 'override') _overrideTemplates.set(tag.id, gltf.scene);
         else if (tag.kind === 'authored') _authoredTemplates.push(gltf.scene);
         else _weaponTemplate = gltf.scene;
-        done();
+        done(tag);
       },
       undefined,
-      (err) => { console.warn(`[WeaponGLB] load failed (${url}):`, err.message); done(); }
+      (err) => { console.warn(`[WeaponGLB] load failed (${url}):`, err.message); done(tag); }
     );
   }
 }

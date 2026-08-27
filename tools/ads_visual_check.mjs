@@ -14,6 +14,12 @@ const browser = await chromium.launch({
     '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page.on('console', (message) => {
+  if (message.type() === 'warning' || message.type() === 'error') {
+    console.log(`[browser ${message.type()}] ${message.text()}`);
+  }
+});
+page.on('pageerror', (error) => console.log(`[browser pageerror] ${error.message}`));
 
 try {
   await page.goto(URL, { waitUntil: 'commit', timeout: 30000 });
@@ -24,13 +30,19 @@ try {
     const g = window.__game || window.game;
     return g && !document.getElementById('hud')?.classList.contains('hidden');
   }, null, { timeout: 60000 });
-  await page.waitForTimeout(8000);
+  await page.waitForFunction(() => {
+    const thumbs = [...document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb')];
+    return thumbs.length > 0
+      && thumbs.every((thumb) => thumb.style.backgroundImage.includes('data:image/png'));
+  }, null, { timeout: 8000 });
 
   const hudSlots = await page.evaluate(() => ({
     total: document.querySelectorAll('#weapon-slots .weapon-slot').length,
     withThumb: document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb').length,
+    withRealModel: [...document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb')]
+      .filter((thumb) => thumb.style.backgroundImage.includes('data:image/png')).length,
   }));
-  if (!hudSlots.total || hudSlots.withThumb !== hudSlots.total) {
+  if (!hudSlots.total || hudSlots.withThumb !== hudSlots.total || hudSlots.withRealModel !== hudSlots.total) {
     throw new Error(`in-match weapon inventory is incomplete: ${JSON.stringify(hudSlots)}`);
   }
   await page.screenshot({ path: path.join(OUT, 'inventory-hud.png') });

@@ -64,6 +64,8 @@ assert(!/preloadZombieModel\(\)/.test(constructorBody),
 assert(/onWeaponModelsReady\(_generate\)/.test(thumbnails)
   && !/function _waitForGLB/.test(thumbnails),
   'weapon thumbnails must wait for actual GLB readiness instead of probing fallbacks');
+assert(/warmWeaponHudThumbs\(ids, onReady\)[\s\S]*?onWeaponModelReady\(id/.test(thumbnails),
+  'match HUD must render only the equipped weapon thumbnails');
 const menuCtor = menu.slice(menu.indexOf('constructor('), menu.indexOf('// ── Nav wiring'));
 assert(!/warmWeaponThumbs\(/.test(menuCtor), 'menu construction must not render weapon thumbnails');
 const inventoryCtor = inventory.slice(inventory.indexOf('constructor('), inventory.indexOf('\n  open()'));

@@ -38,6 +38,8 @@ if (!thumbnails.includes("data:image/svg+xml,")) failures.push('weapon HUD has a
 if (!thumbnails.includes("_hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThumb(id)")) {
   failures.push('weapon HUD never returns null while optional 3D thumbnails warm');
 }
+if (!hud.includes('warmWeaponHudThumbs(slots.map')) failures.push('weapon HUD requests real equipped-model renders');
+if (!hud.includes('this._weaponSlotBuildToken !== buildToken')) failures.push('stale HUD thumbnail work cannot replace a newer loadout');
 const requireMatch = (source, pattern, label) => {
   if (!pattern.test(source)) failures.push(label);
 };

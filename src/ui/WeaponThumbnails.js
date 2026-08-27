@@ -12,8 +12,11 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import {
   buildWeaponModel,
+  hasLoadedWeaponModel,
+  onWeaponModelReady,
   onWeaponModelsReady,
   preloadWeaponModels,
+  QUATERNIUS_GUNS,
 } from '../weapons/WeaponModels.js';
 import { applyWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin } from '../weapons/SwordSkins.js';
@@ -49,9 +52,14 @@ function _fitCamera(camera) {
 const _cache = new Map();
 const _hudCache = new Map();
 const _hudFallbackCache = new Map();
+const _hudPending = new Set();
+const _hudReadyCallbacks = new Set();
+const _hudUpgradeCallbacks = new Map();
+const _hudAuthoredWatch = new Set();
 let _warmed = false;
 let _warming = false;
 let _generating = false;
+let _hudGenerating = false;
 const _readyCallbacks = new Set();
 
 export function getWeaponThumb(id) { return _cache.get(id) ?? null; }
@@ -88,6 +96,39 @@ function _hudFallbackThumb(id) {
 
 export function getWeaponHudThumb(id) {
   return _hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThumb(id);
+}
+
+// Render only the weapons the player is actually carrying. This restores the
+// real model pictures in the match HUD without paying the cost of rasterising
+// the complete armory during startup. The inline silhouette above remains on
+// screen only while the authored GLBs and these one/two PNGs finish.
+export function warmWeaponHudThumbs(ids, onReady) {
+  const requested = [...new Set(ids || [])].filter(Boolean);
+  if (requested.every((id) => _hudCache.has(id))) {
+    queueMicrotask(() => onReady?.());
+    return;
+  }
+  if (onReady) _hudReadyCallbacks.add(onReady);
+  for (const id of requested) {
+    if (!_hudCache.has(id)) _hudPending.add(id);
+    const hasAuthoredUpgrade = QUATERNIUS_GUNS[id] && !hasLoadedWeaponModel(id);
+    if (onReady && hasAuthoredUpgrade) {
+      const callbacks = _hudUpgradeCallbacks.get(id) || new Set();
+      callbacks.add(onReady);
+      _hudUpgradeCallbacks.set(id, callbacks);
+    }
+    if (hasAuthoredUpgrade && !_hudAuthoredWatch.has(id)) {
+      _hudAuthoredWatch.add(id);
+      onWeaponModelReady(id, () => {
+        _hudAuthoredWatch.delete(id);
+        _hudCache.delete(id);
+        _hudPending.add(id);
+        _generateHudThumbs();
+      });
+    }
+  }
+  _generateHudThumbs();
+  preloadWeaponModels();
 }
 
 // Render a one-off larger thumbnail of a weapon wearing a specific skin (or raw
@@ -169,6 +210,100 @@ export function warmWeaponThumbs(onReady) {
 
 function _disposeGroup(g) {
   g.traverse((o) => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
+}
+
+function _generateHudThumbs() {
+  if (_hudGenerating || !_hudPending.size) return;
+  _hudGenerating = true;
+  const requested = [..._hudPending];
+  _hudPending.clear();
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  } catch (error) {
+    _hudGenerating = false;
+    console.warn('[weapon thumbnails] HUD renderer unavailable', error);
+    const callbacks = [..._hudReadyCallbacks];
+    _hudReadyCallbacks.clear();
+    for (const cb of callbacks) cb();
+    return;
+  }
+  const SIZE = 144;
+  renderer.setSize(SIZE, SIZE);
+  renderer.setPixelRatio(1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  const scene = new THREE.Scene();
+  const disposeStudio = _studio(renderer, scene);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 50);
+  let index = 0;
+
+  const renderOne = (id) => {
+    const weapon = WEAPONS.find((entry) => entry.id === id);
+    if (!weapon || _hudCache.has(id)) return;
+    let built;
+    try { built = buildWeaponModel(weapon); } catch { built = null; }
+    if (!built) return;
+    const g = built.group;
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+    scene.add(g);
+    g.position.set(0, 0, 0);
+    g.rotation.set(0, 0, 0);
+    g.scale.setScalar(1);
+    const size = new THREE.Box3().setFromObject(g).getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    g.scale.setScalar(0.94 / maxDim);
+    const center = new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3());
+    g.position.sub(center);
+    const distance = (0.5 * 0.94) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.18;
+    camera.position.set(distance, distance * 0.10, 0);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    _hudCache.set(id, renderer.domElement.toDataURL('image/png'));
+    scene.remove(g);
+    _disposeGroup(g);
+  };
+
+  const schedule = (fn) => {
+    if ('requestIdleCallback' in window) window.requestIdleCallback(fn, { timeout: 120 });
+    else setTimeout(() => fn(null), 0);
+  };
+  const pump = (deadline) => {
+    const sliceStart = performance.now();
+    do {
+      const id = requested[index++];
+      renderOne(id);
+    } while (
+      index < requested.length
+      && (deadline?.timeRemaining?.() > 3 || performance.now() - sliceStart < 8)
+    );
+    if (index < requested.length) {
+      schedule(pump);
+      return;
+    }
+    disposeStudio();
+    renderer.dispose();
+    _hudGenerating = false;
+    if (_hudPending.size) {
+      _generateHudThumbs();
+      return;
+    }
+    const callbacks = [..._hudReadyCallbacks];
+    _hudReadyCallbacks.clear();
+    for (const cb of callbacks) {
+      try { cb(); } catch (error) { console.warn('[weapon thumbnails] HUD ready callback failed', error); }
+    }
+    for (const id of requested) {
+      if (!hasLoadedWeaponModel(id)) continue;
+      const upgrades = [...(_hudUpgradeCallbacks.get(id) || [])];
+      _hudUpgradeCallbacks.delete(id);
+      for (const cb of upgrades) {
+        try { cb(); } catch (error) { console.warn('[weapon thumbnails] HUD upgrade callback failed', error); }
+      }
+    }
+  };
+  schedule(pump);
 }
 
 function _generate() {

@@ -1,4 +1,4 @@
-import { getWeaponHudThumb } from './WeaponThumbnails.js';
+import { getWeaponHudThumb, warmWeaponHudThumbs } from './WeaponThumbnails.js';
 
 function setText(el, value) {
   if (!el) return;
@@ -159,6 +159,8 @@ export class HUD {
   }
 
   buildWeaponSlots(slots, activeIndex) {
+    const buildToken = (this._weaponSlotBuildToken || 0) + 1;
+    this._weaponSlotBuildToken = buildToken;
     this.weaponSlots.innerHTML = '';
     this._slotEls.length = 0;
     this._slotAmmoEls.length = 0;
@@ -190,6 +192,19 @@ export class HUD {
       this.weaponSlots.appendChild(el);
       this._slotEls.push(el);
       this._slotAmmoEls.push(ammo);
+    });
+
+    // Replace the instant placeholder with the real equipped model render as
+    // soon as those one/two thumbnails are ready. A stale async completion may
+    // never overwrite a newer pickup/loadout layout.
+    warmWeaponHudThumbs(slots.map((slot) => slot?.id).filter(Boolean), () => {
+      if (this._weaponSlotBuildToken !== buildToken) return;
+      this._slotEls.forEach((el, index) => {
+        const id = slots[index]?.id;
+        const thumb = id ? getWeaponHudThumb(id) : null;
+        const image = el?.querySelector('.ws-thumb');
+        if (image && thumb) image.style.backgroundImage = `url(${thumb})`;
+      });
     });
   }
 
