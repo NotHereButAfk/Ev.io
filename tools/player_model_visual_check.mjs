@@ -17,11 +17,18 @@ const page = await browser.newPage({ viewport: { width: 640, height: 640 } });
 await page.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.abort());
 
 try {
-  await page.goto(url, { waitUntil: 'commit', timeout: 30000 });
+  const qaUrl = new URL(url);
+  qaUrl.searchParams.set('qa', '1');
+  await page.goto(qaUrl.href, { waitUntil: 'commit', timeout: 30000 });
   await page.waitForSelector('#play-btn', { state: 'attached', timeout: 30000 });
-  await page.waitForTimeout(5000);
+  // The deployed build has real map/network initialization in front of the
+  // menu. Wait for the game object, not an arbitrary delay or the static HTML.
+  await page.waitForFunction(() => !!(window.__game || window.game)?.menu,
+    null, { timeout: 45000 });
   await page.evaluate(() => {
-    document.querySelector('[data-panel="loadout"]')?.click();
+    const game = window.__game || window.game;
+    if (game?.menu?._togglePanel) game.menu._togglePanel('loadout');
+    else document.querySelector('[data-panel="loadout"]')?.click();
   });
   await page.waitForFunction(() => {
     const game = window.__game || window.game;
