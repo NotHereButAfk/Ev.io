@@ -139,8 +139,8 @@ const PALETTES = {
   // Compact arena operative: saturated orange impact armour over a near-black
   // undersuit, pale ceramic helmet/leg shells and a single acid-lime optic. The
   // colour blocking is intentionally bold enough to survive gameplay distance.
-  vanguard: { armor: 0xed6909, armor2: 0x727b80, frame: 0x252a2e, joint: 0x111416,
-              steel: 0x4d565b, bone: 0xa3aaad, glow: 0xb7ff32, bulk: 1.12,
+  vanguard: { armor: 0xed6909, armor2: 0x697278, frame: 0x252a2e, joint: 0x111416,
+              steel: 0x4d565b, bone: 0x939aa5, glow: 0xb7ff32, bulk: 1.12,
               finish: 'pbr' },  // compact arena operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
@@ -171,13 +171,22 @@ export function makeBodyMaterials(pal) {
     return m;
   };
   const red = pal.glow;
+  const frame = body(pal.frame, 0.24, 0.84, 0.02);
+  const bone = body(pal.bone, 0.16, 0.68, 0.06);
+  // The arena warrior is intentionally faceted. Letting both its shaped
+  // undersuit and ceramic planes catch separate highlights makes the anatomy
+  // visible at gameplay distance instead of flattening into pants plus pads.
+  if (pbr) {
+    frame.flatShading = true;
+    bone.flatShading = true;
+  }
   return {
     armor:  body(pal.armor, 0.16, 0.48, 0.14),
     armor2: body(pal.armor2, 0.16, 0.62, 0.12),
-    frame:  body(pal.frame, 0.24, 0.84, 0.02),
+    frame,
     joint:  body(pal.joint, 0.30, 0.96, 0.00),
     steel:  body(pal.steel, 0.16, 0.38, 0.46),
-    bone:   body(pal.bone, 0.16, 0.68, 0.06),
+    bone,
     glow:   pbr
       ? Object.assign(new THREE.MeshStandardMaterial({
           color: new THREE.Color(red).multiplyScalar(0.22), emissive: red,
