@@ -114,8 +114,10 @@ export class ArmorPreviewRenderer {
       if (rig.elbowR) rig.elbowR.rotation.x = 0.36;
       // A planted shoulder-width stance exposes the black inner-thigh gap and
       // keeps the shin armour from merging into one central column on screen.
-      if (rig.legL) rig.legL.rotation.z = -0.085;
-      if (rig.legR) rig.legR.rotation.z = 0.085;
+      if (rig.legL) { rig.legL.rotation.x = 0.035; rig.legL.rotation.z = -0.085; }
+      if (rig.legR) { rig.legR.rotation.x = 0.075; rig.legR.rotation.z = 0.085; }
+      if (rig.kneeL) rig.kneeL.rotation.x = -0.10;
+      if (rig.kneeR) rig.kneeR.rotation.x = -0.14;
       if (rig.ankleL) rig.ankleL.rotation.z = 0.085;
       if (rig.ankleR) rig.ankleR.rotation.z = -0.085;
       if (rig.head) rig.head.rotation.y = -0.035;

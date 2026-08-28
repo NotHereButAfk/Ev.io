@@ -612,7 +612,10 @@ function buildHeroBuffers(id) {
   const buf = (key) => (bufs[key] ||= newBuffer());
 
   // Authored tables carried onto the new figure.
-  const legR = xf(scaled(LEG, bulk), mapLeg);
+  // The arena chassis keeps a visibly athletic thigh/calf under its plates.
+  // Slim anatomy plus broad flat greaves was the combination that made the
+  // lower body read as mechanical stilts.
+  const legR = xf(scaled(LEG, bulk * (arena ? 1.10 : 1)), mapLeg);
   // A warrior frame needs visible deltoid/bicep mass between its plates.  The
   // previous slender arm loft made even good armour read like a robot bolted
   // onto a mannequin; the pivots and lengths remain exactly unchanged.
@@ -723,24 +726,19 @@ function buildHeroBuffers(id) {
     // old plate ran hip-to-knee and turned both legs into uninterrupted grey
     // columns. This shorter, narrower shell sits on the quadriceps instead.
     const thighFront = arena
-      ? lightPlate(legR.slice(3, 9), 0.96, 0.98)
+      ? lightPlate(legR.slice(4, 9), 0.95, 0.97)
       : legR.slice(1, 8).map(q => ({ ...q }));
+    const thighCenter = arena ? FRONT + out * 0.15 : FRONT;
     addPlate(buf(arena ? 'armor2' : 'armor'), thighFront, sx, thigh,
-             { a0: arc(FRONT, arena ? 0.44 : 0.50)[0], a1: arc(FRONT, arena ? 0.44 : 0.50)[1],
-               t: arena ? 0.021 : 0.030, hard: arena ? 4.0 : 3.4 });
-    if (arena) {
-      addPolygonPanel(buf('bone'), [
-        [-0.048, 0.112], [0.048, 0.112], [0.058, 0.030],
-        [0.038, -0.104], [0, -0.126], [-0.038, -0.104], [-0.058, 0.030],
-      ], 0.014, sx, mapLeg(0.840), -0.130, thigh,
-      { bevel: 0.003, rz: -out * 0.018 });
-    }
+             { a0: arc(thighCenter, arena ? 0.36 : 0.50)[0], a1: arc(thighCenter, arena ? 0.36 : 0.50)[1],
+               t: arena ? 0.016 : 0.030, hard: arena ? 3.25 : 3.4 });
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
-    addPlate(buf(arena ? 'armor2' : 'bone'), lightPlate(legR.slice(arena ? 12 : 11, 18), arena ? 1.00 : 1, arena ? 1.00 : 1), sx, knee,
-             { a0: arc(FRONT, arena ? 0.56 : 0.62)[0], a1: arc(FRONT, arena ? 0.56 : 0.62)[1],
-               t: arena ? 0.026 : 0.030, hard: arena ? 3.5 : 3.4 });
+    const shinCenter = arena ? FRONT + out * 0.10 : FRONT;
+    addPlate(buf(arena ? 'armor2' : 'bone'), lightPlate(legR.slice(arena ? 13 : 11, arena ? 17 : 18), arena ? 0.97 : 1, arena ? 0.98 : 1), sx, knee,
+             { a0: arc(shinCenter, arena ? 0.44 : 0.62)[0], a1: arc(shinCenter, arena ? 0.44 : 0.62)[1],
+               t: arena ? 0.018 : 0.030, hard: arena ? 3.20 : 3.4 });
     addPlate(buf(arena ? 'joint' : 'armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
       { y: 0.600, rx: 0.089, rz: 0.092, n: 2.2 },
@@ -758,14 +756,13 @@ function buildHeroBuffers(id) {
     ], mapLeg), sx, thigh, { a0: out > 0 ? -0.42 : Math.PI + 0.42,
                     a1: out > 0 ? 0.42 : Math.PI - 0.42, t: 0.020, seg: 7 });
     if (arena) {
-      // Floating faceted kneecap over the wraparound cup: a separate raised
-      // part gives the joint a mechanical hinge instead of one orange blob.
-      addChamferedPanel(buf('joint'), 0.092, 0.062, 0.018,
-                        sx, mapLeg(0.628), -0.142, knee,
-                        { chamfer: 0.012, rz: -out * 0.020 });
-      addChamferedPanel(buf('armor'), 0.024, 0.034, 0.008,
-                        sx + out * 0.040, mapLeg(0.628), -0.164, knee,
-                        { chamfer: 0.005, bevel: 0.001, rz: -out * 0.08 });
+      // Keep the knee as visible flexible anatomy. A tiny outer guard gives it
+      // protection without turning the joint into a mechanical hinge/button.
+      addPolygonPanel(buf('armor'), [
+        [-0.018 * out, 0.034], [0.022 * out, 0.026],
+        [0.024 * out, -0.030], [-0.010 * out, -0.038],
+      ], 0.010, sx + out * 0.052, mapLeg(0.628), -0.104, knee,
+      { bevel: 0.002, rz: -out * 0.08 });
       // A narrow outer calf reinforcement reads as a protective pad while most
       // of the trouser leg remains visible in profile.
       const calfSide = lightPlate(legR.slice(12, 18), 1.00, 1.01);
@@ -776,12 +773,6 @@ function buildHeroBuffers(id) {
       addPlate(buf('armor2'), edgeStrip(calfSide, 0.24, true), sx, knee,
                { a0: center - 0.35, a1: center + 0.35,
                   lift: 0.020, t: TRIM, seg: 7, hard: 3.3 });
-      // A raised shin face splits the long silver surface into readable facets.
-      addPolygonPanel(buf('bone'), [
-        [-0.040, 0.108], [0.040, 0.108], [0.054, 0.038],
-        [0.030, -0.112], [0, -0.130], [-0.030, -0.112], [-0.054, 0.038],
-      ], 0.014, sx, mapLeg(0.450), -0.112, knee,
-      { bevel: 0.003, rz: -out * 0.018 });
     }
 
     // Front tasset. Hung off the THIGH rather than the hips, which is the only
