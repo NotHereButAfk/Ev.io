@@ -719,16 +719,29 @@ function buildHeroBuffers(id) {
     // Leg armour
     // Down to just above the knee: the skirt now covers the top of the thigh,
     // so a plate that stops at mid-thigh leaves a bare band between the two.
-    addPlate(buf(arena ? 'armor2' : 'armor'), arena ? lightPlate(legR.slice(1, 8), 1.02, 1.00) : legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
-             { a0: arc(FRONT, arena ? 0.52 : 0.50)[0], a1: arc(FRONT, arena ? 0.52 : 0.50)[1],
-               t: arena ? 0.022 : 0.030, hard: arena ? 3.8 : 3.4 });
+    // Leave the upper third of the arena thigh as visible black undersuit. The
+    // old plate ran hip-to-knee and turned both legs into uninterrupted grey
+    // columns. This shorter, narrower shell sits on the quadriceps instead.
+    const thighFront = arena
+      ? lightPlate(legR.slice(3, 9), 0.96, 0.98)
+      : legR.slice(1, 8).map(q => ({ ...q }));
+    addPlate(buf(arena ? 'armor2' : 'armor'), thighFront, sx, thigh,
+             { a0: arc(FRONT, arena ? 0.44 : 0.50)[0], a1: arc(FRONT, arena ? 0.44 : 0.50)[1],
+               t: arena ? 0.021 : 0.030, hard: arena ? 4.0 : 3.4 });
+    if (arena) {
+      addPolygonPanel(buf('bone'), [
+        [-0.048, 0.112], [0.048, 0.112], [0.058, 0.030],
+        [0.038, -0.104], [0, -0.126], [-0.038, -0.104], [-0.058, 0.030],
+      ], 0.014, sx, mapLeg(0.840), -0.130, thigh,
+      { bevel: 0.003, rz: -out * 0.018 });
+    }
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
-    addPlate(buf(arena ? 'armor2' : 'bone'), lightPlate(legR.slice(11, 18), arena ? 1.03 : 1, arena ? 1.02 : 1), sx, knee,
-             { a0: arc(FRONT, arena ? 0.66 : 0.62)[0], a1: arc(FRONT, arena ? 0.66 : 0.62)[1],
+    addPlate(buf(arena ? 'armor2' : 'bone'), lightPlate(legR.slice(arena ? 12 : 11, 18), arena ? 1.00 : 1, arena ? 1.00 : 1), sx, knee,
+             { a0: arc(FRONT, arena ? 0.56 : 0.62)[0], a1: arc(FRONT, arena ? 0.56 : 0.62)[1],
                t: arena ? 0.026 : 0.030, hard: arena ? 3.5 : 3.4 });
-    addPlate(buf('armor'), xf([
+    addPlate(buf(arena ? 'joint' : 'armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
       { y: 0.600, rx: 0.089, rz: 0.092, n: 2.2 },
       { y: 0.645, rx: 0.090, rz: 0.093, n: 2.2 },
@@ -747,12 +760,12 @@ function buildHeroBuffers(id) {
     if (arena) {
       // Floating faceted kneecap over the wraparound cup: a separate raised
       // part gives the joint a mechanical hinge instead of one orange blob.
-      addChamferedPanel(buf('armor'), 0.105, 0.074, 0.020,
+      addChamferedPanel(buf('joint'), 0.092, 0.062, 0.018,
                         sx, mapLeg(0.628), -0.142, knee,
                         { chamfer: 0.012, rz: -out * 0.020 });
-      addChamferedPanel(buf('steel'), 0.026, 0.008, 0.006,
-                        sx, mapLeg(0.628), -0.163, knee,
-                        { chamfer: 0.003, bevel: 0.001 });
+      addChamferedPanel(buf('armor'), 0.024, 0.034, 0.008,
+                        sx + out * 0.040, mapLeg(0.628), -0.164, knee,
+                        { chamfer: 0.005, bevel: 0.001, rz: -out * 0.08 });
       // A narrow outer calf reinforcement reads as a protective pad while most
       // of the trouser leg remains visible in profile.
       const calfSide = lightPlate(legR.slice(12, 18), 1.00, 1.01);
@@ -765,8 +778,8 @@ function buildHeroBuffers(id) {
                   lift: 0.020, t: TRIM, seg: 7, hard: 3.3 });
       // A raised shin face splits the long silver surface into readable facets.
       addPolygonPanel(buf('bone'), [
-        [-0.046, 0.118], [0.046, 0.118], [0.058, 0.032],
-        [0.038, -0.118], [-0.038, -0.118], [-0.058, 0.032],
+        [-0.040, 0.108], [0.040, 0.108], [0.054, 0.038],
+        [0.030, -0.112], [0, -0.130], [-0.030, -0.112], [-0.054, 0.038],
       ], 0.014, sx, mapLeg(0.450), -0.112, knee,
       { bevel: 0.003, rz: -out * 0.018 });
     }
@@ -776,35 +789,20 @@ function buildHeroBuffers(id) {
     // would be a fence the leg swings straight through, and 20cm below the hip
     // joint a 35° swing carries the thigh 10cm past where any hip-mounted panel
     // could stand off to. On the thigh it simply travels with the leg.
-    {
-      const TAS = arena ? [
-        { y: 0.958, rx: 0.102, rz: 0.128, n: 3.2 },
-        { y: 0.930, rx: 0.108, rz: 0.134, n: 3.2 },
-        { y: 0.906, rx: 0.104, rz: 0.130, n: 3.2 },
-      ] : [
+    if (!arena) {
+      const TAS = [
         { y: 0.962, rx: 0.100, rz: 0.130, n: 2.4 },
         { y: 0.916, rx: 0.110, rz: 0.146, n: 2.4 },
         { y: 0.868, rx: 0.112, rz: 0.149, n: 2.4 },
         { y: 0.824, rx: 0.104, rz: 0.141, n: 2.4 },
       ];
-      addPlate(buf(arena ? 'armor2' : 'armor'), TAS, sx, thigh,
+      addPlate(buf('armor'), TAS, sx, thigh,
                { a0: arc(FRONT, 0.58)[0], a1: arc(FRONT, 0.58)[1],
                  t: 0.024, seg: 9, hard: 4.0 });
       addPlate(buf('armor2'), edgeStrip(TAS, 0.30, true), sx, thigh,
                { a0: arc(FRONT, 0.58)[0], a1: arc(FRONT, 0.58)[1],
                  lift: 0.024, t: TRIM, seg: 9, hard: 4.0 });
-      addBox(buf(arena ? 'steel' : 'glow'), 0.022, 0.030, 0.016, sx, 0.910, -0.158, thigh);
-      if (arena) {
-        // Raised thigh face and recessed service slot. These overlap the curved
-        // tasset deliberately, producing a layered shell rather than a single
-        // smooth orange tube.
-        addChamferedPanel(buf('armor'), 0.072, 0.086, 0.014,
-                          sx, 0.842, -0.154, thigh,
-                          { chamfer: 0.014, rz: out * 0.030 });
-        addChamferedPanel(buf('steel'), 0.042, 0.012, 0.007,
-                          sx, 0.866, -0.174, thigh,
-                          { chamfer: 0.005, bevel: 0.0015, rz: out * 0.035 });
-      }
+      addBox(buf('glow'), 0.022, 0.030, 0.016, sx, 0.910, -0.158, thigh);
     }
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
