@@ -458,6 +458,36 @@ function addChamferedPanel(buf, w, h, d, x, y, z, bone, o = {}) {
   g.dispose();
 }
 
+// A deliberately authored faceted plate.  The EV-style warrior needs large,
+// irregular armour planes; an army of equally chamfered rectangles is what
+// made the previous pass read as a kit-built robot.
+function addPolygonPanel(buf, points, d, x, y, z, bone, o = {}) {
+  const shape = new THREE.Shape();
+  points.forEach(([px, py], i) => (i ? shape.lineTo(px, py) : shape.moveTo(px, py)));
+  shape.closePath();
+  const bevel = Math.min(o.bevel ?? 0.004, d * 0.24);
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: d, steps: 1, curveSegments: 1,
+    bevelEnabled: bevel > 0, bevelSegments: 1,
+    bevelSize: bevel, bevelThickness: bevel,
+  });
+  g.translate(0, 0, -d / 2);
+  if (o.rx) g.rotateX(o.rx);
+  if (o.ry) g.rotateY(o.ry);
+  if (o.rz) g.rotateZ(o.rz);
+  g.translate(x, y, z);
+  appendGeometry(g, [[bone, 1]], buf);
+  g.dispose();
+}
+
+function addChevronPanel(buf, w, h, stroke, d, x, y, z, bone) {
+  addPolygonPanel(buf, [
+    [-w / 2, h / 2], [0, -h / 2], [w / 2, h / 2],
+    [w / 2 - stroke, h / 2], [0, -h / 2 + stroke * 1.55],
+    [-w / 2 + stroke, h / 2],
+  ], d, x, y, z, bone, { bevel: 0.001 });
+}
+
 function addDisc(buf, radius, depth, x, y, z, bone, side) {
   const g = new THREE.CylinderGeometry(radius, radius * 0.92, depth, 10, 1, false);
   g.rotateZ(Math.PI / 2);
@@ -583,13 +613,17 @@ function buildHeroBuffers(id) {
 
   // Authored tables carried onto the new figure.
   const legR = xf(scaled(LEG, bulk), mapLeg);
-  const armR = xf(scaled(ARM, bulk), mapArm);
+  // A warrior frame needs visible deltoid/bicep mass between its plates.  The
+  // previous slender arm loft made even good armour read like a robot bolted
+  // onto a mannequin; the pivots and lengths remain exactly unchanged.
+  const armR = xf(scaled(ARM, bulk * (arena ? 1.12 : 1)), mapArm);
   const torsoT = xf(scaled(TORSO, bulk, true), mapTorso);
   // The arena suit is intentionally closer to a six-head heroic proportion
   // than a tall human mannequin. The larger helmet is armour, not a larger hit
   // target: headshot height and the head bone remain unchanged.
   const skullT = xf(scaled(SKULL, arena ? 1.30 : 1), headY);
-  const handT = xf(HAND, mapArm), fingerT = xf(FINGER, mapArm);
+  const handT = xf(scaled(HAND, arena ? 1.08 : 1), mapArm);
+  const fingerT = xf(scaled(FINGER, arena ? 1.04 : 1), mapArm);
   // The foot is swept along its own length, so its "y" is distance from the
   // heel: scaled to the new foot length, and its height by girth. The ankle is
   // 3.9% of stature off the floor now instead of 12.2%, so the boot shaft that
@@ -669,18 +703,29 @@ function buildHeroBuffers(id) {
       addChamferedPanel(buf('steel'), 0.108, 0.074, 0.014,
                         sx, 0.084, -0.174, ankle,
                         { chamfer: 0.015, bevel: 0.002, rx: -Math.PI / 2 });
+      // Orange ankle bridge and separated pale toe facets give the boot the
+      // strapped, load-bearing construction of warrior armour instead of a
+      // smooth white shoe.
+      addPolygonPanel(buf('armor'), [
+        [-0.060, 0.026], [0.060, 0.026], [0.046, -0.026],
+        [0.016, -0.010], [-0.016, -0.010], [-0.046, -0.026],
+      ], 0.022, sx, 0.112, -0.160, ankle, { bevel: 0.003, rx: -Math.PI / 2 });
+      for (const dx of [-0.038, 0, 0.038])
+        addChamferedPanel(buf('bone'), 0.036, 0.046, 0.018,
+                          sx + dx, 0.056, -0.208, ankle,
+                          { chamfer: 0.009, bevel: 0.002, rx: -Math.PI / 2 });
     }
 
     // Leg armour
     // Down to just above the knee: the skirt now covers the top of the thigh,
     // so a plate that stops at mid-thigh leaves a bare band between the two.
-    addPlate(buf(arena ? 'armor2' : 'armor'), arena ? lightPlate(legR.slice(1, 8), 0.96, 0.98) : legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
-             { a0: arc(FRONT, arena ? 0.46 : 0.50)[0], a1: arc(FRONT, arena ? 0.46 : 0.50)[1],
-               t: arena ? 0.020 : 0.030, hard: arena ? 3.4 : 3.4 });
+    addPlate(buf(arena ? 'armor2' : 'armor'), arena ? lightPlate(legR.slice(1, 8), 1.02, 1.00) : legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
+             { a0: arc(FRONT, arena ? 0.52 : 0.50)[0], a1: arc(FRONT, arena ? 0.52 : 0.50)[1],
+               t: arena ? 0.022 : 0.030, hard: arena ? 3.8 : 3.4 });
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
-    addPlate(buf(arena ? 'armor' : 'bone'), lightPlate(legR.slice(11, 18), arena ? 1.03 : 1, arena ? 1.02 : 1), sx, knee,
+    addPlate(buf(arena ? 'armor2' : 'bone'), lightPlate(legR.slice(11, 18), arena ? 1.03 : 1, arena ? 1.02 : 1), sx, knee,
              { a0: arc(FRONT, arena ? 0.66 : 0.62)[0], a1: arc(FRONT, arena ? 0.66 : 0.62)[1],
                t: arena ? 0.026 : 0.030, hard: arena ? 3.5 : 3.4 });
     addPlate(buf('armor'), xf([
@@ -718,6 +763,12 @@ function buildHeroBuffers(id) {
       addPlate(buf('armor2'), edgeStrip(calfSide, 0.24, true), sx, knee,
                { a0: center - 0.35, a1: center + 0.35,
                   lift: 0.020, t: TRIM, seg: 7, hard: 3.3 });
+      // A raised shin face splits the long silver surface into readable facets.
+      addPolygonPanel(buf('bone'), [
+        [-0.046, 0.118], [0.046, 0.118], [0.058, 0.032],
+        [0.038, -0.118], [-0.038, -0.118], [-0.058, 0.032],
+      ], 0.014, sx, mapLeg(0.450), -0.112, knee,
+      { bevel: 0.003, rz: -out * 0.018 });
     }
 
     // Front tasset. Hung off the THIGH rather than the hips, which is the only
@@ -758,11 +809,11 @@ function buildHeroBuffers(id) {
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
     loftSkinned(place(armR, ax, armW), 18, buf('frame'));
-    const forearmShell = arena ? lightPlate(armR.slice(9, 15), 1.16, 1.10)
+    const forearmShell = arena ? lightPlate(armR.slice(9, 15), 1.10, 1.06)
       : armR.slice(9, 15).map(q => ({ ...q }));
-    addPlate(buf(arena ? 'armor' : 'bone'), forearmShell, ax, elbow,
-              { a0: arc(FRONT, arena ? 1.10 : 0.78)[0], a1: arc(FRONT, arena ? 1.10 : 0.78)[1],
-                t: arena ? 0.034 : 0.032, hard: arena ? 3.7 : 3.2 });
+    addPlate(buf(arena ? 'armor2' : 'bone'), forearmShell, ax, elbow,
+              { a0: arc(FRONT, arena ? 0.94 : 0.78)[0], a1: arc(FRONT, arena ? 0.94 : 0.78)[1],
+                t: arena ? 0.028 : 0.032, hard: arena ? 3.7 : 3.2 });
     addBox(buf(arena ? 'steel' : 'glow'), 0.020 * G, 0.060 * G, 0.014 * G,
            ax, mapArm(1.090), -0.086 * G, elbow);
 
@@ -775,7 +826,7 @@ function buildHeroBuffers(id) {
         { y: 0.982, rx: 0.052, rz: 0.057, n: 2.9 },
         { y: 0.938, rx: 0.046, rz: 0.051, n: 2.8 },
       ], mapArm);
-      addPlate(buf(arena ? 'armor' : 'bone'), arena ? lightPlate(CUFF, 1.08, 1.04) : CUFF, ax, elbow,
+      addPlate(buf(arena ? 'armor' : 'bone'), arena ? lightPlate(CUFF, 1.02, 1.02) : CUFF, ax, elbow,
                { a0: arc(FRONT, arena ? 1.10 : 1.06)[0], a1: arc(FRONT, arena ? 1.10 : 1.06)[1],
                  t: arena ? 0.016 : 0.014, seg: 12, hard: arena ? 3.5 : 3.4 });
       addPlate(buf('armor2'), edgeStrip(CUFF, 0.36, true), ax, elbow,
@@ -795,6 +846,12 @@ function buildHeroBuffers(id) {
                             { chamfer: 0.003, bevel: 0.001 });
         addDisc(buf('steel'), 0.024, 0.014,
                 ax + out * 0.065, BODY.ELBOW_Y, 0, elbow, out);
+        addPolygonPanel(buf('armor'), [
+          [-0.040, 0.074], [0.034, 0.062], [0.046, -0.050],
+          [0.012, -0.082], [-0.040, -0.052],
+        ].map(([gx, gy]) => [gx * out, gy]), 0.018,
+        ax, mapArm(1.075), -0.130, elbow,
+        { bevel: 0.003, rz: -out * 0.045 });
       }
     }
 
@@ -846,15 +903,25 @@ function buildHeroBuffers(id) {
       { y: 1.692, rx: 0.114, rz: 0.115, n: 2.6 },
     ], arena ? 0.85 : 0.94, arena ? 0.022 : 0.020);
     if (arena) {
-      // A tapered pauldron over the deltoid reads as worn armor rather than a
-      // rectangular robot pod. Two luminous cuts echo the arena suit's energy.
-      addChamferedPanel(buf('armor'), 0.132, 0.178, 0.028,
-                        px + out * 0.145, mapArm(1.658), 0.004, B.chest,
-                        { chamfer: 0.026, ry: out * Math.PI / 2, rz: -out * 0.12 });
-      for (const dy of [-0.022, 0.022])
-          addChamferedPanel(buf('glow'), 0.054, 0.010, 0.008,
-                            px + out * 0.158, mapArm(1.658) + dy, 0.004, B.chest,
-                          { chamfer: 0.003, bevel: 0.001, ry: out * Math.PI / 2 });
+      // The reference uses a flared orange mantle over a visible dark deltoid,
+      // not a rectangular shoulder pod.  Its asymmetrical six-point face gives
+      // the silhouette a warrior's plated collar while leaving the arm human.
+      const mantle = [
+        [-0.070, -0.104], [0.044, -0.086], [0.064, 0.026],
+        [0.028, 0.094], [-0.036, 0.082], [-0.080, -0.012],
+      ].map(([mx, my]) => [mx * out, my]);
+      addPolygonPanel(buf('armor'), mantle, 0.036,
+                      px + out * 0.142, mapArm(1.666), -0.006, B.chest,
+                      { bevel: 0.005, rz: -out * 0.10, ry: -out * 0.08 });
+      addPolygonPanel(buf('bone'), [
+        [-0.042 * out, 0.004], [0.042 * out, 0.004],
+        [0.028 * out, 0.050], [-0.022 * out, 0.060],
+      ], 0.018, px + out * 0.142, mapArm(1.718), -0.030, B.chest,
+      { bevel: 0.003, rz: -out * 0.10, ry: -out * 0.08 });
+      for (let i = 0; i < 3; i++)
+        addChamferedPanel(buf('steel'), 0.050, 0.009, 0.006,
+                          px + out * 0.142, mapArm(1.674 - i * 0.025), -0.030, B.chest,
+                          { chamfer: 0.003, bevel: 0.001, rz: -out * 0.10 });
     }
     // A single restrained shoulder status mark keeps team identity readable.
     addBox(buf('glow'), 0.018 * G, 0.046 * G, 0.016 * G,
@@ -867,6 +934,22 @@ function buildHeroBuffers(id) {
     addPlate(buf(arena ? 'armor2' : 'armor'), upperArmShell, ax, B['shoulder' + s],
              { a0: pa - out * (arena ? 0.56 : 0.68), a1: pa + out * (arena ? 0.56 : 0.68),
                t: arena ? 0.018 : 0.026, seg: arena ? 8 : 9, hard: arena ? 3.1 : 3.4 });
+    if (arena) {
+      // Faceted white bicep shield with an orange outer flare.  Both ride the
+      // upper-arm bone, so they remain attached through aim and sprint poses.
+      addPolygonPanel(buf('bone'), [
+        [-0.048, 0.072], [0.046, 0.062], [0.056, -0.044],
+        [0.020, -0.076], [-0.050, -0.052],
+      ].map(([ux, uy]) => [ux * out, uy]), 0.020,
+      ax, mapArm(1.488), -0.102, B['shoulder' + s],
+      { bevel: 0.004, rz: -out * 0.035 });
+      addPolygonPanel(buf('armor'), [
+        [-0.022, 0.058], [0.032, 0.042], [0.036, -0.046],
+        [0.004, -0.066], [-0.026, -0.030],
+      ].map(([ux, uy]) => [ux * out, uy]), 0.014,
+      ax + out * 0.050, mapArm(1.480), -0.098, B['shoulder' + s],
+      { bevel: 0.003, rz: -out * 0.035 });
+    }
   }
 
   // ── torso: one trunk, pelvis to neck, weighted up the spine ──
@@ -893,10 +976,20 @@ function buildHeroBuffers(id) {
     addPlate(buf('steel'), BELT, 0, B.hips, { a0: -Math.PI, a1: Math.PI, t: 0.016, seg: 26 });
     addPlate(buf(arena ? 'armor2' : 'armor'), BELT, 0, B.hips,
              { a0: -Math.PI, a1: Math.PI, lift: 0.016, t: TRIM, seg: 26 });
-    addChamferedPanel(buf('armor2'), arena ? 0.094 : 0.070,
-                      arena ? 0.118 : 0.052, arena ? 0.032 : 0.026,
-                      0, arena ? 1.005 : 1.048, -0.108, B.hips,
-                      { chamfer: arena ? 0.018 : 0.006, bevel: 0.003 });
+    if (arena) {
+      addPolygonPanel(buf('armor2'), [
+        [-0.060, 0.056], [0.060, 0.056], [0.052, -0.022],
+        [0.024, -0.088], [0, -0.104], [-0.024, -0.088], [-0.052, -0.022],
+      ], 0.034, 0, 1.008, -0.118, B.hips, { bevel: 0.005 });
+      addPolygonPanel(buf('bone'), [
+        [-0.038, 0.030], [0.038, 0.030], [0.026, -0.036],
+        [0, -0.056], [-0.026, -0.036],
+      ], 0.012, 0, 1.018, -0.150, B.hips, { bevel: 0.003 });
+    } else {
+      addChamferedPanel(buf('armor2'), 0.070, 0.052, 0.026,
+                        0, 1.048, -0.108, B.hips,
+                        { chamfer: 0.006, bevel: 0.003 });
+    }
     addBox(buf('glow'), 0.028, 0.028, 0.024, 0, 1.048, -0.110, B.hips, Math.PI / 4);
   }
   // Side tassets. These CAN hang off the pelvis — the thigh's lateral travel is
@@ -961,6 +1054,21 @@ function buildHeroBuffers(id) {
     addChamferedPanel(buf('armor2'), 0.104, 0.016, 0.010,
                       0, mapTorso(1.274), -0.134, B.spine,
                       { chamfer: 0.004, bevel: 0.001 });
+    // Faceted abdominal plates float over the flexible black core. They make
+    // the waist read as an armoured athlete while leaving dark gaps for bend.
+    for (let i = 0; i < 3; i++) {
+      const y = mapTorso(1.392 - i * 0.074);
+      const w = 0.146 - i * 0.010;
+      addPolygonPanel(buf(i === 2 ? 'armor2' : 'bone'), [
+        [-w / 2, 0.026], [w / 2, 0.026], [w * 0.43, -0.026],
+        [0, -0.040], [-w * 0.43, -0.026],
+      ], 0.014, 0, y, -0.158, B.spine,
+      { bevel: 0.003 });
+    }
+    for (let i = -1; i <= 1; i++)
+      addChamferedPanel(buf('glow'), 0.010, 0.026, 0.006,
+                        i * 0.018, mapTorso(1.318), -0.178, B.spine,
+                        { chamfer: 0.003, bevel: 0.001 });
   }
 
   // Scaled by `bulk` like the torso loft under it. Without that a heavy chassis
@@ -990,22 +1098,25 @@ function buildHeroBuffers(id) {
                t: (arena ? 0.020 : 0.030) * G, seg: arena ? 10 : 12, hard: arena ? 3.2 : 4.2 });
   }
   if (arena) {
-    // Layered pectoral faces sit above the curved breastplate. Their clipped
-    // corners and diagonal seam break up the single broad orange surface.
+    // Two broad, irregular silver pectoral shields sit over the black athletic
+    // trunk. Their shared orange sternum blade gives the torso one strong
+    // warrior shape instead of a grid of small mechanical tiles.
     for (const s of [-1, 1]) {
-      addChamferedPanel(buf('armor2'), 0.132, 0.098, 0.018,
-                        s * 0.086, mapTorso(1.570), -0.154, B.chest,
-                        { chamfer: 0.024, rz: -s * 0.16 });
-      addChamferedPanel(buf('bone'), 0.068, 0.014, 0.007,
-                        s * 0.092, mapTorso(1.578), -0.168, B.chest,
-                        { chamfer: 0.005, bevel: 0.001, rz: -s * 0.17 });
-      addChamferedPanel(buf('armor'), 0.034, 0.044, 0.010,
-                        s * 0.146, mapTorso(1.530), -0.152, B.chest,
-                        { chamfer: 0.007, rz: -s * 0.16 });
+      addPolygonPanel(buf('armor2'), [
+        [-0.116 * s, 0.060], [0.070 * s, 0.074], [0.122 * s, 0.018],
+        [0.080 * s, -0.078], [0.016 * s, -0.102], [-0.106 * s, -0.030],
+      ], 0.028, s * 0.094, mapTorso(1.582), -0.158, B.chest,
+      { bevel: 0.005, rz: -s * 0.035 });
+      addPolygonPanel(buf('bone'), [
+        [-0.080 * s, 0.020], [0.050 * s, 0.030], [0.078 * s, -0.006],
+        [0.044 * s, -0.034], [-0.074 * s, -0.026],
+      ], 0.010, s * 0.094, mapTorso(1.598), -0.185, B.chest,
+      { bevel: 0.002, rz: -s * 0.035 });
     }
-    addChamferedPanel(buf('glow'), 0.016, 0.052, 0.008,
-                      0, mapTorso(1.558), -0.174, B.chest,
-                      { chamfer: 0.006, bevel: 0.002 });
+    addPolygonPanel(buf('armor'), [
+      [-0.050, 0.122], [0.050, 0.122], [0.036, 0.016],
+      [0.018, -0.126], [-0.018, -0.126], [-0.036, 0.016],
+    ], 0.026, 0, mapTorso(1.565), -0.188, B.chest, { bevel: 0.004 });
   }
   addPlate(buf('frame'), CHEST.slice(0, 4), 0, B.chest,
            { a0: FRONT - 0.10, a1: FRONT + 0.10, t: 0.013 * G, seg: 3 });
@@ -1060,21 +1171,25 @@ function buildHeroBuffers(id) {
         addChamferedPanel(buf('frame'), 0.038, 0.008, 0.006,
                           s * 0.096, mapTorso(1.574 + i * 0.030), 0.166, B.chest,
                           { chamfer: 0.003, bevel: 0.001 });
-      // Three separated rails form an open, swept shoulder frame. The empty
-      // center is important: a solid slab looked like a robot backpack, while
-      // this reads as the crest/pauldron of an armored arena warrior.
-      addChamferedPanel(buf('armor'), 0.056, 0.274, 0.034,
-                        s * 0.274, mapTorso(1.744), 0.130, B.chest,
-                        { chamfer: 0.016, bevel: 0.004, rz: s * 0.22, ry: -s * 0.06 });
-      addChamferedPanel(buf('armor'), 0.046, 0.196, 0.032,
-                        s * 0.198, mapTorso(1.720), 0.132, B.chest,
-                        { chamfer: 0.014, bevel: 0.004, rz: s * 0.04, ry: -s * 0.04 });
-      addChamferedPanel(buf('armor'), 0.132, 0.058, 0.034,
-                        s * 0.240, mapTorso(1.872), 0.130, B.chest,
-                        { chamfer: 0.018, bevel: 0.004, rz: -s * 0.10, ry: -s * 0.05 });
-      addChamferedPanel(buf('glow'), 0.014, 0.088, 0.008,
-                        s * 0.274, mapTorso(1.748), 0.151, B.chest,
-                        { chamfer: 0.004, bevel: 0.001, rz: s * 0.22, ry: -s * 0.06 });
+      // Tall solid shoulder crests are the defining rear silhouette.  The old
+      // rail assembly looked like a backpack frame; this tapered fin reads as
+      // ceremonial armour and matches the broad orange profile from the skin.
+      const fin = [
+        [-0.070, -0.135], [0.050, -0.105], [0.070, 0.065],
+        [0.018, 0.145], [-0.050, 0.112], [-0.082, -0.010],
+      ].map(([fx, fy]) => [fx * s, fy]);
+      addPolygonPanel(buf('armor'), fin, 0.040,
+                      s * 0.266, mapTorso(1.758), 0.128, B.chest,
+                      { bevel: 0.005, rz: s * 0.10, ry: -s * 0.05 });
+      addPolygonPanel(buf('bone'), [
+        [-0.044 * s, 0.020], [0.044 * s, 0.020], [0.030 * s, 0.070],
+        [-0.022 * s, 0.082],
+      ], 0.020, s * 0.266, mapTorso(1.858), 0.151, B.chest,
+      { bevel: 0.003, rz: s * 0.10, ry: -s * 0.05 });
+      for (let i = 0; i < 3; i++)
+        addChamferedPanel(buf('steel'), 0.060, 0.010, 0.008,
+                          s * 0.266, mapTorso(1.764 - i * 0.030), 0.151, B.chest,
+                          { chamfer: 0.003, bevel: 0.001, rz: s * 0.10 });
     }
     addChamferedPanel(buf('glow'), 0.010, 0.060, 0.006,
                       0, mapTorso(1.548), 0.190, B.chest,
@@ -1146,21 +1261,39 @@ function buildHeroBuffers(id) {
     addPlate(buf('armor2'), edgeStrip(REAR_HELM, 0.22, true), 0, B.head,
              { a0: arc(BACK, 0.92)[0], a1: arc(BACK, 0.92)[1],
                lift: 0.016 * G, t: TRIM, seg: 12, hard: 3.5 });
+    addPolygonPanel(buf('bone'), [
+      [-0.104 * G, 0.052 * G], [0.104 * G, 0.052 * G],
+      [0.126 * G, -0.010 * G], [0.070 * G, -0.076 * G],
+      [0, -0.096 * G], [-0.070 * G, -0.076 * G], [-0.126 * G, -0.010 * G],
+    ], 0.024 * G, 0, headY(2.092), -0.124 * G, B.head,
+    { bevel: 0.004 * G });
+    addPolygonPanel(buf('armor2'), [
+      [-0.062 * G, 0.030 * G], [0.062 * G, 0.030 * G],
+      [0.050 * G, -0.026 * G], [0, -0.048 * G], [-0.050 * G, -0.026 * G],
+    ], 0.012 * G, 0, headY(2.096), -0.148 * G, B.head,
+    { bevel: 0.002 * G });
   }
 
   // Eye opening and lower face mask. The arena helmet uses one continuous lime
   // optic band inside a black cavity; it should never read as two human goggles.
   const operative = arena;
   if (operative) {
-    addChamferedPanel(buf('joint'), 0.248 * G, 0.072 * G, 0.048 * G,
-                      0, headY(1.982), -0.116 * G, B.head,
-                      { chamfer: 0.014 * G, bevel: 0.003 * G });
-    addChamferedPanel(buf('glow'), 0.194 * G, 0.024 * G, 0.013 * G,
-                      0, headY(1.984), -0.151 * G, B.head,
-                      { chamfer: 0.006 * G, bevel: 0.001 * G });
-    addChamferedPanel(buf('armor'), 0.242 * G, 0.032 * G, 0.020 * G,
-                      0, headY(2.030), -0.142 * G, B.head,
-                      { chamfer: 0.007 * G, bevel: 0.002 * G });
+    // Deep pentagonal face shield with the skin's two unmistakable lime V
+    // optics. A horizontal visor made the head read as a generic robot.
+    addPolygonPanel(buf('joint'), [
+      [-0.120 * G, 0.062 * G], [0.120 * G, 0.062 * G],
+      [0.090 * G, -0.066 * G], [0, -0.112 * G], [-0.090 * G, -0.066 * G],
+    ], 0.050 * G, 0, headY(1.982), -0.116 * G, B.head,
+    { bevel: 0.004 * G });
+    addChevronPanel(buf('glow'), 0.170 * G, 0.050 * G, 0.018 * G, 0.013 * G,
+                    0, headY(2.010), -0.158 * G, B.head);
+    addChevronPanel(buf('glow'), 0.132 * G, 0.042 * G, 0.016 * G, 0.013 * G,
+                    0, headY(1.970), -0.162 * G, B.head);
+    addPolygonPanel(buf('armor2'), [
+      [-0.112 * G, 0.022 * G], [0.112 * G, 0.022 * G],
+      [0.086 * G, 0.064 * G], [-0.086 * G, 0.064 * G],
+    ], 0.020 * G, 0, headY(2.046), -0.146 * G, B.head,
+    { bevel: 0.003 * G });
     for (const s of [-1, 1]) {
       addChamferedPanel(buf('armor'), 0.048 * G, 0.128 * G, 0.034 * G,
                         s * 0.126 * G, headY(1.966), -0.084 * G, B.head,
@@ -1196,7 +1329,7 @@ function buildHeroBuffers(id) {
   // Cheek guards + chin plate close the jaw.
   if (arena) {
     for (const s of [-1, 1]) {
-      addChamferedPanel(buf('bone'), 0.060 * G, 0.150 * G, 0.054 * G,
+      addChamferedPanel(buf('armor'), 0.060 * G, 0.150 * G, 0.054 * G,
                         s * 0.108 * G, headY(1.930), -0.052 * G, B.head,
                         { chamfer: 0.011 * G, rz: -s * 0.055, ry: -s * 0.05 });
       for (let i = 0; i < 2; i++)

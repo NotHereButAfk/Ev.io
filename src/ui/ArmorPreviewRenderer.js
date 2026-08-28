@@ -103,6 +103,18 @@ export class ArmorPreviewRenderer {
     const s = height > 0 ? targetH / height : 1;
     g.scale.setScalar(s);
 
+    // Present connected arena bodies as living warriors instead of an export
+    // bind pose. This only affects the loadout mannequin; gameplay animation
+    // and rifle IK still own these bones in a match.
+    const rig = g.userData?.rig;
+    if (rig) {
+      if (rig.armL) { rig.armL.rotation.x = 0.15; rig.armL.rotation.z = -0.21; }
+      if (rig.armR) { rig.armR.rotation.x = 0.15; rig.armR.rotation.z = 0.21; }
+      if (rig.elbowL) rig.elbowL.rotation.x = 0.36;
+      if (rig.elbowR) rig.elbowR.rotation.x = 0.36;
+      if (rig.head) rig.head.rotation.y = -0.035;
+    }
+
     this._group = g;
     this._baseYaw = g.rotation.y + Math.PI;
     this._scene.add(g);
