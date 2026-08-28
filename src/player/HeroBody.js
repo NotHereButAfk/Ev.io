@@ -809,31 +809,19 @@ function buildHeroBuffers(id) {
     ], mapLeg), sx, knee, { a0: arc(FRONT, arena ? 0.64 : 0.58)[0], a1: arc(FRONT, arena ? 0.64 : 0.58)[1],
                            t: (arena ? 0.022 : 0.030) * G, seg: arena ? 7 : 9,
                            hard: arena ? 3.2 : 3.4 });
-    const outerThigh = shapedArc(xf([
-      { y: 0.820, rx: 0.100, rz: 0.111, n: 2.4 },
-      { y: 0.900, rx: 0.110, rz: 0.121, n: 2.5 },
-      { y: 0.990, rx: 0.118, rz: 0.130, n: 2.6 },
-      { y: 1.080, rx: 0.116, rz: 0.127, n: 2.6 },
-      { y: 1.150, rx: 0.104, rz: 0.116, n: 2.5 },
-    ], mapLeg), [0.58, 0.61, 0.65, 0.70, 0.76]
-      .map(offset => FRONT + out * offset), [0.25, 0.34, 0.39, 0.36, 0.25]);
+    // This crest must be derived from legR, not the unscaled legacy station
+    // table. The arena thigh is deliberately bulkier; using the old radii put
+    // the orange shell *inside* the black anatomy and made the visible model
+    // appear unchanged despite the added geometry.
+    const outerThigh = shapedArc(lightPlate(legR.slice(1, 8), 1.02, 1.02),
+      [0.52, 0.55, 0.59, 0.63, 0.68, 0.73, 0.77]
+        .map(offset => FRONT + out * offset),
+      [0.14, 0.25, 0.34, 0.38, 0.36, 0.29, 0.14]);
     addPlate(buf(arena ? 'armor' : 'glow'), outerThigh, sx, thigh,
              { a0: FRONT + out * 0.66 - 0.36, a1: FRONT + out * 0.66 + 0.36,
-               t: 0.024, seg: 7, hard: 3.6 });
+               lift: arena ? 0.020 : 0,
+               t: arena ? 0.014 : 0.024, seg: 6, hard: 3.8 });
     if (arena) {
-      // The outside of the flexible knee gets one tapered wrap, authored on
-      // the same limb surface. This avoids the unmistakable floating-box look
-      // of a separate kneepad while retaining the orange protective edge.
-      const kneeEdge = shapedArc(xf([
-        { y: 0.555, rx: 0.080, rz: 0.088, n: 2.4 },
-        { y: 0.590, rx: 0.091, rz: 0.100, n: 2.6 },
-        { y: 0.650, rx: 0.093, rz: 0.101, n: 2.6 },
-        { y: 0.695, rx: 0.081, rz: 0.088, n: 2.4 },
-      ], mapLeg), FRONT + out * 0.78, [0.12, 0.27, 0.27, 0.12]);
-      addPlate(buf('armor'), kneeEdge, sx, knee,
-               { a0: FRONT + out * 0.78 - 0.27,
-                 a1: FRONT + out * 0.78 + 0.27,
-                 t: 0.015, seg: 4, hard: 3.7 });
       // A narrow outer calf reinforcement reads as a protective pad while most
       // of the trouser leg remains visible in profile.
       const calfSide = shapedArc(lightPlate(legR.slice(13, 19), 1.00, 1.01),
