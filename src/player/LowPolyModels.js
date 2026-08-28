@@ -140,11 +140,11 @@ const PALETTES = {
   // Neutral hard-surface blocks tie the default chassis to Rook's warm concrete
   // and graphite architecture; cyan is reserved for optics and small status
   // marks so the body stays readable without looking self-illuminated.
-  // Default arena exosuit: dominant safety-orange shells over a graphite
-  // undersuit, with cool alloy at the joints. This is the visual hierarchy of
-  // EV.IO's default silhouette, rebuilt on our own connected/skinned geometry.
-  vanguard: { armor: 0xe87924, armor2: 0xcbd3d6, frame: 0x252d31, joint: 0x11171a,
-              steel: 0x4c5960, bone: 0x939fa4, glow: 0x63e5ee, bulk: 1.08 },  // compact arena exosuit
+  // Human tactical default: muted orange ceramic inserts over charcoal fabric,
+  // with gunmetal hardware. Neutral pads are deliberately mid-grey instead of
+  // white so the suit reads as clothing and armor, not a robot shell.
+  vanguard: { armor: 0xc85f1d, armor2: 0x676f73, frame: 0x30363a, joint: 0x171b1e,
+              steel: 0x424b50, bone: 0x7b8589, glow: 0x62c7cc, bulk: 0.99 },  // human tactical operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
   phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
