@@ -24,6 +24,7 @@
     "test:rifle-reference": "node tests/rifle-carry-reference.test.mjs",
     "test:rifle-clearance": "node tools/rifle_body_clearance_check.mjs",
     "test:rifle-visual": "node tools/rifle_carry_visual_check.mjs",
+    "test:player-model-visual": "node tools/player_model_visual_check.mjs",
     "test:gameplay-smoke": "node tools/gameplay_smoke.mjs",
     "test:player-respawn": "node tools/player_respawn_check.mjs",
     "test:player-death": "node tools/player_death_check.mjs",

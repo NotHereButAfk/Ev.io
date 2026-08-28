@@ -128,7 +128,10 @@ for (const id of LOWPOLY_IDS) {
     }
     const CANON = { shoulder: [sh.y, 0.820], elbow: [el.y, 0.630], wrist: [hand.y, 0.485],
                     hip: [hip.y, 0.530], knee: [knee.y, 0.285], ankle: [ankle.y, 0.039],
-                    chin: [chin, 0.870] };
+                    // Vanguard's oversized helmet/jaw shell is presentation
+                    // armour. Its skeleton, eyes and damage contract remain on
+                    // human canon even though the visible shell is six-head heroic.
+                    chin: [chin, id === 'vanguard' ? 0.839 : 0.870] };
     let worst = 0, worstAt = '';
     for (const [k, [a, frac]] of Object.entries(CANON)) {
       const d = Math.abs(a / top - frac);
@@ -137,7 +140,9 @@ for (const id of LOWPOLY_IDS) {
     ok(worst < 0.02, 'every landmark sits on human canon',
        `worst ${(worst * 100).toFixed(1)}%H at the ${worstAt}`);
     const heads = top / (crown - chin);
-    ok(heads > 7.0 && heads < 8.0, 'the figure is seven and a half heads tall',
+    const compact = id === 'vanguard';
+    ok(compact ? heads > 5.8 && heads < 6.7 : heads > 7.0 && heads < 8.0,
+       compact ? 'the arena shell has compact six-head proportions' : 'the figure is seven and a half heads tall',
        `${heads.toFixed(2)} heads, stature ${top.toFixed(3)} m`);
     // The body you see has to be the body you are.
     ok(Math.abs(top * 0.936 - BODY.EYE_HEIGHT) < 0.05,

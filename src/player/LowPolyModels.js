@@ -136,13 +136,11 @@ function _addOutlines(group, t = 0.011) {
 // which is the point: a hue needs something neutral next to it to be a hue.
 const PALETTES = {
   // Neutral hard-surface blocks tie the default chassis to Rook's warm concrete
-  // and graphite architecture; cyan is reserved for optics and small status
-  // marks so the body stays readable without looking self-illuminated.
-  // Compact arena operative: warm protective pads over a graphite undersuit,
-  // with pale helmet/boot shells and only tiny cyan optic accents. The neutral
-  // anatomy remains visible between pads so the silhouette stays humanoid.
-  vanguard: { armor: 0xe06a17, armor2: 0x858f95, frame: 0x343a3e, joint: 0x171b1e,
-              steel: 0x525c62, bone: 0xa4aeb4, glow: 0x62cfd2, bulk: 1.04 },  // compact arena operative
+  // Compact arena operative: saturated orange impact armour over a near-black
+  // undersuit, pale ceramic helmet/leg shells and a single acid-lime optic. The
+  // colour blocking is intentionally bold enough to survive gameplay distance.
+  vanguard: { armor: 0xf2760e, armor2: 0x9da3a5, frame: 0x292e31, joint: 0x111416,
+              steel: 0x555d61, bone: 0xd2d5cf, glow: 0xb7ff32, bulk: 1.06 },  // compact arena operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
   phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
