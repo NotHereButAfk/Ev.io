@@ -25,6 +25,10 @@ try {
   // menu. Wait for the game object, not an arbitrary delay or the static HTML.
   await page.waitForFunction(() => !!(window.__game || window.game)?.menu,
     null, { timeout: 45000 });
+  // Do not open Inventory while its startup/map shell is still rebuilding the
+  // menu. That can replace the preview canvas after the renderer captured it.
+  await page.waitForSelector('#connect-screen', { state: 'hidden', timeout: 60000 });
+  await page.waitForSelector('#map-loading', { state: 'hidden', timeout: 60000 });
   await page.evaluate(() => {
     const game = window.__game || window.game;
     if (game?.menu?._togglePanel) game.menu._togglePanel('loadout');
@@ -41,9 +45,9 @@ try {
     preview.stop();
     preview._renderer.setPixelRatio(1);
     preview._renderer.setSize(600, 600, false);
-    preview._canvas.width = 600;
-    preview._canvas.height = 600;
-    preview._canvas.style.cssText = 'position:fixed;inset:20px;width:600px;height:600px;z-index:999999';
+    // setSize already updates the WebGL drawing buffer. Assigning canvas.width
+    // afterward clears that buffer and left the regression plate blank.
+    preview._canvas.style.cssText = 'position:fixed;left:20px;top:20px;width:600px;height:600px;z-index:999999;visibility:visible';
     preview._camera.aspect = 1;
     // The production preview camera is framed for a 220px panel. Pull it back
     // slightly for the QA plate so crown and soles remain visible in every view.
@@ -51,8 +55,12 @@ try {
     preview._camera.lookAt(0, 1.15, 0);
     preview._camera.updateProjectionMatrix();
     document.body.style.background = '#0a0e16';
-    for (const child of document.body.children) child.style.visibility = 'hidden';
-    preview._canvas.style.visibility = 'visible';
+    // Keep the preview's ancestors renderable. Hiding body children also hides
+    // descendants even when the canvas itself is set back to visible.
+    for (const el of document.body.querySelectorAll('*')) {
+      if (el === preview._canvas || el.contains(preview._canvas)) continue;
+      if (el instanceof HTMLElement) el.style.opacity = '0';
+    }
   });
 
   for (const [name, yaw] of [['front', 0], ['quarter', Math.PI / 4], ['side', Math.PI / 2]]) {
@@ -62,9 +70,14 @@ try {
       preview._group.rotation.y = preview._baseYaw + rotation;
       preview._scene.updateMatrixWorld(true);
       preview._renderer.render(preview._scene, preview._camera);
+      if (preview._renderer.info.render.calls === 0) {
+        throw new Error('Player preview rendered no draw calls');
+      }
     }, yaw);
     await page.waitForTimeout(120);
-    await page.screenshot({ path: `${stem}-${name}${extension}` });
+    await page.locator('#armor-preview-canvas').screenshot({
+      path: `${stem}-${name}${extension}`,
+    });
   }
   console.log(`player model visual passed -> ${stem}-{front,quarter,side}${extension}`);
 } finally {

@@ -484,7 +484,7 @@ function heroGeometry(id) {
   const parts = buildHeroBuffers(id);
   for (const p of parts) {
     p.geo.userData.shared = true;
-    p.outline.userData.shared = true;
+    if (p.outline) p.outline.userData.shared = true;
   }
   _heroCache.set(id, parts);
   return parts;
@@ -515,14 +515,16 @@ export function buildHeroBody(id = 'vanguard') {
     mesh.bind(skeleton);
     meshes.push(mesh);
 
-    const ol = new THREE.SkinnedMesh(outline, olMat);
-    ol.name = 'outline';
-    ol.castShadow = false;
-    ol.frustumCulled = true;
-    ol.raycast = () => {};
-    group.add(ol);
-    ol.bind(skeleton);
-    outlines.push(ol);
+    if (outline) {
+      const ol = new THREE.SkinnedMesh(outline, olMat);
+      ol.name = 'outline';
+      ol.castShadow = false;
+      ol.frustumCulled = true;
+      ol.raycast = () => {};
+      group.add(ol);
+      ol.bind(skeleton);
+      outlines.push(ol);
+    }
   }
 
   group.userData = {
@@ -564,7 +566,7 @@ function buildHeroBuffers(id) {
   // geometry downward from the fixed crown.
   const headY = (y) => {
     const mapped = mapHead(y);
-    return arena ? BODY.CROWN_Y - (BODY.CROWN_Y - mapped) * 1.24 : mapped;
+    return arena ? BODY.CROWN_Y - (BODY.CROWN_Y - mapped) * 1.28 : mapped;
   };
   // The connected anatomy stays at the animation contract, while visible hard
   // plates pull inward for a fast, cloth-over-light-armour shinobi silhouette.
@@ -586,7 +588,7 @@ function buildHeroBuffers(id) {
   // The arena suit is intentionally closer to a six-head heroic proportion
   // than a tall human mannequin. The larger helmet is armour, not a larger hit
   // target: headshot height and the head bone remain unchanged.
-  const skullT = xf(scaled(SKULL, arena ? 1.18 : 1), headY);
+  const skullT = xf(scaled(SKULL, arena ? 1.30 : 1), headY);
   const handT = xf(HAND, mapArm), fingerT = xf(FINGER, mapArm);
   // The foot is swept along its own length, so its "y" is distance from the
   // heel: scaled to the new foot length, and its height by girth. The ankle is
@@ -594,12 +596,12 @@ function buildHeroBuffers(id) {
   // used to reach a third of the way up the shin is a boot shaft again.
   const footT = FOOT.map(q => ({ ...q,
     y: q.y * (BODY.FOOT_LEN / 0.30),
-    rx: q.rx * G * (arena ? 1.16 : 1),
+    rx: q.rx * G * (arena ? 1.22 : 1),
     // FOOT.rz becomes world-up after the -90deg foot laydown; keep that
     // dimension unchanged so the wider arena boot still plants on y=0.
     rz: q.rz * G, dz: q.dz * G }));
   const ankleMap = remapY([[0.085, BODY.ANKLE_Y * 0.42], [0.300, BODY.ANKLE_Y * 1.62]]);
-  const ankleT = xf(scaled(ANKLE, arena ? 1.10 : 1), ankleMap);
+  const ankleT = xf(scaled(ANKLE, arena ? 1.14 : 1), ankleMap);
 
   for (const s of ['L', 'R']) {
     const sx = s === 'L' ? -BODY.HIP_X : BODY.HIP_X;
@@ -628,7 +630,7 @@ function buildHeroBuffers(id) {
     // while the ankle rolls under it, and hanging it off the ankle bone would
     // swing 13cm of armour every heel strike.
     {
-      const bootK = arena ? 1.14 : 1;
+      const bootK = arena ? 1.20 : 1;
       const SHAFT = [
         { y: 0.106, rx: 0.050 * bootK, rz: 0.055 * bootK, n: 3.0 },
         { y: 0.152, rx: 0.055 * bootK, rz: 0.060 * bootK, n: 3.0 },
@@ -661,7 +663,7 @@ function buildHeroBuffers(id) {
       // Overlapping instep and toe shells turn the rectangular collision-safe
       // boot core into a tapered armored shoe. They sit above the sole, so the
       // locomotion contact footprint and floor tests remain unchanged.
-      addChamferedPanel(buf('bone'), 0.142, 0.166, 0.022,
+      addChamferedPanel(buf('bone'), 0.152, 0.176, 0.024,
                         sx, 0.066, -0.105, ankle,
                         { chamfer: 0.022, bevel: 0.003, rx: -Math.PI / 2 });
       addChamferedPanel(buf('steel'), 0.108, 0.074, 0.014,
@@ -674,16 +676,16 @@ function buildHeroBuffers(id) {
     // Leg armour
     // Down to just above the knee: the skirt now covers the top of the thigh,
     // so a plate that stops at mid-thigh leaves a bare band between the two.
-    addPlate(buf(arena ? 'armor2' : 'armor'), arena ? lightPlate(legR.slice(1, 8), 0.94, 0.96) : legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
-             { a0: arc(FRONT, arena ? 0.36 : 0.50)[0], a1: arc(FRONT, arena ? 0.36 : 0.50)[1],
-               t: arena ? 0.018 : 0.030, hard: arena ? 3.1 : 3.4 });
+    addPlate(buf(arena ? 'bone' : 'armor'), arena ? lightPlate(legR.slice(1, 8), 1.06, 1.03) : legR.slice(1, 8).map(q => ({ ...q })), sx, thigh,
+             { a0: arc(FRONT, arena ? 0.68 : 0.50)[0], a1: arc(FRONT, arena ? 0.68 : 0.50)[1],
+               t: arena ? 0.024 : 0.030, hard: arena ? 3.5 : 3.4 });
     // Shin plate. The slice matters: the first and last stations feather to zero
     // thickness, so the plate you SEE is the interior — cut it too short and the
     // shin loses the armour it had.
     addPlate(buf('bone'), lightPlate(legR.slice(11, 18), arena ? 1.03 : 1, arena ? 1.02 : 1), sx, knee,
              { a0: arc(FRONT, arena ? 0.66 : 0.62)[0], a1: arc(FRONT, arena ? 0.66 : 0.62)[1],
                t: arena ? 0.026 : 0.030, hard: arena ? 3.5 : 3.4 });
-    addPlate(buf(arena ? 'armor2' : 'armor'), xf([
+    addPlate(buf('armor'), xf([
       { y: 0.552, rx: 0.078, rz: 0.082, n: 2.2 },
       { y: 0.600, rx: 0.089, rz: 0.092, n: 2.2 },
       { y: 0.645, rx: 0.090, rz: 0.093, n: 2.2 },
@@ -760,11 +762,11 @@ function buildHeroBuffers(id) {
 
     // ── arm: ONE surface, shoulder to wrist, creasing at the elbow ──
     loftSkinned(place(armR, ax, armW), 18, buf('frame'));
-    const forearmShell = arena ? lightPlate(armR.slice(9, 15), 1.10, 1.06)
+    const forearmShell = arena ? lightPlate(armR.slice(9, 15), 1.16, 1.10)
       : armR.slice(9, 15).map(q => ({ ...q }));
     addPlate(buf(arena ? 'armor' : 'bone'), forearmShell, ax, elbow,
-              { a0: arc(FRONT, arena ? 0.92 : 0.78)[0], a1: arc(FRONT, arena ? 0.92 : 0.78)[1],
-                t: arena ? 0.028 : 0.032, hard: arena ? 3.5 : 3.2 });
+              { a0: arc(FRONT, arena ? 1.10 : 0.78)[0], a1: arc(FRONT, arena ? 1.10 : 0.78)[1],
+                t: arena ? 0.034 : 0.032, hard: arena ? 3.7 : 3.2 });
     addBox(buf(arena ? 'steel' : 'glow'), 0.020 * G, 0.060 * G, 0.014 * G,
            ax, mapArm(1.090), -0.086 * G, elbow);
 
@@ -823,8 +825,8 @@ function buildHeroBuffers(id) {
     const pa = out > 0 ? 0 : Math.PI;
     const lame = (st, half, t) => {
       const arenaShell = arena;
-      const T = xf(lightPlate(st, arenaShell ? 1.12 : 0.86,
-        arenaShell ? 1.05 : 0.91), mapArm);
+      const T = xf(lightPlate(st, arenaShell ? 1.22 : 0.86,
+        arenaShell ? 1.10 : 0.91), mapArm);
       addPlate(buf(arenaShell ? 'armor' : 'bone'), T, px, B.chest,
                { a0: pa - out * half, a1: pa + out * half, t: t * G, seg: 11, hard: 4.0 });
       addPlate(buf('armor2'), edgeStrip(T, 0.34, false), px, B.chest,
@@ -839,23 +841,23 @@ function buildHeroBuffers(id) {
       { y: 1.662, rx: 0.109, rz: 0.110, n: 2.6 },
       { y: 1.716, rx: 0.095, rz: 0.096, n: 2.6 },
       { y: 1.762, rx: 0.064, rz: 0.066, n: 2.4 },
-    ], arena ? 0.90 : 0.88, arena ? 0.024 : 0.022);
+    ], arena ? 1.03 : 0.88, arena ? 0.028 : 0.022);
     lame([                                  // short lower guard
       { y: 1.512, rx: 0.104, rz: 0.108, n: 2.5 },
       { y: 1.548, rx: 0.124, rz: 0.126, n: 2.5 },
       { y: 1.592, rx: 0.129, rz: 0.131, n: 2.5 },
       { y: 1.642, rx: 0.125, rz: 0.126, n: 2.6 },
       { y: 1.692, rx: 0.114, rz: 0.115, n: 2.6 },
-    ], arena ? 0.72 : 0.94, arena ? 0.018 : 0.020);
+    ], arena ? 0.85 : 0.94, arena ? 0.022 : 0.020);
     if (arena) {
-      // Outer pauldron badge is a chamfered side-facing plate, not another
-      // cuboid. Two narrow vents keep the shoulder readable at gameplay scale.
-      addChamferedPanel(buf('armor'), 0.100, 0.132, 0.018,
-                        px + out * 0.130, mapArm(1.626), -0.004, B.chest,
-                        { chamfer: 0.012, ry: out * Math.PI / 2, rz: -out * 0.05 });
+      // Tall lateral pod and inset vents produce the unmistakable wide-shoulder
+      // arena silhouette without swelling the arm or moving its hit surface.
+      addChamferedPanel(buf('armor'), 0.142, 0.194, 0.030,
+                        px + out * 0.154, mapArm(1.670), 0.010, B.chest,
+                        { chamfer: 0.018, ry: out * Math.PI / 2, rz: -out * 0.09 });
       for (const dy of [-0.022, 0.022])
-          addChamferedPanel(buf('bone'), 0.050, 0.010, 0.008,
-                            px + out * 0.142, mapArm(1.626) + dy, -0.004, B.chest,
+          addChamferedPanel(buf('bone'), 0.064, 0.012, 0.009,
+                            px + out * 0.171, mapArm(1.670) + dy, 0.010, B.chest,
                           { chamfer: 0.003, bevel: 0.001, ry: out * Math.PI / 2 });
     }
     // A single restrained shoulder status mark keeps team identity readable.
@@ -876,9 +878,9 @@ function buildHeroBuffers(id) {
 
   for (const s of [-1, 1]) {
     addPlate(buf(arena ? 'bone' : 'armor'), torsoT.slice(0, 4), 0, B.hips,
-             { a0: s > 0 ? (arena ? -0.48 : -0.62) : Math.PI + (arena ? 0.48 : 0.62),
-               a1: s > 0 ? (arena ? 0.48 : 0.62) : Math.PI - (arena ? 0.48 : 0.62),
-               t: arena ? 0.018 : 0.028, seg: arena ? 6 : 7 });
+             { a0: s > 0 ? -0.62 : Math.PI + 0.62,
+               a1: s > 0 ? 0.62 : Math.PI - 0.62,
+               t: arena ? 0.024 : 0.028, seg: arena ? 8 : 7 });
   }
   addBox(buf('glow'), 0.05 * G, 0.05 * G, 0.03 * G, 0, mapTorso(1.150), -0.104 * G, B.hips);
 
@@ -911,10 +913,10 @@ function buildHeroBuffers(id) {
     const SIDE = arena ? [
       // Compact hip pods keep the waist pinched; the old long panels made the
       // character read as a human wearing a skirt.
-      { y: 1.018, rx: 0.136, rz: 0.104, n: 3.3 },
-      { y: 0.992, rx: 0.151, rz: 0.115, n: 3.4 },
-      { y: 0.964, rx: 0.154, rz: 0.117, n: 3.4 },
-      { y: 0.944, rx: 0.145, rz: 0.109, n: 3.3 },
+      { y: 1.026, rx: 0.148, rz: 0.112, n: 3.4 },
+      { y: 0.994, rx: 0.166, rz: 0.124, n: 3.5 },
+      { y: 0.956, rx: 0.170, rz: 0.126, n: 3.5 },
+      { y: 0.926, rx: 0.156, rz: 0.114, n: 3.4 },
     ] : [
       { y: 1.012, rx: 0.150, rz: 0.112, n: 2.6 },
       { y: 0.972, rx: 0.170, rz: 0.126, n: 2.6 },
@@ -923,7 +925,7 @@ function buildHeroBuffers(id) {
     ];
     for (const s of [-1, 1]) {
       const c = s > 0 ? 0 : Math.PI;
-      addPlate(buf(arena ? 'armor2' : 'armor'), SIDE, 0, B.hips,
+      addPlate(buf(arena ? 'bone' : 'armor'), SIDE, 0, B.hips,
                { a0: c - s * 0.56, a1: c + s * 0.56, t: 0.020, seg: 8, hard: 3.4 });
       addPlate(buf('armor2'), edgeStrip(SIDE, 0.30, true), 0, B.hips,
                { a0: c - s * 0.56, a1: c + s * 0.56,
@@ -1062,12 +1064,18 @@ function buildHeroBuffers(id) {
         addChamferedPanel(buf('frame'), 0.038, 0.008, 0.006,
                           s * 0.096, mapTorso(1.574 + i * 0.030), 0.166, B.chest,
                           { chamfer: 0.003, bevel: 0.001 });
-      addChamferedPanel(buf('armor'), 0.072, 0.196, 0.026,
-                        s * 0.118, mapTorso(1.686), 0.164, B.chest,
-                        { chamfer: 0.016, bevel: 0.003, rz: s * 0.18, ry: -s * 0.10 });
-      addChamferedPanel(buf('bone'), 0.028, 0.132, 0.012,
-                        s * 0.120, mapTorso(1.700), 0.184, B.chest,
-                        { chamfer: 0.008, bevel: 0.002, rz: s * 0.18, ry: -s * 0.10 });
+      // Swept rear shoulder blades rise almost to the helmet and stay behind
+      // the rifle plane. Their large chamfered face changes the whole outline;
+      // the dark inset keeps them from reading as solid rectangular blocks.
+      addChamferedPanel(buf('armor'), 0.136, 0.304, 0.038,
+                        s * 0.246, mapTorso(1.752), 0.126, B.chest,
+                        { chamfer: 0.026, bevel: 0.004, rz: s * 0.20, ry: -s * 0.08 });
+      addChamferedPanel(buf('frame'), 0.078, 0.188, 0.042,
+                        s * 0.246, mapTorso(1.754), 0.146, B.chest,
+                        { chamfer: 0.018, bevel: 0.003, rz: s * 0.20, ry: -s * 0.08 });
+      addChamferedPanel(buf('bone'), 0.026, 0.118, 0.010,
+                        s * 0.246, mapTorso(1.756), 0.170, B.chest,
+                        { chamfer: 0.007, bevel: 0.002, rz: s * 0.20, ry: -s * 0.08 });
     }
     addChamferedPanel(buf('glow'), 0.010, 0.060, 0.006,
                       0, mapTorso(1.548), 0.190, B.chest,
@@ -1116,14 +1124,14 @@ function buildHeroBuffers(id) {
   // Vanguard wears a fitted tactical helmet and mask over a human head; the
   // alternate chassis retain the wrapped ninja treatment. Both share the same
   // head/eye hit contract.
-  loftSkinned(place(domed(skullT, arena ? 0.52 : 0.55), 0, () => [[B.head, 1]]), 22, buf(arena ? 'bone' : 'joint'));
+  loftSkinned(place(domed(skullT, arena ? 0.52 : 0.55), 0, () => [[B.head, 1]]), 22, buf(arena ? 'armor2' : 'joint'));
   // Crown plate, hard-faced so the helm has flats and a temple corner rather
   // than being a bowl. Its trim is a band at the BROW, where a helmet's seam
   // actually is — a pale cap over the whole crown reads as a bald head.
   {
     const CROWN = skullT.slice(4).map(q => ({ ...q, z: q.dz }));
     const CA = { a0: -Math.PI, a1: Math.PI, seg: 22, hard: 3.8 };
-    addPlate(buf(arena ? 'bone' : 'armor'), CROWN, 0, B.head, { ...CA, t: (arena ? 0.016 : 0.014) * G });
+    addPlate(buf(arena ? 'armor2' : 'armor'), CROWN, 0, B.head, { ...CA, t: (arena ? 0.016 : 0.014) * G });
     addPlate(buf('steel'), edgeStrip(CROWN, 0.18, false), 0, B.head,
              { ...CA, lift: 0.014 * G, t: TRIM });
   }
@@ -1145,18 +1153,18 @@ function buildHeroBuffers(id) {
   // optic band inside a black cavity; it should never read as two human goggles.
   const operative = arena;
   if (operative) {
-    addChamferedPanel(buf('joint'), 0.224 * G, 0.068 * G, 0.044 * G,
+    addChamferedPanel(buf('joint'), 0.248 * G, 0.072 * G, 0.048 * G,
                       0, headY(1.982), -0.116 * G, B.head,
                       { chamfer: 0.014 * G, bevel: 0.003 * G });
-    addChamferedPanel(buf('glow'), 0.170 * G, 0.022 * G, 0.012 * G,
+    addChamferedPanel(buf('glow'), 0.194 * G, 0.024 * G, 0.013 * G,
                       0, headY(1.984), -0.151 * G, B.head,
                       { chamfer: 0.006 * G, bevel: 0.001 * G });
-    addChamferedPanel(buf('armor'), 0.216 * G, 0.030 * G, 0.018 * G,
+    addChamferedPanel(buf('armor'), 0.242 * G, 0.032 * G, 0.020 * G,
                       0, headY(2.030), -0.142 * G, B.head,
                       { chamfer: 0.007 * G, bevel: 0.002 * G });
     for (const s of [-1, 1]) {
-      addChamferedPanel(buf('armor'), 0.040 * G, 0.118 * G, 0.030 * G,
-                        s * 0.112 * G, headY(1.966), -0.084 * G, B.head,
+      addChamferedPanel(buf('armor'), 0.048 * G, 0.128 * G, 0.034 * G,
+                        s * 0.126 * G, headY(1.966), -0.084 * G, B.head,
                         { chamfer: 0.008 * G, rz: -s * 0.04 });
       addDisc(buf('steel'), 0.030 * G, 0.018 * G,
               s * 0.126 * G, headY(1.960), -0.004 * G, B.head, s);
@@ -1189,8 +1197,8 @@ function buildHeroBuffers(id) {
   // Cheek guards + chin plate close the jaw.
   if (arena) {
     for (const s of [-1, 1]) {
-      addChamferedPanel(buf('bone'), 0.050 * G, 0.142 * G, 0.050 * G,
-                        s * 0.098 * G, headY(1.930), -0.052 * G, B.head,
+      addChamferedPanel(buf('bone'), 0.060 * G, 0.150 * G, 0.054 * G,
+                        s * 0.108 * G, headY(1.930), -0.052 * G, B.head,
                         { chamfer: 0.011 * G, rz: -s * 0.055, ry: -s * 0.05 });
       for (let i = 0; i < 2; i++)
         addChamferedPanel(buf('steel'), 0.020 * G, 0.010 * G, 0.006 * G,
@@ -1226,7 +1234,10 @@ function buildHeroBuffers(id) {
     // stature and the body was a dozen big forms. On a 1.82m figure wearing
     // this many small plates it is a fat black rim on every one of them, and
     // the armour reads as dark first and violet second.
-    parts.push({ key, geo, outline: inflate(geo, OUT_T) });
+    // The default arena suit relies on real material/light response, matching
+    // the reference's clean low-poly rendering. A black hull around every tiny
+    // plate made its curved armour read as a pile of outlined blocks.
+    parts.push({ key, geo, outline: arena ? null : inflate(geo, OUT_T) });
   }
   return parts;
 }

@@ -139,8 +139,9 @@ const PALETTES = {
   // Compact arena operative: saturated orange impact armour over a near-black
   // undersuit, pale ceramic helmet/leg shells and a single acid-lime optic. The
   // colour blocking is intentionally bold enough to survive gameplay distance.
-  vanguard: { armor: 0xf2760e, armor2: 0x9da3a5, frame: 0x292e31, joint: 0x111416,
-              steel: 0x555d61, bone: 0xd2d5cf, glow: 0xb7ff32, bulk: 1.06 },  // compact arena operative
+  vanguard: { armor: 0xf2760e, armor2: 0x858d91, frame: 0x252a2e, joint: 0x111416,
+              steel: 0x555d61, bone: 0xbec4c4, glow: 0xb7ff32, bulk: 1.12,
+              finish: 'pbr' },  // compact arena operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
   phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
@@ -155,24 +156,40 @@ export function getLowPolyPalette(id) {
 }
 
 export function makeBodyMaterials(pal) {
+  const pbr = pal.finish === 'pbr';
   // Body materials carry a self-emissive floor so cel shadows keep their hue
   // instead of crushing to black on large flat plates under ACES tone mapping.
-  const body = (hex, floor = 0.32) => {
-    const m = T(hex);
-    m.emissive = new THREE.Color(hex).multiplyScalar(floor);
-    m.emissiveIntensity = 1;
+  const body = (hex, floor = 0.32, roughness = 0.6, metalness = 0.08) => {
+    const m = pbr
+      ? new THREE.MeshStandardMaterial({ color: hex, roughness, metalness })
+      : T(hex);
+    if (!pbr) {
+      m.emissive = new THREE.Color(hex).multiplyScalar(floor);
+      m.emissiveIntensity = 1;
+    }
+    m.userData.role = 'body';
     return m;
   };
   const red = pal.glow;
   return {
-    armor:  body(pal.armor, 0.16),
-    armor2: body(pal.armor2, 0.16),
-    frame:  body(pal.frame, 0.24),
-    joint:  body(pal.joint, 0.30),
-    steel:  body(pal.steel, 0.16),
-    bone:   body(pal.bone, 0.16),
-    glow:   T(new THREE.Color(red).multiplyScalar(0.15).getHex(), { role: 'energy', emissive: red, emissiveIntensity: 1.5 }),
-    eye:    T(new THREE.Color(red).multiplyScalar(0.2).getHex(),  { role: 'energy', emissive: red, emissiveIntensity: 2.2 }),
+    armor:  body(pal.armor, 0.16, 0.48, 0.14),
+    armor2: body(pal.armor2, 0.16, 0.62, 0.12),
+    frame:  body(pal.frame, 0.24, 0.84, 0.02),
+    joint:  body(pal.joint, 0.30, 0.96, 0.00),
+    steel:  body(pal.steel, 0.16, 0.38, 0.46),
+    bone:   body(pal.bone, 0.16, 0.68, 0.06),
+    glow:   pbr
+      ? Object.assign(new THREE.MeshStandardMaterial({
+          color: new THREE.Color(red).multiplyScalar(0.22), emissive: red,
+          emissiveIntensity: 2.2, roughness: 0.28, metalness: 0.08,
+        }), { userData: { role: 'energy' } })
+      : T(new THREE.Color(red).multiplyScalar(0.15).getHex(), { role: 'energy', emissive: red, emissiveIntensity: 1.5 }),
+    eye:    pbr
+      ? Object.assign(new THREE.MeshStandardMaterial({
+          color: new THREE.Color(red).multiplyScalar(0.28), emissive: red,
+          emissiveIntensity: 3.0, roughness: 0.22, metalness: 0.05,
+        }), { userData: { role: 'energy' } })
+      : T(new THREE.Color(red).multiplyScalar(0.2).getHex(),  { role: 'energy', emissive: red, emissiveIntensity: 2.2 }),
   };
 }
 
