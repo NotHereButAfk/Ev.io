@@ -1,10 +1,8 @@
-// ── Low-poly cyborg-terminator player models — cel-shaded like the guns ──────
-// Endoskeleton cyborgs modelled on the "Cyborg Terminator (low poly)" look: a
-// bare metal SKULL face with glowing red eyes, white/lavender armour plates over
-// a black underframe, red glow accents scattered across chest / knees / thighs,
-// and heavy angular segmented armour. Rendered with the SAME illustrated look as
-// the authored arsenal — flat MeshToonMaterial cel bands + a dark inverted-hull
-// contour outline on every part.
+// ── Low-poly arena operatives — cel-shaded like the guns ─────────────────────
+// Connected humanoid bodies with fabric/under-suit anatomy and shaped protective
+// panels. The default uses a compact orange/grey arena silhouette; alternate
+// bodies stay lighter and more ninja-like. All share the arsenal's illustrated
+// finish: flat MeshToonMaterial bands plus a dark inverted-hull contour.
 //
 // Built with the procedural-body naming convention (boot_/lleg_/thigh_/knee_/
 // uarm_/farm_/elbow_/hand_) so rigCharacterLimbs() walk-animates them for free.
@@ -140,11 +138,11 @@ const PALETTES = {
   // Neutral hard-surface blocks tie the default chassis to Rook's warm concrete
   // and graphite architecture; cyan is reserved for optics and small status
   // marks so the body stays readable without looking self-illuminated.
-  // Human tactical default: muted orange ceramic inserts over charcoal fabric,
-  // with gunmetal hardware. Neutral pads are deliberately mid-grey instead of
-  // white so the suit reads as clothing and armor, not a robot shell.
-  vanguard: { armor: 0xc85f1d, armor2: 0x676f73, frame: 0x30363a, joint: 0x171b1e,
-              steel: 0x424b50, bone: 0x7b8589, glow: 0x62c7cc, bulk: 0.99 },  // human tactical operative
+  // Compact arena operative: warm protective pads over a graphite undersuit,
+  // with pale helmet/boot shells and only tiny cyan optic accents. The neutral
+  // anatomy remains visible between pads so the silhouette stays humanoid.
+  vanguard: { armor: 0xe06a17, armor2: 0x858f95, frame: 0x343a3e, joint: 0x171b1e,
+              steel: 0x525c62, bone: 0xa4aeb4, glow: 0x62cfd2, bulk: 1.04 },  // compact arena operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
   phantom:  { armor: 0x292638, armor2: 0x716b7d, frame: 0x111016, joint: 0x060609,
