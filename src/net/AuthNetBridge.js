@@ -9,6 +9,7 @@
 // ServerSim path is completely untouched when no target is configured.
 
 import * as THREE from 'three';
+import { SHIELD_PER_STACK } from '../core/ShieldConfig.js';
 import { PLAYER_WORLD_MODEL_SCALE, STATURE } from '../player/Proportions.js';
 // Just above each rendered crown. Human avatars use a slightly smaller world
 // scale than full-size bots, so their plate follows that actual silhouette.
@@ -208,6 +209,7 @@ export class AuthNetBridge {
     }
     this._wasAlive = alive;
     const canControl = alive && controlsEnabled && mapReady;
+    this.game.pickupSystem?.syncLootPads?.(c.lootPads);
 
     // ── look (client-owned), same math as the legacy controller ──
     if (canControl) {
@@ -230,6 +232,7 @@ export class AuthNetBridge {
 
     // ── fixed-tick input send + prediction ──
     this._acc += Math.min(dt, 0.1);
+    this._syncAuthoritativeLoadout();
     const def = this.game.weaponSystem?.currentDef;
     while (this._acc >= DT) {
       this._acc -= DT;
@@ -350,6 +353,22 @@ export class AuthNetBridge {
     this._drainEvents();
   }
 
+  _syncAuthoritativeLoadout() {
+    const weapons = this.game.weaponSystem;
+    const matchWeapon = this.client.self.matchWeapon || null;
+    if (matchWeapon && weapons?.mapGunId !== matchWeapon) {
+      const def = weapons.addMapGun?.(matchWeapon);
+      if (def) {
+        this.game.hud?.buildWeaponSlots?.(weapons.getHudInfo().slots, weapons.currentIndex);
+        this.game.hud?.addKillFeed?.(`PICKED UP — ${def.name}`);
+      }
+    } else if (!matchWeapon && weapons?.mapGunId) {
+      weapons.resetLoadout?.();
+      weapons.resetState?.(this.player.baseFov);
+      this.game.hud?.buildWeaponSlots?.(weapons.getHudInfo().slots, weapons.currentIndex);
+    }
+  }
+
   _resolveRookCollision(next, previous) {
     const world = this.game.world;
     if (!world?._mapOctree || this.game._authoritativeMapTransitioning
@@ -468,6 +487,10 @@ export class AuthNetBridge {
         this.game.weaponSystem?.showAuthoritativeExplosion?.(
           new THREE.Vector3(e.x, e.y, e.z), e.r || 5, 'rocket',
         );
+      }
+      else if (e.e === 'pickup' && e.id === me && e.lootType === 'shield') {
+        const stacks = Math.ceil((e.maxShield || 0) / SHIELD_PER_STACK);
+        this.game.hud?.addKillFeed?.(`SHIELD +${SHIELD_PER_STACK} · ${stacks} STACK${stacks === 1 ? '' : 'S'}`);
       }
     }
   }

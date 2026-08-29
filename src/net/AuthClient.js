@@ -62,6 +62,7 @@ export class AuthClient {
     this.connected = false;
     this.seq = 0;
     this.fireSeq = 0;
+    this.pickupSeq = 0;
     // Last authoritative world tick actually rendered by this client. Fire
     // requests carry it so the server rewinds moving targets to what the
     // shooter saw, rather than confusing an input sequence with a world tick.
@@ -71,11 +72,13 @@ export class AuthClient {
     this.sprinting = false;                 // exact predicted MoveSim presentation
     this.simWorld = null;
     this.remotes = new Map();               // id -> {name, buf:[{t,x,y,z,yaw,crouch}]}
-    this.self = { health: 100, shield: 0, alive: true, mag: 30, reserve: 0,
+    this.self = { health: 100, shield: 0, maxShield: 0, alive: true, mag: 30, reserve: 0,
+                  wid: 'm4', mainWid: 'm4', matchWeapon: null,
                   reloading: false, reloadTicks: 0, reloadDuration: 0,
                   kills: 0, deaths: 0, score: 0,
                   blind: false, blindTicks: 0, abilities: { frag: 2, flash: 2, smoke: 2, impulse: 2 }, abilityCD: 0 };
     this.smokes = [];                       // active smoke volumes from the server
+    this.lootPads = [];                     // replicated random pad contents/state
     this.abilitySeq = 0;
     this.events = [];                       // drained by the game each frame
     this.roster = [];
@@ -116,6 +119,7 @@ export class AuthClient {
           kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
         }));
         this.arena = m.arena;
+        this.lootPads = m.arena?.lootPads || [];
         this.mapId = m.arena?.id || null;
         this.matchStart = m.matchStart ?? null;
         this.matchDurationMs = m.matchDurationMs ?? null;
@@ -185,7 +189,9 @@ export class AuthClient {
     }
     // authoritative self
     const y = snap.you;
-    this.self = { health: y.health, shield: y.shield, alive: y.alive,
+    this.self = { health: y.health, shield: y.shield, maxShield: y.maxShield ?? 0, alive: y.alive,
+                  wid: y.wid || this.self.wid, mainWid: y.mainWid || this.self.mainWid,
+                  matchWeapon: y.matchWeapon ?? null,
                   mag: y.mag, reserve: y.reserve ?? this.self.reserve,
                   reloading: !!y.reloading, reloadTicks: y.reloadTicks ?? 0,
                   reloadDuration: y.reloadDuration ?? 0,
@@ -194,6 +200,7 @@ export class AuthClient {
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
                   abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
+    this.lootPads = snap.lootPads ?? snap.arena?.lootPads ?? this.lootPads;
     this.roster = snap.players.map((pl) => ({
       id: pl.id, name: pl.name, isBot: !!pl.isBot,
       kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
@@ -322,6 +329,12 @@ export class AuthClient {
   sendReload(wid) {
     if (!this.connected) return;
     this.ws.send(JSON.stringify({ t: 'reload', wid }));
+  }
+
+  sendPickup(padId) {
+    if (!this.connected || !Number.isInteger(padId)) return;
+    this.pickupSeq++;
+    this.ws.send(JSON.stringify({ t: 'pickup', seq: this.pickupSeq, padId }));
   }
 
   // Request a throwable ability (frag / flash / smoke / impulse). The server owns

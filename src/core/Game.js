@@ -975,7 +975,7 @@ export class Game {
       this.hud.showServerPop(true);
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
-      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+      this.pickupSystem = this._createPickupSystem();
       const _mm = Math.floor(this._modeTimer / 60), _ss = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${_mm}:${String(_ss).padStart(2, '0')}`);
     } else if (this._isSurvival) {
@@ -1006,7 +1006,7 @@ export class Game {
       );
       // (re)create pickup system for fresh match
       this.pickupSystem?.dispose();
-      this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+      this.pickupSystem = this._createPickupSystem();
       this._refreshModeHUD();
     }
 
@@ -1490,7 +1490,7 @@ export class Game {
       this._configureMapCamera(map);
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       if (this.state === 'playing') {
-        this.pickupSystem = new PickupSystem(this.world.scene, this.world.weaponSpawnPoints);
+        this.pickupSystem = this._createPickupSystem();
       }
       await this._finishMapLoading(1800);
       this._pendingMapId = null;
@@ -1544,6 +1544,21 @@ export class Game {
     this.hud.buildWeaponSlots(this.weaponSystem.getHudInfo().slots, 0);
   }
 
+  _createPickupSystem() {
+    const authClient = this._authNet?.ready ? this._authNet.client : null;
+    return new PickupSystem(this.world.scene, this.world.weaponSpawnPoints, {
+      lootPads: authClient?.lootPads || null,
+      onPickupRequest: authClient
+        ? (padId) => authClient.sendPickup?.(padId)
+        : null,
+    });
+  }
+
+  _dropLifePickups() {
+    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+    this._resetLoadoutHud();
+  }
+
   // ── Player damage / death ───────────────────────────────────────────────────
 
   _onPlayerDamaged(dmg, from = null) {
@@ -1577,6 +1592,11 @@ export class Game {
       // survivalManager.onGameOver fires if no revives remain
       return;
     }
+
+    // A death ends the current pickup inventory immediately. The permanent
+    // menu-selected main gun and sword are rebuilt by resetLoadout(); temporary
+    // loot guns and every stacked shield are gone before the respawn begins.
+    this._dropLifePickups();
 
     // Deathmatch: keep the live match/camera active during the automatic
     // respawn. Opening the full navigation GUI here made headless and
@@ -1617,9 +1637,9 @@ export class Game {
   _respawnPlayer() {
     if (this.state !== 'playing') return;
     const point = this.world.safeSpawnPoint(this._activeManager?.bots || []);
+    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this.player.respawn(point);
     this.weaponSystem.resetMotionState();
-    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
     this._resetLoadoutHud();   // drop any picked-up power weapon
     // Match the authoritative room's clean-life ability contract without
     // deleting smoke/explosion presentation that is still active in the map.
@@ -1640,6 +1660,7 @@ export class Game {
     this._respawnRemaining = RESPAWN_DELAY;
     this._respawnDeadline = 0;
     this._beginDeathAnimation();
+    this._dropLifePickups();
     // The dedicated overlay is the death UI. Opening the navigation menu here
     // released pointer lock, obscured the match, and made the authoritative
     // path disagree with local deathmatch behavior.
@@ -1655,6 +1676,8 @@ export class Game {
     this._resetDeathAnimation();
     this.player.velocity.set(0, 0, 0);
     this.player.isSprinting = false;
+    this.player.setMaxShield(self?.maxShield ?? (this.selectedArmorSkin?.shield || 0));
+    this._resetLoadoutHud();
     this.weaponSystem.resetMotionState();
     this.hud.hideRespawn();
     this.hud.addKillFeed('RESPAWNED');

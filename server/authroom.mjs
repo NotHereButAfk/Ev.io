@@ -28,6 +28,12 @@ import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js
 import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
 import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../src/core/CombatConfig.js';
 import {
+  MAX_PICKUP_SHIELD,
+  SHIELD_REGEN_DELAY,
+  SHIELD_REGEN_RATE,
+  addShieldStack,
+} from '../src/core/ShieldConfig.js';
+import {
   BOT_DASH,
   BOT_RETALIATION_AIM_SCALE,
   BOT_STATES,
@@ -46,7 +52,7 @@ import {
   WEAPONS as CLIENT_WEAPONS,
   isMatchPickupWeaponId,
 } from '../src/weapons/weaponDefs.js';
-import { AUTHORED_WEAPON_BY_KIND } from '../src/world/PickupLayout.js';
+import { randomLootSpecs, rollLootItem } from '../src/world/PickupLayout.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
 
 export const TICK_HZ = 20;
@@ -101,8 +107,10 @@ const WEAPONS = Object.fromEntries(CLIENT_WEAPONS.map((weapon) => [weapon.id, {
   arc: weapon.arc || 0,
 }]));
 const BASE_WEAPONS = new Set([...MAIN_WEAPON_IDS, 'sword']);
+const MAIN_WEAPONS = new Set(MAIN_WEAPON_IDS);
 const WEAPON_COLLECT_RADIUS = 2.0;
 const WEAPON_COLLECT_HEIGHT = 2.2;
+const LOOT_RESPAWN_TICKS = TICK_HZ * 35;
 const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 
 // Server-authoritative throwable abilities (Phase 10). The server owns charges,
@@ -173,6 +181,7 @@ export class AuthRoom {
     targetPopulation = 0,
     botDifficulty = 'normal',
     botDifficultyOverrides = null,
+    lootSeed = Date.now(),
   } = {}) {
     this.arenas = Array.isArray(arena) ? arena : [arena];
     if (!this.arenas.length) throw new Error('AuthRoom requires at least one imported arena');
@@ -180,6 +189,10 @@ export class AuthRoom {
     this.arena = this.arenas[0];
     this._setSimArena(this.arena);
     this.tick = 0;
+    this._lootSeed = Number(lootSeed) | 0;
+    this._lootGeneration = 0;
+    this.lootPads = [];
+    this._resetLootPads();
     this.players = new Map();   // id -> player
     this.events = [];           // per-tick outgoing events (kills, hits, spawns)
     this.smokes = [];           // active smoke volumes {x,y,z,r,until}
@@ -217,6 +230,59 @@ export class AuthRoom {
       platforms: this.arena.platforms,
       boxes: this.arena.boxes,
       spawns: this.arena.spawns,
+      lootPads: this._lootPadPayload(),
+    };
+  }
+
+  _lootPadPayload() {
+    return this.lootPads.map((pad) => ({
+      padId: pad.padId,
+      x: pad.x, y: pad.y, z: pad.z,
+      lootType: pad.lootType,
+      gunId: pad.gunId,
+      color: pad.color,
+      active: pad.active,
+      respawnTicks: pad.active ? 0 : Math.max(0, pad.respawnTick - this.tick),
+    }));
+  }
+
+  _resetLootPads() {
+    const points = (this.arena.pickups || []).map((pickup) => ({
+      x: pickup.x, y: pickup.y, z: pickup.z, markerKind: pickup.markerKind,
+    }));
+    const seed = this._lootSeed + this._lootGeneration++ * 0x51ed270b;
+    this.lootPads = randomLootSpecs(points, seed).map((spec) => ({
+      padId: spec.padId,
+      x: spec.position.x, y: spec.position.y, z: spec.position.z,
+      lootType: spec.lootType,
+      gunId: spec.gunId,
+      color: spec.color,
+      active: true,
+      respawnTick: 0,
+      generation: 0,
+    }));
+  }
+
+  _rerollLootPad(pad) {
+    const item = rollLootItem(
+      this._lootSeed + this.tick * 101 + (++pad.generation) * 0x45d9f3b,
+      pad.padId,
+    );
+    Object.assign(pad, item, { active: true, respawnTick: 0 });
+    this.events.push({ e: 'loot-ready', padId: pad.padId, lootType: pad.lootType, gunId: pad.gunId });
+  }
+
+  _resetLifeInventory(player) {
+    const mainWid = MAIN_WEAPONS.has(player.mainWid) ? player.mainWid : 'm4';
+    player.mainWid = mainWid;
+    player.wid = mainWid;
+    player.matchWeapons.clear();
+    player.shield = START_SHIELD;
+    player.maxShield = START_SHIELD;
+    player.shieldRegenDelay = 0;
+    player.mag = WEAPONS[mainWid].mag;
+    player.ammo = {
+      [mainWid]: { mag: WEAPONS[mainWid].mag, reserve: WEAPONS[mainWid].reserve },
     };
   }
 
@@ -225,6 +291,7 @@ export class AuthRoom {
     this.matchStart = now;
     this._arenaIndex = (this._arenaIndex + 1) % this.arenas.length;
     this._setSimArena(this.arenas[this._arenaIndex]);
+    this._resetLootPads();
     // Repeat the collision/map payload for five seconds. A congested client
     // may skip an individual snapshot; map identity must never advance without
     // the matching simulation geometry.
@@ -250,16 +317,12 @@ export class AuthRoom {
       player.history.length = 0;
       player.health = START_HEALTH;
       player.healthRegenDelay = 0;
-      player.shield = player.maxShield;
+      this._resetLifeInventory(player);
       player.alive = true;
       player.deadUntil = 0;
       player.kills = 0;
       player.deaths = 0;
       player.score = 0;
-      player.wid = 'm4';
-      player.matchWeapons.clear();
-      player.mag = WEAPONS.m4.mag;
-      player.ammo = { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } };
       player.reloadUntil = 0;
       player.reloadWid = null;
       player.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
@@ -333,9 +396,9 @@ export class AuthRoom {
       lastInputSeq: 0, ackTick: 0,
       queue: [],
       health: START_HEALTH, shield: START_SHIELD, maxShield: START_SHIELD,
-      healthRegenDelay: 0,
+      healthRegenDelay: 0, shieldRegenDelay: 0,
       alive: true, deadUntil: 0, kills: 0, deaths: 0, score: 0,
-      wid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
+      wid: 'm4', mainWid: 'm4', mag: WEAPONS.m4.mag, fireCooldown: 0, gunBloom: 0,
       ammo: { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } },
       matchWeapons: new Set(),
       reloadUntil: 0, reloadWid: null,
@@ -344,7 +407,7 @@ export class AuthRoom {
       _lastSprint: false, _lastAim: false, _animVX: 0, _animVZ: 0,
       _botReloadUntil: 0,
       history: [],               // [{tick, x,y,z,eye,crouch,slide}]
-      lastFireSeq: 0, lastFireRequestTick: -Infinity,
+      lastFireSeq: 0, lastFireRequestTick: -Infinity, lastPickupSeq: 0,
       abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                    impulse: ABILITIES.impulse.charges },
       abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
@@ -765,24 +828,11 @@ export class AuthRoom {
     return chooseSafeSpawn(this.arena.spawns, occupants, index);
   }
 
-  // Main guns and the standard blade are always legal. A special becomes legal
-  // only after the authoritative position reaches its authored map pad; that
-  // grant lasts until death or the round rotates.
+  // Main guns and the standard blade are always legal. A random loot weapon
+  // becomes legal only after onPickup validates and grants that exact pad.
   _canEquipWeapon(p, wid) {
     if (!WEAPONS[wid]) return false;
     if (BASE_WEAPONS.has(wid) || p.matchWeapons?.has(wid)) return true;
-    if (!isMatchPickupWeaponId(wid)) return false;
-    for (const pickup of this.arena.pickups || []) {
-      const spec = AUTHORED_WEAPON_BY_KIND.get(pickup.markerKind);
-      if (spec?.id !== wid) continue;
-      const dx = p.state.px - pickup.x;
-      const dy = p.state.py - pickup.y;
-      const dz = p.state.pz - pickup.z;
-      if (Math.hypot(dx, dz) < WEAPON_COLLECT_RADIUS && Math.abs(dy) < WEAPON_COLLECT_HEIGHT) {
-        p.matchWeapons.add(wid);
-        return true;
-      }
-    }
     return false;
   }
 
@@ -801,6 +851,7 @@ export class AuthRoom {
       jumpJust: !!msg.jump, crouchJust: !!msg.crouchDown, teleJust: !!msg.tele,
     });
     const wid = this._canEquipWeapon(p, msg.wid) ? msg.wid : p.wid;
+    if (MAIN_WEAPONS.has(wid)) p.mainWid = wid;
     p.queue.push({ seq: msg.seq, inp, wid, aiming: !!msg.aiming });
     p.lastInputSeq = msg.seq;
     if (p.queue.length > MAX_INPUT_QUEUE) p.queue.splice(0, p.queue.length - MAX_INPUT_QUEUE);
@@ -936,6 +987,47 @@ export class AuthRoom {
     }
   }
 
+  onPickup(id, msg) {
+    const p = this.players.get(id);
+    if (!p || !p.alive) return false;
+    if (!Number.isInteger(msg.seq) || msg.seq <= p.lastPickupSeq) return false;
+    p.lastPickupSeq = msg.seq;
+    const pad = this.lootPads.find((entry) => entry.padId === msg.padId);
+    if (!pad?.active) return false;
+    const dx = p.state.px - pad.x;
+    const dy = p.state.py - pad.y;
+    const dz = p.state.pz - pad.z;
+    if (Math.hypot(dx, dz) >= WEAPON_COLLECT_RADIUS || Math.abs(dy) >= WEAPON_COLLECT_HEIGHT) return false;
+
+    if (pad.lootType === 'shield') {
+      if (p.maxShield >= MAX_PICKUP_SHIELD) return false;
+      const next = addShieldStack(p.shield, p.maxShield);
+      p.shield = next.shield;
+      p.maxShield = next.maxShield;
+      p.shieldRegenDelay = 0;
+    } else if (pad.lootType === 'weapon' && isMatchPickupWeaponId(pad.gunId)) {
+      p.matchWeapons.clear();
+      p.matchWeapons.add(pad.gunId);
+      p.wid = pad.gunId;
+      const weapon = WEAPONS[pad.gunId];
+      p.ammo[pad.gunId] = { mag: weapon.mag, reserve: weapon.reserve };
+      p.mag = weapon.mag;
+      p.reloadUntil = 0;
+      p.reloadWid = null;
+    } else {
+      return false;
+    }
+
+    pad.active = false;
+    pad.respawnTick = this.tick + LOOT_RESPAWN_TICKS;
+    this.events.push({
+      e: 'pickup', id: p.id, padId: pad.padId,
+      lootType: pad.lootType, gunId: pad.gunId,
+      shield: p.shield, maxShield: p.maxShield,
+    });
+    return true;
+  }
+
   _resolveRocket(shooter, w, yaw, pitch) {
     const ox = shooter.state.px, oy = shooter.state.py + HEAD_Y, oz = shooter.state.pz;
     const cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -1000,6 +1092,7 @@ export class AuthRoom {
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
     target.healthRegenDelay = HEALTH_REGEN_DELAY;
+    target.shieldRegenDelay = SHIELD_REGEN_DELAY;
     this.events.push({ e: 'hit', id: target.id, by: shooter.id, dmg: Math.round(dmg), head });
     if (target.health <= 0) this._kill(target, shooter, head);
   }
@@ -1012,6 +1105,7 @@ export class AuthRoom {
     target._lastAim = false;
     target._animVX = target._animVZ = 0;
     target._firingTicks = 0;
+    this._resetLifeInventory(target);
     target.deadUntil = this.tick + RESPAWN_TICKS;
     if (target.isBot) target._botState = BOT_STATES.DEAD;
     target.deaths++;
@@ -1121,6 +1215,10 @@ export class AuthRoom {
     this.events.length = 0;
     const rotated = this._rotateMatch();
 
+    for (const pad of this.lootPads) {
+      if (!pad.active && this.tick >= pad.respawnTick) this._rerollLootPad(pad);
+    }
+
     // expire finished smoke volumes
     if (this.smokes.length) this.smokes = this.smokes.filter((s) => this.tick < s.until);
     if (this.frags.length) {
@@ -1146,12 +1244,9 @@ export class AuthRoom {
         if (this.tick >= p.deadUntil) {
           const s = this._spawn(p.id, p.id, true);
           p.state = createState(s[0], s[1], s[2]);
-          p.health = START_HEALTH; p.shield = p.maxShield;
+          p.health = START_HEALTH;
+          this._resetLifeInventory(p);
           p.healthRegenDelay = 0;
-          p.wid = 'm4';
-          p.matchWeapons.clear();
-          p.mag = WEAPONS.m4.mag;
-          p.ammo = { m4: { mag: WEAPONS.m4.mag, reserve: WEAPONS.m4.reserve } };
           p.reloadUntil = 0; p.reloadWid = null;
           p.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
           p.alive = true; p.queue.length = 0;
@@ -1180,6 +1275,11 @@ export class AuthRoom {
         }
       } else if (p.health < START_HEALTH) {
         p.health = Math.min(START_HEALTH, p.health + HEALTH_REGEN_RATE / TICK_HZ);
+      }
+      if (p.shieldRegenDelay > 0) {
+        p.shieldRegenDelay = Math.max(0, p.shieldRegenDelay - 1 / TICK_HZ);
+      } else if (p.shield < p.maxShield) {
+        p.shield = Math.min(p.maxShield, p.shield + SHIELD_REGEN_RATE / TICK_HZ);
       }
 
       // consume the next queued input (or coast with zero-move if starved)
@@ -1309,7 +1409,7 @@ export class AuthRoom {
         firing: (p._firingTicks ?? 0) > 0, alive: p.alive,
         reload: reloadTicks > 0 ? 1 - reloadTicks / reloadDuration : 0,
         swing: p._swingUntil > now ? clamp((now - p._swingStart) / swingDuration, 0, 1) : 1,
-        health: p.health, shield: p.shield,
+        health: p.health, shield: p.shield, maxShield: p.maxShield,
         kills: p.kills, deaths: p.deaths, score: p.score,
         botState: p.isBot ? p._botState : undefined,
       });
@@ -1336,7 +1436,9 @@ export class AuthRoom {
                nX: p.state.nX, nY: p.state.nY, nZ: p.state.nZ,
                safeX: p.state.safeX, safeY: p.state.safeY, safeZ: p.state.safeZ,
                sprint: !!p._lastSprint,
-               health: p.health, shield: p.shield, alive: p.alive,
+               health: p.health, shield: p.shield, maxShield: p.maxShield, alive: p.alive,
+               wid: p.wid, mainWid: p.mainWid,
+               matchWeapon: Array.from(p.matchWeapons)[0] || null,
                mag: p.mag, reserve: ammo.reserve,
                reloading: p.reloadWid === p.wid && p.reloadUntil > now,
                reloadTicks: p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0,
@@ -1347,6 +1449,7 @@ export class AuthRoom {
                abilities: p.abilities, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,
         smokes: smokeList,
+        lootPads: this._lootPadPayload(),
         events: this.events,
       });
     }

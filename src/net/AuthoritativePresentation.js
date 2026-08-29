@@ -3,6 +3,7 @@
 // stamina and throwable inventory.
 export function applyAuthoritativeResources(player, client, grenades) {
   player.shield = client.self.shield ?? player.shield;
+  if (client.self.maxShield != null) player.maxShield = client.self.maxShield;
   player.stamina = client.sim?.stamina ?? player.stamina;
   if (grenades && client.self.abilities) {
     grenades.frags = client.self.abilities.frag ?? grenades.frags;

@@ -1,4 +1,8 @@
 import { getWeaponHudThumb, warmWeaponHudThumbs } from './WeaponThumbnails.js';
+import {
+  MAX_PICKUP_SHIELD,
+  SHIELD_PER_STACK,
+} from '../core/ShieldConfig.js';
 
 function setText(el, value) {
   if (!el) return;
@@ -26,6 +30,7 @@ export class HUD {
     this.shieldWrap  = document.getElementById('shield-wrap');
     this.shieldBar   = document.getElementById('shield-bar');
     this.shieldText  = document.getElementById('shield-text');
+    this.shieldStacks = document.getElementById('shield-stacks');
     this.staminaBar  = document.getElementById('stamina-bar');
     this.staminaText = document.getElementById('stamina-text');
     this.fragCount   = document.getElementById('frag-count');
@@ -236,9 +241,10 @@ export class HUD {
 
     if (player.maxShield > 0) {
       this.shieldWrap.classList.remove('hidden');
-      const spct = Math.max(0, (player.shield / player.maxShield) * 100);
+      const spct = Math.max(0, Math.min(100, (player.shield / MAX_PICKUP_SHIELD) * 100));
       setStyle(this.shieldBar, 'width', `${spct}%`);
       setText(this.shieldText, Math.ceil(player.shield));
+      setText(this.shieldStacks, `×${Math.ceil(player.maxShield / SHIELD_PER_STACK)}`);
     } else {
       this.shieldWrap.classList.add('hidden');
     }

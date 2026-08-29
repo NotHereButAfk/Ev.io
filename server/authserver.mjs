@@ -232,6 +232,9 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
         case 'reload':
           if (conn.id != null) room.onReload(conn.id, msg);
           break;
+        case 'pickup':
+          if (conn.id != null) room.onPickup(conn.id, msg);
+          break;
         case 'ability':
           if (conn.id != null) room.onAbility(conn.id, msg);
           break;

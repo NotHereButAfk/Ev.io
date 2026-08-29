@@ -7084,3 +7084,72 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
   #hud #weapon-slots { right: 5px !important; bottom: 78px !important; transform: scale(.64) !important; }
   #hud #weapon-wrap { right: 104px !important; bottom: -5px !important; transform: scale(.72) !important; transform-origin: bottom right !important; }
 }
+
+/* Stackable pickup shield: a compact crest and segmented blue line sit
+   directly above health. Each segment represents one 30-point stack. */
+#hud #shield-wrap {
+  bottom: 37px !important;
+  height: 15px !important;
+  gap: 6px !important;
+}
+#hud .shield-icon {
+  display: grid !important;
+  place-items: center;
+  width: 23px !important;
+  min-width: 23px !important;
+  height: 20px;
+}
+#hud .shield-icon::after { display: none !important; }
+#hud .shield-icon svg {
+  display: block;
+  width: 17px;
+  height: 20px;
+  overflow: visible;
+  fill: rgba(28, 137, 221, .76);
+  stroke: #8becff;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 4px rgba(57, 191, 255, .72));
+}
+#hud .shield-icon .shield-mark {
+  fill: none;
+  stroke: #d8f9ff;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+}
+#hud #shield-wrap .bar-bg {
+  height: 5px !important;
+  border-color: rgba(106, 220, 255, .34) !important;
+  background: rgba(4, 18, 31, .72) !important;
+}
+#hud #shield-wrap .bar-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(20% - 1px),
+    rgba(2, 22, 37, .82) calc(20% - 1px) 20%
+  );
+}
+#hud #shield-bar {
+  background: linear-gradient(90deg, #168be0, #79e9ff) !important;
+  box-shadow: 0 0 7px rgba(54, 199, 255, .62) !important;
+  transition: width .16s ease-out !important;
+}
+#hud #shield-text {
+  width: 28px !important;
+  color: #d9f8ff !important;
+}
+#hud #shield-stacks {
+  width: 25px;
+  color: #7de8ff;
+  font: 700 11px/1 'Rajdhani', sans-serif;
+  letter-spacing: .3px;
+  text-align: right;
+  text-shadow: 0 1px 3px #000, 0 0 5px rgba(57,191,255,.5);
+}
+@media (max-width: 700px) {
+  #hud #shield-stacks { width: 21px; font-size: 10px; }
+}

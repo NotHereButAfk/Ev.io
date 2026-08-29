@@ -24,7 +24,7 @@ const ok = (name, cond, extra = '') => {
 // ── raw client helper ──
 function client() {
   const ws = new WebSocket(`ws://127.0.0.1:${PORT}`, { origin: 'http://localhost' });
-  const c = { ws, welcome: null, snaps: [], events: [], seq: 0, fireSeq: 0 };
+  const c = { ws, welcome: null, snaps: [], events: [], seq: 0, fireSeq: 0, pickupSeq: 0 };
   ws.on('message', (raw) => {
     const m = JSON.parse(raw);
     if (m.t === 'welcome') c.welcome = m;
@@ -36,6 +36,7 @@ function client() {
   c.inputRaw = (o) => ws.send(JSON.stringify({ t: 'input', ...o }));
   c.fire = (wid, yaw, pitch) => ws.send(JSON.stringify({ t: 'fire', seq: ++c.fireSeq, wid, yaw, pitch }));
   c.fireRaw = (o) => ws.send(JSON.stringify({ t: 'fire', ...o }));
+  c.pickup = (padId) => ws.send(JSON.stringify({ t: 'pickup', seq: ++c.pickupSeq, padId }));
   c.last = () => c.snaps[c.snaps.length - 1];
   return c;
 }
@@ -142,6 +143,24 @@ await sleep(200);
 ok('join: both welcomed with distinct ids', a.welcome && b.welcome && a.welcome.you !== b.welcome.you);
 ok('join: arena shipped', !!a.welcome?.arena?.boxes);
 ok('snapshot: both see two players', a.last()?.players.length === 2 && b.last()?.players.length === 2);
+
+// Random pad collection is an explicit authoritative request. Asking from far
+// away cannot grant anything; reaching the exact active pad can grant a shield
+// and the replicated state hides that pad for every client.
+const pickupPlayer = room.players.get(a.welcome.you);
+const pickupPad = room.lootPads[0];
+Object.assign(pickupPad, { lootType: 'shield', gunId: undefined, active: true });
+const pickupStartShield = a.last().you.shield;
+a.pickup(pickupPad.padId);
+await sleep(120);
+ok('pickup: remote request cannot collect a pad from across the map',
+   a.last().you.shield === pickupStartShield && pickupPad.active);
+Object.assign(pickupPlayer.state, { px: pickupPad.x, py: pickupPad.y, pz: pickupPad.z });
+a.pickup(pickupPad.padId);
+await sleep(120);
+ok('pickup: server grants a shield only at the active pad', a.last().you.shield === 30);
+ok('pickup: collected pad state is hidden and replicated',
+   !pickupPad.active && a.last().lootPads?.find((pad) => pad.padId === pickupPad.padId)?.active === false);
 
 // movement authority: walk Alice forward with valid inputs
 const startZ = a.last().you.z;

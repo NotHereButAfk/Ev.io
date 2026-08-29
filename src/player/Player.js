@@ -12,6 +12,11 @@ import {
   STAMINA_REGEN_DELAY,
 } from '../sim/MovementConfig.js';
 import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../core/CombatConfig.js';
+import {
+  SHIELD_REGEN_DELAY,
+  SHIELD_REGEN_RATE,
+  addShieldStack,
+} from '../core/ShieldConfig.js';
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
@@ -23,9 +28,6 @@ const MOUSE_SENSITIVITY = 0.0024;
 
 const TELEPORT_RANGE    = 22;
 const TELEPORT_COOLDOWN = 5.0;
-
-const SHIELD_REGEN      = 6;    // per second
-const SHIELD_REGEN_DELAY = 3.0; // seconds before regen kicks in
 
 const CROUCH_HEIGHT   = 0.85;
 const SLIDE_DURATION  = 0.72;
@@ -114,6 +116,14 @@ export class Player {
     this.maxShield = max;
     this.shield = max;
     this._shieldRegenDelay = 0;
+  }
+
+  addShieldStack() {
+    const next = addShieldStack(this.shield, this.maxShield);
+    this.shield = next.shield;
+    this.maxShield = next.maxShield;
+    this._shieldRegenDelay = 0;
+    return next.gained;
   }
 
   respawn(position) {
@@ -243,7 +253,7 @@ export class Player {
     if (this._shieldRegenDelay > 0) {
       this._shieldRegenDelay = Math.max(0, this._shieldRegenDelay - dt);
     } else if (this.shield < this.maxShield) {
-      this.shield = Math.min(this.maxShield, this.shield + SHIELD_REGEN * dt);
+      this.shield = Math.min(this.maxShield, this.shield + SHIELD_REGEN_RATE * dt);
     }
 
     const len = Math.hypot(moveX, moveZ);

@@ -1,29 +1,32 @@
 import * as THREE from 'three';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
-import { authoredWeaponSpecs } from './PickupLayout.js';
+import { MAX_PICKUP_SHIELD } from '../core/ShieldConfig.js';
+import {
+  authoredWeaponSpecs,
+  randomLootSpecs,
+  rollLootItem,
+} from './PickupLayout.js';
 
 const RESPAWN_DELAY = 18;  // seconds before a pickup reappears
 const COLLECT_RADIUS = 1.6;
-const WEAPON_RESPAWN = 35;  // power weapons come back slowly — worth fighting over
+const LOOT_RESPAWN = 35;  // loot pads come back slowly — worth fighting over
 const WEAPON_COLLECT_RADIUS = 2.0;
 const WEAPON_COLLECT_HEIGHT = 2.2;
 
-// Used only by maps with no authored weapon markers. Rook's deterministic
-// marker-to-gun mapping lives in PickupLayout.js.
-const FALLBACK_SPECIAL_WEAPONS = [
-  { id: 'rpg',        position: new THREE.Vector3(0, 0, 0),   color: 0xff7a1a },
-  { id: 'boltsniper', position: new THREE.Vector3(22, 0, 0),  color: 0x33d0ec },
-  { id: 'fuelrod',    position: new THREE.Vector3(-22, 0, 0), color: 0x5cff7a },
-  { id: 'needler',    position: new THREE.Vector3(0, 0, 22),  color: 0xff4dd2 },
-  { id: 'concussion', position: new THREE.Vector3(0, 0, -22), color: 0xb27bff },
+// Used only by maps with no authored weapon markers.
+const FALLBACK_LOOT_POINTS = [
+  new THREE.Vector3(0, 0, 0),
+  new THREE.Vector3(22, 0, 0),
+  new THREE.Vector3(-22, 0, 0),
+  new THREE.Vector3(0, 0, 22),
+  new THREE.Vector3(0, 0, -22),
 ];
 
 // Pickup definitions: type, color, geometry size
 const PICKUP_DEFS = {
   health: { color: 0x00ff88, emissive: 0x00ff88, geo: 'sphere', size: 0.28, label: '+40 HP' },
   ammo:   { color: 0xffcc00, emissive: 0xffaa00, geo: 'box',    size: 0.30, label: 'AMMO' },
-  shield: { color: 0x00ccff, emissive: 0x0088ff, geo: 'sphere', size: 0.26, label: '+30 SHIELD' },
 };
 
 // Fixed world positions: along avenues (open streets) and corner plazas
@@ -34,9 +37,6 @@ const SPAWN_LAYOUT = [
   ['health', [ 28,   0]], ['ammo',   [-28,   0]],
   ['health', [  0,  44]], ['ammo',   [  0, -44]],
   ['health', [ 44,   0]], ['ammo',   [-44,   0]],
-  // Cross-street corners (the old corner spots are now inside the towers)
-  ['shield', [ 38,  38]], ['shield', [-38,  38]],
-  ['shield', [ 38, -38]], ['shield', [-38, -38]],
   // Mid-range scatter
   ['ammo',   [ 36,  36]], ['ammo',   [-36,  36]],
   ['ammo',   [ 36, -36]], ['ammo',   [-36, -36]],
@@ -45,16 +45,36 @@ const SPAWN_LAYOUT = [
 ];
 
 export class PickupSystem {
-  constructor(scene, authoredWeaponSpawns = []) {
+  constructor(scene, authoredWeaponSpawns = [], {
+    lootPads = null,
+    onPickupRequest = null,
+    seed = Date.now(),
+  } = {}) {
     this.scene    = scene;
     this._pickups = [];
-    this._weaponSpawns = this._resolveWeaponSpawns(authoredWeaponSpawns);
+    this._authoritative = typeof onPickupRequest === 'function';
+    this._onPickupRequest = onPickupRequest;
+    this._lootSeed = Number(seed) | 0;
+    this._weaponSpawns = this._resolveLootSpawns(authoredWeaponSpawns, lootPads);
     this._buildAll();
   }
 
-  _resolveWeaponSpawns(points) {
+  _resolveLootSpawns(points, supplied) {
+    if (Array.isArray(supplied) && supplied.length) {
+      return supplied.map((pad, padId) => ({
+        padId: pad.padId ?? padId,
+        lootType: pad.lootType,
+        gunId: pad.gunId,
+        color: pad.color ?? (pad.lootType === 'shield' ? 0x39bfff : 0xff7a1a),
+        active: pad.active !== false,
+        position: new THREE.Vector3(pad.x, pad.y, pad.z),
+      }));
+    }
     const authored = authoredWeaponSpecs(points);
-    return authored.length ? authored : FALLBACK_SPECIAL_WEAPONS;
+    const positions = authored.length
+      ? authored.map((spec) => spec.position)
+      : FALLBACK_LOOT_POINTS;
+    return randomLootSpecs(positions, this._lootSeed);
   }
 
   _buildMesh(def) {
@@ -92,7 +112,9 @@ export class PickupSystem {
   }
 
   _buildAll() {
-    for (const [type, [px, pz]] of SPAWN_LAYOUT) {
+    // The authoritative server only exposes loot pads. Legacy/local matches
+    // retain their lightweight health and ammo pickups.
+    for (const [type, [px, pz]] of this._authoritative ? [] : SPAWN_LAYOUT) {
       const def    = PICKUP_DEFS[type];
       const mesh   = this._buildMesh(def);
       mesh.position.set(px, 0.7, pz);
@@ -100,24 +122,29 @@ export class PickupSystem {
       // Stagger _animT so every pickup floats at a different phase from the start
       this._pickups.push({ type, def, mesh, active: true, respawnTimer: 0, baseY: 0.7, _animT: this._pickups.length * 1.37 });
     }
-    // Special power-weapon spawns.
+    // Random loot pads: each generation is either a temporary weapon or a
+    // shield stack. The pad itself remains in the authored weapon location.
     for (const spec of this._weaponSpawns) {
-      const gun = getWeapon(spec.id);
-      if (!gun) continue;
-      const mesh = this._buildWeaponMesh(spec, gun);
+      const gun = spec.lootType === 'weapon' ? getWeapon(spec.gunId) : null;
+      if (spec.lootType === 'weapon' && !gun) continue;
+      const mesh = this._buildLootMesh(spec, gun);
       mesh.position.copy(spec.position);
+      mesh.visible = spec.active !== false;
       this.scene.add(mesh);
       this._pickups.push({
-        type: 'weapon', gunId: spec.id, def: gun, name: gun.name, mesh,
-        active: true, respawnTimer: 0, baseY: 1.4, _animT: this._pickups.length * 1.37,
+        type: 'loot', lootType: spec.lootType, gunId: spec.gunId,
+        def: gun, name: gun?.name || 'Shield Stack', padId: spec.padId,
+        color: spec.color, mesh, active: spec.active !== false,
+        respawnTimer: 0, baseY: 1.4, _animT: this._pickups.length * 1.37,
+        _requestCooldown: 0,
         _spin: mesh.getObjectByName('wpnSpin'),
       });
     }
   }
 
-  // A marked power-weapon spawn: a beam of light + a glowing base ring with the
-  // floating weapon model inside.
-  _buildWeaponMesh(spec, gun) {
+  // A marked loot spawn: a beam of light + a glowing base ring with either the
+  // floating weapon model or a proper shield crest inside.
+  _buildLootMesh(spec, gun) {
     const group = new THREE.Group();
     group.userData.noHit = true;
     const col = spec.color;
@@ -135,9 +162,9 @@ export class PickupSystem {
 
     // Floating weapon model (procedural — no GLB dependency), scaled to fit.
     const spin = new THREE.Group(); spin.name = 'wpnSpin'; spin.position.y = 1.4;
-    const built = buildWeaponModel(gun, { procedural: true });
-    const wm = built && built.group;
-    if (wm) {
+    const built = gun ? buildWeaponModel(gun, { procedural: true }) : null;
+    const wm = built?.group;
+    if (wm && spec.lootType === 'weapon') {
       wm.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.userData.noHit = true; } });
       const box = new THREE.Box3().setFromObject(wm);
       const size = box.getSize(new THREE.Vector3());
@@ -146,11 +173,32 @@ export class PickupSystem {
       const c = box.getCenter(new THREE.Vector3()).multiplyScalar(2.4 / maxd);
       wm.position.sub(c);
       spin.add(wm);
-    } else {
-      // fallback: a glowing diamond
-      const dm = new THREE.Mesh(new THREE.OctahedronGeometry(0.5),
-        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.4 }));
-      spin.add(dm);
+    } else if (spec.lootType === 'shield') {
+      const shape = new THREE.Shape();
+      shape.moveTo(0, 0.72);
+      shape.lineTo(0.58, 0.43);
+      shape.lineTo(0.48, -0.26);
+      shape.quadraticCurveTo(0.28, -0.62, 0, -0.78);
+      shape.quadraticCurveTo(-0.28, -0.62, -0.48, -0.26);
+      shape.lineTo(-0.58, 0.43);
+      shape.closePath();
+      const shield = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.04, bevelSegments: 2 }),
+        new THREE.MeshStandardMaterial({
+          color: 0x147dcc, emissive: 0x39bfff, emissiveIntensity: 1.15,
+          metalness: 0.62, roughness: 0.24,
+        }),
+      );
+      shield.position.z = -0.06;
+      shield.userData.noHit = true;
+      const core = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.09, 0.48, 4, 8),
+        new THREE.MeshBasicMaterial({ color: 0xc8f6ff }),
+      );
+      core.scale.x = 0.72;
+      core.position.z = 0.09;
+      core.userData.noHit = true;
+      spin.add(shield, core);
     }
     group.add(spin);
     return group;
@@ -167,18 +215,29 @@ export class PickupSystem {
   }
 
   _collect(pickup, player, weaponSystem, hud) {
+    if (pickup.type === 'loot' && this._authoritative) {
+      if (pickup._requestCooldown <= 0) {
+        pickup._requestCooldown = 0.65;
+        this._onPickupRequest?.(pickup.padId);
+      }
+      return;
+    }
+
     pickup.active      = false;
-    pickup.respawnTimer = pickup.type === 'weapon' ? WEAPON_RESPAWN : RESPAWN_DELAY;
+    pickup.respawnTimer = pickup.type === 'loot' ? LOOT_RESPAWN : RESPAWN_DELAY;
     pickup.mesh.visible = false;
 
-    if (pickup.type === 'weapon') {
-      if (weaponSystem?.addMapGun) {
+    if (pickup.type === 'loot') {
+      if (pickup.lootType === 'weapon' && weaponSystem?.addMapGun) {
         const def = weaponSystem.addMapGun(pickup.gunId);
         if (def && hud) {
           hud.addKillFeed(`PICKED UP — ${def.name}`);
           // Rebuild the right-side weapon inventory so the extra shows next to the main.
           hud.buildWeaponSlots?.(weaponSystem.getHudInfo().slots, weaponSystem.currentIndex);
         }
+      } else if (pickup.lootType === 'shield') {
+        const gained = player.addShieldStack?.() || 0;
+        if (gained && hud) hud.addKillFeed(`SHIELD STACK +${gained}`);
       }
       return;
     }
@@ -187,16 +246,6 @@ export class PickupSystem {
       const gained = Math.min(40, player.maxHealth - player.health);
       player.health = Math.min(player.maxHealth, player.health + 40);
       if (hud) hud.addKillFeed(`+ ${gained} HP`);
-    } else if (pickup.type === 'shield') {
-      if (player.maxShield > 0) {
-        const gained = Math.min(30, player.maxShield - player.shield);
-        player.shield = Math.min(player.maxShield, player.shield + 30);
-        if (hud) hud.addKillFeed(`+ ${gained} SHIELD`);
-      } else {
-        // Treat as health if no shield
-        player.health = Math.min(player.maxHealth, player.health + 30);
-        if (hud) hud.addKillFeed(`+30 HP`);
-      }
     } else if (pickup.type === 'ammo') {
       if (weaponSystem) {
         for (const w of weaponSystem.loadout) {
@@ -213,22 +262,77 @@ export class PickupSystem {
     }
   }
 
+  _replaceLoot(pickup, next) {
+    const position = next.position || pickup.mesh.position;
+    const gun = next.lootType === 'weapon' ? getWeapon(next.gunId) : null;
+    if (next.lootType === 'weapon' && !gun) return;
+    const old = pickup.mesh;
+    const mesh = this._buildLootMesh(next, gun);
+    mesh.position.copy(position);
+    mesh.visible = next.active !== false;
+    this.scene.add(mesh);
+    this.scene.remove(old);
+    this._disposeMesh(old);
+    Object.assign(pickup, {
+      lootType: next.lootType,
+      gunId: next.gunId,
+      def: gun,
+      name: gun?.name || 'Shield Stack',
+      color: next.color,
+      mesh,
+      active: next.active !== false,
+      baseY: 1.4,
+      _spin: mesh.getObjectByName('wpnSpin'),
+      _requestCooldown: 0,
+    });
+  }
+
+  syncLootPads(states = []) {
+    if (!this._authoritative || !Array.isArray(states)) return;
+    const byId = new Map(states.map((state) => [state.padId, state]));
+    for (const pickup of this._pickups) {
+      if (pickup.type !== 'loot') continue;
+      const state = byId.get(pickup.padId);
+      if (!state) continue;
+      const changed = pickup.lootType !== state.lootType
+        || pickup.gunId !== state.gunId
+        || pickup.color !== state.color;
+      if (changed) {
+        this._replaceLoot(pickup, {
+          ...state,
+          position: new THREE.Vector3(state.x, state.y, state.z),
+        });
+      } else {
+        pickup.active = state.active !== false;
+        pickup.mesh.visible = pickup.active;
+        if (!pickup.active) pickup._requestCooldown = 0;
+      }
+    }
+  }
+
   update(dt, player, weaponSystem, hud) {
     const pPos = player.position;
 
     for (const p of this._pickups) {
+      p._requestCooldown = Math.max(0, (p._requestCooldown || 0) - dt);
       if (!p.active) {
+        if (this._authoritative) continue;
         p.respawnTimer -= dt;
         if (p.respawnTimer <= 0) {
-          p.active      = true;
-          p.mesh.visible = true;
+          if (p.type === 'loot') {
+            const next = rollLootItem(++this._lootSeed + p.padId * 101, p.padId);
+            this._replaceLoot(p, { ...next, active: true, position: p.mesh.position.clone() });
+          } else {
+            p.active = true;
+            p.mesh.visible = true;
+          }
         }
         continue;
       }
 
       // Float + spin animation — use frame time instead of Date.now() (avoids 20 syscalls/frame)
       p._animT += dt * 2.0;
-      if (p.type === 'weapon') {
+      if (p.type === 'loot') {
         // Spin only the floating weapon; the beam/ring stay put.
         if (p._spin) { p._spin.rotation.y += dt * 1.1; p._spin.position.y = p.baseY + Math.sin(p._animT) * 0.18; }
       } else {
@@ -240,15 +344,15 @@ export class PickupSystem {
       const dx = pPos.x - p.mesh.position.x;
       const dy = pPos.y - p.mesh.position.y;
       const dz = pPos.z - p.mesh.position.z;
-      const radius = p.type === 'weapon' ? WEAPON_COLLECT_RADIUS : COLLECT_RADIUS;
+      const radius = p.type === 'loot' ? WEAPON_COLLECT_RADIUS : COLLECT_RADIUS;
       const closeEnough = Math.sqrt(dx * dx + dz * dz) < radius
-        && (p.type !== 'weapon' || Math.abs(dy) < WEAPON_COLLECT_HEIGHT);
+        && (p.type !== 'loot' || Math.abs(dy) < WEAPON_COLLECT_HEIGHT);
       if (closeEnough && !player.isDead) {
         // Only collect if it does something useful.
         let needed = false;
-        if (p.type === 'weapon')  needed = weaponSystem?.currentDef?.id !== p.gunId;  // not already holding it
+        if (p.type === 'loot' && p.lootType === 'weapon') needed = weaponSystem?.mapGunId !== p.gunId;
+        if (p.type === 'loot' && p.lootType === 'shield') needed = player.maxShield < MAX_PICKUP_SHIELD;
         if (p.type === 'health')  needed = player.health  < player.maxHealth;
-        if (p.type === 'shield')  needed = player.maxShield > 0 ? player.shield < player.maxShield : player.health < player.maxHealth;
         if (p.type === 'ammo')    needed = weaponSystem?.loadout.some(w =>
           w.kind !== 'melee' && weaponSystem.state.get(w.id)?.reserveAmmo < w.reserveMax
         );
@@ -258,7 +362,10 @@ export class PickupSystem {
   }
 
   dispose() {
-    for (const p of this._pickups) this.scene.remove(p.mesh);
+    for (const p of this._pickups) {
+      this.scene.remove(p.mesh);
+      this._disposeMesh(p.mesh);
+    }
     this._pickups = [];
   }
 }

@@ -262,6 +262,7 @@ export class WeaponSystem {
     this.keyMap = new Map();
     this._rebuildKeyMap();
     this.currentIndex = 0;
+    this.mapGunId = null;
     this.state = new Map();
     for (const w of this.allWeapons) {
       this.state.set(w.id, {
@@ -746,6 +747,7 @@ export class WeaponSystem {
     this.loadout = [gun, melee].filter(Boolean);
     this._mainGunId = gun?.id ?? null;   // remembered so map power-weapons can be dropped on respawn
     this._meleeId   = melee?.id ?? null;
+    this.mapGunId = null;
     this.currentIndex = 0;
     this._rebuildKeyMap();
     this._setActiveModel(0);
@@ -766,6 +768,7 @@ export class WeaponSystem {
     if (!main || main.id !== def.id) slots.push(def);   // the extra power slot
     if (melee) slots.push(melee);
     this.loadout = slots;
+    this.mapGunId = def.id;
     this.currentIndex = this.loadout.indexOf(def);
     this._rebuildKeyMap();
     const st = this.state.get(def.id);
