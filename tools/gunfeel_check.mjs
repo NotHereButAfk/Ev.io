@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { getWeapon } from '../src/weapons/weaponDefs.js';
 import {
   advanceFireCooldown,
+  isRunningAndFiring,
   scheduleNextShot,
   wantsTriggerShot,
 } from '../src/weapons/FireControl.js';
@@ -48,6 +49,18 @@ assert.ok(bloom > 0.015, 'sustained fire must visibly build toward maximum bloom
 assert.equal(wantsTriggerShot(false, true, false), true, 'semi-auto fires on press edge');
 assert.equal(wantsTriggerShot(false, true, true), false, 'semi-auto cannot fire while held');
 assert.equal(wantsTriggerShot(true, true, true), true, 'automatic keeps firing while held');
+assert.equal(
+  isRunningAndFiring({ velocity: { x: 9, z: 0 } }, { mouseDown: true }),
+  true,
+  'run-and-gun trigger state was not detected while moving',
+);
+assert.equal(
+  isRunningAndFiring({ velocity: { x: 9, z: 0 } }, { mouseDown: false }),
+  false,
+  'run-and-gun state ignored a released trigger',
+);
+assert.match(weaponSystemSource, /isRunningAndFiring\(player, input\)/,
+  'weapon presentation must expose a moving-fire pose');
 
 const expected = automaticShots(60, 1, ar.fireRate);
 for (const fps of [30, 60, 144]) {

@@ -140,6 +140,50 @@ try {
     `sprint peak ${sprintPeak.toFixed(2)}m/s is not faster than walk ${walkPeak.toFixed(2)}m/s`);
   mark('movement');
 
+  // Run-and-gun: sprinting must not disable the trigger or force the weapon
+  // into a buried carry pose. Keep the movement and firing inputs held at the
+  // same time, then verify both authoritative local ammo and the presentation
+  // blend advanced while the player retained sprint speed.
+  await game(`
+    const spawn = g.world.spawnPoints.find(p => p.y <= 3.1) || g.world.spawnPoints[0];
+    g.player.position.copy(spawn);
+    g.player.yaw = Number.isFinite(spawn.spawnYaw) ? spawn.spawnYaw : 0;
+    g.player.velocity.set(0, 0, 0);
+    g.weaponSystem.currentState.magAmmo = Math.max(12, g.weaponSystem.currentDef.magSize || 12);
+    g.input.mouseDown = true;
+    g.input._onKeyDown({code:'ShiftLeft',key:'Shift',preventDefault(){}});
+    g.input._onKeyDown({code:'KeyW',key:'w',preventDefault(){}});
+    return true;
+  `);
+  const runGunStartAmmo = await game(`return g.weaponSystem.currentState.magAmmo;`);
+  let runGunPeak = 0;
+  let runGunBlend = 0;
+  for (let i = 0; i < 12; i++) {
+    await page.waitForTimeout(100);
+    const sample = await game(`return {
+      speed: Math.hypot(g.player.velocity.x, g.player.velocity.z),
+      ammo: g.weaponSystem.currentState.magAmmo,
+      blend: g.weaponSystem._movingFireT,
+    };`);
+    runGunPeak = Math.max(runGunPeak, sample.speed);
+    runGunBlend = Math.max(runGunBlend, sample.blend);
+    if (sample.ammo < runGunStartAmmo) break;
+  }
+  await game(`
+    g.input.mouseDown = false;
+    g.input._onKeyUp({code:'KeyW',key:'w'});
+    g.input._onKeyUp({code:'ShiftLeft',key:'Shift'});
+    return true;
+  `);
+  const runGunEndAmmo = await game(`return g.weaponSystem.currentState.magAmmo;`);
+  assert(runGunPeak > walkPeak * 1.12,
+    `run-and-gun lost sprint speed (${runGunPeak.toFixed(2)}m/s)`);
+  assert(runGunEndAmmo < runGunStartAmmo,
+    `run-and-gun trigger did not fire (${runGunStartAmmo}->${runGunEndAmmo})`);
+  assert(runGunBlend > 0.4,
+    `run-and-gun presentation blend stayed low (${runGunBlend.toFixed(2)})`);
+  mark('run-and-gun');
+
   await game(`
     const spawn = g.world.spawnPoints.find(p => p.y <= 3.1) || g.world.spawnPoints[0];
     g.player.respawn(spawn);

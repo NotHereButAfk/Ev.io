@@ -6,6 +6,7 @@ import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
 import {
   advanceFireCooldown,
+  isRunningAndFiring,
   scheduleNextShot,
   wantsTriggerShot,
 } from './FireControl.js';
@@ -288,6 +289,7 @@ export class WeaponSystem {
     this.swingPhase = 1;
     this.scopeT = 0; // 0..1 zoom blend
     this._sprintT = 0; // 0..1 sprint carry blend
+    this._movingFireT = 0; // 0..1 braced run-and-gun presentation blend
     // smoothed viewmodel state (all frame-rate-independent) — the applied
     // transform eases toward these targets so nothing ever snaps.
     this._swayX = 0; this._swayY = 0;         // smoothed look-sway
@@ -846,6 +848,7 @@ export class WeaponSystem {
     this.swingPhase = 1;
     this.scopeT = 0;
     this._sprintT = 0;
+    this._movingFireT = 0;
     this._swayX = 0;
     this._swayY = 0;
     this._swayVelX = 0;
@@ -1682,8 +1685,16 @@ export class WeaponSystem {
     }
     this._prevRightMouse = input.rightMouseDown;
 
-    // Sprint blend for COD carry animation (blocks ADS)
+    // Sprint blend for COD carry animation. Firing remains legal while
+    // sprinting; run-and-gun simply keeps the rig braced instead of allowing
+    // the non-combat carry pose to bury the sights below the frame.
     this._sprintT = expDamp(this._sprintT, player.isSprinting ? 1 : 0, 9, dt);
+    this._movingFireT = expDamp(
+      this._movingFireT,
+      isRunningAndFiring(player, input) ? 1 : 0,
+      14,
+      dt,
+    );
 
     // Every EV.IO firearm can zoom. Regular guns remain visible and travel
     // onto their physical sight axis; snipers hand off to the overlay late in
@@ -1870,18 +1881,22 @@ export class WeaponSystem {
     const sprintDrop = THREE.MathUtils.lerp(
       -0.02, 0.14, THREE.MathUtils.clamp((this.camera.fov - 60) / 18, 0, 1),
     );
-    const sprintDropY  = -this._sprintT * sprintDrop;
-    const sprintShiftX = -this._sprintT * 0.12 * aspectScale;
+    // A moving shot is a combat pose, not a full sprint carry. Leave a small
+    // amount of bob/cant so speed still reads, while keeping both hands and
+    // the muzzle in a usable firing lane.
+    const sprintCarry = this._sprintT * (1 - 0.72 * this._movingFireT);
+    const sprintDropY  = -sprintCarry * sprintDrop;
+    const sprintShiftX = -sprintCarry * 0.12 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const hipX = swordGuard
       ? SWORD_VIEWMODEL_X * THREE.MathUtils.clamp(aspectScale, 0.26, 1.08)
-        - this._sprintT * 0.025 * aspectScale
+        - sprintCarry * 0.025 * aspectScale
       : baseX + sprintShiftX;
     const hipY = swordGuard
-      ? SWORD_VIEWMODEL_Y - this._sprintT * 0.075
+      ? SWORD_VIEWMODEL_Y - sprintCarry * 0.075
       : VIEWMODEL_Y + sprintDropY;
-    const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - this._sprintT * 0.025 : VIEWMODEL_Z;
+    const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - sprintCarry * 0.025 : VIEWMODEL_Z;
     // The mount was solved from the actual model bounds at construction time.
     // Using that physical sight anchor here keeps every gun centred without a
     // per-weapon screen-offset table or changing third-person weapon scale.
@@ -1898,11 +1913,11 @@ export class WeaponSystem {
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     const targetMountPitch = swordGuard
-      ? SWORD_VIEWMODEL_PITCH - this._sprintT * 0.055 + landPulse * 0.05
-      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + this._sprintT * 0.22, ADS_PITCH, adsEase)
+      ? SWORD_VIEWMODEL_PITCH - sprintCarry * 0.055 + landPulse * 0.05
+      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + sprintCarry * 0.22, ADS_PITCH, adsEase)
         + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12;
     const targetMountYaw = swordGuard
-      ? SWORD_VIEWMODEL_YAW + this._sprintT * 0.025
+      ? SWORD_VIEWMODEL_YAW + sprintCarry * 0.025
       : THREE.MathUtils.lerp(VIEWMODEL_YAW, ADS_YAW, adsEase);
     this._mountRot.x = expDamp(this._mountRot.x, targetMountPitch, 17, dt);
     this._mountRot.y = expDamp(this._mountRot.y, targetMountYaw, 17, dt);
@@ -1911,8 +1926,8 @@ export class WeaponSystem {
       // the support shoulder into the middle of the screen. The old 57° roll
       // was what made even a human-length sleeve appear to end in mid-air.
       swordGuard
-        ? SWORD_VIEWMODEL_ROLL - this._sprintT * 0.06
-        : THREE.MathUtils.lerp(VIEWMODEL_ROLL + this._sprintT * -0.40, ADS_ROLL, adsEase)
+        ? SWORD_VIEWMODEL_ROLL - sprintCarry * 0.06
+        : THREE.MathUtils.lerp(VIEWMODEL_ROLL + sprintCarry * -0.40, ADS_ROLL, adsEase)
           + 0.42 * framedBell, 17, dt);
     // The tested shared depth keeps the longest authored stock and its recoil
     // travel clear of the near plane without separating either glove.
