@@ -4,6 +4,7 @@ import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
+import { applyUniversalLocomotion } from '../player/UniversalAnimations.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
 import { getSkin } from '../player/skins.js';
@@ -945,24 +946,19 @@ export class Bot {
     const run = THREE.MathUtils.clamp((this._animSpeed - 3.0) / 3.0, 0, 1);
     if (this._rig) {
       const isMoving = resolvedMoving;
-      // applyWalkCycle owns the stride phase and locks it to ground speed.
-      // Bots now orbit and retreat while aiming, so direction and air state are
-      // explicit—the forward-only default would moonwalk during those moves.
-      gait = applyWalkCycle(this._rig, {
+      const gaitOptions = {
         speed: isMoving ? this._animSpeed : 0,
         moving: isMoving,
         run,
+        sprint: this._dashT > 0,
         dirF: resolvedDirF,
         dirR: resolvedDirR,
         grounded: this._onGround,
         vy: this._velY,
         dt,
-      });
-      // Do not run the generic retargeted clip after applyWalkCycle here. Its
-      // source rig has a different hip/rest height, so stacking both animators
-      // folds these exosuits into a seated gait and leaves the carried weapon
-      // floating above the torso. applyWalkCycle already owns a complete,
-      // ground-speed-synchronised soldier locomotion pose for bot rigs.
+      };
+      gait = applyUniversalLocomotion(this._rig, gaitOptions)
+        || applyWalkCycle(this._rig, gaitOptions);
       this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so
       // you can hear someone coming up behind you.
@@ -975,8 +971,11 @@ export class Bot {
       }
       // The pelvis drops at full stride and the body leans into the run. Local
       // pitch (the mesh is YXZ-ordered) so the lean follows the facing.
+      this.mesh.position.x = this.position.x + Math.cos(this.mesh.rotation.y) * gait.sway;
       this.mesh.position.y = this.position.y + gait.bob;
+      this.mesh.position.z = this.position.z - Math.sin(this.mesh.rotation.y) * gait.sway;
       this.mesh.rotation.x = gait.lean;        // already eased, and bob assumes it
+      this.mesh.rotation.z = gait.roll;
 
       // AR bots' arms belong to the rifle (applyRifleCarry, below, poses both
       // onto the grip and handguard). Sword bots go through the shared melee

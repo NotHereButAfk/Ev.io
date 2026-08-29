@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { stripRetargetedRootMotion } from '../src/player/UniversalAnimations.js';
+import {
+  authoredTravelDirection,
+  prepareRetargetedLocomotionClip,
+} from '../src/player/UniversalAnimations.js';
 
 globalThis.ProgressEvent ??= class ProgressEvent {
   constructor(type, init = {}) { this.type = type; Object.assign(this, init); }
@@ -43,20 +46,44 @@ const fixture = new THREE.AnimationClip('upright-retarget', 1, [
   new THREE.QuaternionKeyframeTrack('.bones[hips].quaternion', [0, 1], [
     0, 0, 0, 1, 0.1, 0, 0, 0.995,
   ]),
+  new THREE.QuaternionKeyframeTrack('.bones[thighL].quaternion', [0, 1], [
+    0, 0, 0, 1, 0.2, 0, 0, 0.98,
+  ]),
+  new THREE.VectorKeyframeTrack('.bones[thighL].position', [0, 1], [
+    0, 1, 0, 0, 0.5, 0,
+  ]),
 ]);
-stripRetargetedRootMotion(fixture);
+prepareRetargetedLocomotionClip(fixture);
 if (fixture.tracks.some((track) => track.name.includes('[root]'))) {
   throw new Error('retargeted root rotation can still lay a character on the floor');
 }
-if (!fixture.tracks.some((track) => track.name.includes('[hips]'))) {
-  throw new Error('upright correction removed articulated locomotion');
+if (fixture.tracks.some((track) => track.name.endsWith('.position'))) {
+  throw new Error('retargeted source translation can still collapse the target skeleton');
+}
+if (fixture.tracks.some((track) => track.name.includes('[hips]'))) {
+  throw new Error('authored upper body can still move the solved weapon shoulder');
+}
+if (!fixture.tracks.some((track) => track.name.includes('[thighL]'))) {
+  throw new Error('retarget sanitizing removed the authored leg performance');
 }
 
 for (const sourcePath of ['../src/entities/Bot.js', '../src/player/Avatar.js', '../src/core/Game.js']) {
   const runtimeSource = fs.readFileSync(new URL(sourcePath, import.meta.url), 'utf8');
-  if (/universalAnimator\?\.update\s*\(/.test(runtimeSource)) {
-    throw new Error(`${sourcePath} stacks a retargeted locomotion clip over the ground-speed gait`);
+  if (!/applyUniversalLocomotion\s*\(/.test(runtimeSource)) {
+    throw new Error(`${sourcePath} does not sample the authored character animation`);
+  }
+  if (!/\|\|\s*applyWalkCycle\s*\(/.test(runtimeSource)) {
+    throw new Error(`${sourcePath} lost its safe procedural fallback`);
   }
 }
 
-console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; root-axis correction keeps player rigs upright while bot rigs use their ground-speed soldier gait`);
+const strafe = authoredTravelDirection(0, 1);
+if (Math.abs(strafe.yaw + Math.PI / 2) > 1e-6 || strafe.playbackSign !== 1) {
+  throw new Error('right-strafe leg plane points away from travel');
+}
+const retreat = authoredTravelDirection(-1, 0);
+if (Math.abs(retreat.yaw) > 1e-6 || retreat.playbackSign !== -1) {
+  throw new Error('backpedal does not reverse the authored stride');
+}
+
+console.log(`universal animations passed: ${gltf.animations.length} clips, ${bones.size} bones; authored jog/sprint/crouch/jump legs drive players and bots with upright root, stable weapon shoulder, directional travel, and procedural slide fallback`);

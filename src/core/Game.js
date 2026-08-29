@@ -28,7 +28,7 @@ import {
 } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
-import { preloadUniversalAnimations } from '../player/UniversalAnimations.js';
+import { applyUniversalLocomotion, preloadUniversalAnimations } from '../player/UniversalAnimations.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { isLowPolyId } from '../player/LowPolyModels.js';
@@ -2105,15 +2105,15 @@ export class Game {
       dirF = (p.velocity.x * -bsn + p.velocity.z * -bcs) / speed;
       dirR = (p.velocity.x *  bcs + p.velocity.z * -bsn) / speed;
     }
-    const gait = applyWalkCycle(rig, {
-      speed, moving, run, crouch: this._tpsCrouch, dt, dirF, dirR,
+    const gaitOptions = {
+      speed, moving, run, sprint: !!p.isSprinting,
+      crouch: this._tpsCrouch, dt, dirF, dirR,
       grounded: p.onGround, vy: p.velocity.y,
       slide: p.isSliding ? 1 : 0,
-    });
-    // Do not stack the generic retargeted clip over the connected exosuit gait;
-    // its source hip height folds this rig and separates the hands from the gun.
-    // Subtle side-to-side weight transfer makes the armored chassis feel
-    // connected through the hips. Apply it in body-local +X so strafing and
+    };
+    const gait = applyUniversalLocomotion(rig, gaitOptions)
+      || applyWalkCycle(rig, gaitOptions);
+    // Side-to-side transfer is applied in body-local +X, so strafing and
     // turning do not make the visual body drift in an unrelated world axis.
     this._playerBody.position.x = p.position.x + Math.cos(p.yaw) * gait.sway;
     this._playerBody.position.y = p.position.y + gait.bob;

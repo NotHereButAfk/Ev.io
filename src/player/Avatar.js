@@ -4,6 +4,7 @@ import { isSharedGeometry } from './LowPolyModels.js';
 import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
+import { applyUniversalLocomotion } from './UniversalAnimations.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 import { cameraYawToBodyYaw, movementInBodySpace } from './Facing.js';
@@ -344,15 +345,15 @@ export class Avatar {
     this._wasHit = !!s.hit;
     const act = tickActions(this.rig, dt);
 
-    // The stride phase is owned by applyWalkCycle and derived from `speed`.
-    const gait = applyWalkCycle(this.rig, {
-      speed, moving, run, crouch: this._crouch, dt, dirF, dirR,
+    const gaitOptions = {
+      speed, moving, run, sprint: !!s.sprint, crouch: this._crouch, dt, dirF, dirR,
       grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
-    });
-    // applyWalkCycle is the authoritative locomotion solver for this connected
-    // exosuit rig. Stacking the generic retargeted clip here changes hip/rest
-    // height after the weapon carry has been solved, producing the visible
-    // seated/sideways bot gait and a gun floating above the body.
+    };
+    // Use the imported authored poses when the library is ready. The animator
+    // owns the leg layer only; slide keeps the planted procedural pose, and the
+    // weapon/arms are solved afterward against the stable upper body.
+    const gait = applyUniversalLocomotion(this.rig, gaitOptions)
+      || applyWalkCycle(this.rig, gaitOptions);
     this._walkT = gait.phase;
     this._gaitSway = gait.sway;
     this._gaitBob = gait.bob;
