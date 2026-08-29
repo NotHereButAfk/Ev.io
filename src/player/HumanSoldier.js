@@ -51,7 +51,7 @@ export function preloadHumanSoldier(onLoad) {
   if (_template) { onLoad?.(); return; }
   if (_loading) return;
   _loading = true;
-  new GLTFLoader().load('/soldier.glb',
+  new GLTFLoader().load('/kyx-player.glb',
     (gltf) => {
       gltf.scene.traverse((o) => {
         if (o.isMesh) {
@@ -133,6 +133,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   const look = _lookFor(armorTypeId);
   const root = cloneSkeleton(_template.scene);
   root.scale.setScalar(MODEL_SCALE * look.scale);
+  const authoredArmor = !!root.getObjectByName('KYX_HelmetHood')
+    || !!root.getObjectByName('KYX_CoreVest');
 
   // Give this instance its own materials, and split body vs visor so we can
   // paint each armour variant: coloured plate + glowing visor.
@@ -159,12 +161,14 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   // space by _attachAtWorld, so they are unaffected by this bone scale — only the
   // hidden head mesh shrinks. HEAD_SQUASH is re-asserted each frame in armorTick.
   const _headBone = findBone(root, 'Head');
-  if (_headBone) _headBone.scale.copy(HEAD_SQUASH);
+  if (_headBone && !authoredArmor) _headBone.scale.copy(HEAD_SQUASH);
 
   // Bolt on this loadout's distinct armour set (bone-parented so plates ride the
   // skeleton during the animation). Each armor type gets its own silhouette.
   group.updateMatrixWorld(true);
-  const armor = _buildArmorPieces(root, armorTypeId, look, armorSkin);
+  const armor = authoredArmor
+    ? { animated: [], materials: [], pieces: [] }
+    : _buildArmorPieces(root, armorTypeId, look, armorSkin);
 
   // Measure the standing figure now, while its matrices resolve cleanly, and
   // stash the result. Re-measuring a posed SkinnedMesh elsewhere (e.g. the
@@ -483,7 +487,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       : t * 1.5;
 
     // Keep the head squashed even if an animation clip touches head scale.
-    if (B.head) B.head.scale.copy(HEAD_SQUASH);
+    if (B.head && !authoredArmor) B.head.scale.copy(HEAD_SQUASH);
 
     // ── Animated armor pieces (visor blink, thruster pulse, plate sway) ──
     for (const a of armor.animated) {

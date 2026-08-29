@@ -379,6 +379,14 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin = null, opts = {}) {
+  // The authored Blender rig is the shared runtime body for local players,
+  // bots, remotes, and previews. Keep the connected low-poly body only as the
+  // startup fallback while the GLB is loading (or when a caller explicitly
+  // requests the legacy model for tooling).
+  if (isHumanSoldierReady() && opts.allowHuman !== false && opts.useLegacyLowPoly !== true) {
+    const human = buildHumanSoldier(skin, armorTypeId, armorSkin);
+    if (human) return human;
+  }
   // Low-poly cel-shaded models own their whole look (their own toon materials +
   // outlines), so they take precedence over every other path — for the player,
   // bots and previews alike. Rigged by rigCharacterLimbs() via their named limbs.
