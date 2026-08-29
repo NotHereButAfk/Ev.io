@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:move": "node tools/movesim_fixtures.mjs",
+    "test:stairs": "node tools/stair_movement_check.mjs",
     "test:gait": "node tools/gait_check.mjs",
     "test:actions": "node tools/action_check.mjs",
     "test:mesh": "node tools/mesh_check.mjs",

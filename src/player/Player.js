@@ -5,6 +5,7 @@ import {
   findThirdPersonObstruction,
 } from './ThirdPersonCamera.js';
 import { sprintRequested } from '../core/GameplayInput.js';
+import { characterSweepSegments } from '../sim/CharacterSweep.js';
 import {
   STAMINA_DRAIN,
   STAMINA_MAX,
@@ -366,39 +367,52 @@ export class Player {
 
     this.velocity.y += GRAVITY * dt;
 
-    const prevY = this.position.y;
-    this.position.x += this.velocity.x * dt;
-    this.position.z += this.velocity.z * dt;
-    this.position.y += this.velocity.y * dt;
-
-    // Land on the highest walkable surface under us (platforms/ramps, or base
-    // ground at y=0). Swept test prevents falling through thin platforms.
+    // Break fast horizontal travel into short collision sweeps. At sprint
+    // speed (or on a slow browser frame) one unswept move can cross a complete
+    // stair tread and hit the following riser, making ordinary stairs feel
+    // sticky. The step-height contract remains owned by groundHeightAt, so
+    // this cannot turn walls into climbable surfaces.
+    const totalDX = this.velocity.x * dt;
+    const totalDZ = this.velocity.z * dt;
+    const sweepSegments = characterSweepSegments(totalDX, totalDZ);
+    const sweepDt = dt / sweepSegments;
     const landingVel = this.velocity.y;
-    const groundY = world.groundHeightAt
-      ? world.groundHeightAt(this.position.x, this.position.z, prevY, this.position.y)
-      : 0;
-    if (this.position.y <= groundY + 0.05 && this.velocity.y <= 0.001) {
-      this.position.y = groundY;
-      this.velocity.y = 0;
-      if (!this._wasOnGround && this.audio) {
-        this.audio.playLand(landingVel < -12);
-      }
-      this.onGround = true;
-    } else {
-      this.onGround = false;
-    }
-    this._wasOnGround = this.onGround;
-
+    const wasOnGround = this._wasOnGround;
+    let touchedGround = false;
     this._worldContact ||= {
       grounded: false, normalY: -1, depth: 0, verticalCorrection: 0,
     };
-    world.resolveCollisions(this.position, RADIUS, this._worldContact,
-      (this.isSliding || this.isCrouching) ? 1.0 : 1.7);
-    if (this._worldContact.grounded && this.velocity.y <= 0.001) {
-      this.velocity.y = 0;
-      this.onGround = true;
-      this._wasOnGround = true;
+    for (let segment = 0; segment < sweepSegments; segment++) {
+      const prevY = this.position.y;
+      this.position.x += this.velocity.x * sweepDt;
+      this.position.z += this.velocity.z * sweepDt;
+      this.position.y += this.velocity.y * sweepDt;
+
+      // Land on the highest walkable surface under this short sweep. Sampling
+      // every tread is what makes both walking and sprinting climb smoothly.
+      const groundY = world.groundHeightAt
+        ? world.groundHeightAt(this.position.x, this.position.z, prevY, this.position.y)
+        : 0;
+      let segmentGrounded = false;
+      if (this.position.y <= groundY + 0.05 && this.velocity.y <= 0.001) {
+        this.position.y = groundY;
+        this.velocity.y = 0;
+        segmentGrounded = true;
+      }
+
+      world.resolveCollisions(this.position, RADIUS, this._worldContact,
+        (this.isSliding || this.isCrouching) ? 1.0 : 1.7);
+      if (this._worldContact.grounded && this.velocity.y <= 0.001) {
+        this.velocity.y = 0;
+        segmentGrounded = true;
+      }
+      this.onGround = segmentGrounded;
+      touchedGround ||= segmentGrounded;
     }
+    if (!wasOnGround && touchedGround && this.audio) {
+      this.audio.playLand(landingVel < -12);
+    }
+    this._wasOnGround = this.onGround;
 
     // --- teleporter pads: step on one, drop out of its linked partner ---
     if (world.queryTeleport) {

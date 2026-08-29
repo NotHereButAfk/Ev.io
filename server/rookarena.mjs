@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { buildEvMapScene, parseEvMap } from '../src/world/EvMapLoader.js';
 import { boundedOctreeRayIntersect } from '../src/world/BoundedOctreeRay.js';
 import { IMPORTED_MAPS } from '../src/world/MapRegistry.js';
+import { DT } from '../src/sim/MoveSim.js';
+import { characterSweepSegments } from '../src/sim/CharacterSweep.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +34,7 @@ function loadArena(definition) {
   const groundRay = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
   const ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3());
   const normal = new THREE.Vector3();
+  const collisionPush = new THREE.Vector3();
 
   function groundHeightAt(x, z, prevY, newY) {
     const stepUp = 0.55;
@@ -48,36 +51,57 @@ function loadArena(definition) {
 
   function resolveState(previous, state) {
     const height = (state.crouch || state.slide) ? 1.0 : 1.7;
-    const groundY = groundHeightAt(state.px, state.pz, previous.py, state.py);
-    if (state.py <= groundY + 0.05 && state.vy <= 0.001) {
-      state.py = q(groundY);
-      state.vy = 0;
-      state.onGround = 1;
-      state.nX = 0; state.nY = 1; state.nZ = 0;
-    }
+    const dx = state.px - previous.px;
+    const dy = state.py - previous.py;
+    const dz = state.pz - previous.pz;
+    const distance = Math.hypot(dx, dz);
+    const segments = distance < 2 ? characterSweepSegments(dx, dz) : 1;
+    let stepX = dx / segments;
+    let stepY = dy / segments;
+    let stepZ = dz / segments;
+    state.px = previous.px;
+    state.py = previous.py;
+    state.pz = previous.pz;
 
-    capsule.radius = 0.45;
-    capsule.start.set(state.px, state.py + capsule.radius, state.pz);
-    capsule.end.set(state.px, state.py + Math.max(capsule.radius, height - capsule.radius), state.pz);
-    for (let i = 0; i < 3; i++) {
-      const hit = octree.capsuleIntersect(capsule);
-      if (!hit) break;
-      capsule.translate(hit.normal.clone().multiplyScalar(hit.depth));
-      const into = state.vx * hit.normal.x + state.vy * hit.normal.y + state.vz * hit.normal.z;
-      if (into < 0) {
-        state.vx = q(state.vx - hit.normal.x * into);
-        state.vy = q(state.vy - hit.normal.y * into);
-        state.vz = q(state.vz - hit.normal.z * into);
-      }
-      if (hit.normal.y > 0.35) {
+    for (let segment = 0; segment < segments; segment++) {
+      const previousY = state.py;
+      state.px += stepX;
+      state.py += stepY;
+      state.pz += stepZ;
+      const groundY = groundHeightAt(state.px, state.pz, previousY, state.py);
+      if (state.py <= groundY + 0.05 && state.vy <= 0.001) {
+        state.py = q(groundY);
+        state.vy = 0;
         state.onGround = 1;
-        if (state.vy < 0) state.vy = 0;
-        state.nX = q(hit.normal.x); state.nY = q(hit.normal.y); state.nZ = q(hit.normal.z);
+        state.nX = 0; state.nY = 1; state.nZ = 0;
       }
+
+      capsule.radius = 0.45;
+      capsule.start.set(state.px, state.py + capsule.radius, state.pz);
+      capsule.end.set(state.px, state.py + Math.max(capsule.radius, height - capsule.radius), state.pz);
+      for (let i = 0; i < 3; i++) {
+        const hit = octree.capsuleIntersect(capsule);
+        if (!hit) break;
+        capsule.translate(collisionPush.copy(hit.normal).multiplyScalar(hit.depth));
+        const into = state.vx * hit.normal.x + state.vy * hit.normal.y + state.vz * hit.normal.z;
+        if (into < 0) {
+          state.vx = q(state.vx - hit.normal.x * into);
+          state.vy = q(state.vy - hit.normal.y * into);
+          state.vz = q(state.vz - hit.normal.z * into);
+        }
+        if (hit.normal.y > 0.35) {
+          state.onGround = 1;
+          if (state.vy < 0) state.vy = 0;
+          state.nX = q(hit.normal.x); state.nY = q(hit.normal.y); state.nZ = q(hit.normal.z);
+        }
+      }
+      state.px = q(capsule.start.x);
+      state.py = q(capsule.start.y - capsule.radius);
+      state.pz = q(capsule.start.z);
+      stepX = state.vx * DT / segments;
+      stepY = state.vy * DT / segments;
+      stepZ = state.vz * DT / segments;
     }
-    state.px = q(capsule.start.x);
-    state.py = q(capsule.start.y - capsule.radius);
-    state.pz = q(capsule.start.z);
     if (state.onGround) {
       state.safeTicks = Math.min(3, (previous.safeTicks || 0) + 1);
       if (state.safeTicks >= 3) {

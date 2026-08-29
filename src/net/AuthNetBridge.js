@@ -16,6 +16,7 @@ import { PLAYER_WORLD_MODEL_SCALE, STATURE } from '../player/Proportions.js';
 const nameplateY = (avatar) => STATURE * (avatar.group.userData?.worldModelScale || 1) + 0.16;
 import { AuthClient } from './AuthClient.js';
 import { DT } from '../sim/MoveSim.js';
+import { characterSweepSegments } from '../sim/CharacterSweep.js';
 import { Avatar } from '../player/Avatar.js';
 import {
   nextThirdPersonDistance,
@@ -376,24 +377,47 @@ export class AuthNetBridge {
     const world = this.game.world;
     if (!world?._mapOctree || this.game._authoritativeMapTransitioning
       || world.currentMapId !== this.client.mapId) return next;
-    const ground = world.groundHeightAt(next.px, next.pz, previous.py, next.py);
-    if (next.py <= ground + 0.05 && next.vy <= 0.001) {
-      next.py = ground; next.vy = 0; next.onGround = 1;
-      next.nX = 0; next.nY = 1; next.nZ = 0;
+    const dx = next.px - previous.px;
+    const dy = next.py - previous.py;
+    const dz = next.pz - previous.pz;
+    const distance = Math.hypot(dx, dz);
+    const segments = distance < 2 ? characterSweepSegments(dx, dz) : 1;
+    let stepX = dx / segments;
+    let stepY = dy / segments;
+    let stepZ = dz / segments;
+    next.px = previous.px;
+    next.py = previous.py;
+    next.pz = previous.pz;
+
+    for (let segment = 0; segment < segments; segment++) {
+      const previousY = next.py;
+      next.px += stepX;
+      next.py += stepY;
+      next.pz += stepZ;
+      const ground = world.groundHeightAt(next.px, next.pz, previousY, next.py);
+      if (next.py <= ground + 0.05 && next.vy <= 0.001) {
+        next.py = ground; next.vy = 0; next.onGround = 1;
+        next.nX = 0; next.nY = 1; next.nZ = 0;
+      }
+      const position = this._collisionPosition.set(next.px, next.py, next.pz);
+      world.resolveCollisions(position, 0.45, this._collisionContact,
+        (next.crouch || next.slide) ? 1.0 : 1.7);
+      if (this._collisionContact.grounded && next.vy <= 0.001) {
+        next.vy = 0;
+        next.onGround = 1;
+        next.nX = 0;
+        next.nY = 1;
+        next.nZ = 0;
+      }
+      next.px = Math.round(position.x * 1e6) / 1e6;
+      next.py = Math.round(position.y * 1e6) / 1e6;
+      next.pz = Math.round(position.z * 1e6) / 1e6;
+      // Collision can remove one velocity component. Use the resolved motion
+      // for the remaining micro-steps so a wall still stops the player.
+      stepX = next.vx * DT / segments;
+      stepY = next.vy * DT / segments;
+      stepZ = next.vz * DT / segments;
     }
-    const position = this._collisionPosition.set(next.px, next.py, next.pz);
-    world.resolveCollisions(position, 0.45, this._collisionContact,
-      (next.crouch || next.slide) ? 1.0 : 1.7);
-    if (this._collisionContact.grounded && next.vy <= 0.001) {
-      next.vy = 0;
-      next.onGround = 1;
-      next.nX = 0;
-      next.nY = 1;
-      next.nZ = 0;
-    }
-    next.px = Math.round(position.x * 1e6) / 1e6;
-    next.py = Math.round(position.y * 1e6) / 1e6;
-    next.pz = Math.round(position.z * 1e6) / 1e6;
     return next;
   }
 
