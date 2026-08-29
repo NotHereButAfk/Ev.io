@@ -249,9 +249,19 @@ function install(group) {
       const sway = weight * (0.005 + 0.003 * run);
       if (rig.head) rig.head.rotation.z = -roll * 0.5;
       const lean = rig._authoredLean;
+      // A running clip can briefly have both feet above its bind-pose floor.
+      // Driving the whole character root down until one foot touches turns that
+      // flight frame into a visible floor/map penetration and makes the camera
+      // feel jittery when following the body. Collision owns the root; retain
+      // only a restrained, damped presentation offset from the sampled pose.
+      const rawBob = grounded ? posedGroundOffset(group, rig, lean, roll) : 0;
+      const bobLimitDown = crouch > 0.28 ? -0.22 : -0.035;
+      const targetBob = THREE.MathUtils.clamp(rawBob, bobLimitDown, 0.055);
+      rig._authoredBob = (rig._authoredBob || 0)
+        + (targetBob - (rig._authoredBob || 0)) * (1 - Math.exp(-14 * dt));
 
       return {
-        bob: grounded ? posedGroundOffset(group, rig, lean, roll) : 0,
+        bob: rig._authoredBob,
         lean,
         roll,
         sway,

@@ -76,6 +76,11 @@ for (const sourcePath of ['../src/entities/Bot.js', '../src/player/Avatar.js', '
     throw new Error(`${sourcePath} lost its safe procedural fallback`);
   }
 }
+const animatorSource = fs.readFileSync(new URL('../src/player/UniversalAnimations.js', import.meta.url), 'utf8');
+if (!/const bobLimitDown = crouch > 0\.28 \? -0\.22 : -0\.035/.test(animatorSource)
+    || !/_authoredBob[\s\S]*?Math\.exp\(-14 \* dt\)/.test(animatorSource)) {
+  throw new Error('authored gait can move the visual root into the map or jitter it without damping');
+}
 
 const strafe = authoredTravelDirection(0, 1);
 if (Math.abs(strafe.yaw + Math.PI / 2) > 1e-6 || strafe.playbackSign !== 1) {

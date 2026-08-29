@@ -231,7 +231,12 @@ export class Game {
     this._camPreviousPos = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
     this._camStallTime = 0;
     this._camFadeIn = 0;
-    this._menuBotSpawnTarget = 6;
+    // The menu is a map-loading/spectator presentation, not a second match.
+    // Simulating six full combatants here duplicated the most expensive part
+    // of a match before the player even joined and produced uneven camera frame
+    // pacing on integrated GPUs. Keep one distant ambient combatant; the real
+    // match still fills every open slot normally.
+    this._menuBotSpawnTarget = 1;
     this._menuBotSpawnCooldown = 0;
     this._rebuildSpectatorCurves();
 
@@ -2307,7 +2312,10 @@ export class Game {
     // Gameplay simulation stays capped for stability, but camera travel uses
     // real frame time. Otherwise a 90 ms render advances only 50 ms and the
     // fly-through visibly crawls/freezes exactly when the browser is busy.
-    const cameraStep = THREE.MathUtils.clamp(cameraDt, 0, 0.25);
+    // Do not let a decode/GC hitch become a quarter-second camera leap. The
+    // route is presentation-only, so losing a little tour time is preferable
+    // to visible judder. Normal frames still advance at real elapsed time.
+    const cameraStep = THREE.MathUtils.clamp(cameraDt, 0, 1 / 30);
     this._camTravelTime += cameraStep;
     const fadeWindow = 0.18;
     let cameraOpacity = 1;
@@ -2364,7 +2372,7 @@ export class Game {
       this._camPoseReady = true;
     } else {
       const poseDt = THREE.MathUtils.clamp(cameraDt, 0, 1 / 30);
-      const poseBlend = 1 - Math.exp(-10 * poseDt);
+      const poseBlend = 1 - Math.exp(-14 * poseDt);
       this._camRenderPos.lerp(this._camPos, poseBlend);
       this._camRenderLook.lerp(this._camLook, poseBlend);
     }

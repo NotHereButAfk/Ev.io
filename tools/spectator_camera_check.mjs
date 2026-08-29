@@ -20,11 +20,15 @@ assert.match(source, /const fadeWindow = 0\.18[\s\S]*?this\.canvas\.style\.opaci
 assert.match(source, /this\._camStallTime > 0\.45/,
   'spectator must recover from a degenerate route instead of staying still');
 assert.match(source, /_updateMenuScene\(dt, cameraDt = dt\)[\s\S]*?this\._camTravelTime \+= cameraStep/,
-  'spectator travel must use real frame time instead of the capped gameplay delta');
+  'spectator travel must use its own presentation delta');
+assert.match(source, /const cameraStep = THREE\.MathUtils\.clamp\(cameraDt, 0, 1 \/ 30\)/,
+  'spectator must cap long-frame travel so a hitch cannot become a camera leap');
 assert.match(source, /const poseDt = THREE\.MathUtils\.clamp\(cameraDt, 0, 1 \/ 30\)[\s\S]*?this\._camRenderPos\.lerp\(this\._camPos, poseBlend\)/,
   'spectator render pose must absorb long startup frames instead of visibly jumping');
 assert.match(source, /this\.world\.currentMap[\s\S]*?this\.botManager\.addBot\(false, 1, false\)[\s\S]*?this\._menuBotSpawnCooldown = 0\.12/,
   'spectator bots must be staggered behind real map readiness');
+assert.match(source, /this\._menuBotSpawnTarget = 1/,
+  'spectator must not simulate a duplicate full lobby behind the menu');
 assert.match(source, /this\.botManager\.update\([\s\S]*?this\._menuDummyPlayer[\s\S]*?this\.world, true,/,
   'spectator bots must use normal bot-versus-bot combat');
 assert.match(source, /const minimumCameraStep = Math\.max\(cameraStep, 1 \/ 240\) \* 0\.05/,
