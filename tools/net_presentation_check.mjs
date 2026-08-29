@@ -62,7 +62,7 @@ rotationClient.pending = [{ seq: 41, inp: { f: 1, r: 0, jump: false, crouch: fal
 rotationClient._acc = 0.04;
 rotationClient._reconcile({
   tick: 100, ack: 40, mapId: 'winter-graveyard', mapName: 'Winter Graveyard',
-  matchStart: Date.now(), matchDurationMs: 480000,
+  matchStart: Date.now(), matchDurationMs: 180000,
   arena: { id: 'winter-graveyard', half: 100, killY: -25, noBaseFloor: false, platforms: [], boxes: [] },
   you: { x: 24, y: 4, z: -12, vx: 0, vy: 0, vz: 0, health: 100, shield: 0, alive: true, mag: 30, reserve: 90, kills: 0, deaths: 0, score: 0 },
   players: [], smokes: [],

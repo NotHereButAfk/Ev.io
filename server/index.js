@@ -1,6 +1,7 @@
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { IMPORTED_MAPS } from '../src/world/MapRegistry.js';
+import { MATCH_DURATION_MS, continuousMatchState } from './matchclock.mjs';
 
 // ───────────────────────────────────────────────────────────────────────────
 // kyx.io match-state relay.
@@ -19,12 +20,12 @@ import { IMPORTED_MAPS } from '../src/world/MapRegistry.js';
 // ───────────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 8787;
-const MATCH_DURATION_MS = 8 * 60 * 1000; // matches the client's deathmatch length
 const MAX_NAME_LEN = 24;
 const KILL_RATE_LIMIT_MS = 150; // guards against a client spamming fake kills
 
-let matchStart = Date.now();
-let mapIndex = 0;
+const initialMatch = continuousMatchState(Date.now(), IMPORTED_MAPS.length);
+let matchStart = initialMatch.matchStart;
+let mapIndex = initialMatch.arenaIndex;
 /** @type {Map<import('ws').WebSocket, {id:number, name:string, kills:number, score:number, lastKillAt:number}>} */
 const players = new Map();
 let nextId = 1;
@@ -58,9 +59,10 @@ function broadcastState() {
 // Cycle the match automatically so the arena never actually "ends" — this is
 // what makes it a 24/7 server instead of one private match per visit.
 setInterval(() => {
-  if (Date.now() - matchStart >= MATCH_DURATION_MS) {
-    matchStart = Date.now();
-    mapIndex = (mapIndex + 1) % IMPORTED_MAPS.length;
+  const current = continuousMatchState(Date.now(), IMPORTED_MAPS.length);
+  if (current.matchStart !== matchStart) {
+    matchStart = current.matchStart;
+    mapIndex = current.arenaIndex;
     for (const p of players.values()) { p.kills = 0; p.score = 0; }
     broadcastState();
   }

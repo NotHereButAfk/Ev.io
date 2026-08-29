@@ -63,6 +63,8 @@ const AUTO = [
     fn: () => { const r = run('npm run test:adblock'); return { ok: r.ok && /sponsor blocker check passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-POP', phase: 'match', name: 'Bots occupy player slots in every roster path',
     fn: () => { const r = run('npm run test:population'); return { ok: r.ok && /player population passed/.test(r.out), detail: tail(r.out) }; } },
+  { id: 'G-CLOCK', phase: 'match', name: 'Three-minute public rounds survive server restarts',
+    fn: () => { const r = run('npm run test:match-clock'); return { ok: r.ok && /match clock passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-SPEC', phase: 'camera', name: 'Spectator camera continuously roams the complete arena',
     fn: () => { const r = run('npm run test:spectator'); return { ok: r.ok && /spectator camera passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G-NAME', phase: 'HUD', name: 'Player labels respect map line of sight',

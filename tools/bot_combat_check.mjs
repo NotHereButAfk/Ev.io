@@ -297,11 +297,15 @@ const loadRoom = new AuthRoom(aiArena, { targetPopulation: 8, botDifficulty: 'no
 const loadStarted = performance.now();
 for (let i = 0; i < 1200; i++) loadRoom.update();
 const averageTickMs = (performance.now() - loadStarted) / 1200;
+const autonomousBotKills = [...loadRoom.players.values()].reduce((sum, bot) => sum + bot.kills, 0);
+assert.ok(autonomousBotKills > 0,
+  'authoritative bots shared a live arena for one minute without fighting each other');
 assert.ok(averageTickMs < 5,
   `eight-bot decisions exceeded the server budget (${averageTickMs.toFixed(2)}ms/tick)`);
 assert.ok([...loadRoom.players.values()].every((entry) => entry.isBot
   && (!entry.alive || entry._botNextScanTick > loadRoom.tick - 20)),
   'bot scans are not timer-throttled');
 console.log(`ok   eight bots throttle scans/LOS/decisions (${averageTickMs.toFixed(3)}ms per 20Hz tick)`);
+console.log(`ok   autonomous server bots fight each other (${autonomousBotKills} kills in one simulated minute)`);
 
 console.log('\nall bot combat checks passed');

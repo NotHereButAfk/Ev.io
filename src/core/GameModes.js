@@ -1,14 +1,16 @@
+export const DEATHMATCH_TIME_LIMIT_SECONDS = 3 * 60;
+
 export const GAME_MODES = [
   {
     id:        'deathmatch',
     name:      'FREE FOR ALL',
     icon:      '⚔',
     tag:       'FFA',
-    desc:      'Every Spartan for themselves. 8 players, 8 minutes. Kill streaks multiply coin rewards.',
+    desc:      'Every Spartan for themselves. 8 players, 3 minutes. Kill streaks multiply coin rewards.',
     color:     '#ff5c5c',
     botCount:  7,
     noRespawn: false,
-    timeLimit: 480,
+    timeLimit: DEATHMATCH_TIME_LIMIT_SECONDS,
     lives:     Infinity,
     waves:     false,
     isZombie:  false,

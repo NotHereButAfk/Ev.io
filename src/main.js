@@ -69,6 +69,17 @@ if (qaRequested) {
         runtimeQuality: game._runtimeQuality,
       },
       frame: game._qaFrameStats.last,
+      spectator: {
+        x: game.menuCamera.position.x,
+        y: game.menuCamera.position.y,
+        z: game.menuCamera.position.z,
+        route: game._camRouteIndex,
+        travelTime: game._camTravelTime,
+      },
+      match: {
+        start: game._selectedMatch?.matchStart ?? game._authNet?.client?.matchStart ?? null,
+        durationMs: game._selectedMatch?.matchDurationMs ?? game._authNet?.client?.matchDurationMs ?? null,
+      },
       bots: game.botManager.bots.map((bot) => ({
         id: bot.id, name: bot.displayName, alive: bot.alive,
         x: bot.position.x, y: bot.position.y, z: bot.position.z,

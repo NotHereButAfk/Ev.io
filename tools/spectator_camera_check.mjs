@@ -21,6 +21,12 @@ assert.match(source, /this\._camStallTime > 0\.45/,
   'spectator must recover from a degenerate route instead of staying still');
 assert.match(source, /_updateMenuScene\(dt, cameraDt = dt\)[\s\S]*?this\._camTravelTime \+= cameraStep/,
   'spectator travel must use real frame time instead of the capped gameplay delta');
+assert.match(source, /const poseDt = THREE\.MathUtils\.clamp\(cameraDt, 0, 1 \/ 30\)[\s\S]*?this\._camRenderPos\.lerp\(this\._camPos, poseBlend\)/,
+  'spectator render pose must absorb long startup frames instead of visibly jumping');
+assert.match(source, /this\.world\.currentMap[\s\S]*?this\.botManager\.addBot\(false, 1, false\)[\s\S]*?this\._menuBotSpawnCooldown = 0\.12/,
+  'spectator bots must be staggered behind real map readiness');
+assert.match(source, /this\.botManager\.update\([\s\S]*?this\._menuDummyPlayer[\s\S]*?this\.world, true,/,
+  'spectator bots must use normal bot-versus-bot combat');
 assert.match(source, /const minimumCameraStep = Math\.max\(cameraStep, 1 \/ 240\) \* 0\.05/,
   'spectator stall detection must be refresh-rate independent');
 assert.doesNotMatch(source, /movedSq < 0\.0004/,
@@ -57,4 +63,12 @@ const minimumStep = Math.max(highRefreshDt, 1 / 240) * 0.05;
 assert.ok(legitimateStep < 0.02 && legitimateStep > minimumStep,
   'high-refresh spectator motion must not trigger stall recovery');
 
-console.log('spectator camera passed: travel is real-time, high-refresh safe, and route cuts stay hidden');
+// A 120ms startup hitch may move the route target substantially, but the
+// rendered camera consumes only a frame-rate-independent fraction of it.
+const hitchTargetDistance = 7 * 0.12;
+const hitchBlend = 1 - Math.exp(-10 * (1 / 30));
+const hitchRenderedDistance = hitchTargetDistance * hitchBlend;
+assert.ok(hitchRenderedDistance > 0 && hitchRenderedDistance < hitchTargetDistance * 0.35,
+  'startup hitch was not damped before reaching the visible camera');
+
+console.log('spectator camera passed: startup hitches are damped, bots are staggered, and route cuts stay hidden');

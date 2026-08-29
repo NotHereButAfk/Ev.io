@@ -55,6 +55,7 @@ import {
 } from '../src/weapons/weaponDefs.js';
 import { randomLootSpecs, rollLootItem } from '../src/world/PickupLayout.js';
 import { IMPORTED_ARENAS } from './rookarena.mjs';
+import { MATCH_DURATION_MS, continuousMatchState } from './matchclock.mjs';
 
 export const TICK_HZ = 20;
 export const TICK_MS = 1000 / TICK_HZ;
@@ -183,11 +184,13 @@ export class AuthRoom {
     botDifficulty = 'normal',
     botDifficultyOverrides = null,
     lootSeed = Date.now(),
+    now = Date.now(),
   } = {}) {
     this.arenas = Array.isArray(arena) ? arena : [arena];
     if (!this.arenas.length) throw new Error('AuthRoom requires at least one imported arena');
-    this._arenaIndex = 0;
-    this.arena = this.arenas[0];
+    const continuousMatch = continuousMatchState(now, this.arenas.length);
+    this._arenaIndex = continuousMatch.arenaIndex;
+    this.arena = this.arenas[this._arenaIndex];
     this._setSimArena(this.arena);
     this.tick = 0;
     this._lootSeed = Number(lootSeed) | 0;
@@ -198,8 +201,8 @@ export class AuthRoom {
     this.events = [];           // per-tick outgoing events (kills, hits, spawns)
     this.smokes = [];           // active smoke volumes {x,y,z,r,until}
     this.frags = [];            // pending authoritative detonations
-    this.matchStart = Date.now();
-    this.matchDurationMs = 8 * 60 * 1000;
+    this.matchStart = continuousMatch.matchStart;
+    this.matchDurationMs = MATCH_DURATION_MS;
     this._arenaBroadcastUntilTick = -1;
     const requestedPopulation = Number.isFinite(targetPopulation) ? targetPopulation | 0 : 0;
     this.targetPopulation = clamp(requestedPopulation, 0, 8);
@@ -289,8 +292,11 @@ export class AuthRoom {
 
   _rotateMatch(now = Date.now()) {
     if (now - this.matchStart < this.matchDurationMs) return false;
-    this.matchStart = now;
-    this._arenaIndex = (this._arenaIndex + 1) % this.arenas.length;
+    // Keep the clock on its global cadence even if the process sleeps or a
+    // tick is delayed across more than one complete round.
+    const elapsedRounds = Math.max(1, Math.floor((now - this.matchStart) / this.matchDurationMs));
+    this.matchStart += elapsedRounds * this.matchDurationMs;
+    this._arenaIndex = (this._arenaIndex + elapsedRounds) % this.arenas.length;
     this._setSimArena(this.arenas[this._arenaIndex]);
     this._resetLootPads();
     // Repeat the collision/map payload for five seconds. A congested client

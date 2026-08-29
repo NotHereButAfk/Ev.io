@@ -68,7 +68,7 @@ Five appear in the picker. **Be aware that only two are implemented:**
 
 | mode | state |
 |---|---|
-| **Free For All** (deathmatch) | implemented — 8 players, 8 minutes |
+| **Free For All** (deathmatch) | implemented — 8 players, continuous 3-minute rounds |
 | **Firefight** (survival) | implemented — co-op wave defence, downs and revives |
 | Team Slayer | **menu entry only** — runs as deathmatch, no teams |
 | Capture the Flag | **menu entry only** — no flags |

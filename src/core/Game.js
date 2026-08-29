@@ -18,7 +18,7 @@ import { UserAccount } from './UserAccount.js';
 import { Armory } from './Armory.js';
 import { GameSettings } from './GameSettings.js';
 import { DeathEffectManager } from '../effects/DeathEffects.js';
-import { getMode } from './GameModes.js';
+import { DEATHMATCH_TIME_LIMIT_SECONDS, getMode } from './GameModes.js';
 import { getSkin } from '../player/skins.js';
 import {
   buildPreviewCharacter,
@@ -225,9 +225,14 @@ export class Game {
     this._camTravelTime = 0;
     this._camPos = new THREE.Vector3();
     this._camLook = new THREE.Vector3();
+    this._camRenderPos = new THREE.Vector3();
+    this._camRenderLook = new THREE.Vector3();
+    this._camPoseReady = false;
     this._camPreviousPos = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
     this._camStallTime = 0;
     this._camFadeIn = 0;
+    this._menuBotSpawnTarget = 6;
+    this._menuBotSpawnCooldown = 0;
     this._rebuildSpectatorCurves();
 
     this.selectedSkin      = getSkin('spartan');
@@ -498,6 +503,7 @@ export class Game {
       this._camFadeIn = 0;
       this.canvas.style.opacity = '1';
       this._rebuildSpectatorCurves();
+      this._snapSpectatorCamera();
       this.menuCamera.far = 600;
       this.menuCamera.updateProjectionMatrix();
       return;
@@ -531,6 +537,7 @@ export class Game {
     this._camSegTime = 0;
     this._camTravelTime = 0;
     this._rebuildSpectatorCurves();
+    this._snapSpectatorCamera();
     this.menuCamera.far = Math.max(600, Math.max(size.x, size.z) * 4);
     this.menuCamera.updateProjectionMatrix();
   }
@@ -548,6 +555,18 @@ export class Game {
       ? THREE.MathUtils.clamp(pathLength / 7, 32, 90)
       : THREE.MathUtils.clamp(pathLength / 3.5, 4, 8);
     this._camStallTime = 0;
+  }
+
+  _snapSpectatorCamera() {
+    const u = this._camCycleDuration > 0 ? this._camTravelTime / this._camCycleDuration : 0;
+    this._camPath.getPointAt(u, this._camPos);
+    this._camLookPath.getPointAt(u, this._camLook);
+    this._camRenderPos.copy(this._camPos);
+    this._camRenderLook.copy(this._camLook);
+    this._camPreviousPos.copy(this._camPos);
+    this.menuCamera.position.copy(this._camRenderPos);
+    this.menuCamera.lookAt(this._camRenderLook);
+    this._camPoseReady = true;
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -955,7 +974,7 @@ export class Game {
         this.botManager.clear();
         this.serverSim.stop();
         this._netDriven = true;
-        this._modeTimer = 480;
+        this._modeTimer = DEATHMATCH_TIME_LIMIT_SECONDS;
         if (!this._authNet?.ready) this._showServerJoining(modeId);
       } else {
         this.botManager.spawnAll(MAX_PLAYERS - 1, false, 1);
@@ -966,10 +985,10 @@ export class Game {
         this.net.sendHello(name);
         this._modeTimer = (this.net.matchStart != null)
           ? THREE.MathUtils.clamp(this.net.matchDurationMs / 1000 - (Date.now() - this.net.matchStart) / 1000, 0, this.net.matchDurationMs / 1000)
-          : 480;
+          : DEATHMATCH_TIME_LIMIT_SECONDS;
         this._applyNetRoster(this.net.roster);
       } else if (!expectsAuth) {
-        this._modeTimer = 480; // 8 minutes
+        this._modeTimer = DEATHMATCH_TIME_LIMIT_SECONDS;
         this.serverSim.start(false, 1);
       }
       this.hud.showServerPop(true);
@@ -1090,7 +1109,7 @@ export class Game {
 
   // Fired whenever the net relay pushes a state snapshot. If the current
   // deathmatch started OFFLINE (the WebSocket races page load, so clicking
-  // PLAY quickly lands before it connects — the timer shows a private 8:00),
+  // PLAY quickly can briefly show the local three-minute fallback),
   // adopt the shared server state as soon as it arrives: snap the countdown
   // to the real match time and swap the roster to real players. Better a
   // one-time timer jump than a whole match on a private clock.
@@ -2237,19 +2256,13 @@ export class Game {
   _spawnMenuBots() {
     if (this._menuBotsActive) return;
     this._menuBotsActive = true;
-    this.botManager.spawnAll(6, true, 1);
-    for (const bot of this.botManager.bots) {
-      bot._provoked = false;
-      bot._provokeTimer = 0;
-      // Menu spectators do not need twelve always-on health-bar draw calls.
-      // The bodies and weapons remain visible and animate normally.
-      if (bot.healthBarGroup) bot.healthBarGroup.visible = false;
-    }
+    this._menuBotSpawnCooldown = 0;
   }
 
   _clearMenuBots() {
     if (!this._menuBotsActive) return;
     this._menuBotsActive = false;
+    this._menuBotSpawnCooldown = 0;
     this.botManager.clear();
   }
 
@@ -2266,10 +2279,21 @@ export class Game {
     this.world.update(dt);
 
     // Spectator bots — visible running around the map during the home screen.
-    if (this.state === 'menu' && !this._menuBotsActive) this._spawnMenuBots();
+    // Build one cached body at a time while the arena loading card is still
+    // present. Constructing all six on the first visible menu frame caused a
+    // long main-thread pause that looked like a lagging spectator camera.
+    if (this.state === 'menu' && this.world.currentMap && !this._menuBotsActive) this._spawnMenuBots();
     if (this._menuBotsActive) {
+      this._menuBotSpawnCooldown = Math.max(0, this._menuBotSpawnCooldown - dt);
+      if (this.botManager.count < this._menuBotSpawnTarget && this._menuBotSpawnCooldown <= 0) {
+        const bot = this.botManager.addBot(false, 1, false);
+        bot._provoked = false;
+        bot._provokeTimer = 0;
+        if (bot.healthBarGroup) bot.healthBarGroup.visible = false;
+        this._menuBotSpawnCooldown = 0.12;
+      }
       this.botManager.update(
-        dt, this._menuDummyPlayer, this.menuCamera, this._noopCallback, this.world, false,
+        dt, this._menuDummyPlayer, this.menuCamera, this._noopCallback, this.world, true,
       );
       // A void recovery calls Bot.respawnAt(), which restores its combat HUD.
       // Keep those bars suppressed on the spectator presentation every frame.
@@ -2331,8 +2355,21 @@ export class Game {
       this._camLookPath.getPointAt(this._camTravelTime / this._camCycleDuration, this._camLook);
     }
     this._camPreviousPos.copy(this._camPos);
-    this.menuCamera.position.copy(this._camPos);
-    this.menuCamera.lookAt(this._camLook);
+    // Smooth the rendered pose toward the real-time route. Long decode or
+    // model-build frames can still advance the route clock, but no longer
+    // turn that elapsed time into a single visible camera jump.
+    if (!this._camPoseReady || routeChanged) {
+      this._camRenderPos.copy(this._camPos);
+      this._camRenderLook.copy(this._camLook);
+      this._camPoseReady = true;
+    } else {
+      const poseDt = THREE.MathUtils.clamp(cameraDt, 0, 1 / 30);
+      const poseBlend = 1 - Math.exp(-10 * poseDt);
+      this._camRenderPos.lerp(this._camPos, poseBlend);
+      this._camRenderLook.lerp(this._camLook, poseBlend);
+    }
+    this.menuCamera.position.copy(this._camRenderPos);
+    this.menuCamera.lookAt(this._camRenderLook);
   }
 
   _loop() {
