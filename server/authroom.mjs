@@ -26,13 +26,14 @@
 
 import { createState, step, makeInput, isSprinting } from '../src/sim/MoveSim.js';
 import { STAMINA_MAX } from '../src/sim/MovementConfig.js';
-import { HEALTH_REGEN_DELAY, HEALTH_REGEN_RATE } from '../src/core/CombatConfig.js';
 import {
+  HEALTH_REGEN_DELAY,
+  HEALTH_REGEN_RATE,
   MAX_PICKUP_SHIELD,
   SHIELD_REGEN_DELAY,
   SHIELD_REGEN_RATE,
   addShieldStack,
-} from '../src/core/ShieldConfig.js';
+} from '../src/core/CombatConfig.js';
 import {
   BOT_DASH,
   BOT_RETALIATION_AIM_SCALE,
