@@ -52,8 +52,7 @@ import { DeathmatchManager } from './DeathmatchManager.js';
 import { ServerSim } from './ServerSim.js';
 import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
-import { preloadPlayerModel, preloadSpartanModel } from '../player/PreviewCharacter.js';
-import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
+import { preloadSpartanModel } from '../player/PreviewCharacter.js';
 import { preloadWeaponModels, onWeaponModelsReady, buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { PickupSystem } from '../world/PickupSystem.js';
 import { getImportedMap, nextImportedMapId } from '../world/MapRegistry.js';
@@ -353,10 +352,8 @@ export class Game {
       }
     });
     const stages = [
-      ['player', preloadHumanSoldier],
       ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
       ['animations', preloadUniversalAnimations],
-      ['models', preloadPlayerModel],
       ['armor', preloadSpartanModel],
     ];
     // Loading every GLB and the 6 MB animation library simultaneously caused

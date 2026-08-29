@@ -171,7 +171,7 @@ export class AuthNetBridge {
       weaponId: 'm4',
       // Network peers must render from the same connected exosuit roster as
       // local players and bots; the legacy Soldier is tooling-only.
-      allowHuman: true,
+      allowHuman: false,
       // Bots remain the full readable combat silhouette. Human-controlled
       // avatars use the slightly smaller player presentation scale.
       modelScale: isBot ? 1 : PLAYER_WORLD_MODEL_SCALE,

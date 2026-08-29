@@ -51,7 +51,10 @@ export function preloadHumanSoldier(onLoad) {
   if (_template) { onLoad?.(); return; }
   if (_loading) return;
   _loading = true;
-  new GLTFLoader().load('/kyx-player.glb',
+  // Optional presentation rig only. Live players/bots use HeroBody directly;
+  // keep this fallback on the original licensed soldier asset instead of the
+  // rejected block mannequin export.
+  new GLTFLoader().load('/soldier.glb',
     (gltf) => {
       gltf.scene.traverse((o) => {
         if (o.isMesh) {
