@@ -1,5 +1,10 @@
 import { Bot } from './Bot.js';
-import { botSeparationVector, combatTargetScore } from './BotCombat.js';
+import {
+  BOT_TACTICS,
+  botArenaDetectionDistance,
+  botSeparationVector,
+  combatTargetScore,
+} from './BotCombat.js';
 import { randomBotName } from './BotNames.js';
 
 // Gamertag pool for simulated remote players and named bots, so the kill feed
@@ -88,7 +93,8 @@ export class BotManager {
         const current = bot._targetEntity;
         const currentValid = current && current !== bot && !current.isDead &&
           current.alive !== false && current.position &&
-          current.position.distanceTo(bot.position) < 46;
+          current.position.distanceTo(bot.position)
+            < botArenaDetectionDistance(BOT_TACTICS.detectRadius);
 
         if (!currentValid || bot._targetScanT <= 0) {
           const candidates = [player, ...this.bots].filter((candidate) =>
@@ -99,7 +105,8 @@ export class BotManager {
             // never meet or fight.
             (candidate === player
               ? bot._provokedByPlayer
-              : true)
+              : candidate.position.distanceTo(bot.position)
+                <= botArenaDetectionDistance(BOT_TACTICS.detectRadius))
           );
           let best = null;
           let bestScore = Infinity;

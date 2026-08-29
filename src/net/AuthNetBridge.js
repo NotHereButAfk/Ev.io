@@ -33,6 +33,7 @@ import { isNameplateOccluded } from '../ui/NameplateOcclusion.js';
 import { sprintRequested } from '../core/GameplayInput.js';
 import { applyAuthoritativeResources } from './AuthoritativePresentation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
+import { getSkin } from '../player/skins.js';
 
 // Give each remote a stable look derived from their id, so the same player is
 // the same colour every time you see them.
@@ -41,6 +42,7 @@ const REMOTE_SKINS = [
   { primary: 0x9050d1, secondary: 0x241433 }, { primary: 0x2fae5a, secondary: 0x0c2a16 },
   { primary: 0xc9d2d8, secondary: 0x2a3238 }, { primary: 0xe0902c, secondary: 0x33240c },
 ];
+const DEFAULT_REMOTE_SKIN = getSkin('default');
 function hashId(id) {
   const s = String(id);
   let h = 0;
@@ -163,8 +165,9 @@ export class AuthNetBridge {
     // sphere head, so what everyone else saw of you bore no relation to what
     // you saw of yourself.
     const avatar = new Avatar(this.scene, {
-      skin: REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
-      armorTypeId: PLAYABLE_ARMOR_IDS[hashId(id) % PLAYABLE_ARMOR_IDS.length],
+      skin: isBot ? DEFAULT_REMOTE_SKIN : REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
+      armorTypeId: isBot ? PLAYABLE_ARMOR_IDS[0]
+        : PLAYABLE_ARMOR_IDS[hashId(id) % PLAYABLE_ARMOR_IDS.length],
       weaponId: 'm4',
       // Network peers must render from the same connected exosuit roster as
       // local players and bots; the legacy Soldier is tooling-only.

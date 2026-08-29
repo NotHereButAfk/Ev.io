@@ -10,6 +10,14 @@ export const BOT_TACTICS = Object.freeze({
   meleeAttackDistance: 2.2,
 });
 
+// Arena opponents need to notice each other across the wider sightlines in the
+// imported maps. Humans keep the ordinary passive-until-attacked detection
+// radius. For bot-vs-bot play this is movement/footstep awareness; firing still
+// requires a separate unobstructed line-of-sight check.
+export function botArenaDetectionDistance(baseDistance = BOT_TACTICS.detectRadius) {
+  return Math.min(82, Math.max(baseDistance, baseDistance * 1.7));
+}
+
 // Bots keep their ordinary sprint, then punctuate it with short readable bursts.
 // The extra speed is applied only after a full clear-lane/ground check, so this
 // feels like an arena dash without teleporting through cover or off a ledge.

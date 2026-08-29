@@ -10,6 +10,7 @@ import {
   advanceBotMagazine,
   advanceBurst,
   botAimErrorMeters,
+  botArenaDetectionDistance,
   botDashBonusSpeed,
   botLoadoutForId,
   botSeparationVector,
@@ -29,6 +30,10 @@ assert.ok(BOT_DIFFICULTIES.easy.aimErrorScale > BOT_DIFFICULTIES.hard.aimErrorSc
 assert.ok(BOT_DIFFICULTIES.easy.detectionDistance < BOT_DIFFICULTIES.hard.detectionDistance);
 assert.ok(BOT_DIFFICULTIES.easy.movementSpeed < BOT_DIFFICULTIES.hard.movementSpeed);
 assert.equal(getBotDifficulty('missing'), BOT_DIFFICULTIES.normal);
+assert.ok(botArenaDetectionDistance(BOT_TACTICS.detectRadius) > BOT_TACTICS.detectRadius,
+  'bot opponents do not receive enough arena awareness to find each other');
+assert.ok(botArenaDetectionDistance(100) <= 82,
+  'bot opponent awareness grew beyond its performance/safety cap');
 assert.equal(isInsideBotFov(0, 0, -10, 90), true);
 assert.equal(isInsideBotFov(0, 0, 10, 90), false);
 assert.ok(Math.abs(smoothBotAim(0, Math.PI, 4, 0.05)) < Math.PI,

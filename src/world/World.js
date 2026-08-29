@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Capsule } from 'three/addons/math/Capsule.js';
 import { Octree } from 'three/addons/math/Octree.js';
+import { boundedOctreeRayIntersect } from './BoundedOctreeRay.js';
 import { loadEvMap } from './EvMapLoader.js';
 import { DEFAULT_MAP_ID, getImportedMap, nextImportedMapId } from './MapRegistry.js';
 
@@ -244,7 +245,7 @@ export class World {
   raycastCollisionDistance(ray, far = Infinity) {
     let distance = far;
     if (this._mapOctree) {
-      const hit = this._mapOctree.rayIntersect(ray);
+      const hit = boundedOctreeRayIntersect(this._mapOctree, ray, far);
       if (hit && hit.distance > 0.015 && hit.distance < distance) distance = hit.distance;
     }
     const boxHit = this.raycastBoxHit(ray, distance);
@@ -260,7 +261,7 @@ export class World {
   raycastCollisionHit(ray, far = Infinity) {
     let best = null;
     if (this._mapOctree) {
-      const hit = this._mapOctree.rayIntersect(ray);
+      const hit = boundedOctreeRayIntersect(this._mapOctree, ray, far);
       if (hit && hit.distance > 0.015 && hit.distance <= far) {
         best = {
           point: hit.position.clone(),

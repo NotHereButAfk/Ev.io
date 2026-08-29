@@ -6,7 +6,8 @@ import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
-import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
+import { getSkin } from '../player/skins.js';
+import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botArenaDetectionDistance, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 
@@ -46,21 +47,10 @@ const PLAYER_HEAD_Y = 1.60, PLAYER_HEAD_R = 0.24;
 
 let nextId = 1;
 
-// Bots spawn as the cyborg-terminator models — the same low-poly cel-shaded
-// endoskeletons the player uses. Cycling the three chassis keeps the mob varied.
-let _armorIdx = 0;
-
-// Each bot picks the next skin in sequence so the lobby always looks varied.
-// Bright, distinct hues so enemy soldiers read clearly at a distance.
-const BOT_SKINS = [
-  { primary: 0xd1372b, secondary: 0x2b1414 }, // Crimson
-  { primary: 0x2b6fd1, secondary: 0x14223a }, // Cobalt
-  { primary: 0x9050d1, secondary: 0x241433 }, // Violet
-  { primary: 0x2fae5a, secondary: 0x0c2a16 }, // Emerald
-  { primary: 0xc9d2d8, secondary: 0x2a3238 }, // Arctic
-  { primary: 0xe0902c, secondary: 0x33240c }, // Amber
-];
-let _skinIdx = 0;
+// Bots share the exact default player presentation. Names and BOT badges keep
+// them readable without giving AI opponents a separate model/skin roster.
+const DEFAULT_BOT_SKIN = getSkin('default');
+const DEFAULT_BOT_ARMOR_ID = PLAYABLE_ARMOR_IDS[0];
 
 function buildHealthBar() {
   const group = new THREE.Group();
@@ -171,8 +161,10 @@ export class Bot {
 
     this.position = spawnPoint.clone();
 
-    const armorTypeId = PLAYABLE_ARMOR_IDS[_armorIdx++ % PLAYABLE_ARMOR_IDS.length];
-    const skin = BOT_SKINS[_skinIdx++ % BOT_SKINS.length];
+    const armorTypeId = DEFAULT_BOT_ARMOR_ID;
+    const skin = DEFAULT_BOT_SKIN;
+    this.armorTypeId = armorTypeId;
+    this.skin = skin;
     // Bots use the same connected arena-exosuit family as the player. Keep the
     // retired layered Soldier path explicitly disabled so an asset-load race
     // cannot put a gun back inside the older bulky vest/glove silhouette.
@@ -588,7 +580,10 @@ export class Bot {
     // ── Awareness ──────────────────────────────────────────────────────────────
     // A bot only retaliates after takeDamage() provokes it. Visibility refreshes
     // combat memory after that point, but merely walking into view is neutral.
-    const inRange = !player.isDead && distToPlayer < DETECT_RADIUS;
+    const targetDetectRadius = player?.isBot
+      ? botArenaDetectionDistance(DETECT_RADIUS)
+      : DETECT_RADIUS;
+    const inRange = !player.isDead && distToPlayer < targetDetectRadius;
     this._losT -= dt;
     if (inRange) {
       if (this._losT <= 0) {
@@ -599,13 +594,17 @@ export class Bot {
       this._losCache = false;
     }
     const hasVisual = inRange && this._losCache;
+    // Arena bots can hear another bot's movement at the expanded acquisition
+    // range. This lets separated opponents converge around cover, while all
+    // shooting below still requires hasVisual and therefore real LOS.
+    const hasArenaAwareness = !!player?.isBot && inRange;
     const canEngageTarget = !!player?.isBot || this._provokedByPlayer;
     if (player.isDead) {
       this._provoked = false;
       this._provokedByPlayer = false;
       this._provokeTimer = 0;
       this._lastSeenValid = false;
-    } else if (hasVisual && canEngageTarget) {
+    } else if ((hasVisual || hasArenaAwareness) && canEngageTarget) {
       if (!this._provoked) this._reactT = REACTION_MIN + Math.random() * (REACTION_MAX - REACTION_MIN);
       this._provoked = true;
       this._provokeTimer = PROVOKE_DURATION;
@@ -626,7 +625,7 @@ export class Bot {
     let gaitDirF = 0;
     let gaitDirR = 0;
     if (engaged) {
-      const target = hasVisual ? player.position : this._lastSeenPos;
+      const target = (hasVisual || hasArenaAwareness) ? player.position : this._lastSeenPos;
       this._toTarget.set(target.x - this.position.x, 0, target.z - this.position.z);
       const targetDistance = this._toTarget.length();
       const targetDir = this._combatDir.copy(this._toTarget);

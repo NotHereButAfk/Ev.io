@@ -82,6 +82,7 @@ if (qaRequested) {
       },
       bots: game.botManager.bots.map((bot) => ({
         id: bot.id, name: bot.displayName, alive: bot.alive,
+        armor: bot.armorTypeId, skin: bot.skin?.id,
         x: bot.position.x, y: bot.position.y, z: bot.position.z,
         pitch: bot.mesh.rotation.x, yaw: bot.mesh.rotation.y, roll: bot.mesh.rotation.z,
         speed: bot._animSpeed, engaged: bot._provoked,

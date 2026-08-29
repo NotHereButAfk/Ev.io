@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as THREE from 'three';
 import {
   bloomEnabled, lowerRuntimeQuality, postFxPixelRatio, rendererPixelRatio,
   shouldReduceMenuQuality, shouldReduceRuntimeQuality,
 } from '../src/core/RenderQuality.js';
+import { boundedOctreeRayIntersect } from '../src/world/BoundedOctreeRay.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
@@ -16,6 +18,26 @@ assert(postFxPixelRatio('high', 3) === 1.5, 'high bloom must cap at 1.5x');
 assert(rendererPixelRatio('low', 3) === 0.6, 'low renderer scale changed');
 assert(!bloomEnabled('low') && !bloomEnabled('medium') && bloomEnabled('high'),
   'bloom must stay a high-quality-only effect');
+
+const ray = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, 0, -1));
+const nearTriangle = new THREE.Triangle(
+  new THREE.Vector3(-1, -1, -5),
+  new THREE.Vector3(1, -1, -5),
+  new THREE.Vector3(0, 1, -5),
+);
+const mockOctree = {
+  triangles: [],
+  subTrees: [{
+    box: new THREE.Box3(new THREE.Vector3(-1, -1, -5.1), new THREE.Vector3(1, 1, -4.9)),
+    triangles: [nearTriangle],
+    subTrees: [],
+  }],
+  rayIntersect: () => { throw new Error('finite query fell back to an unbounded octree scan'); },
+};
+assert(!boundedOctreeRayIntersect(mockOctree, ray, 4),
+  'bounded octree query returned geometry beyond its finite segment');
+assert(Math.abs(boundedOctreeRayIntersect(mockOctree, ray, 6).distance - 5) < 1e-6,
+  'bounded octree query missed nearby collision');
 assert(lowerRuntimeQuality('high') === 'medium'
   && lowerRuntimeQuality('medium') === 'low'
   && lowerRuntimeQuality('low') === 'low', 'runtime quality fallback order changed');
@@ -41,6 +63,8 @@ const hero = readFileSync(join(root, 'src/player/HeroBody.js'), 'utf8');
 assert(!/quaternion\.clone\(\)\.invert\(\)/.test(bot), 'bot billboard allocates every frame');
 assert(/raycastCollisionDistance\(ray, far = Infinity\)/.test(world),
   'world must expose an octree-accelerated bot obstruction query');
+assert(/boundedOctreeRayIntersect\(this\._mapOctree, ray, far\)/.test(world),
+  'client collision rays must stay bounded to their requested segment');
 assert(!/intersectObjects\([^\n]*raycastMeshes/.test(bot),
   'bot AI must not scan every imported map mesh for navigation or gunfire');
 assert((bot.match(/raycastCollisionDistance/g) || []).length >= 4,

@@ -48,6 +48,16 @@ assert.ok(PLAYER_WORLD_MODEL_SCALE < 1 && PLAYER_WORLD_MODEL_SCALE >= 0.9,
 const bridgeSource = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
 assert.match(bridgeSource, /modelScale:\s*isBot\s*\?\s*1\s*:\s*PLAYER_WORLD_MODEL_SCALE/,
   'network humans and bots do not apply their intended relative scales');
+assert.match(bridgeSource, /isBot\s*\?\s*DEFAULT_REMOTE_SKIN\s*:/,
+  'network bots do not render with the default player skin');
+assert.match(bridgeSource, /isBot\s*\?\s*PLAYABLE_ARMOR_IDS\[0\]/,
+  'network bots do not render with the default player armor');
+
+const botSource = readFileSync(new URL('../src/entities/Bot.js', import.meta.url), 'utf8');
+assert.match(botSource, /DEFAULT_BOT_SKIN\s*=\s*getSkin\('default'\)/,
+  'local bots do not use the default player skin');
+assert.match(botSource, /DEFAULT_BOT_ARMOR_ID\s*=\s*PLAYABLE_ARMOR_IDS\[0\]/,
+  'local bots do not use the default player armor');
 
 for (const path of ['../src/entities/Bot.js', '../src/net/AuthNetBridge.js']) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');

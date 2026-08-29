@@ -37,6 +37,7 @@ import {
 import {
   BOT_DASH,
   BOT_RETALIATION_AIM_SCALE,
+  botArenaDetectionDistance,
   BOT_STATES,
   botAimErrorMeters,
   botDashBonusSpeed,
@@ -511,7 +512,10 @@ export class AuthRoom {
     const dx = target.state.px - p.state.px;
     const dz = target.state.pz - p.state.pz;
     const distance = Math.hypot(dx, dz);
-    if (distance > cfg.detectionDistance) return false;
+    const detectionDistance = target.isBot
+      ? botArenaDetectionDistance(cfg.detectionDistance)
+      : cfg.detectionDistance;
+    if (distance > detectionDistance) return false;
     if (!ignoreFov && !isInsideBotFov(p._botAimYaw ?? p._lastYaw ?? 0, dx, dz, cfg.fovDegrees)) return false;
     const dy = (target.state.py + HEAD_Y) - (p.state.py + HEAD_Y);
     const length = Math.hypot(dx, dy, dz) || 1e-6;
@@ -593,8 +597,15 @@ export class AuthRoom {
         const dx = candidate.state.px - p.state.px;
         const dz = candidate.state.pz - p.state.pz;
         const distance = Math.hypot(dx, dz);
-        if (distance >= bestDistance || distance > cfg.detectionDistance) continue;
-        if (!this._botCanSee(p, candidate, candidate.id === p._botTargetId)) continue;
+        const detectionDistance = isArenaOpponent
+          ? botArenaDetectionDistance(cfg.detectionDistance)
+          : cfg.detectionDistance;
+        if (distance >= bestDistance || distance > detectionDistance) continue;
+        // Other bots are also acquired by nearby movement sound. Human targets
+        // still require real visibility, and the fire path below always checks
+        // LOS, so awareness cannot become shooting through walls.
+        if (!isArenaOpponent && !this._botCanSee(p, candidate,
+          candidate.id === p._botTargetId)) continue;
         best = candidate;
         bestDistance = distance;
       }
@@ -609,6 +620,26 @@ export class AuthRoom {
         p._botReactionUntil = this.tick + this._botReactionTicks(p);
         p._botState = BOT_STATES.REACT;
       }
+
+      const trackedArenaBot = this.players.get(p._botTargetId);
+      if (trackedArenaBot?.isBot && trackedArenaBot.alive) {
+        const trackedDistance = Math.hypot(
+          trackedArenaBot.state.px - p.state.px,
+          trackedArenaBot.state.pz - p.state.pz,
+        );
+        if (trackedDistance <= botArenaDetectionDistance(cfg.detectionDistance)) {
+          // Refresh only the pursuit point. _botLosCache stays authoritative for
+          // aiming/firing and is updated solely by _botCanSee below.
+          p._botLastSeen = {
+            x: trackedArenaBot.state.px,
+            y: trackedArenaBot.state.py,
+            z: trackedArenaBot.state.pz,
+          };
+          p._botLastSeenTick = this.tick;
+          p._botHostility.set(trackedArenaBot.id,
+            this.tick + secondsToTicks(cfg.focusDuration + cfg.searchDuration));
+        }
+      }
     }
 
     let target = this.players.get(p._botTargetId);
@@ -620,7 +651,17 @@ export class AuthRoom {
 
     let hasVisual = false;
     if (target && this.tick >= p._botNextLosTick) {
-      p._botNextLosTick = this.tick + secondsToTicks(cfg.losInterval);
+      const targetDistance = Math.hypot(
+        target.state.px - p.state.px,
+        target.state.pz - p.state.pz,
+      );
+      // Imported map octrees are intentionally detailed. Footstep-aware bots
+      // can pursue at long range without spending a raycast every three ticks;
+      // checks tighten once opponents are close enough to exchange fire.
+      const losInterval = target.isBot
+        ? Math.max(cfg.losInterval, targetDistance > 36 ? 0.70 : 0.32)
+        : cfg.losInterval;
+      p._botNextLosTick = this.tick + secondsToTicks(losInterval);
       p._botLosTargetId = target.id;
       p._botLosCache = this._botCanSee(p, target, true);
       if (p._botLosCache) {

@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildEvMapScene, parseEvMap } from '../src/world/EvMapLoader.js';
+import { boundedOctreeRayIntersect } from '../src/world/BoundedOctreeRay.js';
 import { IMPORTED_MAPS } from '../src/world/MapRegistry.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -89,7 +90,7 @@ function loadArena(definition) {
   function raycast(ox, oy, oz, dx, dy, dz, maxT) {
     ray.origin.set(ox, oy, oz);
     ray.direction.set(dx, dy, dz).normalize();
-    const hit = octree.rayIntersect(ray);
+    const hit = boundedOctreeRayIntersect(octree, ray, maxT);
     return hit && hit.distance > 0.1 && hit.distance < maxT ? hit.distance : maxT;
   }
 
