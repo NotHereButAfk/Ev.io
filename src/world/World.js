@@ -236,6 +236,23 @@ export class World {
   }
 
   /**
+   * Cheap nearest-obstruction query for bot navigation and gunfire. Imported
+   * arenas already build an octree for collision, so re-use that acceleration
+   * structure instead of asking Three.js to traverse every map mesh and every
+   * triangle for each bot probe.
+   */
+  raycastCollisionDistance(ray, far = Infinity) {
+    let distance = far;
+    if (this._mapOctree) {
+      const hit = this._mapOctree.rayIntersect(ray);
+      if (hit && hit.distance > 0.015 && hit.distance < distance) distance = hit.distance;
+    }
+    const boxHit = this.raycastBoxHit(ray, distance);
+    if (boxHit && boxHit.distance < distance) distance = boxHit.distance;
+    return distance;
+  }
+
+  /**
    * Raycast against the collision scene rather than the decorative render
    * meshes. Fast rockets and tiny grenades cannot tunnel through a thin floor
    * merely because its visible mesh was simplified or tagged noHit.

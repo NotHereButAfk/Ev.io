@@ -27,6 +27,7 @@ assert(!shouldReduceMenuQuality(1.6, 96, 0),
   'a steady spectator must preserve requested quality');
 
 const bot = readFileSync(join(root, 'src/entities/Bot.js'), 'utf8');
+const world = readFileSync(join(root, 'src/world/World.js'), 'utf8');
 const zombie = readFileSync(join(root, 'src/entities/Zombie.js'), 'utf8');
 const game = readFileSync(join(root, 'src/core/Game.js'), 'utf8');
 const plates = readFileSync(join(root, 'src/ui/Nameplates.js'), 'utf8');
@@ -38,6 +39,12 @@ const htaccess = readFileSync(join(root, 'public/.htaccess'), 'utf8');
 const authNet = readFileSync(join(root, 'src/net/AuthNetBridge.js'), 'utf8');
 const hero = readFileSync(join(root, 'src/player/HeroBody.js'), 'utf8');
 assert(!/quaternion\.clone\(\)\.invert\(\)/.test(bot), 'bot billboard allocates every frame');
+assert(/raycastCollisionDistance\(ray, far = Infinity\)/.test(world),
+  'world must expose an octree-accelerated bot obstruction query');
+assert(!/intersectObjects\([^\n]*raycastMeshes/.test(bot),
+  'bot AI must not scan every imported map mesh for navigation or gunfire');
+assert((bot.match(/raycastCollisionDistance/g) || []).length >= 4,
+  'bot sight, dash, shooting, and roaming must share accelerated collision rays');
 assert(!/quaternion\.clone\(\)\.invert\(\)/.test(zombie), 'zombie billboard allocates every frame');
 const menuUpdate = game.slice(game.indexOf('_updateMenuScene(dt)'), game.indexOf('_loop()'));
 assert(!/new THREE\.Vector3/.test(menuUpdate), 'menu simulation allocates a vector every frame');

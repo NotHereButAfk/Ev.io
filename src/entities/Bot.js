@@ -390,16 +390,11 @@ export class Bot {
     const dist = this._shootFrom.distanceTo(this._shootTarget);
     if (dist < 0.5) return true;
     this._shootDir.subVectors(this._shootTarget, this._shootFrom).normalize();
-    if (!world?.colliders?.length) return true;
-    // Collider VISUALS get a mesh raycast; the map's bare box colliders (trees,
-    // kiosks, benches, escalators — most of the mall's cover) need their own
-    // ray/AABB test, or bots see straight through everything you hide behind.
-    this._raycaster.near = 0.2;
-    this._raycaster.far  = dist - 0.5;
-    this._raycaster.set(this._shootFrom, this._shootDir);
-    if (this._raycaster.intersectObjects(world.raycastMeshes, true).length) return false;
-    if (world.raycastBoxHit(this._raycaster.ray, this._raycaster.far)) return false;
-    return true;
+    if (!world?.raycastCollisionDistance) return true;
+    // Use World's collision octree plus bare box colliders. Traversing every
+    // render mesh for each bot probe made dense imported maps unplayable.
+    this._bulletRay.set(this._shootFrom, this._shootDir);
+    return world.raycastCollisionDistance(this._bulletRay, dist - 0.5) >= dist - 0.5;
   }
 
   _dashLaneSafe(direction, world) {
@@ -414,17 +409,10 @@ export class Bot {
         ? (x, z, prevY, nextY) => world.groundHeightAt(x, z, prevY, nextY)
         : null,
       raycast: (ox, oy, oz, dx, dy, dz, far) => {
-        this._raycaster.near = 0.12;
-        this._raycaster.far = far;
         this._shootFrom.set(ox, oy, oz);
         this._shootDir.set(dx, dy, dz);
-        this._raycaster.set(this._shootFrom, this._shootDir);
-        const meshHit = world?.raycastMeshes?.length
-          ? this._raycaster.intersectObjects(world.raycastMeshes, true)[0]
-          : null;
         this._bulletRay.set(this._shootFrom, this._shootDir);
-        const boxHit = world?.raycastBoxHit?.(this._bulletRay, far);
-        return Math.min(meshHit?.distance ?? far, boxHit?.distance ?? far);
+        return world?.raycastCollisionDistance?.(this._bulletRay, far) ?? far;
       },
     });
   }
@@ -471,14 +459,8 @@ export class Bot {
 
     // Nearest world obstruction along the bullet's actual path.
     let blockAt = Infinity;
-    if (world?.colliders?.length) {
-      this._raycaster.near = 0.2;
-      this._raycaster.far  = range;
-      this._raycaster.set(this._shootFrom, this._shootDir);
-      const wh = this._raycaster.intersectObjects(world.raycastMeshes, true);
-      if (wh.length) blockAt = wh[0].distance;
-      const bh = world.raycastBoxHit(this._bulletRay, range);
-      if (bh && bh.distance < blockAt) blockAt = bh.distance;
+    if (world?.raycastCollisionDistance) {
+      blockAt = world.raycastCollisionDistance(this._bulletRay, range);
     }
 
     // Does it reach the player before that?
@@ -730,15 +712,10 @@ export class Bot {
           half: this.world.arenaHalf, killY: this.world.killY,
           groundHeightAt: (x, z, prevY, newY) => this.world.groundHeightAt(x, z, prevY, newY),
           raycast: (ox, oy, oz, dx, dy, dz, far) => {
-            this._raycaster.near = 0.12;
-            this._raycaster.far = far;
             this._shootFrom.set(ox, oy, oz);
             this._shootDir.set(dx, dy, dz);
-            this._raycaster.set(this._shootFrom, this._shootDir);
-            const meshHit = this._raycaster.intersectObjects(this.world.raycastMeshes, true)[0];
             this._bulletRay.set(this._shootFrom, this._shootDir);
-            const boxHit = this.world.raycastBoxHit(this._bulletRay, far);
-            return Math.min(meshHit?.distance ?? far, boxHit?.distance ?? far);
+            return this.world.raycastCollisionDistance?.(this._bulletRay, far) ?? far;
           },
         });
         if (picked) this.wanderTarget.set(picked[0], picked[1], picked[2]);
