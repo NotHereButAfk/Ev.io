@@ -39,6 +39,7 @@ import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
+import { isHumanSoldierReady } from '../player/HumanSoldier.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
 import { AuthNetBridge, authNetTarget, authNetTargets } from '../net/AuthNetBridge.js';
