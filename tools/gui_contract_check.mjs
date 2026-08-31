@@ -10,6 +10,7 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const index = read('index.html');
 const login = read('login.html');
 const register = read('register.html');
+const tournaments = read('tournaments.html');
 const privacy = read('privacy.html');
 const terms = read('terms.html');
 const menu = read('src/ui/MainMenu.js');
@@ -61,7 +62,7 @@ if (requestPointerLockSafely({ requestPointerLock: () => { throw new Error('wron
   failures.push('pointer-lock synchronous DOMException is contained');
 }
 
-for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'CRYPTO', 'SETTINGS']) {
+for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'CRYPTO', 'TOURNAMENTS', 'SETTINGS']) {
   requireMatch(index, new RegExp(`>${label}(?:\\s|&|<)`), `top navigation: ${label}`);
 }
 for (const panel of ['private', 'profile', 'shop', 'settings', 'feedback', 'more', 'rankings']) {
@@ -85,6 +86,8 @@ for (const control of ['reg-email', 'reg-strength', 'reg-match', 'reg-privacy', 
 }
 requireMatch(privacy, /Privacy policy/i, 'privacy page');
 requireMatch(terms, /Terms of use/i, 'terms page');
+requireMatch(tournaments, /DAILY PRIZE POOL[\s\S]*?0\.5[\s\S]*?SOL/, '0.5 SOL daily tournament prize pool');
+requireMatch(tournaments, /id=["']tournament-enter["']/, 'tournament entry control');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 requireMatch(index, /id=["']map-loading["'][^>]*class=["'][^"']*hidden/,
@@ -145,4 +148,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('gui contract passed: 7 top-level destinations, 7 panels, auth routes, and dynamic ADS crosshair');
+console.log('gui contract passed: 8 top-level destinations, tournaments, auth routes, and dynamic ADS crosshair');

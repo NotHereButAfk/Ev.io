@@ -13,6 +13,7 @@ export default defineConfig({
         main:     resolve(__dirname, 'index.html'),
         login:    resolve(__dirname, 'login.html'),
         register: resolve(__dirname, 'register.html'),
+        tournaments: resolve(__dirname, 'tournaments.html'),
         privacy:  resolve(__dirname, 'privacy.html'),
         terms:    resolve(__dirname, 'terms.html'),
       },

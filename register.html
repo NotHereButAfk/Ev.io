@@ -23,7 +23,7 @@
       <h1 class="login-title">Create new account</h1>
 
       <div class="login-tabs">
-        <a class="auth-tab" href="/login">Log in</a>
+        <a class="auth-tab" href="/login" data-auth-route="login">Log in</a>
         <a class="auth-tab active" href="/register">Create new account</a>
         <a class="auth-tab" href="/login?reset=1">Reset your password</a>
       </div>
@@ -57,7 +57,7 @@
       </div>
 
       <div class="login-alt">
-        Already have an account? <a href="/login" class="login-link">Log in</a>
+        Already have an account? <a href="/login" class="login-link" data-auth-route="login">Log in</a>
         <span class="login-sep">·</span>
         <button id="guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
       </div>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KYX.IO — Tournaments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="tournament-page">
+    <header class="login-topbar tournament-topbar">
+      <a class="login-brand" href="/">KYX<span>.IO</span></a>
+      <nav class="login-nav">
+        <a class="login-nav-link" href="/">Play</a>
+        <a class="login-nav-link active" href="/tournaments">Tournaments</a>
+        <a id="tournament-login" class="login-nav-link" href="/login?next=/tournaments">Log in</a>
+        <a id="tournament-register" class="login-nav-link" href="/register?next=/tournaments">Register</a>
+        <button id="tournament-logout" class="login-nav-link tournament-logout hidden" type="button">Log out</button>
+      </nav>
+    </header>
+
+    <main class="tournament-main">
+      <section class="tournament-hero">
+        <div class="tournament-kicker">DAILY COMPETITIVE SERIES</div>
+        <h1>TOURNAMENTS</h1>
+        <p>Enter the daily arena, climb the live leaderboard, and compete for the prize pool.</p>
+        <div class="prize-card" aria-label="Daily prize pool 0.5 SOL">
+          <span class="prize-label">DAILY PRIZE POOL</span>
+          <strong>0.5 <span>SOL</span></strong>
+          <small>Resets daily at 00:00 UTC</small>
+        </div>
+      </section>
+
+      <section class="tournament-grid">
+        <article class="tournament-card tournament-card-live">
+          <div class="tournament-card-top"><span class="live-dot"></span> DAILY ARENA</div>
+          <h2>OPEN DEATHMATCH</h2>
+          <div class="tournament-meta"><span>8 PLAYERS</span><span>3 MINUTES</span><span>FFA</span></div>
+          <p>Score as many eliminations as possible. Your best completed match counts toward today's standings.</p>
+          <button id="tournament-enter" class="tournament-action" type="button">ENTER TOURNAMENT</button>
+          <div id="tournament-message" class="tournament-message" aria-live="polite"></div>
+        </article>
+
+        <article class="tournament-card">
+          <div class="tournament-card-top">TODAY'S PAYOUT</div>
+          <ol class="payout-list">
+            <li><span>1ST</span><strong>0.25 SOL</strong></li>
+            <li><span>2ND</span><strong>0.15 SOL</strong></li>
+            <li><span>3RD</span><strong>0.10 SOL</strong></li>
+          </ol>
+          <p class="tournament-note">Wallet payouts require account eligibility and a linked wallet. The wallet connector remains unavailable in this build.</p>
+        </article>
+
+        <article class="tournament-card tournament-leaderboard">
+          <div class="tournament-card-top">LIVE STANDINGS</div>
+          <div class="standings-empty">No qualifying scores yet.<br />Be the first player on the board.</div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/src/tournamentsPage.js"></script>
+</body>
+</html>

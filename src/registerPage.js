@@ -15,6 +15,18 @@ const strengthEl = document.getElementById('reg-strength');
 const strengthBar = document.getElementById('reg-strength-bar');
 const matchEl = document.getElementById('reg-match');
 
+function destination() {
+  const next = new URLSearchParams(location.search).get('next');
+  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+}
+
+const returnTo = destination();
+if (returnTo !== '/') {
+  document.querySelectorAll('[data-auth-route]').forEach((link) => {
+    link.href = `/${link.dataset.authRoute}?next=${encodeURIComponent(returnTo)}`;
+  });
+}
+
 function passwordScore(value) {
   if (!value) return 0;
   let score = value.length >= 8 ? 1 : 0;
@@ -45,7 +57,7 @@ const doReg = async () => {
   if (passEl.value !== pass2El.value) { err("Passwords don't match"); return; }
   if (!privacyEl.checked || !termsEl.checked) { err('Accept the privacy policy and terms of use to continue'); return; }
   const res = await UserAccount.register(nameEl.value.trim(), passEl.value, email);
-  if (res.ok) window.location.href = '/';
+  if (res.ok) window.location.href = destination();
   else err(res.err);
 };
 
@@ -59,5 +71,5 @@ renderPasswordFeedback();
 
 document.getElementById('guest-btn')?.addEventListener('click', () => {
   UserAccount.guest();
-  window.location.href = '/';
+  window.location.href = destination();
 });

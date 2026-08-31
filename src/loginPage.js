@@ -9,10 +9,22 @@ function clearErr(id) { document.getElementById(id)?.classList.add('hidden'); }
 const nameEl = document.getElementById('login-name');
 const passEl = document.getElementById('login-pass');
 
+function destination() {
+  const next = new URLSearchParams(location.search).get('next');
+  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+}
+
+const returnTo = destination();
+if (returnTo !== '/') {
+  document.querySelectorAll('[data-auth-route]').forEach((link) => {
+    link.href = `/${link.dataset.authRoute}?next=${encodeURIComponent(returnTo)}`;
+  });
+}
+
 const doLogin = async () => {
   clearErr('login-err');
   const res = await UserAccount.login(nameEl.value.trim(), passEl.value);
-  if (res.ok) window.location.href = '/';
+  if (res.ok) window.location.href = destination();
   else err('login-err', res.err);
 };
 
@@ -21,7 +33,7 @@ passEl?.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); }
 
 document.getElementById('guest-btn')?.addEventListener('click', () => {
   UserAccount.guest();
-  window.location.href = '/';
+  window.location.href = destination();
 });
 
 document.getElementById('reset-btn')?.addEventListener('click', () => {

@@ -23,19 +23,19 @@
       <h1 class="login-title">Log in</h1>
 
       <div class="login-tabs">
-        <a class="auth-tab active" href="/login">Log in</a>
-        <a class="auth-tab" href="/register">Create new account</a>
+        <a class="auth-tab active" href="/login" data-auth-route="login">Log in</a>
+        <a class="auth-tab" href="/register" data-auth-route="register">Create new account</a>
         <a class="auth-tab" href="/login?reset=1" id="tab-reset">Reset your password</a>
       </div>
 
       <div class="login-forms">
         <div id="form-login" class="auth-form">
-          <label class="login-label" for="login-name">Username <span class="req">*</span></label>
+          <label class="login-label" for="login-name">Username or email <span class="req">*</span></label>
           <input id="login-name" class="login-input" autocomplete="username" autofocus />
           <label class="login-label" for="login-pass">Password <span class="req">*</span></label>
           <input id="login-pass" class="login-input" type="password" autocomplete="current-password" />
           <div id="login-err" class="auth-error hidden"></div>
-          <button id="login-btn" class="login-submit"><span class="login-ico">&#8677;</span> Log in</button>
+          <button id="login-btn" class="login-submit" type="button"><span class="login-ico">&#8677;</span> Log in</button>
         </div>
 
         <div id="form-reset" class="auth-form hidden">
@@ -48,7 +48,7 @@
       </div>
 
       <div class="login-alt">
-        Don't have an account? <a href="/register" class="login-link">Create one</a>
+        Don't have an account? <a href="/register" class="login-link" data-auth-route="register">Create one</a>
         <span class="login-sep">·</span>
         <button id="guest-btn" class="login-guest">Play as guest instead &rsaquo;</button>
       </div>

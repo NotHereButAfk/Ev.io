@@ -5042,6 +5042,50 @@ html, body { margin: 0; }
 .auth-page .login-input { border-radius: 0; padding: 9px 11px; }
 .auth-page .login-submit { align-self: flex-start; margin-top: 15px; padding: 9px 12px; border-radius: 0; }
 .auth-page .login-alt { display: none; }
+
+/* Tournaments — standalone competitive page sharing the auth visual language. */
+.tournament-page { min-height: 100vh; color: #f4f7fa; background: radial-gradient(circle at 72% 6%, rgba(21,211,194,.13), transparent 31%), linear-gradient(145deg, #0a0d12 0%, #11161e 58%, #090b0f 100%); font-family: 'Rajdhani', sans-serif; }
+.tournament-topbar { background: rgba(7,9,13,.86); border-bottom: 1px solid rgba(255,255,255,.09); }
+.tournament-logout { background: none; border: 0; cursor: pointer; font: inherit; }
+.tournament-main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 70px 0 90px; }
+.tournament-hero { display: grid; grid-template-columns: 1fr minmax(260px, 360px); column-gap: 60px; align-items: center; }
+.tournament-kicker, .tournament-card-top, .prize-label { color: #22dac7; letter-spacing: .19em; font-weight: 700; font-size: 13px; }
+.tournament-hero h1 { margin: 8px 0 12px; font-family: 'Michroma', sans-serif; font-size: clamp(38px, 6vw, 78px); letter-spacing: .04em; }
+.tournament-hero > p { max-width: 650px; margin: 0; color: #9ca7b5; font-size: 20px; line-height: 1.45; }
+.prize-card { grid-column: 2; grid-row: 1 / span 3; display: flex; min-height: 205px; padding: 28px; flex-direction: column; justify-content: center; border: 1px solid rgba(34,218,199,.42); background: linear-gradient(150deg, rgba(34,218,199,.13), rgba(255,255,255,.025)); box-shadow: 0 18px 60px rgba(0,0,0,.34), inset 0 0 35px rgba(34,218,199,.045); }
+.prize-card strong { margin: 6px 0 3px; font-family: 'Michroma', sans-serif; font-size: clamp(48px, 6vw, 74px); line-height: 1; }
+.prize-card strong span { color: #22dac7; font-size: .34em; }
+.prize-card small { color: #8e99a7; font-size: 14px; }
+.tournament-grid { display: grid; grid-template-columns: 1.35fr .8fr; gap: 18px; margin-top: 65px; }
+.tournament-card { min-height: 230px; padding: 28px; border: 1px solid rgba(255,255,255,.11); background: rgba(15,19,26,.82); box-shadow: 0 16px 42px rgba(0,0,0,.24); }
+.tournament-card-live { grid-row: span 2; }
+.tournament-card h2 { margin: 12px 0 8px; font-family: 'Michroma', sans-serif; font-size: clamp(23px, 3vw, 38px); }
+.tournament-card p { color: #9ca7b5; font-size: 17px; line-height: 1.45; }
+.live-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #22dac7; box-shadow: 0 0 11px #22dac7; animation: tournament-pulse 1.8s ease-in-out infinite; }
+.tournament-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0; }
+.tournament-meta span { padding: 5px 9px; color: #c7d0da; border: 1px solid rgba(255,255,255,.14); font-size: 13px; letter-spacing: .1em; }
+.tournament-action { margin-top: 14px; padding: 13px 20px; color: #06100f; border: 0; background: #22dac7; font: 700 15px 'Michroma', sans-serif; cursor: pointer; }
+.tournament-action:hover { background: #65f3e4; }
+.tournament-message { min-height: 22px; margin-top: 13px; color: #71eddf; }
+.payout-list { margin: 20px 0; padding: 0; list-style: none; }
+.payout-list li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.payout-list li span { color: #8793a1; }
+.payout-list li strong { color: #eef3f6; }
+.tournament-note { font-size: 14px !important; }
+.standings-empty { display: grid; min-height: 150px; place-items: center; color: #778391; text-align: center; font-size: 17px; }
+.nav-page-link { display: flex; align-items: center; text-decoration: none; }
+.side-register { color: #b9c1ca; font-size: 16px; text-decoration: none; }
+@keyframes tournament-pulse { 50% { opacity: .4; box-shadow: 0 0 3px #22dac7; } }
+@media (max-width: 760px) {
+  .tournament-main { width: min(100% - 28px, 620px); padding-top: 38px; }
+  .tournament-hero, .tournament-grid { grid-template-columns: 1fr; }
+  .prize-card { grid-column: 1; grid-row: auto; margin-top: 28px; }
+  .tournament-grid { margin-top: 28px; }
+  .tournament-card-live { grid-row: auto; }
+  .tournament-topbar { align-items: flex-start; gap: 16px; }
+  .tournament-topbar .login-nav { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 .password-meter {
   width: 100%; height: 4px; margin-top: 8px; overflow: hidden;
   background: #262b31;

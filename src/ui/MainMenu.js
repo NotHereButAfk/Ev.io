@@ -515,12 +515,14 @@ export class MenuUI {
 
     const nameEl    = document.getElementById('nav-username');
     const loginLink = document.getElementById('nav-login-link');
+    const registerLink = document.getElementById('nav-register-link');
     const account   = document.getElementById('nav-account');
 
     if (nameEl) {
       nameEl.textContent = username ? UserAccount.getDisplayName(username) : 'guest';
     }
     loginLink?.classList.toggle('hidden', registered);
+    registerLink?.classList.toggle('hidden', registered);
     account?.classList.toggle('hidden', !registered);
 
     // A guest / logged-out user must not keep an account-only panel open.
