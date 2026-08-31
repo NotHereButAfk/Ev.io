@@ -55,6 +55,15 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
   if (!databaseUrl) return null;
   const pool = new Pool({ connectionString: databaseUrl, max: 6, idleTimeoutMillis: 30_000 });
   let ready = false;
+  const attempts = new Map();
+  const allowAttempt = (req) => {
+    const key = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+    const now = Date.now();
+    const entry = attempts.get(key);
+    if (!entry || now - entry.started > 60_000) { attempts.set(key, { started: now, count: 1 }); return true; }
+    entry.count++;
+    return entry.count <= 12;
+  };
   const initialized = pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
@@ -110,6 +119,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
         return true;
       }
       if (req.method === 'POST' && pathname === '/api/account/register') {
+        if (!allowAttempt(req)) { json(res, 429, { ok: false, err: 'Too many attempts. Try again in one minute.' }); return true; }
         const data = await body(req);
         const username = normalizeUsername(data.username);
         const usernameKey = username.toLowerCase();
@@ -135,6 +145,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
         return true;
       }
       if (req.method === 'POST' && pathname === '/api/account/login') {
+        if (!allowAttempt(req)) { json(res, 429, { ok: false, err: 'Too many attempts. Try again in one minute.' }); return true; }
         const data = await body(req);
         const identifier = String(data.identifier || '').trim().toLowerCase();
         const result = await pool.query(
