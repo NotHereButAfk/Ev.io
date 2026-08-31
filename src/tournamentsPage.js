@@ -33,4 +33,5 @@ logout?.addEventListener('click', () => {
   renderSession();
 });
 
+await UserAccount.restore();
 renderSession();

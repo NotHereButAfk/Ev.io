@@ -1,8 +1,10 @@
 import './style.css';
 import { Game } from './core/Game.js';
 import { installSponsorBlockCheck } from './ui/SponsorAvailability.js';
+import { UserAccount } from './core/UserAccount.js';
 
 installSponsorBlockCheck();
+await UserAccount.restore();
 
 const canvas = document.getElementById('game-canvas');
 const game = new Game(canvas);

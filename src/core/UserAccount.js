@@ -8,6 +8,8 @@ const _SES = 'sio_session';
 const _GUEST = 'sio_guest_name';
 const _PBKDF2_ITERS = 210_000;
 const _SALT_BYTES = 16;
+const _usesServer = () => typeof location !== 'undefined'
+  && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
 
 function _load() {
   try { return JSON.parse(localStorage.getItem(_DB) || '{"accounts":{}}'); }
@@ -66,6 +68,16 @@ export const UserAccount = {
   isLoggedIn() { return !!sessionStorage.getItem(_SES); },
 
   async login(username, password) {
+    if (_usesServer()) {
+      try {
+        const response = await fetch('/api/account/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: username, password }) });
+        const result = await response.json();
+        if (!result.ok) return result;
+        sessionStorage.setItem(_SES, result.user.username.toLowerCase());
+        localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+        return { ok: true };
+      } catch { return { ok: false, err: 'Unable to reach the account server' }; }
+    }
     if (!username) return { ok: false, err: 'Enter a username' };
     const db = _load();
     const lookup = username.trim().toLowerCase();
@@ -103,6 +115,16 @@ export const UserAccount = {
   },
 
   async register(username, password, email = '') {
+    if (_usesServer()) {
+      try {
+        const response = await fetch('/api/account/register', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, email }) });
+        const result = await response.json();
+        if (!result.ok) return result;
+        sessionStorage.setItem(_SES, result.user.username.toLowerCase());
+        localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+        return { ok: true };
+      } catch { return { ok: false, err: 'Unable to reach the account server' }; }
+    }
     const u = (username || '').trim();
     const normalizedEmail = (email || '').trim().toLowerCase();
     if (u.length < 2)               return { ok: false, err: 'Username must be 2+ characters' };
@@ -133,7 +155,24 @@ export const UserAccount = {
     return { ok: true };
   },
 
-  logout() { sessionStorage.removeItem(_SES); },
+  logout() {
+    sessionStorage.removeItem(_SES);
+    localStorage.removeItem('sio_server_profile');
+    if (_usesServer()) {
+      fetch('/api/account/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+    }
+  },
+  async restore() {
+    if (typeof location === 'undefined' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') return this.current();
+    try {
+      const response = await fetch('/api/account/me', { credentials: 'same-origin' });
+      const result = await response.json();
+      if (!result.ok) { sessionStorage.removeItem(_SES); return null; }
+      sessionStorage.setItem(_SES, result.user.username.toLowerCase());
+      localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+      return this.current();
+    } catch { return this.current(); }
+  },
   guest()  {
     sessionStorage.setItem(_SES, '__guest__');
     if (!sessionStorage.getItem(_GUEST)) {
@@ -148,11 +187,15 @@ export const UserAccount = {
       if (!sessionStorage.getItem(_GUEST)) this.guest();
       return sessionStorage.getItem(_GUEST);
     }
+    const serverProfile = JSON.parse(localStorage.getItem('sio_server_profile') || 'null');
+    if (serverProfile?.username?.toLowerCase() === username) return serverProfile.username;
     const { accounts } = _load();
     return accounts[username]?.displayName || username;
   },
 
   getStats(username) {
+    const serverProfile = JSON.parse(localStorage.getItem('sio_server_profile') || 'null');
+    if (serverProfile?.username?.toLowerCase() === username) return serverProfile;
     const { accounts } = _load();
     return accounts[username]?.stats || { kills: 0, deaths: 0, score: 0, games: 0 };
   },

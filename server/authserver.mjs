@@ -19,6 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { createGzip, constants as zlibConstants } from 'zlib';
 import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
+import { createAccountService } from './accountservice.mjs';
 
 const MAX_MSG_BYTES = 2 * 1024;             // a single command is tiny
 const RATE_TOKENS = 60, RATE_REFILL_MS = 1000;   // ~60 msgs/sec sustained
@@ -42,6 +43,7 @@ const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.svg', '.gltf', 
 const CLEAN_HTML_ROUTES = new Map([
   ['/login', '/login.html'],
   ['/register', '/register.html'],
+  ['/tournaments', '/tournaments.html'],
   ['/privacy', '/privacy.html'],
   ['/terms', '/terms.html'],
 ]);
@@ -152,9 +154,11 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
   const staticFallback = staticRoot
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
-  const handler = (req, res) => {
+  const accounts = createAccountService();
+  const handler = async (req, res) => {
     let pathname = '';
     try { pathname = new URL(req.url || '/', 'http://localhost').pathname; } catch {}
+    if (accounts && await accounts(req, res, pathname)) return;
     if (req.method === 'GET' && pathname === '/api/matchmake') {
       const humans = Array.from(room.players.values()).filter((player) => !player.isBot).length;
       const capacity = room.targetPopulation || 8;
