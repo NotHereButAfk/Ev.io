@@ -11,6 +11,21 @@ const _SALT_BYTES = 16;
 const _usesServer = () => typeof location !== 'undefined'
   && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
 
+function _storeServerProfile(user) {
+  localStorage.setItem('sio_server_profile', JSON.stringify(user));
+  const entitlements = Array.isArray(user?.ownedSkins) ? user.ownedSkins : [];
+  const shop = JSON.parse(localStorage.getItem('sio_shop') || '{"coins":500,"owned":[]}');
+  const armory = JSON.parse(localStorage.getItem('sio_armory') || '{}');
+  if (!Array.isArray(shop.owned)) shop.owned = [];
+  if (!Array.isArray(armory.__owned)) armory.__owned = [];
+  for (const item of entitlements) {
+    const target = item.kind === 'character' ? shop.owned : armory.__owned;
+    if (!target.includes(item.id)) target.push(item.id);
+  }
+  localStorage.setItem('sio_shop', JSON.stringify(shop));
+  localStorage.setItem('sio_armory', JSON.stringify(armory));
+}
+
 function _load() {
   try { return JSON.parse(localStorage.getItem(_DB) || '{"accounts":{}}'); }
   catch { return { accounts: {} }; }
@@ -74,7 +89,7 @@ export const UserAccount = {
         const result = await response.json();
         if (!result.ok) return result;
         sessionStorage.setItem(_SES, result.user.username.toLowerCase());
-        localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+        _storeServerProfile(result.user);
         return { ok: true };
       } catch { return { ok: false, err: 'Unable to reach the account server' }; }
     }
@@ -121,7 +136,7 @@ export const UserAccount = {
         const result = await response.json();
         if (!result.ok) return result;
         sessionStorage.setItem(_SES, result.user.username.toLowerCase());
-        localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+        _storeServerProfile(result.user);
         return { ok: true };
       } catch { return { ok: false, err: 'Unable to reach the account server' }; }
     }
@@ -169,7 +184,7 @@ export const UserAccount = {
       const result = await response.json();
       if (!result.ok) { sessionStorage.removeItem(_SES); return null; }
       sessionStorage.setItem(_SES, result.user.username.toLowerCase());
-      localStorage.setItem('sio_server_profile', JSON.stringify(result.user));
+      _storeServerProfile(result.user);
       return this.current();
     } catch { return this.current(); }
   },

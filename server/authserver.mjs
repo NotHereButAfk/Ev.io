@@ -20,6 +20,7 @@ import { createGzip, constants as zlibConstants } from 'zlib';
 import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
 import { createAccountService } from './accountservice.mjs';
+import { createPaymentService } from './paymentservice.mjs';
 
 const MAX_MSG_BYTES = 2 * 1024;             // a single command is tiny
 const RATE_TOKENS = 60, RATE_REFILL_MS = 1000;   // ~60 msgs/sec sustained
@@ -155,9 +156,11 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
   const accounts = createAccountService();
+  const payments = createPaymentService(accounts);
   const handler = async (req, res) => {
     let pathname = '';
     try { pathname = new URL(req.url || '/', 'http://localhost').pathname; } catch {}
+    if (payments && await payments(req, res, pathname)) return;
     if (accounts && await accounts(req, res, pathname)) return;
     if (req.method === 'GET' && pathname === '/api/matchmake') {
       const humans = Array.from(room.players.values()).filter((player) => !player.isBot).length;

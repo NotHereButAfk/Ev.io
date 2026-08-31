@@ -85,6 +85,13 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS account_sessions_expiry_idx ON account_sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS user_skins (
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      skin_id VARCHAR(80) NOT NULL,
+      skin_kind VARCHAR(16) NOT NULL CHECK (skin_kind IN ('character','weapon')),
+      granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(user_id, skin_id)
+    );
   `).then(() => { ready = true; });
 
   async function session(req) {
@@ -95,7 +102,12 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
       FROM account_sessions s JOIN users u ON u.id=s.user_id
       WHERE s.token_hash=$1 AND s.expires_at > NOW()
     `, [tokenHash(token)]);
-    return result.rows[0] || null;
+    const user = result.rows[0] || null;
+    if (user) {
+      const owned = await pool.query('SELECT skin_id,skin_kind FROM user_skins WHERE user_id=$1 ORDER BY granted_at', [user.id]);
+      user.ownedSkins = owned.rows.map((row) => ({ id: row.skin_id, kind: row.skin_kind }));
+    }
+    return user;
   }
 
   async function issue(res, userId) {
@@ -107,7 +119,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
     return `kyx_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`;
   }
 
-  return async (req, res, pathname) => {
+  const handler = async (req, res, pathname) => {
     if (!pathname.startsWith('/api/account/')) return false;
     try { await initialized; } catch { json(res, 503, { ok: false, err: 'Account database unavailable' }); return true; }
     if (!ready) { json(res, 503, { ok: false, err: 'Account database unavailable' }); return true; }
@@ -175,4 +187,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
       return true;
     }
   };
+  handler.pool = pool;
+  handler.session = session;
+  return handler;
 }

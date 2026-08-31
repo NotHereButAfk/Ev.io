@@ -14,6 +14,7 @@ import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
+import { openPayPalCheckout } from '../payments/PayPalCheckout.js';
 
 // Shop card previews use the same weapon-render pipeline as the inventory:
 // each gun-skin card shows one of the 5 main guns wearing the finish.
@@ -820,8 +821,8 @@ export class MenuUI {
     const equippedArmor = Shop.getEquipped();
 
     // Every rarity has a default price; armor skins override with their own.
-    const RARITY_PRICE = { common: 100, epic: 1500, legendary: 3000, mythic: 6000 };
-    const priceOf = (skin) => skin.price ?? RARITY_PRICE[skin.rarity || 'common'] ?? 100;
+    const RARITY_PRICE = { common: 20, epic: 40, legendary: 60, mythic: 80 };
+    const priceOf = (skin) => RARITY_PRICE[skin.rarity || 'common'] ?? 20;
 
     const _hex6 = n => n.toString(16).padStart(6, '0');
 
@@ -947,28 +948,10 @@ export class MenuUI {
         }
       } else {
         btn.classList.add('shop-btn-buy');
-        btn.innerHTML = `&#9670; ${price.toLocaleString()} E-COINS`;
-        btn.disabled = Shop.getCoins() < price;
+        btn.textContent = `$${price.toFixed(2)} · BUY`;
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const res = Shop.buy(skin.id, price);
-          if (res.ok) {
-            if (isCharacter) {
-              Shop.equip(skin.id);
-              this.onArmorSkinEquipped?.(skin.id);
-            } else {
-              // Weapon/sword skin -> grant into the Armory's owned pool so
-              // it appears in the matching inventory tab.
-              Armory.grantSkin(skin.id);
-            }
-            this._renderShop();
-            this._refreshCoins();
-          } else {
-            btn.textContent = res.err.toUpperCase();
-            setTimeout(() => {
-              btn.innerHTML = `&#9670; ${price.toLocaleString()} E-COINS`;
-            }, 1500);
-          }
+          openPayPalCheckout({ skinId: skin.id, name: skin.name, kind, price, onComplete: () => this._renderShop() });
         });
       }
       ctaWrap.appendChild(btn);

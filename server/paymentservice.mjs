@@ -1,0 +1,126 @@
+import { randomUUID } from 'crypto';
+import { ARMOR_SKINS } from '../src/player/ArmorSkins.js';
+import { WEAPON_SKINS } from '../src/weapons/WeaponSkins.js';
+
+const PRICE = { common: '20.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
+const items = new Map([
+  ...ARMOR_SKINS.filter((skin) => !skin.starter).map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'character', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
+  ...WEAPON_SKINS.map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'weapon', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
+]);
+
+const send = (res, status, value) => {
+  const payload = JSON.stringify(value);
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(payload), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  res.end(payload);
+};
+
+async function readBody(req) {
+  let raw = '';
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 16_384) throw new Error('Request too large');
+  }
+  return JSON.parse(raw || '{}');
+}
+
+export function createPaymentService(accounts) {
+  if (!accounts?.pool || !accounts?.session) return null;
+  const clientId = process.env.PAYPAL_CLIENT_ID || '';
+  const secret = process.env.PAYPAL_CLIENT_SECRET || '';
+  const environment = process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox';
+  const api = environment === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+  let access = null;
+
+  const initialized = accounts.pool.query(`
+    CREATE TABLE IF NOT EXISTS store_orders (
+      id UUID PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      paypal_order_id VARCHAR(32) UNIQUE,
+      paypal_capture_id VARCHAR(32) UNIQUE,
+      skin_id VARCHAR(80) NOT NULL,
+      skin_kind VARCHAR(16) NOT NULL,
+      amount_cents INTEGER NOT NULL,
+      currency CHAR(3) NOT NULL DEFAULT 'USD',
+      status VARCHAR(20) NOT NULL DEFAULT 'created',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      captured_at TIMESTAMPTZ
+    );
+  `);
+
+  async function accessToken() {
+    if (access && access.expires > Date.now() + 60_000) return access.token;
+    const response = await fetch(`${api}/v1/oauth2/token`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=client_credentials',
+    });
+    if (!response.ok) throw new Error('PayPal authentication failed');
+    const data = await response.json();
+    access = { token: data.access_token, expires: Date.now() + data.expires_in * 1000 };
+    return access.token;
+  }
+
+  async function paypal(path, options = {}) {
+    const token = await accessToken();
+    const response = await fetch(`${api}${path}`, {
+      ...options,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'PayPal-Request-Id': options.requestId || randomUUID(), ...(options.headers || {}) },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.message || 'PayPal request failed');
+    return data;
+  }
+
+  return async (req, res, pathname) => {
+    if (!pathname.startsWith('/api/store/')) return false;
+    await initialized;
+    if (req.method === 'GET' && pathname === '/api/store/config') {
+      send(res, 200, { configured: !!(clientId && secret), clientId: clientId || null, environment, prices: PRICE }); return true;
+    }
+    const user = await accounts.session(req);
+    if (!user) { send(res, 401, { ok: false, err: 'Log in to purchase skins' }); return true; }
+    if (!clientId || !secret) { send(res, 503, { ok: false, err: 'Checkout is awaiting merchant configuration' }); return true; }
+    try {
+      if (req.method === 'POST' && pathname === '/api/store/orders') {
+        const { skinId } = await readBody(req);
+        const item = items.get(String(skinId));
+        if (!item) { send(res, 400, { ok: false, err: 'Skin is not for sale' }); return true; }
+        const owned = await accounts.pool.query('SELECT 1 FROM user_skins WHERE user_id=$1 AND skin_id=$2', [user.id, item.id]);
+        if (owned.rowCount) { send(res, 409, { ok: false, err: 'Skin already owned' }); return true; }
+        const localId = randomUUID();
+        const order = await paypal('/v2/checkout/orders', {
+          method: 'POST', requestId: localId,
+          body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ reference_id: localId, custom_id: `${user.id}:${item.id}`, description: `KYX.IO ${item.name} skin`, amount: { currency_code: 'USD', value: item.price } }], application_context: { shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' } }),
+        });
+        await accounts.pool.query('INSERT INTO store_orders(id,user_id,paypal_order_id,skin_id,skin_kind,amount_cents,status) VALUES($1,$2,$3,$4,$5,$6,$7)', [localId, user.id, order.id, item.id, item.kind, Math.round(Number(item.price) * 100), 'approved_pending']);
+        send(res, 201, { ok: true, orderId: order.id }); return true;
+      }
+      const captureMatch = pathname.match(/^\/api\/store\/orders\/([A-Z0-9]+)\/capture$/i);
+      if (req.method === 'POST' && captureMatch) {
+        const orderId = captureMatch[1];
+        const found = await accounts.pool.query('SELECT * FROM store_orders WHERE paypal_order_id=$1 AND user_id=$2 FOR UPDATE', [orderId, user.id]);
+        const order = found.rows[0];
+        if (!order) { send(res, 404, { ok: false, err: 'Order not found' }); return true; }
+        if (order.status === 'completed') { send(res, 200, { ok: true, skinId: order.skin_id, kind: order.skin_kind }); return true; }
+        const capture = await paypal(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, { method: 'POST', body: '{}', requestId: order.id });
+        const payment = capture.purchase_units?.[0]?.payments?.captures?.[0];
+        const paidCents = Math.round(Number(payment?.amount?.value || 0) * 100);
+        if (capture.status !== 'COMPLETED' || payment?.status !== 'COMPLETED' || payment?.amount?.currency_code !== order.currency || paidCents !== order.amount_cents) {
+          send(res, 409, { ok: false, err: 'Payment was not completed for the expected amount' }); return true;
+        }
+        const client = await accounts.pool.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query("UPDATE store_orders SET status='completed',paypal_capture_id=$1,captured_at=NOW() WHERE id=$2", [payment.id, order.id]);
+          await client.query('INSERT INTO user_skins(user_id,skin_id,skin_kind) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [user.id, order.skin_id, order.skin_kind]);
+          await client.query('COMMIT');
+        } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+        send(res, 200, { ok: true, skinId: order.skin_id, kind: order.skin_kind }); return true;
+      }
+      send(res, 404, { ok: false, err: 'Not found' }); return true;
+    } catch (error) {
+      console.error('[store]', error?.message || error);
+      send(res, 502, { ok: false, err: 'Payment service could not complete this request' }); return true;
+    }
+  };
+}
