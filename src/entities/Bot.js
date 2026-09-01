@@ -10,6 +10,7 @@ import { getSkin } from '../player/skins.js';
 import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botArenaDetectionDistance, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
 import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
+import { PLAYER_WORLD_MODEL_SCALE } from '../player/Proportions.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
 const _tmpA = new THREE.Vector3();   // scratch: bullet-cone basis
@@ -169,6 +170,10 @@ export class Bot {
     // If the asset is still loading, the builder retains its safe fallback.
     this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: true });
     this._isHuman = !!this.mesh.userData?.isHuman;
+    // Bots and players share one silhouette. The old full-scale bot setting
+    // made the same mesh look like a different, oversized character.
+    this.mesh.scale.multiplyScalar(PLAYER_WORLD_MODEL_SCALE);
+    this.mesh.userData.worldModelScale = PLAYER_WORLD_MODEL_SCALE;
     this.bodyMat = this.mesh.userData.primaryMat;
 
     this.mesh.userData.bot = this;

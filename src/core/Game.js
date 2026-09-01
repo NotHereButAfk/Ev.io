@@ -368,7 +368,7 @@ export class Game {
     return this._presentationPreloadPromise;
   }
 
-  _ensureHumanPresentationReady(timeoutMs = 8000) {
+  _ensureHumanPresentationReady(timeoutMs = 20000) {
     if (isHumanSoldierReady()) return Promise.resolve(true);
     if (this._humanPresentationReadyPromise) return this._humanPresentationReadyPromise;
     this._humanPresentationReadyPromise = new Promise((resolve) => {
@@ -380,7 +380,7 @@ export class Game {
         resolve(ready);
       };
       const timer = setTimeout(() => finish(isHumanSoldierReady()), timeoutMs);
-      preloadHumanSoldier(() => finish(true));
+      preloadHumanSoldier((ready) => finish(ready !== false && isHumanSoldierReady()));
     }).finally(() => { this._humanPresentationReadyPromise = null; });
     return this._humanPresentationReadyPromise;
   }
@@ -841,7 +841,11 @@ export class Game {
         // was still parsing. Those avatars permanently retained the crude
         // emergency body even after the real model became available. Resolve
         // the shared rig before any local or network bot can be constructed.
-        await this._ensureHumanPresentationReady();
+        const humanPresentationReady = await this._ensureHumanPresentationReady();
+        if (!humanPresentationReady) {
+          this._showStartupError(new Error('The player model could not be loaded.'));
+          return;
+        }
         if (!this.currentUsername || UserAccount.isGuest()) {
           if (!UserAccount.isGuest()) UserAccount.guest();
           this._onAuth('__guest__');

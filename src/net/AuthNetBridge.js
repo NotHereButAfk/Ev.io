@@ -172,9 +172,8 @@ export class AuthNetBridge {
       weaponId: 'm4',
       // Network peers and simulated bots share the Blender-authored default.
       allowHuman: true,
-      // Bots remain the full readable combat silhouette. Human-controlled
-      // avatars use the slightly smaller player presentation scale.
-      modelScale: isBot ? 1 : PLAYER_WORLD_MODEL_SCALE,
+      // Bots and humans use the exact same default-player silhouette.
+      modelScale: PLAYER_WORLD_MODEL_SCALE,
     });
     const nameEl = document.createElement('div');
     nameEl.className = 'nameplate';

@@ -47,8 +47,8 @@ function _asMapToonMaterial(source) {
 }
 
 export function preloadHumanSoldier(onLoad) {
+  if (_template) { onLoad?.(true); return; }
   if (onLoad) _callbacks.push(onLoad);
-  if (_template) { onLoad?.(); return; }
   if (_loading) return;
   _loading = true;
   // Blender-authored KYX warrior: continuous skinned anatomy, fitted armor,
@@ -64,10 +64,17 @@ export function preloadHumanSoldier(onLoad) {
       });
       _template = { scene: gltf.scene, animations: gltf.animations };
       _loading  = false;
-      _callbacks.splice(0).forEach((cb) => cb());
+      _callbacks.splice(0).forEach((cb) => cb(true));
     },
     undefined,
-    (err) => { console.warn('[HumanSoldier] load failed:', err?.message); _loading = false; }
+    (err) => {
+      console.warn('[HumanSoldier] load failed:', err?.message);
+      _loading = false;
+      // Never leave gameplay callers waiting forever and never let them assume
+      // the authored rig exists. They can now present RETRY instead of silently
+      // constructing the emergency block body.
+      _callbacks.splice(0).forEach((cb) => cb(false));
+    }
   );
 }
 
