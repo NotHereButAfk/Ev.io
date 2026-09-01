@@ -62,8 +62,13 @@ if (requestPointerLockSafely({ requestPointerLock: () => { throw new Error('wron
   failures.push('pointer-lock synchronous DOMException is contained');
 }
 
-for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'CRYPTO', 'TOURNAMENTS', 'SETTINGS']) {
+for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'SETTINGS']) {
   requireMatch(index, new RegExp(`>${label}(?:\\s|&|<)`), `top navigation: ${label}`);
+}
+requireMatch(index, /id=["']dd-social["'][\s\S]*?href=["']\/tournaments["'][\s\S]*?>TOURNAMENTS</,
+  'tournaments destination inside Social dropdown');
+if (/data-dd=["']crypto["']|id=["']dd-crypto["']|id=["']crypto-wallet-btn["']/.test(index)) {
+  failures.push('removed Crypto navigation stays absent');
 }
 for (const panel of ['private', 'profile', 'shop', 'settings', 'feedback', 'more', 'rankings']) {
   requireMatch(index, new RegExp(`id=["']panel-${panel}["']`), `panel: ${panel}`);
@@ -86,7 +91,8 @@ for (const control of ['reg-email', 'reg-strength', 'reg-match', 'reg-privacy', 
 }
 requireMatch(privacy, /Privacy policy/i, 'privacy page');
 requireMatch(terms, /Terms of use/i, 'terms page');
-requireMatch(tournaments, /DAILY PRIZE POOL[\s\S]*?0\.5[\s\S]*?SOL/, '0.5 SOL daily tournament prize pool');
+requireMatch(tournaments, /Cash and token prizes are not currently offered/i,
+  'tournament page does not advertise an inactive prize pool');
 requireMatch(tournaments, /id=["']tournament-enter["']/, 'tournament entry control');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
@@ -121,8 +127,8 @@ for (const id of ['boot-progress-fill', 'boot-detail', 'boot-percent', 'boot-ret
 }
 requireMatch(game, /_showStartupError[\s\S]*?boot-retry[\s\S]*?_runConnectSequence/,
   'startup loader exposes a recoverable retry path');
-requireMatch(game, /_startPresentationPreloads\(onProgress[\s\S]*?preloadHumanSoldier[\s\S]*?preloadWeaponModels/,
-  'soldier, animation, and weapon presentation assets share the deferred preload path');
+requireMatch(game, /const stages = \[[\s\S]*?preloadWeaponModels[\s\S]*?preloadHumanSoldier[\s\S]*?preloadSpartanModel[\s\S]*?for \(const \[label, starter\] of stages\)/,
+  'weapon, soldier, and armor presentation assets use the deferred sequential preload path');
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'menu panel wiring');
 requireMatch(index, /ability-page-key["']>Q<[\s\S]*?<strong>TELEPORT<\/strong>/,
   'abilities page advertises Q teleport');
@@ -148,4 +154,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('gui contract passed: 8 top-level destinations, tournaments, auth routes, and dynamic ADS crosshair');
+console.log('gui contract passed: streamlined navigation, Social tournaments, auth routes, and dynamic ADS crosshair');

@@ -221,12 +221,6 @@ export class MenuUI {
       this._loadSettings();
     });
 
-    // Cosmetic wallet button inside the CRYPTO dropdown.
-    document.getElementById('crypto-wallet-btn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.currentTarget.querySelector('.pm-name').textContent = 'WALLET LINKED ✓';
-    });
-
     document.getElementById('feedback-save-btn')?.addEventListener('click', () => {
       const field = document.getElementById('feedback-text');
       const status = document.getElementById('feedback-status');

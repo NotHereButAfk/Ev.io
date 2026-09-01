@@ -4587,8 +4587,8 @@ html, body {
 
 /* ============================================================================
    ===============   KYX.IO  ev.io GUI: nav dropdowns + auth   ================
-   Generic top-nav dropdown system (PUBLIC GAME / PROFILE / STORE / SOCIAL /
-   CRYPTO), the login/logout auth control, and the full-page login screen.
+   Generic top-nav dropdown system (PUBLIC GAME / PROFILE / STORE / SOCIAL),
+   the login/logout auth control, and the full-page login screen.
    Appended last to win specificity.
    ============================================================================ */
 
@@ -4601,7 +4601,7 @@ html, body {
   box-shadow: inset 0 -2px 0 var(--kx-cyan);
 }
 /* anchor the last dropdowns to their right edge so they never clip off-screen */
-#dd-crypto, #dd-social { left: auto; right: 0; }
+#dd-social { left: auto; right: 0; }
 /* let anchor-based menu items sit inline like the button ones */
 a.profile-menu-item { text-decoration: none; }
 
