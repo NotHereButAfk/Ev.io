@@ -550,9 +550,21 @@
           <span>I agree to the <a href="/terms#digital-purchases" target="_blank" rel="noopener">Digital Skin Purchase Terms</a>: this digital purchase is final except where required by law, the skin entitlement is permanent for my account, skin visuals may be modified, and reward multipliers may be rebalanced.</span>
         </label>
         <button id="checkout-continue" class="checkout-continue" type="button" disabled>ACCEPT &amp; CONTINUE</button>
-        <div id="paypal-buttons" class="paypal-buttons"></div>
+        <div id="checkout-payment-options" class="checkout-payment-options hidden">
+          <div id="paypal-buttons" class="paypal-buttons"></div>
+          <div id="checkout-or" class="checkout-or hidden"><span>OR PAY BY CARD</span></div>
+          <div id="paypal-card-form" class="paypal-card-form hidden">
+            <div id="paypal-card-name" class="paypal-card-field"></div>
+            <div id="paypal-card-number" class="paypal-card-field"></div>
+            <div class="paypal-card-row">
+              <div id="paypal-card-expiry" class="paypal-card-field"></div>
+              <div id="paypal-card-cvv" class="paypal-card-field"></div>
+            </div>
+            <button id="paypal-card-submit" class="checkout-card-submit" type="button">PAY SECURELY</button>
+          </div>
+        </div>
         <div id="checkout-status" class="checkout-status" aria-live="polite"></div>
-        <div class="checkout-trust">Processed securely by PayPal. Pay with PayPal or an eligible debit/credit card.</div>
+        <div class="checkout-trust">Payment details are encrypted and processed by PayPal. KYX.IO never receives or stores your card number.</div>
       </div>
     </div>
 

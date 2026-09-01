@@ -13,6 +13,10 @@ name: Deploy to VPS
 #
 # VITE_AUTH_WS_URL is the public authoritative WebSocket URL. For the combined
 # Nginx/Node deployment use wss://kryx.live.
+#
+# PayPal checkout is enabled when PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are
+# present. PAYPAL_ENV must be either sandbox or live. The secret is installed
+# only in the server service environment; it is never included in the Vite app.
 
 on:
   push:
@@ -78,6 +82,9 @@ jobs:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
           DEPLOY_PATH: ${{ secrets.VPS_PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
+          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+          PAYPAL_ENV: ${{ secrets.PAYPAL_ENV }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
@@ -108,6 +115,29 @@ jobs:
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             package.json package-lock.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          if test -n "$PAYPAL_CLIENT_ID" && test -n "$PAYPAL_CLIENT_SECRET"; then
+            case "$PAYPAL_CLIENT_ID$PAYPAL_CLIENT_SECRET" in
+              *[!A-Za-z0-9_-]*) echo "PayPal credentials contain unsupported environment-file characters"; exit 1 ;;
+            esac
+            case "$PAYPAL_ENV" in
+              sandbox|live) ;;
+              *) echo "PAYPAL_ENV must be sandbox or live"; exit 1 ;;
+            esac
+            payment_env="$(/usr/bin/mktemp)"
+            /usr/bin/chmod 600 "$payment_env"
+            /usr/bin/printf 'PAYPAL_CLIENT_ID=%s\nPAYPAL_CLIENT_SECRET=%s\nPAYPAL_ENV=%s\n' \
+              "$PAYPAL_CLIENT_ID" "$PAYPAL_CLIENT_SECRET" "$PAYPAL_ENV" > "$payment_env"
+            /usr/bin/scp -i ~/.ssh/deploy_key -P 22 \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+              "$payment_env" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.paypal.env.next"
+            /usr/bin/rm -f "$payment_env"
+            /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
+              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "sudo -n /usr/bin/install -m 600 '$DEPLOY_PATH/.paypal.env.next' /etc/kryx-game-paypal.env && /usr/bin/rm -f '$DEPLOY_PATH/.paypal.env.next' && sudo -n /usr/bin/mkdir -p /etc/systemd/system/kryx-game.service.d && /usr/bin/printf '%s\n' '[Service]' 'EnvironmentFile=-/etc/kryx-game-paypal.env' | sudo -n /usr/bin/tee /etc/systemd/system/kryx-game.service.d/paypal.conf >/dev/null && sudo -n /usr/bin/systemctl daemon-reload"
+          else
+            echo "PayPal secrets are not set; deploying checkout in disabled mode."
+          fi
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \

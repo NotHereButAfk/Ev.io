@@ -1,33 +1,61 @@
 import { Shop } from '../core/Shop.js';
 import { Armory } from '../core/Armory.js';
 
+const TERMS_VERSION = '2026-08-31';
 let sdkPromise = null;
-async function config() {
-  const response = await fetch('/api/store/config', { credentials: 'same-origin' });
-  return response.json();
+let checkoutGeneration = 0;
+
+async function jsonRequest(url, options = {}) {
+  const response = await fetch(url, { credentials: 'same-origin', ...options });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.err || `Checkout request failed (${response.status})`);
+  }
+  return result;
 }
-function loadSdk(clientId, environment) {
-  if (window.paypal) return Promise.resolve(window.paypal);
+
+function loadSdk(clientId, clientToken) {
+  if (window.paypal?.Buttons && window.paypal?.CardFields) return Promise.resolve(window.paypal);
   if (sdkPromise) return sdkPromise;
   sdkPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    const host = environment === 'sandbox' ? 'https://www.sandbox.paypal.com' : 'https://www.paypal.com';
-    script.src = `${host}/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&components=buttons&enable-funding=card`;
-    script.onload = () => resolve(window.paypal);
-    script.onerror = () => reject(new Error('PayPal checkout failed to load'));
+    // Sandbox/live routing is determined by the REST app represented by the
+    // client ID. PayPal serves both environments from the same SDK host.
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&commit=true&components=buttons,card-fields&enable-funding=card`;
+    script.dataset.clientToken = clientToken;
+    script.dataset.namespace = 'paypal';
+    script.onload = () => window.paypal?.Buttons
+      ? resolve(window.paypal)
+      : reject(new Error('PayPal checkout did not initialize'));
+    script.onerror = () => reject(new Error('Secure payment options could not be loaded'));
     document.head.appendChild(script);
   });
   return sdkPromise;
 }
 
 export async function openPayPalCheckout({ skinId, name, kind, price, onComplete }) {
+  const generation = ++checkoutGeneration;
   const modal = document.getElementById('checkout-modal');
+  const options = document.getElementById('checkout-payment-options');
   const mount = document.getElementById('paypal-buttons');
+  const cardForm = document.getElementById('paypal-card-form');
+  const cardDivider = document.getElementById('checkout-or');
+  const cardSubmit = document.getElementById('paypal-card-submit');
   const status = document.getElementById('checkout-status');
   const checkbox = document.getElementById('checkout-terms-checkbox');
   const continueButton = document.getElementById('checkout-continue');
-  document.getElementById('checkout-item').textContent = `${name} · $${price.toFixed(2)} USD`;
+  const item = document.getElementById('checkout-item');
+  if (!modal || !options || !mount || !status || !checkbox || !continueButton || !item) return;
+
+  item.textContent = `${name} · $${price.toFixed(2)} USD`;
   mount.innerHTML = '';
+  for (const id of ['paypal-card-name', 'paypal-card-number', 'paypal-card-expiry', 'paypal-card-cvv']) {
+    const field = document.getElementById(id);
+    if (field) field.innerHTML = '';
+  }
+  options.classList.add('hidden');
+  cardForm?.classList.add('hidden');
+  cardDivider?.classList.add('hidden');
   checkbox.checked = false;
   continueButton.disabled = true;
   continueButton.classList.remove('hidden');
@@ -36,35 +64,71 @@ export async function openPayPalCheckout({ skinId, name, kind, price, onComplete
 
   checkbox.onchange = () => { continueButton.disabled = !checkbox.checked; };
   continueButton.onclick = async () => {
-    if (!checkbox.checked) return;
+    if (!checkbox.checked || generation !== checkoutGeneration) return;
     continueButton.disabled = true;
     status.textContent = 'Loading secure payment options…';
     try {
-    const settings = await config();
-    if (!settings.configured) throw new Error('Checkout is awaiting PayPal merchant configuration');
-    const paypal = await loadSdk(settings.clientId, settings.environment);
-    status.textContent = '';
-    await paypal.Buttons({
-      style: { layout: 'vertical', shape: 'rect', label: 'paypal' },
-      createOrder: async () => {
-        const response = await fetch('/api/store/orders', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skinId, termsAccepted: true, termsVersion: '2026-08-31' }) });
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.err || 'Unable to create order');
+      const settings = await jsonRequest('/api/store/config');
+      if (!settings.configured) throw new Error('Checkout is not live yet: PayPal merchant credentials are missing.');
+      const token = await jsonRequest('/api/store/client-token', { method: 'POST' });
+      const paypal = await loadSdk(settings.clientId, token.clientToken);
+      if (generation !== checkoutGeneration) return;
+
+      const createOrder = async () => {
+        status.textContent = 'Creating secure order…';
+        const result = await jsonRequest('/api/store/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skinId, termsAccepted: true, termsVersion: TERMS_VERSION }),
+        });
         return result.orderId;
-      },
-      onApprove: async ({ orderID }) => {
+      };
+      const approve = async ({ orderID }) => {
         status.textContent = 'Confirming payment…';
-        const response = await fetch(`/api/store/orders/${encodeURIComponent(orderID)}/capture`, { method: 'POST', credentials: 'same-origin' });
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.err || 'Payment capture failed');
-        if (kind === 'character') Shop.unlock(result.skinId); else Armory.grantSkin(result.skinId);
+        if (cardSubmit) cardSubmit.disabled = true;
+        const result = await jsonRequest(`/api/store/orders/${encodeURIComponent(orderID)}/capture`, { method: 'POST' });
+        if (kind === 'character') Shop.unlock(result.skinId);
+        else Armory.grantSkin(result.skinId);
         status.textContent = 'PURCHASE COMPLETE — ADDED TO INVENTORY';
         onComplete?.(result);
-      },
-      onCancel: () => { status.textContent = 'Checkout canceled. You were not charged.'; },
-      onError: (error) => { status.textContent = error?.message || 'Checkout could not be completed.'; },
-    }).render('#paypal-buttons');
-    continueButton.classList.add('hidden');
+      };
+      const fail = (error) => {
+        status.textContent = error?.message || 'Checkout could not be completed.';
+        if (cardSubmit) cardSubmit.disabled = false;
+      };
+
+      const buttons = paypal.Buttons({
+        style: { layout: 'vertical', shape: 'rect', label: 'paypal', height: 45 },
+        createOrder,
+        onApprove: approve,
+        onCancel: () => { status.textContent = 'Checkout canceled. You were not charged.'; },
+        onError: fail,
+      });
+      if (buttons.isEligible()) await buttons.render('#paypal-buttons');
+
+      const fields = paypal.CardFields({ createOrder, onApprove: approve, onError: fail });
+      const cardEligible = fields.isEligible();
+      if (cardEligible && cardForm && cardDivider && cardSubmit) {
+        await Promise.all([
+          fields.NameField({ placeholder: 'Name on card' }).render('#paypal-card-name'),
+          fields.NumberField({ placeholder: 'Card number' }).render('#paypal-card-number'),
+          fields.ExpiryField({ placeholder: 'MM / YY' }).render('#paypal-card-expiry'),
+          fields.CVVField({ placeholder: 'CVV' }).render('#paypal-card-cvv'),
+        ]);
+        cardForm.classList.remove('hidden');
+        cardDivider.classList.remove('hidden');
+        cardSubmit.onclick = async () => {
+          cardSubmit.disabled = true;
+          status.textContent = 'Authorizing card…';
+          try { await fields.submit(); } catch (error) { fail(error); }
+        };
+      }
+
+      options.classList.remove('hidden');
+      continueButton.classList.add('hidden');
+      status.textContent = cardEligible
+        ? 'Choose PayPal or enter a debit/credit card.'
+        : 'Choose an available PayPal payment method.';
     } catch (error) {
       status.textContent = error.message;
       continueButton.disabled = false;
@@ -72,4 +136,7 @@ export async function openPayPalCheckout({ skinId, name, kind, price, onComplete
   };
 }
 
-document.getElementById('checkout-close')?.addEventListener('click', () => document.getElementById('checkout-modal')?.classList.add('hidden'));
+document.getElementById('checkout-close')?.addEventListener('click', () => {
+  checkoutGeneration++;
+  document.getElementById('checkout-modal')?.classList.add('hidden');
+});
