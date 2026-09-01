@@ -6,7 +6,7 @@ import {
   characterSweepSegments,
 } from '../src/sim/CharacterSweep.js';
 
-const sprintDistance = 13.2 * DT;
+const sprintDistance = 18.48 * DT;
 const sprintSegments = characterSweepSegments(0, sprintDistance);
 assert.ok(sprintSegments >= 4, `sprint tick only received ${sprintSegments} stair samples`);
 assert.ok(sprintDistance / sprintSegments <= MAX_CHARACTER_SWEEP_DISTANCE + 1e-9,
@@ -51,4 +51,4 @@ for (const [name, source] of [['offline player', player], ['client prediction', 
   assert.match(source, /characterSweepSegments\(/, `${name} is missing stair substeps`);
 }
 
-console.log(`stair movement passed: ${sprintSegments} samples per 13.2m/s tick, narrow stairs climb, 0.9m walls remain blocked`);
+console.log(`stair movement passed: ${sprintSegments} samples per 18.48m/s tick, narrow stairs climb, 0.9m walls remain blocked`);
