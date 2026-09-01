@@ -28,7 +28,6 @@ import {
 } from '../player/PreviewCharacter.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle, triggerHop } from '../player/Locomotion.js';
-import { applyUniversalLocomotion, preloadUniversalAnimations } from '../player/UniversalAnimations.js';
 import { triggerAction, tickActions, applyMeleeCarry } from '../player/Actions.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { isLowPolyId } from '../player/LowPolyModels.js';
@@ -354,7 +353,6 @@ export class Game {
     });
     const stages = [
       ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
-      ['animations', preloadUniversalAnimations],
       ['armor', preloadSpartanModel],
     ];
     // Loading every GLB and the 6 MB animation library simultaneously caused
@@ -2120,8 +2118,7 @@ export class Game {
       grounded: p.onGround, vy: p.velocity.y,
       slide: p.isSliding ? 1 : 0,
     };
-    const gait = applyUniversalLocomotion(rig, gaitOptions)
-      || applyWalkCycle(rig, gaitOptions);
+    const gait = applyWalkCycle(rig, gaitOptions);
     // Side-to-side transfer is applied in body-local +X, so strafing and
     // turning do not make the visual body drift in an unrelated world axis.
     this._playerBody.position.x = p.position.x + Math.cos(p.yaw) * gait.sway;

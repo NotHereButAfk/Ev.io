@@ -4,7 +4,6 @@ import { isSharedGeometry } from './LowPolyModels.js';
 import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
-import { applyUniversalLocomotion } from './UniversalAnimations.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 import { cameraYawToBodyYaw, movementInBodySpace } from './Facing.js';
@@ -349,11 +348,12 @@ export class Avatar {
       speed, moving, run, sprint: !!s.sprint, crouch: this._crouch, dt, dirF, dirR,
       grounded, vy: s.vy || 0, slide: s.sliding ? 1 : 0,
     };
-    // Use the imported authored poses when the library is ready. The animator
-    // owns the leg layer only; slide keeps the planted procedural pose, and the
-    // weapon/arms are solved afterward against the stable upper body.
-    const gait = applyUniversalLocomotion(this.rig, gaitOptions)
-      || applyWalkCycle(this.rig, gaitOptions);
+    // The imported animation pack uses a different bind-axis convention. Its
+    // retargeted absolute leg rotations can collapse the connected HeroBody
+    // into a folded pose in live remote/spectator rendering. The procedural
+    // solver is authored against this exact rig and keeps feet, knees and hips
+    // in the correct local spaces for every network snapshot.
+    const gait = applyWalkCycle(this.rig, gaitOptions);
     this._walkT = gait.phase;
     this._gaitSway = gait.sway;
     this._gaitBob = gait.bob;

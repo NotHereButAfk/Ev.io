@@ -4,7 +4,6 @@ import { buildWeaponModel, hasLoadedWeaponModel } from '../weapons/WeaponModels.
 import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
-import { applyUniversalLocomotion } from '../player/UniversalAnimations.js';
 import { applyMeleeCarry } from '../player/Actions.js';
 import { directionToBodyYaw } from '../player/Facing.js';
 import { getSkin } from '../player/skins.js';
@@ -957,8 +956,7 @@ export class Bot {
         vy: this._velY,
         dt,
       };
-      gait = applyUniversalLocomotion(this._rig, gaitOptions)
-        || applyWalkCycle(this._rig, gaitOptions);
+      gait = applyWalkCycle(this._rig, gaitOptions);
       this._walkT = gait.phase;
       // Footsteps, one per heel strike (twice a stride), placed in the world so
       // you can hear someone coming up behind you.
