@@ -260,6 +260,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     rLeg:  findBone(root, 'RightUpLeg'),
     lCalf: findBone(root, 'LeftLeg'),
     rCalf: findBone(root, 'RightLeg'),
+    weaponSocket: root.getObjectByName('KYX_WeaponSocket_R'),
+    supportSocket: root.getObjectByName('KYX_SupportSocket_L'),
+    swordSocket: root.getObjectByName('KYX_SwordSocket_R'),
+    backHolsterSocket: root.getObjectByName('KYX_BackHolsterSocket'),
   };
 
   // ── Weapon-hold references ──────────────────────────────────────────────────
@@ -871,6 +875,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     triggerTeleport, // ()           — plays the blink-arrival reform (crouch → recover)
     setDeathState,   // (0..1, side)  — absolute full-skeleton death crumple
     attachWeapon,    // (weaponGroup, isMelee) — hold a weapon in the right hand
+    weaponSockets: {
+      trigger: B.weaponSocket,
+      support: B.supportSocket,
+      sword: B.swordSocket,
+      holster: B.backHolsterSocket,
+    },
     armorTick,
     bodyMats,
     visorMats,

@@ -7,7 +7,14 @@
     "CrouchIdle",
     "CrouchWalk",
     "Death",
+    "DodgeRoll",
     "Fire",
+    "GunAimDown",
+    "GunAimNeutral",
+    "GunAimUp",
+    "GunIdle",
+    "HitChest",
+    "HitHead",
     "Idle",
     "JumpLand",
     "JumpLoop",
@@ -19,7 +26,14 @@
     "TPose",
     "Walk"
   ],
-  "armorPieces": 47,
+  "characterVersion": 4,
+  "weaponSockets": [
+    "KYX_WeaponSocket_R",
+    "KYX_SupportSocket_L",
+    "KYX_SwordSocket_R",
+    "KYX_BackHolsterSocket"
+  ],
+  "armorPieces": 60,
   "bones": 53,
-  "triangles": 22683
+  "triangles": 22763
 }
