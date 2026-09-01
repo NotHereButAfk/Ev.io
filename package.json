@@ -49,6 +49,7 @@
     "test:bot-visual": "node tools/bot_locomotion_visual_check.mjs",
     "test:bot-roam": "node tools/bot_roaming_live_check.mjs",
     "test:population": "node tools/population_check.mjs",
+    "test:survival-population": "node tools/survival_population_check.mjs",
     "test:spectator": "node tools/spectator_camera_check.mjs",
     "test:nameplates": "node tools/nameplate_occlusion_check.mjs",
     "test:net-presentation": "node tools/net_presentation_check.mjs",

@@ -958,6 +958,7 @@ export class Game {
     // Mode-specific setup
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
     this._isSurvival = modeId === 'survival';
+    this.botManager.setEnabled(!this._isSurvival);
     const expectsAuth = this._isDM && !!(this._selectedAuthNetUrl || authNetTarget());
 
     this.hud.hideDMTimer();
@@ -2223,11 +2224,11 @@ export class Game {
       const best  = `YOUR BEST TIME: ${this._fmtHMS(sm.bestTime())}`;
       const mmss  = (t) => { const m = Math.floor(t / 60), s = Math.floor(t % 60); return `${m}:${String(s).padStart(2, '0')}`; };
       if (sm.graceActive) {
-        this.hud.setModeHUD(`WAVE 1 SPAWNS IN ${mmss(sm.graceTimer)}`, `${alive} BOTS ALIVE`, best);
+        this.hud.setModeHUD(`WAVE 1 SPAWNS IN ${mmss(sm.graceTimer)}`, `${alive} ZOMBIES ALIVE`, best);
       } else if (sm.betweenWave) {
-        this.hud.setModeHUD(`WAVE ${sm.wave + 1} SPAWNS IN ${mmss(sm.betweenTimer)}`, `${alive} BOTS ALIVE`, best);
+        this.hud.setModeHUD(`WAVE ${sm.wave + 1} SPAWNS IN ${mmss(sm.betweenTimer)}`, `${alive} ZOMBIES ALIVE`, best);
       } else {
-        this.hud.setModeHUD(`WAVE ${sm.wave}`, `${alive} BOTS ALIVE`, best);
+        this.hud.setModeHUD(`WAVE ${sm.wave}`, `${alive} ZOMBIES ALIVE`, best);
       }
       this.hud.setWaveBonus(sm.waveBonus());
       return;
@@ -2264,6 +2265,7 @@ export class Game {
 
   _spawnMenuBots() {
     if (this._menuBotsActive) return;
+    this.botManager.setEnabled(true);
     this._menuBotsActive = true;
     this._menuBotSpawnCooldown = 0;
   }

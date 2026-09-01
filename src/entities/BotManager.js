@@ -16,11 +16,21 @@ export class BotManager {
     this.audio = audio;   // bots emit positional gunfire / footsteps / death
     this.bots  = [];
     this._usedTags = new Set();
+    this.enabled = true;
+  }
+
+  // Survival owns a separate ZombieManager. Disabling this manager is a mode
+  // invariant: it clears existing player-style bots and rejects late roster,
+  // menu, or reconnect attempts to add them until the mode changes again.
+  setEnabled(enabled) {
+    this.enabled = !!enabled;
+    if (!this.enabled) this.clear();
   }
 
   // Spawn a fresh set of bots. noRespawn prevents auto-respawn (wave/elimination modes).
   // healthMult scales max HP (used by wave survival to ramp up difficulty).
   spawnAll(count = 7, noRespawn = false, healthMult = 1) {
+    if (!this.enabled) { this.clear(); return; }
     for (const bot of this.bots) this.scene.remove(bot.mesh);
     this.bots = [];
     this._usedTags.clear();
@@ -30,6 +40,7 @@ export class BotManager {
   }
 
   _spawnOne(noRespawn, healthMult, isHumanSlot) {
+    if (!this.enabled) return null;
     const point = this.world.safeSpawnPoint(this.bots);
     const bot   = new Bot(this.world, point);
     bot.audio       = this.audio;
@@ -74,6 +85,7 @@ export class BotManager {
   }
 
   update(dt, player, camera, onPlayerDamaged, world, allowBotCombat = true) {
+    if (!this.enabled) return;
     this._livePlayer = player;
     for (const bot of this.bots) {
       const separation = botSeparationVector({
