@@ -287,24 +287,35 @@ def build_mesh(M):
              (0.096, 0.086, 0.115), top=(1.06, 1.08))
 
     # ── legs ─────────────────────────────────────────────────────────────────
+    # Human leg silhouette: the thigh narrows decisively into a hidden knee,
+    # then the calf uses two tapered masses instead of one straight column.
+    # These are still rigid plates on the same bones, so the proven gameplay
+    # gait remains stable while the standing/run silhouette stops reading as a
+    # robot assembled from equal-width tubes.
     mirrored("Thigh_Under", D, "Thigh", (0.112, 0.0, 0.760),
-             (0.175, 0.195, 0.360), top=(1.10, 1.08))
-    mirrored("Thigh_Plate", A, "Thigh", (0.114, -0.070, 0.800),
-             (0.180, 0.115, 0.235), top=(0.92, 0.90), top_off=(0.004, -0.008))
+             (0.154, 0.170, 0.365), top=(1.25, 1.15))
+    mirrored("Thigh_Plate", A, "Thigh", (0.114, -0.064, 0.810),
+             (0.158, 0.105, 0.225), top=(1.13, 1.02), top_off=(0.004, -0.006))
+    mirrored("Thigh_Cuff", D, "Thigh", (0.112, -0.004, 0.595),
+             (0.150, 0.158, 0.085), top=(1.02, 1.02))
     mirrored("Knee", D, "Thigh", (0.112, -0.014, 0.520),
-             (0.156, 0.170, 0.090), top=(1.04, 1.02))
-    mirrored("Shin_Under", D, "Shin", (0.112, 0.0, 0.315),
-             (0.146, 0.160, 0.330), top=(1.04, 1.04))
-    mirrored("Shin_Plate", A, "Shin", (0.114, -0.062, 0.330),
-             (0.156, 0.105, 0.275), top=(0.86, 0.88))
+             (0.142, 0.154, 0.090), top=(1.03, 1.02))
+    mirrored("Shin_Upper", D, "Shin", (0.112, 0.0, 0.405),
+             (0.132, 0.142, 0.200), top=(1.13, 1.12))
+    mirrored("Shin_Lower", D, "Shin", (0.112, 0.0, 0.225),
+             (0.112, 0.126, 0.170), top=(1.20, 1.13))
+    mirrored("Shin_Plate", A, "Shin", (0.114, -0.056, 0.340),
+             (0.138, 0.092, 0.250), top=(1.11, 1.04))
     mirrored("Shin_Glow", V, "Shin", (0.114, -0.118, 0.430),
              (0.032, 0.022, 0.075))
     # Thick, flat-bottomed sci-fi boot: the block flares DOWNWARD (top scale
     # below 1) so the widest line is the one on the floor.
-    mirrored("Boot", A, "Foot", (0.112, -0.022, 0.098),
-             (0.182, 0.270, 0.105), top=(0.82, 0.88), top_off=(0, 0.016))
-    mirrored("Boot_Sole", D, "Foot", (0.112, -0.022, 0.022),
-             (0.190, 0.284, 0.044), top=(0.97, 0.98))
+    mirrored("Ankle_Cuff", D, "Foot", (0.112, -0.002, 0.145),
+             (0.132, 0.142, 0.080), top=(0.92, 0.94))
+    mirrored("Boot", A, "Foot", (0.112, -0.022, 0.092),
+             (0.165, 0.248, 0.100), top=(0.84, 0.90), top_off=(0, 0.014))
+    mirrored("Boot_Sole", D, "Foot", (0.112, -0.022, 0.020),
+             (0.174, 0.262, 0.040), top=(0.97, 0.98))
 
     # ── detail pass ──────────────────────────────────────────────────────────
     # Every one of these is another 12-triangle block. They are placed to break
