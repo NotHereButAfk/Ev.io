@@ -1,9 +1,24 @@
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
 import { STORE_ITEMS } from './storecatalog.mjs';
 
 const PRICE = { common: '20.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
 const TERMS_VERSION = '2026-08-31';
 const items = new Map(STORE_ITEMS.map((skin) => [skin.id, { ...skin, price: PRICE[skin.rarity] }]));
+
+function loadPrivatePaymentEnv(baseEnv) {
+  const values = {};
+  try {
+    const source = readFileSync(new URL('./.paypal.env', import.meta.url), 'utf8');
+    for (const line of source.split(/\r?\n/)) {
+      const match = line.match(/^(PAYPAL_CLIENT_ID|PAYPAL_CLIENT_SECRET|PAYPAL_ENV)=([A-Za-z0-9_-]+)$/);
+      if (match) values[match[1]] = match[2];
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.error('[store] Unable to read private payment configuration');
+  }
+  return { ...values, ...baseEnv };
+}
 
 const send = (res, status, value) => {
   const payload = JSON.stringify(value);
@@ -34,6 +49,7 @@ function isSameOrigin(req) {
 
 export function createPaymentService(accounts, { fetchImpl = fetch, env = process.env } = {}) {
   if (!accounts?.pool || !accounts?.session) return null;
+  env = loadPrivatePaymentEnv(env);
   const clientId = env.PAYPAL_CLIENT_ID || '';
   const secret = env.PAYPAL_CLIENT_SECRET || '';
   const environment = env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox';
