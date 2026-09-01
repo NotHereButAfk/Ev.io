@@ -108,10 +108,18 @@ export class ArmorPreviewRenderer {
     // and rifle IK still own these bones in a match.
     const rig = g.userData?.rig;
     if (rig) {
-      if (rig.armL) { rig.armL.rotation.x = 0.15; rig.armL.rotation.z = -0.21; }
-      if (rig.armR) { rig.armR.rotation.x = 0.15; rig.armR.rotation.z = 0.21; }
-      if (rig.elbowL) rig.elbowL.rotation.x = 0.36;
-      if (rig.elbowR) rig.elbowR.rotation.x = 0.36;
+      // EV's default presentation is a relaxed combat-ready human pose, not a
+      // bind-pose mannequin: shoulders open, elbows bent forward and palms
+      // turned slightly inward.  Besides feeling alive, this makes the single
+      // connected bicep/forearm surface visible instead of letting straight
+      // arms read as stacked robot segments.
+      if (rig.armL) { rig.armL.rotation.x = -0.12; rig.armL.rotation.z = -0.40; }
+      if (rig.armR) { rig.armR.rotation.x = -0.12; rig.armR.rotation.z = 0.40; }
+      if (rig.elbowL) { rig.elbowL.rotation.x = -0.82; rig.elbowL.rotation.z = -0.08; }
+      if (rig.elbowR) { rig.elbowR.rotation.x = -0.82; rig.elbowR.rotation.z = 0.08; }
+      const bones = g.userData?.bones;
+      if (bones?.handL) { bones.handL.rotation.x = 0.14; bones.handL.rotation.y = -0.16; }
+      if (bones?.handR) { bones.handR.rotation.x = 0.14; bones.handR.rotation.y = 0.16; }
       // A planted shoulder-width stance exposes the black inner-thigh gap and
       // keeps the shin armour from merging into one central column on screen.
       if (rig.legL) { rig.legL.rotation.x = 0.035; rig.legL.rotation.z = -0.085; }
@@ -121,6 +129,19 @@ export class ArmorPreviewRenderer {
       if (rig.ankleL) rig.ankleL.rotation.z = 0.085;
       if (rig.ankleR) rig.ankleR.rotation.z = -0.085;
       if (rig.head) rig.head.rotation.y = -0.035;
+      this._idleRig = rig;
+      this._idleBase = {
+        chestX: rig.chest?.rotation.x || 0,
+        spineX: rig.spine?.rotation.x || 0,
+        headY: rig.head?.rotation.y || 0,
+        armLX: rig.armL?.rotation.x || 0,
+        armRX: rig.armR?.rotation.x || 0,
+        elbowLX: rig.elbowL?.rotation.x || 0,
+        elbowRX: rig.elbowR?.rotation.x || 0,
+      };
+    } else {
+      this._idleRig = null;
+      this._idleBase = null;
     }
 
     this._group = g;
@@ -144,6 +165,21 @@ export class ArmorPreviewRenderer {
         // a restrained presentation sway shows the model without turning its
         // back while the user is choosing a skin.
         this._group.rotation.y = (this._baseYaw || 0) + Math.sin(this._t * 0.45) * 0.22;
+        // Subtle breath and asymmetric weight transfer. Keep the amplitudes
+        // below gameplay animation values: this is an alive idle, not a looped
+        // dance, and it must never fight weapon carry in the match.
+        if (this._idleRig && this._idleBase) {
+          const r = this._idleRig, b = this._idleBase;
+          const breath = Math.sin(this._t * 1.45);
+          const weight = Math.sin(this._t * 0.72 + 0.8);
+          if (r.chest) r.chest.rotation.x = b.chestX + breath * 0.012;
+          if (r.spine) r.spine.rotation.x = b.spineX - breath * 0.006;
+          if (r.head) r.head.rotation.y = b.headY + weight * 0.025;
+          if (r.armL) r.armL.rotation.x = b.armLX - breath * 0.010;
+          if (r.armR) r.armR.rotation.x = b.armRX - breath * 0.010;
+          if (r.elbowL) r.elbowL.rotation.x = b.elbowLX + weight * 0.018;
+          if (r.elbowR) r.elbowR.rotation.x = b.elbowRX - weight * 0.018;
+        }
         // Drive the rigged human soldier's idle animation on the turntable.
         const ud = this._group.userData;
         if (ud?.isHuman) { ud.setMotion('idle'); ud.mixer.update(0.016); ud.armorTick?.(0.016); }

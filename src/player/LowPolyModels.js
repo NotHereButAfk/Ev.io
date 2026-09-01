@@ -139,8 +139,8 @@ const PALETTES = {
   // Compact arena operative: saturated orange impact armour over a near-black
   // undersuit, pale ceramic helmet/leg shells and a single acid-lime optic. The
   // colour blocking is intentionally bold enough to survive gameplay distance.
-  vanguard: { armor: 0xed6909, armor2: 0x697278, frame: 0x252a2e, joint: 0x111416,
-              steel: 0x4d565b, bone: 0x939aa5, glow: 0xb7ff32, bulk: 1.12,
+  vanguard: { armor: 0xff7208, armor2: 0xc4c6d4, frame: 0x202428, joint: 0x0d1013,
+              steel: 0x555d66, bone: 0xe0e1eb, glow: 0xc7ff34, bulk: 1.06,
               finish: 'pbr' },  // compact arena operative
   striker:  { armor: 0x173c64, armor2: 0x6687a0, frame: 0x101821, joint: 0x070b10,
               steel: 0x263d50, bone: 0x48677d, glow: 0x32f0d3, bulk: 0.91 },  // frost shinobi
