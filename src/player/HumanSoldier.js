@@ -158,7 +158,12 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       else                  bodyMats.push(o.material);
     }
   });
-  _applyArmorLook(bodyMats, visorMats, look);
+  // The Blender-authored KYX model already contains its designed white,
+  // graphite, and orange material blocking. Flattening every non-visor mesh to
+  // one armor-look colour is what turned the live model into the featureless
+  // blue-gray figure even though the inventory preview showed the correct
+  // white/orange character. Only legacy/non-authored soldiers need that pass.
+  if (!authoredArmor) _applyArmorLook(bodyMats, visorMats, look);
 
   const group = new THREE.Group();
   group.add(root);
@@ -1487,6 +1492,9 @@ function _buildArmorPieces(root, armorTypeId, look, armorSkin = null) {
 export function tintHumanSoldier(group, skin, armorSkin = null) {
   const mats = group.userData?.bodyMats;
   if (!mats || !mats.length) return;
+  // "Default" means the authored model, not a gray cosmetic dye. Preserve the
+  // source palette so the live player and bots match the inventory preview.
+  if (!armorSkin && (!skin || skin.id === 'default')) return;
   const hex = armorSkin ? armorSkin.primary : skin?.primary;
   if (hex == null) return;
   const tint = new THREE.Color(hex);
