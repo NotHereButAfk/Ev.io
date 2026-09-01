@@ -34,6 +34,7 @@ const TELEPORT_COOLDOWN = 5.0;
 
 const CROUCH_HEIGHT   = 0.85;
 const SLIDE_DURATION  = 0.72;
+const SLIDE_MIN_SPEED = WALK_SPEED * 1.25;
 const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~43.6 u/s burst
 const COYOTE_TIME     = 0.14;
 
@@ -275,11 +276,14 @@ export class Player {
     const wantCrouch   = input.isDown('ControlLeft') || input.isDown('KeyC');
     const justCrouch   = input.consumeJustPressed('ControlLeft') || input.consumeJustPressed('KeyC');
 
-    if (justCrouch && this.isSprinting && this.onGround && !this.isSliding) {
-      // Initiate slide
+    const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
+    if (justCrouch && horizontalSpeed >= SLIDE_MIN_SPEED
+        && this.onGround && !this.isSliding) {
+      // Carry the player's actual travel direction into the burst. This keeps
+      // a diagonal sprint from snapping to camera-forward when crouch is hit.
       this.isSliding   = true;
       this._slideTimer = SLIDE_DURATION;
-      this._slideFwd.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      this._slideFwd.set(this.velocity.x / horizontalSpeed, 0, this.velocity.z / horizontalSpeed);
       this._slideVel.copy(this._slideFwd).multiplyScalar(SLIDE_BOOST);
       this.isSprinting = false;
     }

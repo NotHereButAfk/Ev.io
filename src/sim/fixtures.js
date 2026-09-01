@@ -176,15 +176,18 @@ export const FIXTURES = [
     world: W({}),
     spawn: [0, 0, 0],
     tape: [
+      { ticks: 3, crouch: true, crouchJust: true },         // too slow: crouch only
+      { ticks: 5 },
       { ticks: 30, mz: 1, sprint: true, yaw: 0 },
       { ticks: 20, mz: 1, sprint: true, yaw: 0, crouch: true, crouchJust: true },
       { ticks: 40 },
     ],
     check(states) {
+      if (states.slice(0, 8).some((s) => s.slide)) return 'slide started below its speed threshold';
       let slid = false;
       for (const s of states) if (s.slide) slid = true;
       if (!slid) return 'slide never started';
-      const start = states[29], last = states[states.length - 1];
+      const start = states[37], last = states[states.length - 1];
       const dist = Math.abs(last.pz - start.pz);
       if (dist < 4) return `slide covered too little ground (${dist})`;
       if (last.slide) return 'slide never ended';

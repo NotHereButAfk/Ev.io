@@ -41,6 +41,7 @@ const STAND_H = 1.7;
 const CROUCH_H = 1.0;
 const CROUCH_SPEED = 0.55;
 const SLIDE_DURATION = 0.72;
+const SLIDE_MIN_SPEED = WALK_SPEED * 1.25;
 const SLIDE_BOOST = WALK_SPEED * SPRINT_MULT * 1.65;
 const COYOTE_TIME = 0.14;
 const STEP_UP = 0.55, GRACE = 0.06;      // platform support (matches World)
@@ -225,11 +226,12 @@ export function step(s, input, world) {
 
   // slide / ground / air movement
   const speed = WALK_SPEED * (sprinting ? SPRINT_MULT : (s.crouch ? CROUCH_SPEED : 1));
-  if (input.crouchJust && sprinting && s.onGround && !s.slide) {
+  const horizontalSpeed = Math.hypot(s.vx, s.vz);
+  if (input.crouchJust && horizontalSpeed >= SLIDE_MIN_SPEED && s.onGround && !s.slide) {
     n.slide = 1;
     n.slideT = SLIDE_DURATION;
-    n.slideDx = q(-sinY * SLIDE_BOOST);
-    n.slideDz = q(-cosY * SLIDE_BOOST);
+    n.slideDx = q((s.vx / horizontalSpeed) * SLIDE_BOOST);
+    n.slideDz = q((s.vz / horizontalSpeed) * SLIDE_BOOST);
   }
   if (n.slide) {
     n.slideT = q(Math.max(0, (n.slideT || s.slideT) - DT));
