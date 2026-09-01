@@ -140,7 +140,11 @@ const ADS_SIGHT_Y = -0.018;
 // Keep the shot/crosshair at screen centre but seat the physical optic a little
 // below it. This preserves the full-size gun while clearing the target and the
 // upper half of the POV during ordinary right-click aim.
-const ADS_VIEWMODEL_DROP = 0.012;
+// Keep the physical gun full-size, but seat its sight line below the reticle.
+// At 0.012 the camera looked straight down the receiver and the orange upper
+// housing became a solid vertical slab over the target. The shot still follows
+// the centre reticle; this is presentation-only clearance.
+const ADS_VIEWMODEL_DROP = 0.075;
 const DEFAULT_ADS_FOV = 46;
 const ADS_PITCH = 0;
 const ADS_YAW = 0;
