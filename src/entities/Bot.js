@@ -353,6 +353,16 @@ export class Bot {
     this._reloadTimer = 0;
     this._targetEntity = null;
     this._targetScanT = 0;
+    if (this._isHuman) {
+      const ud = this.mesh.userData;
+      ud.setDeathState?.(0, this._deathSide);
+      ud.setLocomotion?.(0, true, false, 0, 1, 0);
+      ud.setAim?.(0, 0);
+      ud.setActionState?.({
+        reload: 0, swing: 1, crouch: 0, slide: 0, vy: 0,
+        aim: 0, move: 0, run: 0, firing: 0, scoped: 0,
+      });
+    }
     if (this._isSwordBot) {
       if (this._weaponMesh) { this._weaponMesh.position.z = this._weaponBaseZ; this._weaponMesh.rotation.x = -0.70; }
     } else {

@@ -352,8 +352,8 @@ export class Game {
       }
     });
     const stages = [
-      ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
       ['player', preloadHumanSoldier],
+      ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
       ['armor', preloadSpartanModel],
     ];
     // Loading every GLB and the 6 MB animation library simultaneously caused
@@ -366,6 +366,23 @@ export class Game {
       }
     })();
     return this._presentationPreloadPromise;
+  }
+
+  _ensureHumanPresentationReady(timeoutMs = 8000) {
+    if (isHumanSoldierReady()) return Promise.resolve(true);
+    if (this._humanPresentationReadyPromise) return this._humanPresentationReadyPromise;
+    this._humanPresentationReadyPromise = new Promise((resolve) => {
+      let settled = false;
+      const finish = (ready) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(ready);
+      };
+      const timer = setTimeout(() => finish(isHumanSoldierReady()), timeoutMs);
+      preloadHumanSoldier(() => finish(true));
+    }).finally(() => { this._humanPresentationReadyPromise = null; });
+    return this._humanPresentationReadyPromise;
   }
 
   _schedulePresentationPreloads() {
@@ -820,6 +837,11 @@ export class Game {
         // A failed map load owns its visible RETRY state. Do not create a
         // match against the one-point construction fallback underneath it.
         if (!this.world.currentMap) return;
+        // A quick click used to create the authoritative roster while the GLB
+        // was still parsing. Those avatars permanently retained the crude
+        // emergency body even after the real model became available. Resolve
+        // the shared rig before any local or network bot can be constructed.
+        await this._ensureHumanPresentationReady();
         if (!this.currentUsername || UserAccount.isGuest()) {
           if (!UserAccount.isGuest()) UserAccount.guest();
           this._onAuth('__guest__');
