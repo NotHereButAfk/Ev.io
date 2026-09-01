@@ -962,8 +962,9 @@ export class MenuUI {
     // Night Market: 5 daily items seeded by today's date. Unowned skins get
     // priority so the rotation stays worth checking; owned ones only pad out
     // the row when the collection is nearly complete.
-    // Stock = armor finishes + gun skins. Sword skins are NOT sold any more —
-    // skins are a main-weapon feature, so melee finishes would be unusable.
+    // Stock = player finishes + shared weapon finishes. A purchased weapon
+    // finish can be equipped independently on its authored main gun and on the
+    // sword; the inventory owns those two equipped slots.
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
     const weaponItems    = WEAPON_SKINS.filter((s) => getWeaponIdForSkin(s.id))
       .map(s => ({ ...s, _kind: 'weapon' }));

@@ -119,6 +119,10 @@
               <span class="pm-icon">&#127903;</span>
               <div class="pm-body"><div class="pm-name">BATTLE PASS</div><div class="pm-sub">Season 1 rewards track</div></div>
             </button>
+            <a class="profile-menu-item" href="/withdrawal">
+              <span class="pm-icon">$</span>
+              <div class="pm-body"><div class="pm-name">WITHDRAWAL</div><div class="pm-sub">USDC redemption status</div></div>
+            </a>
           </div>
         </div>
 
@@ -541,6 +545,11 @@
         <div class="checkout-kicker">SECURE CHECKOUT</div>
         <h2 id="checkout-title">PURCHASE SKIN</h2>
         <div id="checkout-item" class="checkout-item"></div>
+        <label class="checkout-terms-accept">
+          <input id="checkout-terms-checkbox" type="checkbox" />
+          <span>I agree to the <a href="/terms#digital-purchases" target="_blank" rel="noopener">Digital Skin Purchase Terms</a>: this digital purchase is final except where required by law, the skin entitlement is permanent for my account, skin visuals may be modified, and reward multipliers may be rebalanced.</span>
+        </label>
+        <button id="checkout-continue" class="checkout-continue" type="button" disabled>ACCEPT &amp; CONTINUE</button>
         <div id="paypal-buttons" class="paypal-buttons"></div>
         <div id="checkout-status" class="checkout-status" aria-live="polite"></div>
         <div class="checkout-trust">Processed securely by PayPal. Pay with PayPal or an eligible debit/credit card.</div>

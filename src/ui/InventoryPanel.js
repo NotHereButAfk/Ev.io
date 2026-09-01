@@ -197,7 +197,11 @@ export class InventoryPanel {
     // Only the skins the player OWNS for this weapon. New accounts have
     // none — the tab shows just Default until skins are earned/bought.
     // ONE shared catalog: the sword wears the same 40 finishes as the guns.
-    const owned = getWeaponSkinsFor(gun.id).filter((s) => Armory.ownsSkin(s.id));
+    // The sword has its own independent equipped slot but intentionally uses
+    // the same purchased finish catalog. Main guns remain restricted to their
+    // authored five-skin sets so choosing a finish never swaps the gun shape.
+    const catalog = isMelee ? WEAPON_SKINS : getWeaponSkinsFor(gun.id);
+    const owned = catalog.filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
     for (const s of owned) {
       const card = this._weaponCard(gun, s, this._isEquipped(gun.id, s.id), () => {

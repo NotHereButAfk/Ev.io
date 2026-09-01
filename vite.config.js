@@ -14,6 +14,7 @@ export default defineConfig({
         login:    resolve(__dirname, 'login.html'),
         register: resolve(__dirname, 'register.html'),
         tournaments: resolve(__dirname, 'tournaments.html'),
+        withdrawal: resolve(__dirname, 'withdrawal.html'),
         privacy:  resolve(__dirname, 'privacy.html'),
         terms:    resolve(__dirname, 'terms.html'),
       },

@@ -48,7 +48,7 @@ try {
     compressedMap.status === 200 && compressedMap.headers.get('content-encoding') === 'gzip'
       && decodedMap.byteLength > 1_000_000);
 
-  for (const route of ['/login', '/register', '/privacy', '/terms']) {
+  for (const route of ['/login', '/register', '/privacy', '/terms', '/withdrawal']) {
     const page = await fetch(`http://127.0.0.1:${PORT}${route}`);
     const pageHtml = await page.text();
     await check(`serves clean HTML route ${route}`, page.status === 200 && /<!doctype html>/i.test(pageHtml));

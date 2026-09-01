@@ -45,6 +45,7 @@ const CLEAN_HTML_ROUTES = new Map([
   ['/login', '/login.html'],
   ['/register', '/register.html'],
   ['/tournaments', '/tournaments.html'],
+  ['/withdrawal', '/withdrawal.html'],
   ['/privacy', '/privacy.html'],
   ['/terms', '/terms.html'],
 ]);

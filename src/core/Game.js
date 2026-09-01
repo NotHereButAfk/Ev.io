@@ -46,7 +46,7 @@ import { AuthNetBridge, authNetTarget, authNetTargets } from '../net/AuthNetBrid
 import { findAvailableMatch } from '../net/Matchmaker.js';
 import { SWORD_SKINS } from '../weapons/SwordSkins.js';
 import { MobileControls } from '../ui/MobileControls.js';
-import { KILL_MULT_BONUS } from './RarityPerks.js';
+import { KILL_MULTIPLIER } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
@@ -745,17 +745,23 @@ export class Game {
   }
 
   _computeSkinKillMult() {
-    const bonus = (skinList, id) => {
+    const multiplier = (skinList, id) => {
       const s = skinList.find(s => s.id === id);
-      return KILL_MULT_BONUS[s?.rarity] ?? 0;
+      return KILL_MULTIPLIER[s?.rarity] ?? 1;
     };
     const gunId    = Loadout.getGun();
     const meleeId  = Loadout.getMelee();
     const armorId  = Shop.getEquipped();
-    const gunBonus   = bonus(WEAPON_SKINS, Armory.getSkinId(gunId,   false));
-    const meleeBonus = bonus(SWORD_SKINS,  Armory.getSkinId(meleeId, true));
-    const armorBonus = bonus(ARMOR_SKINS,  armorId);
-    return Math.min(5.0, 1.0 + gunBonus + meleeBonus + armorBonus);
+    const gunMult = multiplier(WEAPON_SKINS, Armory.getSkinId(gunId, false));
+    // The current sword uses the shared weapon-finish catalog. Keep the legacy
+    // sword catalog fallback so old saved sword skins still retain their rarity.
+    const meleeSkinId = Armory.getSkinId(meleeId, true);
+    const meleeMult = Math.max(
+      multiplier(WEAPON_SKINS, meleeSkinId),
+      multiplier(SWORD_SKINS, meleeSkinId),
+    );
+    const armorMult = multiplier(ARMOR_SKINS, armorId);
+    return Math.max(1, gunMult, meleeMult, armorMult);
   }
 
   _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {

@@ -24,11 +24,22 @@ export async function openPayPalCheckout({ skinId, name, kind, price, onComplete
   const modal = document.getElementById('checkout-modal');
   const mount = document.getElementById('paypal-buttons');
   const status = document.getElementById('checkout-status');
+  const checkbox = document.getElementById('checkout-terms-checkbox');
+  const continueButton = document.getElementById('checkout-continue');
   document.getElementById('checkout-item').textContent = `${name} · $${price.toFixed(2)} USD`;
   mount.innerHTML = '';
-  status.textContent = 'Loading secure payment options…';
+  checkbox.checked = false;
+  continueButton.disabled = true;
+  continueButton.classList.remove('hidden');
+  status.textContent = 'Review and accept the purchase terms to continue.';
   modal.classList.remove('hidden');
-  try {
+
+  checkbox.onchange = () => { continueButton.disabled = !checkbox.checked; };
+  continueButton.onclick = async () => {
+    if (!checkbox.checked) return;
+    continueButton.disabled = true;
+    status.textContent = 'Loading secure payment options…';
+    try {
     const settings = await config();
     if (!settings.configured) throw new Error('Checkout is awaiting PayPal merchant configuration');
     const paypal = await loadSdk(settings.clientId, settings.environment);
@@ -36,7 +47,7 @@ export async function openPayPalCheckout({ skinId, name, kind, price, onComplete
     await paypal.Buttons({
       style: { layout: 'vertical', shape: 'rect', label: 'paypal' },
       createOrder: async () => {
-        const response = await fetch('/api/store/orders', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skinId }) });
+        const response = await fetch('/api/store/orders', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skinId, termsAccepted: true, termsVersion: '2026-08-31' }) });
         const result = await response.json();
         if (!result.ok) throw new Error(result.err || 'Unable to create order');
         return result.orderId;
@@ -53,7 +64,12 @@ export async function openPayPalCheckout({ skinId, name, kind, price, onComplete
       onCancel: () => { status.textContent = 'Checkout canceled. You were not charged.'; },
       onError: (error) => { status.textContent = error?.message || 'Checkout could not be completed.'; },
     }).render('#paypal-buttons');
-  } catch (error) { status.textContent = error.message; }
+    continueButton.classList.add('hidden');
+    } catch (error) {
+      status.textContent = error.message;
+      continueButton.disabled = false;
+    }
+  };
 }
 
 document.getElementById('checkout-close')?.addEventListener('click', () => document.getElementById('checkout-modal')?.classList.add('hidden'));

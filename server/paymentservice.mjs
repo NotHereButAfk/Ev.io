@@ -3,6 +3,7 @@ import { ARMOR_SKINS } from '../src/player/ArmorSkins.js';
 import { WEAPON_SKINS } from '../src/weapons/WeaponSkins.js';
 
 const PRICE = { common: '20.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
+const TERMS_VERSION = '2026-08-31';
 const items = new Map([
   ...ARMOR_SKINS.filter((skin) => !skin.starter).map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'character', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
   ...WEAPON_SKINS.map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'weapon', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
@@ -45,6 +46,8 @@ export function createPaymentService(accounts) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       captured_at TIMESTAMPTZ
     );
+    ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS terms_version VARCHAR(20);
+    ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
   `);
 
   async function accessToken() {
@@ -82,7 +85,10 @@ export function createPaymentService(accounts) {
     if (!clientId || !secret) { send(res, 503, { ok: false, err: 'Checkout is awaiting merchant configuration' }); return true; }
     try {
       if (req.method === 'POST' && pathname === '/api/store/orders') {
-        const { skinId } = await readBody(req);
+        const { skinId, termsAccepted, termsVersion } = await readBody(req);
+        if (termsAccepted !== true || termsVersion !== TERMS_VERSION) {
+          send(res, 400, { ok: false, err: 'Accept the current Digital Skin Purchase Terms to continue' }); return true;
+        }
         const item = items.get(String(skinId));
         if (!item) { send(res, 400, { ok: false, err: 'Skin is not for sale' }); return true; }
         const owned = await accounts.pool.query('SELECT 1 FROM user_skins WHERE user_id=$1 AND skin_id=$2', [user.id, item.id]);
@@ -92,7 +98,7 @@ export function createPaymentService(accounts) {
           method: 'POST', requestId: localId,
           body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ reference_id: localId, custom_id: `${user.id}:${item.id}`, description: `KYX.IO ${item.name} skin`, amount: { currency_code: 'USD', value: item.price } }], application_context: { shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' } }),
         });
-        await accounts.pool.query('INSERT INTO store_orders(id,user_id,paypal_order_id,skin_id,skin_kind,amount_cents,status) VALUES($1,$2,$3,$4,$5,$6,$7)', [localId, user.id, order.id, item.id, item.kind, Math.round(Number(item.price) * 100), 'approved_pending']);
+        await accounts.pool.query('INSERT INTO store_orders(id,user_id,paypal_order_id,skin_id,skin_kind,amount_cents,status,terms_version,terms_accepted_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,NOW())', [localId, user.id, order.id, item.id, item.kind, Math.round(Number(item.price) * 100), 'approved_pending', TERMS_VERSION]);
         send(res, 201, { ok: true, orderId: order.id }); return true;
       }
       const captureMatch = pathname.match(/^\/api\/store\/orders\/([A-Z0-9]+)\/capture$/i);
