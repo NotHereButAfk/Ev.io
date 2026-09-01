@@ -8,6 +8,7 @@ import {
   HUMAN_PHASE_ORIGIN,
   HUMAN_STRIDE_WARP,
   humanMotionTransitionSeconds,
+  humanAimPose,
   humanStrideWarpAngle,
   humanTravelPose,
   mapHumanMotionPhase,
@@ -34,6 +35,16 @@ assert(humanMotionTransitionSeconds('run', 'air') <= 0.06,
 assert(humanMotionTransitionSeconds('air', 'run') >= 0.1
   && humanMotionTransitionSeconds('air', 'run') <= 0.14,
   'landing-to-run recovery is mistimed');
+
+for (const yaw of [-Math.PI * 8, -Math.PI, -1, 0, 1, Math.PI, Math.PI * 8]) {
+  const aim = humanAimPose(99, yaw);
+  assert(Math.abs(aim.yaw) <= 0.620001,
+    `upper body can overtwist at yaw ${yaw} (${aim.yaw})`);
+  assert(Math.abs(aim.pitch) <= 0.780001,
+    `upper body can overpitch (${aim.pitch})`);
+}
+assert(humanAimPose(0, Math.PI * 2 + 0.25).yaw > 0.24,
+  'aim yaw did not take the short path across the seam');
 
 const walkRate = targetHumanTimeScale('walk', 2.5);
 const runRate = targetHumanTimeScale('run', 6.2);

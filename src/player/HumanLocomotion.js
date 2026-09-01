@@ -102,6 +102,21 @@ export function dampHumanTimeScale(current, target, dt, response = 9) {
   return target + (current - target) * Math.exp(-response * Math.max(0, dt));
 }
 
+// Anatomical upper-body aim limits. Network yaw can legitimately cross the
+// ±π seam while the body is still catching up; feeding that raw delta into the
+// spine lets the chest rotate almost 180° and makes the torso look detachable.
+// The remaining turn belongs to the character root, not the ribcage.
+export function humanAimPose(pitch = 0, yaw = 0) {
+  const safePitch = Number.isFinite(pitch) ? pitch : 0;
+  const safeYaw = Number.isFinite(yaw) ? yaw : 0;
+  const wrappedYaw = ((safeYaw + Math.PI) % (Math.PI * 2) + Math.PI * 2)
+    % (Math.PI * 2) - Math.PI;
+  return {
+    pitch: Math.max(-0.78, Math.min(0.78, safePitch)),
+    yaw: Math.max(-0.62, Math.min(0.62, wrappedYaw)),
+  };
+}
+
 // Convert resolved travel in body space into the lower-body yaw and playback
 // direction used by the Soldier rig. Keeping this pure makes the lateral
 // forward/back crossover measurable instead of relying on an eyeballed pose.

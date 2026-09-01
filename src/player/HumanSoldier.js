@@ -7,6 +7,7 @@ import {
   humanStrideWarpAngle,
   humanTravelPose,
   humanMotionTransitionSeconds,
+  humanAimPose,
   mapHumanMotionPhase,
   selectHumanMotion,
   targetHumanStrideScale,
@@ -461,7 +462,11 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   };
 
   // Aim tracking: yaw twists the upper spine, pitch tilts the head.
-  const setAim = (pitch, yaw) => { _aimPitch = pitch; _aimYaw = yaw; };
+  const setAim = (pitch, yaw) => {
+    const aim = humanAimPose(pitch, yaw);
+    _aimPitch = aim.pitch;
+    _aimYaw = aim.yaw;
+  };
   // Impulse hooks: fire recoil, damage flinch, jump launch.
   const triggerFire = (kick = 1) => { _fireRecoil = Math.max(_fireRecoil, 0.12 * kick); };
   const triggerHit  = (dx = 0, dy = 0) => { _flinch.x = dx * 0.18; _flinch.y = dy * 0.14; _flinch.t = 0.35; };
