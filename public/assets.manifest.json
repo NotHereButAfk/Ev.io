@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-01T12:38:26.205Z",
+  "generated": "2026-09-01T15:54:02.195Z",
   "budgets": {
     "maxBytes": 3670016,
     "maxVerts": 120000,
@@ -7,24 +7,24 @@
   },
   "totals": {
     "assets": 8,
-    "bytes": 10222968,
-    "vertices": 180278,
-    "megabytes": 9.75
+    "bytes": 10245444,
+    "vertices": 180654,
+    "megabytes": 9.77
   },
   "assets": [
     {
       "file": "kyx-player.glb",
-      "bytes": 2106316,
-      "sha256": "9f5b49ebc7547013",
+      "bytes": 2128792,
+      "sha256": "b11380c7b60cb709",
       "glbVersion": 2,
-      "meshes": 61,
-      "primitives": 61,
-      "vertices": 15940,
-      "triangles": 22763,
-      "nodes": 120,
+      "meshes": 63,
+      "primitives": 63,
+      "vertices": 16316,
+      "triangles": 23487,
+      "nodes": 122,
       "hasUV": true,
       "compressed": false,
-      "binBytes": 1356096,
+      "binBytes": 1376504,
       "warnings": []
     },
     {

@@ -190,6 +190,21 @@ def front_bar(name, loc, length, width, angle, depth, mat):
     return obj
 
 
+def front_ribbon(name, loc, start, end, width, depth, mat):
+    """Extrude a narrow X/Z ribbon between two exact endpoints."""
+    dx, dz = end[0] - start[0], end[1] - start[1]
+    length = max(1e-6, math.sqrt(dx * dx + dz * dz))
+    px, pz = -dz / length * width * 0.5, dx / length * width * 0.5
+    mx, mz = (start[0] + end[0]) * 0.5, (start[1] + end[1]) * 0.5
+    points = [
+        (start[0] - mx + px, start[1] - mz + pz),
+        (end[0] - mx + px, end[1] - mz + pz),
+        (end[0] - mx - px, end[1] - mz - pz),
+        (start[0] - mx - px, start[1] - mz - pz),
+    ]
+    return front_panel(name, loc + Vector((mx, 0, mz)), points, depth, mat, width * 0.18)
+
+
 def limb_guard(name, armature, bone_name, width, length_ratio, depth, mat,
                front_offset=0.0, taper=0.72):
     """An anatomical plate that follows a limb without replacing its volume.
@@ -652,46 +667,73 @@ for side, tag in ((-1, "L"), (1, "R")):
                         (S(0.038), S(-0.110)), (S(-0.025), S(-0.135))],
                        S(0.105), accent, S(0.009)), "mixamorigHips")
 
-# Compact faceted helmet.  The black hood supplies a continuous neck seal; the
-# pale crown is narrow, orange cheek rails frame the face, and the three neon
-# bars form the unmistakable V visor rather than a giant horizontal screen.
+# Compact faceted helmet. A deep black facial recess separates the mask from
+# the shell, while layered crown, cheek and jaw plates create an actual face.
+# Three thin luminous chevrons replace the previous filled V-shaped polygon.
 head_center = bone_world(armature, "mixamorigHead", 0.58)
 fitted(faceted_ellipsoid("KYX_HelmetHood", head_center + Vector((0, S(0.018), 0)),
-                         (S(0.226), S(0.202), S(0.258)), armor_dark, subdivisions=3), "mixamorigHead")
-# A fitted ceramic crown covers the skull in every view.  The former front-only
-# panel left a black bald dome from three-quarter and rear angles, which made a
-# human head look unfinished rather than helmeted.
+                         (S(0.226), S(0.202), S(0.266)), armor_dark, subdivisions=3), "mixamorigHead")
 fitted(faceted_ellipsoid("KYX_HelmetShell", head_center + Vector((0, S(0.020), S(0.070))),
-                         (S(0.236), S(0.218), S(0.270)), armor, subdivisions=3), "mixamorigHead")
+                         (S(0.228), S(0.214), S(0.258)), armor, subdivisions=3), "mixamorigHead")
 fitted(front_panel("KYX_HelmetCrown", head_center + Vector((0, S(-0.108), S(0.030))),
-                   [(S(-0.105), S(-0.042)), (S(-0.100), S(0.086)),
-                    (S(-0.060), S(0.158)), (S(0.060), S(0.158)),
-                    (S(0.100), S(0.086)), (S(0.105), S(-0.042)),
-                    (S(0.064), S(-0.074)), (S(-0.064), S(-0.074))],
-                   S(0.090), armor, S(0.010)), "mixamorigHead")
+                   [(S(-0.104), S(-0.018)), (S(-0.094), S(0.094)),
+                    (S(-0.054), S(0.158)), (S(0.054), S(0.158)),
+                    (S(0.094), S(0.094)), (S(0.104), S(-0.018)),
+                    (S(0.060), S(-0.056)), (S(-0.060), S(-0.056))],
+                   S(0.082), armor, S(0.009)), "mixamorigHead")
+# Recessed mask opening: this dark silhouette is the face plane, not another
+# outer helmet shell. It remains visible between every bright visor segment.
+fitted(front_panel("KYX_FaceRecess", head_center + Vector((0, S(-0.171), S(-0.030))),
+                   [(S(-0.090), S(0.090)), (S(0.090), S(0.090)),
+                    (S(0.078), S(-0.062)), (S(0.044), S(-0.120)),
+                    (0, S(-0.142)), (S(-0.044), S(-0.120)),
+                    (S(-0.078), S(-0.062))],
+                   S(0.022), armor_dark, S(0.004)), "mixamorigHead")
 for side, tag in ((-1, "L"), (1, "R")):
-    fitted(front_panel(f"KYX_HelmetCheek_{tag}", head_center + Vector((S(0.083 * side), S(-0.128), S(-0.045))),
-                       [(S(-0.036), S(0.076)), (S(0.041), S(0.052)),
-                        (S(0.030), S(-0.082)), (S(-0.018), S(-0.102))],
-                       S(0.048), accent, S(0.007)), "mixamorigHead")
-# Two nested neon chevrons reproduce the aggressive face language without the
-# previous horizontal screen.  Each is one continuous angular ribbon so it
-# remains legible during animation and at normal gameplay distance.
-for index, (z, width, drop) in enumerate(((-0.002, 0.074, 0.045), (-0.042, 0.060, 0.038))):
-    fitted(front_panel(
-        f"KYX_VisorChevron_{index+1}", head_center + Vector((0, S(-0.176), S(z))),
-        [(S(-width), S(0.030)), (S(-width + 0.020), S(0.044)),
-         (0, S(-drop + 0.016)), (S(width - 0.020), S(0.044)),
-         (S(width), S(0.030)), (0, S(-drop - 0.012))],
-        S(0.017), visor, S(0.004)), "mixamorigHead")
-fitted(front_panel("KYX_ForeheadInset", head_center + Vector((0, S(-0.154), S(0.112))),
-                   [(S(-0.052), S(-0.035)), (S(0.052), S(-0.035)),
-                    (S(0.040), S(0.050)), (S(-0.040), S(0.050))],
-                   S(0.024), armor_dark, S(0.005)), "mixamorigHead")
+    # Orange temple rails frame the mask; a smaller pale jaw insert adds a
+    # second layer so the side profile no longer looks like one flat slab.
+    fitted(front_panel(f"KYX_HelmetCheek_{tag}", head_center + Vector((S(0.086 * side), S(-0.151), S(-0.030))),
+                       [(S(-0.030), S(0.096)), (S(0.034), S(0.070)),
+                        (S(0.026), S(-0.090)), (S(-0.012), S(-0.118))],
+                       S(0.040), accent, S(0.006)), "mixamorigHead")
+    fitted(front_panel(f"KYX_JawInsert_{tag}", head_center + Vector((S(0.060 * side), S(-0.176), S(-0.094))),
+                       [(S(-0.024), S(0.038)), (S(0.026), S(0.028)),
+                        (S(0.018), S(-0.052)), (S(-0.018), S(-0.064))],
+                       S(0.018), armor, S(0.004)), "mixamorigHead")
+
+# Each visor chevron is made from two separate narrow illuminated bars. The
+# black gap between rows is deliberately wider than the bar thickness.
+visor_parts = []
+for index, (z, width, drop, thickness) in enumerate(((0.050, 0.080, 0.058, 0.013),
+                                                      (-0.012, 0.066, 0.048, 0.011),
+                                                      (-0.064, 0.052, 0.038, 0.009))):
+    for side, tag in ((-1, "L"), (1, "R")):
+        visor_parts.append(fitted(front_ribbon(
+            f"KYX_Visor_{index+1}_{tag}",
+            head_center + Vector((0, S(-0.188), 0)),
+            (S(width * side), S(z)), (0, S(z - drop)),
+            S(thickness), S(0.013), visor),
+            "mixamorigHead"))
+
+# All six bars share one bone and one material. Joining them preserves the
+# visible gaps while keeping the production model under its browser mesh budget.
+for part in visor_parts[1:]:
+    pieces.remove(part)
+bpy.ops.object.select_all(action="DESELECT")
+for part in visor_parts:
+    part.select_set(True)
+bpy.context.view_layer.objects.active = visor_parts[0]
+bpy.ops.object.join()
+visor_parts[0].name = "KYX_VisorChevrons"
+
+fitted(front_panel("KYX_ForeheadInset", head_center + Vector((0, S(-0.158), S(0.118))),
+                   [(S(-0.050), S(-0.030)), (S(0.050), S(-0.030)),
+                    (S(0.036), S(0.048)), (0, S(0.064)), (S(-0.036), S(0.048))],
+                   S(0.022), armor_dark, S(0.005)), "mixamorigHead")
 fitted(front_panel("KYX_Chin", head_center + Vector((0, S(-0.143), S(-0.112))),
-                   [(S(-0.068), S(0.045)), (S(0.068), S(0.045)),
-                    (S(0.042), S(-0.052)), (0, S(-0.075)), (S(-0.042), S(-0.052))],
-                   S(0.050), armor_dark, S(0.007)), "mixamorigHead")
+                   [(S(-0.058), S(0.042)), (S(0.058), S(0.042)),
+                    (S(0.038), S(-0.046)), (0, S(-0.068)), (S(-0.038), S(-0.046))],
+                   S(0.045), armor, S(0.007)), "mixamorigHead")
 
 # Raised orange pauldrons with pale lower inserts, plus thin anatomical arm
 # guards.  Cloth remains visible at the elbow and wrist; the armor therefore
