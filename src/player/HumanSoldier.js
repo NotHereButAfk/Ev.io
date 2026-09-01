@@ -260,11 +260,54 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     rLeg:  findBone(root, 'RightUpLeg'),
     lCalf: findBone(root, 'LeftLeg'),
     rCalf: findBone(root, 'RightLeg'),
+    lFoot: findBone(root, 'LeftFoot'),
+    rFoot: findBone(root, 'RightFoot'),
     weaponSocket: root.getObjectByName('KYX_WeaponSocket_R'),
     supportSocket: root.getObjectByName('KYX_SupportSocket_L'),
     swordSocket: root.getObjectByName('KYX_SwordSocket_R'),
     backHolsterSocket: root.getObjectByName('KYX_BackHolsterSocket'),
   };
+
+  // Lightweight boot jets. They live in character space (rather than under
+  // the foot bones) so the flame always points down even while the jump pose
+  // rotates the ankles. The foot bones only supply the two emitter positions.
+  const _thrusterFx = new THREE.Group();
+  _thrusterFx.name = 'KYX_BootThrusters';
+  _thrusterFx.visible = false;
+  const _thrusterOuterMat = new THREE.MeshBasicMaterial({
+    color: 0xff7a20,
+    transparent: true,
+    opacity: 0.72,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const _thrusterInnerMat = new THREE.MeshBasicMaterial({
+    color: 0x8eefff,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const _makeBootFlame = () => {
+    const flame = new THREE.Group();
+    const outer = new THREE.Mesh(new THREE.ConeGeometry(0.048, 0.22, 7), _thrusterOuterMat);
+    outer.rotation.z = Math.PI;
+    outer.position.y = -0.105;
+    outer.frustumCulled = false;
+    const inner = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.145, 6), _thrusterInnerMat);
+    inner.rotation.z = Math.PI;
+    inner.position.y = -0.064;
+    inner.frustumCulled = false;
+    flame.add(outer, inner);
+    _thrusterFx.add(flame);
+    return flame;
+  };
+  const _bootFlames = [_makeBootFlame(), _makeBootFlame()];
+  const _bootBones = [B.lFoot, B.rFoot];
+  const _bootWorld = new THREE.Vector3();
+  group.add(_thrusterFx);
 
   // ── Weapon-hold references ──────────────────────────────────────────────────
   // Bake the idle clip's first frame into the bones once, and snapshot the arm
@@ -348,6 +391,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let _targetCrouch = 0, _crouchT = 0;
   let _targetSlide = 0, _slideT = 0;
   let _reloadP = 0, _meleeSwing = 1;
+  let _reloadPoseP = 0, _meleePoseP = 1;
   let _targetWeaponAim = 0, _weaponAim = 0;
   let _weaponMove = 0, _weaponRun = 0, _weaponFiring = 0, _weaponScoped = 0;
   const _actionLeft = { swap: 0, throw: 0 };
@@ -480,6 +524,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   let armorT = 0;
   const _rootBaseY = root.position.y;
   const armorTick = (dt) => {
+    // Presentation is allowed to catch up after a dropped frame, but never to
+    // jump an entire pose in one render. Simulation/network time remains
+    // untouched; this clamp only stabilizes the visible skeleton and weapon IK.
+    dt = Math.min(Math.max(dt || 0, 0), 0.05);
     armorT += dt;
     const t = armorT;
     let bodyDrop = 0;
@@ -527,6 +575,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     _crouchT += (_targetCrouch - _crouchT) * (1 - Math.exp(-12 * dt));
     _slideT += (_targetSlide - _slideT) * (1 - Math.exp(-16 * dt));
     _weaponAim += (_targetWeaponAim - _weaponAim) * (1 - Math.exp(-10 * dt));
+    _reloadPoseP += (_reloadP - _reloadPoseP) * (1 - Math.exp(-22 * dt));
+    _meleePoseP += (_meleeSwing - _meleePoseP) * (1 - Math.exp(-24 * dt));
 
     // Smooth the aim tracking so quick camera whips don't snap the spine.
     const aimEase = 1 - Math.exp(-8 * dt);
@@ -761,8 +811,8 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     const swapP = actionProgress('swap');
     const throwP = actionProgress('throw');
     sampleHumanActionPose({
-      reload: _weaponKind === 'gun' ? _reloadP : 0,
-      swing: _weaponKind === 'melee' ? _meleeSwing : 1,
+      reload: _weaponKind === 'gun' ? _reloadPoseP : 0,
+      swing: _weaponKind === 'melee' ? _meleePoseP : 1,
       swap: swapP,
       throwP,
     }, _actionPose);
@@ -791,7 +841,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       applyHumanRifleCarry(group, B, _heldWeapon, {
         dt,
         aim: _weaponAim,
-        reload: _reloadP,
+        reload: _reloadPoseP,
         swap: swapP,
         throwP,
         sprint: _holdRunT,
@@ -821,6 +871,28 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
       applyActionEuler(B.rCalf, _deathPose.rCalfX, 0, 0);
       applyActionEuler(B.lLeg,  _deathPose.lLegX,  0, _deathPose.lLegZ);
       applyActionEuler(B.lCalf, _deathPose.lCalfX, 0, 0);
+    }
+
+    // Fire the boot jets for the entire airborne interval. Re-anchor after the
+    // mixer and procedural jump layers so the flames stay under the animated
+    // soles instead of lagging one frame behind them.
+    _thrusterFx.visible = !_grounded && _deathP <= 0;
+    if (_thrusterFx.visible) {
+      group.updateMatrixWorld(true);
+      const flicker = 0.88 + Math.sin(t * 47) * 0.10 + Math.sin(t * 73) * 0.04;
+      _thrusterOuterMat.opacity = 0.68 + Math.sin(t * 39) * 0.10;
+      _thrusterInnerMat.opacity = 0.86 + Math.sin(t * 51) * 0.08;
+      for (let i = 0; i < _bootFlames.length; i++) {
+        const flame = _bootFlames[i];
+        const foot = _bootBones[i];
+        flame.visible = !!foot;
+        if (!foot) continue;
+        foot.getWorldPosition(_bootWorld);
+        group.worldToLocal(_bootWorld);
+        flame.position.copy(_bootWorld);
+        flame.position.y -= 0.035;
+        flame.scale.set(1, flicker * (1 + Math.min(0.35, Math.abs(_verticalVelocity) * 0.018)), 1);
+      }
     }
   };
 

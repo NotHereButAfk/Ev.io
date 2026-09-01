@@ -2,7 +2,7 @@
 // Collision must sample the route often enough to see each walkable top,
 // otherwise the capsule meets the next vertical riser and appears stuck.
 export const MAX_CHARACTER_SWEEP_DISTANCE = 0.18;
-export const MAX_CHARACTER_SWEEP_SEGMENTS = 8;
+export const MAX_CHARACTER_SWEEP_SEGMENTS = 16;
 
 export function characterSweepSegments(
   dx,

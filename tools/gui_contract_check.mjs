@@ -10,7 +10,6 @@ const read = (file) => readFileSync(join(root, file), 'utf8');
 const index = read('index.html');
 const login = read('login.html');
 const register = read('register.html');
-const tournaments = read('tournaments.html');
 const privacy = read('privacy.html');
 const terms = read('terms.html');
 const menu = read('src/ui/MainMenu.js');
@@ -65,12 +64,12 @@ if (requestPointerLockSafely({ requestPointerLock: () => { throw new Error('wron
 for (const label of ['PUBLIC GAME', 'PRIVATE', 'PROFILE', 'STORE', 'SOCIAL', 'SETTINGS']) {
   requireMatch(index, new RegExp(`>${label}(?:\\s|&|<)`), `top navigation: ${label}`);
 }
-requireMatch(index, /id=["']dd-social["'][\s\S]*?href=["']\/tournaments["'][\s\S]*?>TOURNAMENTS</,
-  'tournaments destination inside Social dropdown');
+requireMatch(index, /id=["']dd-social["'][\s\S]*?data-panel=["']tournaments["'][\s\S]*?>TOURNAMENTS</,
+  'tournaments menu inside Social dropdown');
 if (/data-dd=["']crypto["']|id=["']dd-crypto["']|id=["']crypto-wallet-btn["']/.test(index)) {
   failures.push('removed Crypto navigation stays absent');
 }
-for (const panel of ['private', 'profile', 'shop', 'settings', 'feedback', 'more', 'rankings']) {
+for (const panel of ['private', 'profile', 'shop', 'settings', 'feedback', 'more', 'rankings', 'tournaments']) {
   requireMatch(index, new RegExp(`id=["']panel-${panel}["']`), `panel: ${panel}`);
 }
 requireMatch(menu, /querySelectorAll\(['"]\[data-panel\]['"]\)/, 'generic panel controls');
@@ -91,9 +90,8 @@ for (const control of ['reg-email', 'reg-strength', 'reg-match', 'reg-privacy', 
 }
 requireMatch(privacy, /Privacy policy/i, 'privacy page');
 requireMatch(terms, /Terms of use/i, 'terms page');
-requireMatch(tournaments, /Cash and token prizes are not currently offered/i,
-  'tournament page does not advertise an inactive prize pool');
-requireMatch(tournaments, /id=["']tournament-enter["']/, 'tournament entry control');
+requireMatch(index, /id=["']tournament-enter-menu["']/, 'tournament menu entry control');
+if (/href=["']\/tournaments["']/.test(index)) failures.push('tournaments must not navigate away from the game');
 
 requireMatch(index, /id=["']crosshair["']/, 'crosshair element');
 requireMatch(index, /id=["']map-loading["'][^>]*class=["'][^"']*hidden/,

@@ -137,6 +137,10 @@ export function shouldHideAdsViewmodel(def, scopeT, aimHeld = false) {
 // awareness.  True sniper scopes still use their dedicated 28-degree overlay.
 const ADS_SIGHT_DEPTH = -0.70;
 const ADS_SIGHT_Y = -0.018;
+// Keep the shot/crosshair at screen centre but seat the physical optic a little
+// below it. This preserves the full-size gun while clearing the target and the
+// upper half of the POV during ordinary right-click aim.
+const ADS_VIEWMODEL_DROP = 0.012;
 const DEFAULT_ADS_FOV = 46;
 const ADS_PITCH = 0;
 const ADS_YAW = 0;
@@ -1902,7 +1906,7 @@ export class WeaponSystem {
     // per-weapon screen-offset table or changing third-person weapon scale.
     const measuredAdsMount = this.models.get(def.id)?.adsMount;
     const adsX = measuredAdsMount?.x ?? 0;
-    const adsY = measuredAdsMount?.y ?? ADS_SIGHT_Y;
+    const adsY = (measuredAdsMount?.y ?? ADS_SIGHT_Y) - ADS_VIEWMODEL_DROP;
     const adsZ = measuredAdsMount?.z ?? ADS_SIGHT_DEPTH;
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;

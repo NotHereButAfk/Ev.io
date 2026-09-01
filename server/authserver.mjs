@@ -44,7 +44,6 @@ const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.svg', '.gltf', 
 const CLEAN_HTML_ROUTES = new Map([
   ['/login', '/login.html'],
   ['/register', '/register.html'],
-  ['/tournaments', '/tournaments.html'],
   ['/withdrawal', '/withdrawal.html'],
   ['/privacy', '/privacy.html'],
   ['/terms', '/terms.html'],
@@ -61,6 +60,11 @@ function staticHandler(root) {
     try { pathname = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname); }
     catch { res.writeHead(400); res.end('Bad request'); return; }
     if (pathname.includes('\0')) { res.writeHead(400); res.end('Bad request'); return; }
+    if (pathname === '/tournaments' || pathname === '/tournaments.html') {
+      res.writeHead(302, { Location: '/?panel=tournaments', 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
     if (pathname === '/') pathname = '/index.html';
     else pathname = CLEAN_HTML_ROUTES.get(pathname) || pathname;
 

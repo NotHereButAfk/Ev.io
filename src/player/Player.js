@@ -21,7 +21,9 @@ import {
 
 const EYE_HEIGHT = 1.7;
 const RADIUS = 0.45;
-const WALK_SPEED = 6.6;
+// KYX is intentionally a fast arena shooter. Keep this mirrored in MoveSim so
+// local play, prediction, and the authoritative server travel at one speed.
+const WALK_SPEED = 13.2;
 const SPRINT_MULT = 2.0;
 const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
@@ -32,7 +34,7 @@ const TELEPORT_COOLDOWN = 5.0;
 
 const CROUCH_HEIGHT   = 0.85;
 const SLIDE_DURATION  = 0.72;
-const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~17.9 u/s burst
+const SLIDE_BOOST     = WALK_SPEED * SPRINT_MULT * 1.65;  // ~43.6 u/s burst
 const COYOTE_TIME     = 0.14;
 
 export class Player {

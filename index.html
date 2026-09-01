@@ -134,10 +134,10 @@
               <span class="pm-icon">&#128101;</span>
               <div class="pm-body"><div class="pm-name">FIRETEAM</div><div class="pm-sub">Squad up with friends</div></div>
             </button>
-            <a class="profile-menu-item" href="/tournaments">
+            <button class="profile-menu-item" data-panel="tournaments">
               <span class="pm-icon">&#127942;</span>
               <div class="pm-body"><div class="pm-name">TOURNAMENTS</div><div class="pm-sub">Competitive events and standings</div></div>
-            </a>
+            </button>
             <a class="profile-menu-item" href="https://twitter.com" target="_blank" rel="noopener">
               <span class="pm-icon">&#128038;</span>
               <div class="pm-body"><div class="pm-name">TWITTER</div><div class="pm-sub">Follow for updates</div></div>
@@ -522,6 +522,33 @@
         </div>
         <div id="shop-grid-root"></div>
         <div class="shop-earn-tip">Earn E-Coins in-game &middot; 10 per kill &middot; 100 match bonus &middot; Daily challenges</div>
+      </div>
+    </div>
+
+    <!-- ===================== PANEL: TOURNAMENTS ===================== -->
+    <div id="panel-tournaments" class="nav-panel nav-panel-wide tournament-menu-panel hidden">
+      <button class="panel-x" data-close-panel aria-label="Close tournaments">[X]</button>
+      <div class="tournament-menu-head">
+        <div>
+          <div class="tournament-kicker"><span class="live-dot"></span> DAILY COMPETITIVE SERIES</div>
+          <h2>TOURNAMENTS</h2>
+          <p>Enter the daily arena and climb the live leaderboard.</p>
+        </div>
+        <div class="tournament-season">SEASON 1</div>
+      </div>
+      <div class="tournament-menu-grid">
+        <section class="tournament-menu-card tournament-menu-primary">
+          <div class="tournament-card-top">DAILY ARENA</div>
+          <h3>OPEN DEATHMATCH</h3>
+          <div class="tournament-meta"><span>8 PLAYERS</span><span>3 MINUTES</span><span>FFA</span></div>
+          <p>Your best completed public deathmatch counts toward today's standings.</p>
+          <button id="tournament-enter-menu" class="tournament-action" type="button">ENTER TOURNAMENT</button>
+          <div id="tournament-menu-message" class="tournament-message" aria-live="polite"></div>
+        </section>
+        <section class="tournament-menu-card">
+          <div class="tournament-card-top">LIVE STANDINGS</div>
+          <div class="standings-empty">No qualifying scores yet.<br />Be the first player on the board.</div>
+        </section>
       </div>
     </div>
 

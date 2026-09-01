@@ -240,6 +240,24 @@ export class MenuUI {
       }
     });
 
+    document.getElementById('tournament-enter-menu')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const status = document.getElementById('tournament-menu-message');
+      if (!this._isRegistered()) {
+        if (status) status.textContent = 'Log in to enter the daily arena.';
+        this.onLoginRequest?.();
+        return;
+      }
+      if (status) status.textContent = 'Entering the daily arena…';
+      startGame('deathmatch');
+    });
+
+    // External account/legal pages can return directly to this menu without a
+    // second standalone tournaments document.
+    if (new URLSearchParams(location.search).get('panel') === 'tournaments') {
+      queueMicrotask(() => this._togglePanel('tournaments'));
+    }
+
     // Auth control (right-side menu). "login" is a plain link to /login; the
     // logout button clears the session and drops back to spectating.
     document.getElementById('nav-logout-btn')?.addEventListener('click', (e) => {

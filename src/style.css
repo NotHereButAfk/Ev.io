@@ -5085,7 +5085,69 @@ html, body { margin: 0; }
   .tournament-topbar { align-items: flex-start; gap: 16px; }
   .tournament-topbar .login-nav { flex-wrap: wrap; justify-content: flex-end; }
 }
+
+.mbtn-slide {
+  width: 58px;
+  height: 58px;
+  border-color: rgba(72, 214, 255, 0.78);
+  color: #bdf4ff;
+  font-size: 28px;
+}
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* Tournaments now lives inside the game shell like every other nav menu. */
+.tournament-menu-panel {
+  width: min(94vw, 900px) !important;
+  padding: 28px 30px 32px !important;
+}
+.tournament-menu-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.tournament-menu-head h2 {
+  margin: 7px 0 5px;
+  color: #f5f7fa;
+  font: clamp(25px, 4vw, 42px) 'Michroma', sans-serif;
+  letter-spacing: .06em;
+}
+.tournament-menu-head p,
+.tournament-menu-card p { margin: 0; color: #9ca7b5; font-size: 16px; line-height: 1.45; }
+.tournament-season {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  color: #22dac7;
+  border: 1px solid rgba(34,218,199,.4);
+  font: 700 11px 'Michroma', sans-serif;
+  letter-spacing: .15em;
+}
+.tournament-menu-grid {
+  display: grid;
+  grid-template-columns: 1.35fr .8fr;
+  gap: 14px;
+  margin-top: 18px;
+}
+.tournament-menu-card {
+  min-height: 220px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(9,13,20,.68);
+}
+.tournament-menu-primary { border-color: rgba(34,218,199,.28); }
+.tournament-menu-card h3 {
+  margin: 10px 0 8px;
+  color: #f5f7fa;
+  font: clamp(19px, 3vw, 29px) 'Michroma', sans-serif;
+}
+@media (max-width: 680px) {
+  .tournament-menu-panel { top: 48px !important; padding: 24px 16px !important; }
+  .tournament-menu-head { gap: 12px; }
+  .tournament-menu-grid { grid-template-columns: 1fr; }
+  .tournament-menu-card { min-height: 0; }
+}
 .checkout-modal { position: fixed; inset: 0; z-index: 25000; display: grid; place-items: center; padding: 20px; background: rgba(3,5,8,.82); backdrop-filter: blur(7px); }
 .checkout-modal.hidden { display: none !important; }
 .checkout-card { position: relative; width: min(94vw, 470px); padding: 34px; color: #f5f8fa; border: 1px solid rgba(34,218,199,.38); background: #11161d; box-shadow: 0 30px 90px #000b; font-family: 'Rajdhani',sans-serif; }

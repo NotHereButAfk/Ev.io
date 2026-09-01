@@ -26,12 +26,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { STAMINA_DRAIN, STAMINA_MAX, STAMINA_REGEN, STAMINA_REGEN_DELAY } from './MovementConfig.js';
+import { characterSweepSegments } from './CharacterSweep.js';
 
 export const TICK_RATE = 20;
 export const DT = 1 / TICK_RATE;
 
 // Movement constants — kept identical to the legacy controller.
-const WALK_SPEED = 6.6;
+const WALK_SPEED = 13.2;
 const SPRINT_MULT = 2.0;
 const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
@@ -294,31 +295,37 @@ export function step(s, input, world) {
     }
   }
 
-  // gravity + integrate
+  // Gravity + swept integration. At doubled arena speed a 20 Hz tick can move
+  // more than a metre; one endpoint collision test would tunnel through thin
+  // walls, skip stair treads, and lose ramp support. Resolve short segments
+  // along the exact same deterministic route instead.
   n.vy = q(n.vy + GRAVITY * DT);
-  const prevY = n.py;
-  n.px = q(n.px + n.vx * DT);
-  n.pz = q(n.pz + n.vz * DT);
-  n.py = q(n.py + n.vy * DT);
+  const totalDX = n.vx * DT, totalDZ = n.vz * DT;
+  const segments = characterSweepSegments(totalDX, totalDZ);
+  const segmentDt = DT / segments;
+  let supported = !!s.onGround;
+  for (let segment = 0; segment < segments; segment++) {
+    const prevY = n.py;
+    n.px = q(n.px + totalDX / segments);
+    n.pz = q(n.pz + totalDZ / segments);
+    n.py = q(n.py + n.vy * segmentDt);
 
-  // ceiling clamp (before support solve so a blocked jump can still land)
-  [n.py, n.vy] = ceilingClamp(world, n.px, n.py, n.pz, height, n.vy);
-
-  // support solve — flat-floor stability + snap-down hysteresis + normal
-  const sup = supportAt(world, n.px, n.pz, prevY, n.py);
-  const snap = s.onGround ? SNAP_DOWN : 0.05;
-  if (n.py <= sup.y + snap && n.vy <= 0.001) {
-    n.py = sup.y;
-    n.vy = 0;
-    n.onGround = 1;
-    n.nX = sup.nx; n.nY = sup.ny; n.nZ = sup.nz;
-  } else {
-    n.onGround = 0;
-    n.nX = 0; n.nY = 1; n.nZ = 0;
+    // Ceiling clamp precedes support so a blocked jump can land in this sweep.
+    [n.py, n.vy] = ceilingClamp(world, n.px, n.py, n.pz, height, n.vy);
+    const sup = supportAt(world, n.px, n.pz, prevY, n.py);
+    const snap = supported ? SNAP_DOWN : 0.05;
+    if (n.py <= sup.y + snap && n.vy <= 0.001) {
+      n.py = sup.y;
+      n.vy = 0;
+      supported = true;
+      n.nX = sup.nx; n.nY = sup.ny; n.nZ = sup.nz;
+    } else {
+      supported = false;
+      n.nX = 0; n.nY = 1; n.nZ = 0;
+    }
+    [n.px, n.pz] = circleVsBoxes(world, n.px, n.pz, n.py, height);
   }
-
-  // horizontal pushout + arena clamp
-  [n.px, n.pz] = circleVsBoxes(world, n.px, n.pz, n.py, height);
+  n.onGround = supported ? 1 : 0;
 
   // teleporter pads
   if (n.padCD <= 0) {

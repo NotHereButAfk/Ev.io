@@ -46,6 +46,7 @@ export class MobileControls {
         <button class="mbtn mbtn-sm" data-role="grenade">G</button>
       </div>
       <div id="m-bot-btns">
+        <button class="mbtn mbtn-slide" data-role="slide" aria-label="Slide">⇩</button>
         <button class="mbtn mbtn-jump" data-role="jump">↑</button>
         <button class="mbtn mbtn-fire" data-role="fire">●</button>
       </div>
@@ -121,6 +122,7 @@ export class MobileControls {
       if (rec) {
         if (rec.role === 'joy')  this._releaseJoy();
         if (rec.role === 'fire') this.input.mouseDown = false;
+        if (rec.role === 'slide') this.input.setVirtualKey('KeyC', false);
         this._touches.delete(t.identifier);
       }
     }
@@ -140,6 +142,10 @@ export class MobileControls {
         break;
       case 'jump':
         inp.justPressed.add('Space');
+        break;
+      case 'slide':
+        inp.setVirtualKey('KeyC', true);
+        inp.justPressed.add('KeyC');
         break;
       case 'swap':
         inp.wheelDelta += 1; // WeaponSystem cycles to next slot on wheelDelta != 0
@@ -183,7 +189,7 @@ export class MobileControls {
     this._joyActive = false;
     this._joyInner.style.transform = 'translate(-50%, -50%)';
     const inp = this.input;
-    ['KeyW','KeyS','KeyA','KeyD','ShiftLeft'].forEach(k => inp.setVirtualKey(k, false));
+    ['KeyW','KeyS','KeyA','KeyD','ShiftLeft','KeyC'].forEach(k => inp.setVirtualKey(k, false));
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -195,7 +201,7 @@ export class MobileControls {
 
   hide() {
     const inp = this.input;
-    ['KeyW','KeyS','KeyA','KeyD','ShiftLeft'].forEach(k => inp.setVirtualKey(k, false));
+    ['KeyW','KeyS','KeyA','KeyD','ShiftLeft','KeyC'].forEach(k => inp.setVirtualKey(k, false));
     inp.mouseDown = false;
     this._touches.clear();
     this._el.classList.add('hidden');

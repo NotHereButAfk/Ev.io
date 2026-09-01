@@ -86,12 +86,12 @@ export const FIXTURES = [
     id: 'ramp',
     title: 'Ramp — walk up the slope, grounded throughout, tilted normal',
     // axis z, t=(z-minZ)/len: y0 is the minZ end. Spawn near the low end and
-    // walk toward +z (yaw π) so the run CLIMBS 0 → ~3.4 over 40 ticks.
+    // walk toward +z (yaw π) so the doubled-speed run climbs 0 → ~3.4.
     world: W({ platforms: [{ minX: -3, maxX: 3, minZ: -20, maxZ: -4, y0: 0, y1: 4, axis: 'z' }] }),
     spawn: [0, 0, -19],
     tape: [
       { ticks: 6 },
-      { ticks: 40, mz: 1, yaw: Math.PI },
+      { ticks: 20, mz: 1, yaw: Math.PI },
       { ticks: 20 },
     ],
     check(states) {
