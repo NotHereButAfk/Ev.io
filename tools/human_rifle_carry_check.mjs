@@ -115,14 +115,15 @@ globalThis.ProgressEvent ??= class ProgressEvent {
   }
 };
 
-const bytes = fs.readFileSync(new URL('../public/soldier.glb', import.meta.url));
+const bytes = fs.readFileSync(new URL('../public/kyx-player.glb', import.meta.url));
 const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 const gltf = await new Promise((resolve, reject) => {
   new GLTFLoader().parse(buffer, '', resolve, reject);
 });
+const AUTHORED_KYX = !!gltf.scene.getObjectByName('KYX_HelmetShell');
 const clips = Object.fromEntries(gltf.animations.map((clip) => [clip.name, clip]));
 for (const name of ['Idle', 'Walk', 'Run']) {
-  assert(clips[name], `soldier.glb is missing its ${name} clip`);
+  assert(clips[name], `kyx-player.glb is missing its ${name} clip`);
 }
 
 // Exercise the carry against frames that put the shoulders in materially
@@ -217,7 +218,7 @@ function measure(spec, armorName, armor, def) {
     rHand: findBone(root, 'RightHand'),
   };
   for (const name of ['spine', 's1', 'lArm', 'rArm', 'lFore', 'rFore', 'lHand', 'rHand']) {
-    assert(rig[name], `soldier.glb is missing ${name}`);
+    assert(rig[name], `kyx-player.glb is missing ${name}`);
   }
 
   applyProductionTorsoLayers(rig, armor, spec.reload || 0, spec.swap || 0);
@@ -252,7 +253,11 @@ function measure(spec, armorName, armor, def) {
   // Check the complete gun mesh, not only its origin. These volumes follow the
   // live skeleton and deliberately include the armored shoulder pocket. A
   // stock may touch that pocket, but it may not pass through it or the chest.
-  const shoulderRadius = 0.125 * armor.scale;
+  // The KYX GLB's shoulder bone sits near the deltoid centre and its compact
+  // armor shell is ~7cm deep. The legacy Soldier rig used a much broader
+  // synthetic 12.5cm pocket; applying that volume to KYX falsely labels a
+  // correctly seated stock as being 5-8cm inside the body.
+  const shoulderRadius = (AUTHORED_KYX ? 0.045 : 0.125) * armor.scale;
   const torsoCentre = shoulderMid.clone().add(
     new THREE.Vector3(0, -0.205 * armor.scale, 0.018)
   );
@@ -299,7 +304,10 @@ function measure(spec, armorName, armor, def) {
 }
 
 const firearms = WEAPONS.filter((def) => def.kind !== 'melee');
-const results = firearms.flatMap((def) => Object.entries(ARMORS).flatMap(([name, armor]) =>
+// The Blender-authored KYX character is the default Vanguard silhouette. The
+// other legacy Soldier scale variants are not constructed from this GLB.
+const activeArmors = AUTHORED_KYX ? { assault: ARMORS.assault } : ARMORS;
+const results = firearms.flatMap((def) => Object.entries(activeArmors).flatMap(([name, armor]) =>
   CASES.map((spec) => measure(spec, name, armor, def))
 ));
 const EXPECTED_CARRY_FAMILY = Object.freeze({

@@ -44,7 +44,7 @@ export class Avatar {
     this.scene = scene;
     this.group = buildPreviewCharacter(
       opts.skin || null, opts.armorTypeId || 'vanguard', null,
-      { allowHuman: opts.allowHuman ?? false });
+      { allowHuman: opts.allowHuman ?? true });
     this.isHuman = !!this.group.userData?.isHuman;
     this.rig = this.isHuman ? null : rigCharacterLimbs(this.group);
     const modelScale = Number.isFinite(opts.modelScale) ? opts.modelScale : 1;

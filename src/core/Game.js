@@ -38,7 +38,7 @@ import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
-import { isHumanSoldierReady } from '../player/HumanSoldier.js';
+import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
 import { AuthNetBridge, authNetTarget, authNetTargets } from '../net/AuthNetBridge.js';
@@ -353,6 +353,7 @@ export class Game {
     });
     const stages = [
       ['weapons', (ready) => { onWeaponModelsReady(ready); preloadWeaponModels(); }],
+      ['player', preloadHumanSoldier],
       ['armor', preloadSpartanModel],
     ];
     // Loading every GLB and the 6 MB animation library simultaneously caused
@@ -884,7 +885,9 @@ export class Game {
     if (armorTypeId !== undefined) this.selectedArmorType = armorTypeId;
     if (armorSkinId !== undefined) this.selectedArmorSkin = getArmorSkin(armorSkinId);
     this.world.scene.remove(this.previewCharacter);
-    this.previewCharacter = buildPreviewCharacter(this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin);
+    this.previewCharacter = buildPreviewCharacter(
+      this.selectedSkin, this.selectedArmorType, this.selectedArmorSkin, { allowHuman: true }
+    );
     this.previewCharacter.position.copy(this.world.previewPedestalPos);
     this.previewCharacter.visible = true;
     this.world.scene.add(this.previewCharacter);
@@ -897,7 +900,7 @@ export class Game {
     const wasVisible = preserveVisibility && !!this._playerBody?.visible;
     if (this._playerBody) this.world.scene.remove(this._playerBody);
     this._playerBody = buildPreviewCharacter(
-      this.selectedSkin, armorTypeId || 'vanguard', this.selectedArmorSkin
+      this.selectedSkin, armorTypeId || 'vanguard', this.selectedArmorSkin, { allowHuman: true }
     );
     // The human Soldier animates through its skeleton; connected arena bodies
     // use the shared limb-pivot rig and full-mesh RifleCarry solver.

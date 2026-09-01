@@ -1,4 +1,4 @@
-// Playback calibration measured from public/soldier.glb. At 1x playback the
+// Playback calibration measured from public/kyx-player.glb. At 1x playback the
 // planted feet travel beneath the body at roughly these world speeds.
 export const HUMAN_CLIP_SPEED = Object.freeze({
   walk: 1.70,
@@ -7,16 +7,16 @@ export const HUMAN_CLIP_SPEED = Object.freeze({
 
 // The Walk and Run clips do not put the same planted foot at the same
 // normalized time. These origins are measured from both ToeBase contact minima
-// in public/soldier.glb (right contact averaged with left contact minus 0.5).
+// in public/kyx-player.glb (right contact averaged with left contact minus 0.5).
 // Convert through this shared contact phase when changing clips so a planted
 // foot stays planted through the crossfade.
 export const HUMAN_PHASE_ORIGIN = Object.freeze({
-  walk: 0.29792,
-  run: 0.11111,
+  walk: 0.70278,
+  run: 0.68472,
 });
 
 // Additive upper-leg rotation needed once cadence reaches its believable cap.
-// These gains are measured against public/soldier.glb: the negative sine sign
+// These gains are measured against public/kyx-player.glb: the negative sine sign
 // extends each planted foot's rearward travel. Calf warping is intentionally
 // omitted because it shortens that travel and pushes the toes through the floor.
 export const HUMAN_STRIDE_WARP = Object.freeze({

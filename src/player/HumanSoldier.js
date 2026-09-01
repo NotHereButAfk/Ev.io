@@ -51,10 +51,9 @@ export function preloadHumanSoldier(onLoad) {
   if (_template) { onLoad?.(); return; }
   if (_loading) return;
   _loading = true;
-  // Optional presentation rig only. Live players/bots use HeroBody directly;
-  // keep this fallback on the original licensed soldier asset instead of the
-  // rejected block mannequin export.
-  new GLTFLoader().load('/soldier.glb',
+  // Blender-authored KYX warrior: continuous skinned anatomy, fitted armor,
+  // and the production locomotion/action clips live in one runtime asset.
+  new GLTFLoader().load('/kyx-player.glb',
     (gltf) => {
       gltf.scene.traverse((o) => {
         if (o.isMesh) {
@@ -556,7 +555,11 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     // Past the believable cadence cap, extend the authored stride at the
     // thighs. The sign is calibrated against the real Run clip so the planted
     // foot travels farther backwards; bending the calves here causes toe drag.
-    if (_grounded && (_locName === 'walk' || _locName === 'run') && _strideScale > 1.001) {
+    // The KYX Blender clips already contain their complete leg arcs. Applying
+    // the legacy Soldier thigh warp on top of them can over-rotate a planted
+    // leg by hundreds of degrees at the loop seam, producing folded bots.
+    if (!authoredArmor && _grounded
+        && (_locName === 'walk' || _locName === 'run') && _strideScale > 1.001) {
       const stride = humanStrideWarpAngle(_locName, _strideScale, gaitPhase)
         * (1 - _slideT) * (1 - _crouchT * 0.45);
       if (B.lLeg)  B.lLeg.quaternion.multiply(_q[0].setFromAxisAngle(_AX_X,  stride));

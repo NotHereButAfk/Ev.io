@@ -50,19 +50,19 @@ globalThis.ProgressEvent ??= class ProgressEvent {
   }
 };
 
-const bytes = fs.readFileSync(new URL('../public/soldier.glb', import.meta.url));
+const bytes = fs.readFileSync(new URL('../public/kyx-player.glb', import.meta.url));
 const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 const gltf = await new Promise((resolve, reject) => {
   new GLTFLoader().parse(buffer, '', resolve, reject);
 });
 const walk = gltf.animations.find((clip) => clip.name === 'Walk');
-assert(walk, 'soldier.glb is missing its Walk clip');
+assert(walk, 'kyx-player.glb is missing its Walk clip');
 
 const mixer = new THREE.AnimationMixer(gltf.scene);
 mixer.clipAction(walk).play();
 const foot = gltf.scene.getObjectByName('mixamorigLeftToeBase')
   || gltf.scene.getObjectByName('mixamorigLeftFoot');
-assert(foot, 'soldier.glb is missing its left foot bones');
+assert(foot, 'kyx-player.glb is missing its left foot bones');
 
 const samples = [];
 const point = new THREE.Vector3();

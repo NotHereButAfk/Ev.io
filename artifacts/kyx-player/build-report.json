@@ -1,0 +1,25 @@
+{
+  "source": "C:\\Users\\nothe\\Documents\\Codex\\2026-08-11\\pl\\work\\performance-main\\.codex-worktrees\\spectator-round-bot-fix\\public\\vendor\\quaternius\\universal-animation-library.glb",
+  "glb": "C:\\Users\\nothe\\Documents\\Codex\\2026-08-11\\pl\\work\\performance-main\\.codex-worktrees\\spectator-round-bot-fix\\public\\kyx-player.glb",
+  "blend": "C:\\Users\\nothe\\Documents\\Codex\\2026-08-11\\pl\\work\\performance-main\\.codex-worktrees\\spectator-round-bot-fix\\artifacts\\kyx-player\\kyx-warrior.blend",
+  "height": 1.8287,
+  "actions": [
+    "CrouchIdle",
+    "CrouchWalk",
+    "Death",
+    "Fire",
+    "Idle",
+    "JumpLand",
+    "JumpLoop",
+    "JumpStart",
+    "Reload",
+    "Run",
+    "SwordAttack",
+    "SwordIdle",
+    "TPose",
+    "Walk"
+  ],
+  "armorPieces": 47,
+  "bones": 53,
+  "triangles": 22683
+}

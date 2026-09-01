@@ -319,6 +319,7 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   const swapBell = swap > 0 ? Math.sin(Math.PI * swap) : 0;
   const rack = reload > 0 ? Math.exp(-Math.pow((reload - 0.70) / 0.055, 2)) : 0;
   const carry = humanCarryPose(weapon);
+  const authoredKyx = !!body.getObjectByName?.('KYX_HelmetShell');
   weapon.userData.humanCarryFamily = carry.family;
 
   const anchor = V[18];
@@ -360,7 +361,10 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
     ));
     weapon.quaternion.multiply(Q[4]);
     weapon.position.y -= (reloadBell * 0.13 + swapBell * 0.25) * rigScale;
-    weapon.position.x -= reloadBell * 0.05 * rigScale;
+    // Keep long KYX weapons beside the anatomical chest during the magazine
+    // seat; the legacy rig needed a deeper inward sweep because its torso and
+    // shoulder spacing were different.
+    weapon.position.x -= reloadBell * (authoredKyx ? 0.025 : 0.05) * rigScale;
   }
   if (rack) weapon.position.z += rack * 0.045 * rigScale;
   if (recoil) weapon.position.z += recoil * 0.035 * rigScale;

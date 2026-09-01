@@ -144,6 +144,38 @@ def frustum(name, loc, width_top, width_bottom, height, depth, mat, bevel=0.014)
     return mark(obj, "armor")
 
 
+def front_panel(name, loc, points, depth, mat, bevel=0.008):
+    """Extrude an angular X/Z silhouette toward the camera-facing -Y side.
+
+    EV-style armor reads from overlapping silhouettes rather than cuboids.  A
+    small two-dimensional outline gives chest, helmet and leg plates a fitted
+    shape while keeping the mesh inexpensive enough for a browser match.
+    """
+    half = depth * 0.5
+    count = len(points)
+    verts = [(x, -half, z) for x, z in points] + [(x, half, z) for x, z in points]
+    faces = [tuple(range(count - 1, -1, -1)), tuple(range(count, count * 2))]
+    for i in range(count):
+        j = (i + 1) % count
+        faces.append((i, j, count + j, count + i))
+    mesh = bpy.data.meshes.new(name + "_Mesh")
+    mesh.from_pydata(verts, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.location = loc
+    set_material(obj, mat)
+    apply_bevel(obj, min(bevel, depth * 0.24), 2)
+    smooth(obj)
+    return mark(obj, "armor")
+
+
+def front_bar(name, loc, length, width, angle, depth, mat):
+    obj = rounded_box(name, loc, (length, depth, width), mat, min(width * 0.24, depth * 0.2))
+    obj.rotation_euler[1] = angle
+    return obj
+
+
 def bone_world(armature, bone_name, factor=0.5):
     bone = armature.data.bones.get(bone_name)
     if not bone:
@@ -160,10 +192,11 @@ def bone_vector(armature, bone_name):
 
 
 def parent_to_bone(obj, armature, bone_name):
-    # Bake authored transforms before transferring the mannequin's nearby skin
-    # weights. Nearest-surface weights keep plates attached to the continuous
-    # body through hips, knees, shoulders and the curved running poses instead
-    # of turning every plate into a disconnected single-bone robot segment.
+    # Bake authored transforms, then give every hard-surface piece one rigid
+    # deform group.  Nearest-surface weight transfer looked attractive on paper
+    # but blended gauntlets across elbow/finger groups and folded shin/boot
+    # plates into white blobs during Idle/Run.  Armor is rigid in real life too:
+    # the black undersuit bends while each plate rides its anatomical bone.
     # `transform_apply(location=True)` resets generated primitive locations in
     # Blender 5 without preserving their intended world-space vertex offset.
     # Bake the complete matrix into the mesh explicitly instead.
@@ -173,21 +206,10 @@ def parent_to_bone(obj, armature, bone_name):
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
 
-    if BODY_SOURCE is not None:
-        transfer = obj.modifiers.new("KYX Skin Weights", "DATA_TRANSFER")
-        transfer.object = BODY_SOURCE
-        transfer.use_vert_data = True
-        transfer.data_types_verts = {"VGROUP_WEIGHTS"}
-        transfer.vert_mapping = "POLYINTERP_NEAREST"
-        transfer.layers_vgroup_select_src = "ALL"
-        transfer.layers_vgroup_select_dst = "NAME"
-        bpy.ops.object.modifier_apply(modifier=transfer.name)
-
-    # Distant accessories (for example the outer backpack face) may have no
-    # transferable group. Keep a deterministic rigid fallback for those.
-    if not obj.vertex_groups:
-        group = obj.vertex_groups.new(name=bone_name)
-        group.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
+    for group in list(obj.vertex_groups):
+        obj.vertex_groups.remove(group)
+    group = obj.vertex_groups.new(name=bone_name)
+    group.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
     modifier = obj.modifiers.new("KYX Rig", "ARMATURE")
     modifier.object = armature
     obj.parent = armature
@@ -294,7 +316,7 @@ if armature is None:
 armature.name = "KYX_Warrior_Rig"
 armature.data.name = "KYX_Warrior_Skeleton"
 armature["kyx_authored_armor"] = True
-armature["kyx_character_version"] = 2
+armature["kyx_character_version"] = 3
 mark(armature, "rig")
 
 armature.data.pose_position = "REST"
@@ -317,13 +339,37 @@ for obj in body_objects:
 rename_rig(armature)
 actions = keep_game_actions()
 
-undersuit = material("KYX_Undersuit", (0.026, 0.033, 0.043), metallic=0.05, roughness=0.78)
-armor = material("KYX_Armor", (0.16, 0.20, 0.24), metallic=0.52, roughness=0.31)
-armor_dark = material("KYX_ArmorDark", (0.035, 0.048, 0.065), metallic=0.38, roughness=0.44)
-accent = material("KYX_Orange", (0.94, 0.29, 0.035), metallic=0.28, roughness=0.32,
-                  emission=(0.48, 0.07, 0.005), emission_strength=0.22)
-visor = material("KYX_Visor", (0.015, 0.34, 0.42), metallic=0.22, roughness=0.18,
-                 emission=(0.02, 0.74, 0.92), emission_strength=3.2)
+
+def offset_action_hips_vertical(action_name, amount):
+    """Move a locomotion clip onto the shared ground plane without rebaking."""
+    action = bpy.data.actions.get(action_name)
+    if not action or not action.slots or not action.layers:
+        return
+    strip = action.layers[0].strips[0]
+    bag = strip.channelbag(action.slots[0])
+    if not bag:
+        return
+    for curve in bag.fcurves:
+        # Mixamo's hips bone points along local Y. Blender scene Z is vertical,
+        # but editing the pose-bone Z channel pushes this rig diagonally.
+        if curve.data_path == 'pose.bones["mixamorigHips"].location' and curve.array_index == 1:
+            for key in curve.keyframe_points:
+                key.co[1] += amount
+                key.handle_left[1] += amount
+                key.handle_right[1] += amount
+
+
+# The source sprint dips the toes about 5.7cm below Idle/Walk. Normalizing its
+# hips baseline prevents a visible whole-body drop at the Walk→Run crossfade.
+offset_action_hips_vertical("Run", 0.057)
+
+undersuit = material("KYX_Undersuit", (0.018, 0.022, 0.028), metallic=0.02, roughness=0.82)
+armor = material("KYX_Armor", (0.66, 0.68, 0.75), metallic=0.18, roughness=0.36)
+armor_dark = material("KYX_ArmorDark", (0.055, 0.062, 0.075), metallic=0.14, roughness=0.52)
+accent = material("KYX_Orange", (1.0, 0.29, 0.015), metallic=0.12, roughness=0.34,
+                  emission=(0.62, 0.055, 0.002), emission_strength=0.16)
+visor = material("KYX_Visor", (0.74, 0.96, 0.04), metallic=0.05, roughness=0.20,
+                 emission=(0.60, 1.0, 0.015), emission_strength=3.6)
 
 for obj in body_objects:
     set_material(obj, undersuit)
@@ -440,10 +486,196 @@ for side in (-1, 1):
 pieces.append(add(frustum("KYX_WaistTab", P(0, -0.115, 0.79), S(0.135), S(0.09), S(0.17), S(0.035), armor_dark, S(0.010)), "mixamorigHips"))
 pieces.append(add(rounded_box("KYX_WaistMark", P(0, -0.158, 0.80), (S(0.035), S(0.012), S(0.13)), accent, S(0.003)), "mixamorigHips"))
 
+# Version 3 rebuild.  The earlier pass proved that simply stacking rounded
+# boxes over a mannequin produces the toy-robot silhouette the player rejected.
+# Remove that pass and author a fitted, faceted warrior shell: the black body is
+# continuous, joint gaps stay hidden, and the light/orange plates follow the
+# same large shapes visible in the EV.IO default reference without extracting
+# or redistributing its proprietary mesh.
+for old_piece in list(pieces):
+    try:
+        old_name = old_piece.name
+    except ReferenceError:
+        # Several legacy calls appended add(...) twice.  The duplicate pointer
+        # becomes invalid after the first instance is removed.
+        continue
+    if old_name in bpy.data.objects:
+        bpy.data.objects.remove(old_piece, do_unlink=True)
+pieces.clear()
+
+
+def fitted(obj, bone):
+    return add(obj, bone)
+
+
+# Tapered carrier and split pectorals.  Their lower points interlock with the
+# abdomen instead of ending in a rectangular shelf.
+fitted(frustum("KYX_CoreVest", P(0, 0.012, 1.25), S(0.39), S(0.26), S(0.42), S(0.17), armor_dark, S(0.015)), "mixamorigSpine2")
+for side, tag in ((-1, "L"), (1, "R")):
+    mirrored = lambda pts: [(S(x * side), S(z)) for x, z in pts]
+    fitted(front_panel(
+        f"KYX_Pectoral_{tag}", P(S(0.083 * side) / scale, -0.096, 1.335),
+        mirrored([(-0.082, 0.080), (0.052, 0.102), (0.088, 0.026),
+                  (0.058, -0.084), (0.004, -0.122), (-0.074, -0.056)]),
+        S(0.052), armor, S(0.009)), "mixamorigSpine2")
+    fitted(front_panel(
+        f"KYX_ChestOrange_{tag}", P(S(0.042 * side) / scale, -0.128, 1.285),
+        mirrored([(-0.026, 0.050), (0.042, 0.070), (0.049, -0.048),
+                  (0.006, -0.087), (-0.034, -0.056)]),
+        S(0.025), accent, S(0.005)), "mixamorigSpine2")
+
+# Floating collar blades are a defining shoulder-to-neck transition in the
+# reference.  They sit high but stay slim enough to clear the rifle stock.
+for side, tag in ((-1, "L"), (1, "R")):
+    fitted(front_panel(
+        f"KYX_Collar_{tag}", P(0.105 * side, -0.075, 1.475),
+        [(S(-0.070), S(-0.038)), (S(0.072), S(-0.055)),
+         (S(0.064), S(0.060)), (S(-0.028), S(0.085))],
+        S(0.065), accent, S(0.008)), "mixamorigSpine2")
+
+# Articulated abdomen: dark diagonal gaps remain visible between plates and
+# make the waist bend like armor worn by a person, not a rigid appliance.
+for idx, (z, width) in enumerate(((1.135, 0.245), (1.065, 0.225), (0.995, 0.205))):
+    fitted(front_panel(
+        f"KYX_AbPlate_{idx+1}", P(0, -0.102, z),
+        [(S(-width * 0.50), S(-0.030)), (S(width * 0.50), S(-0.030)),
+         (S(width * 0.42), S(0.030)), (S(-width * 0.42), S(0.030))],
+        S(0.045), armor if idx != 1 else armor_dark, S(0.006)), "mixamorigSpine1")
+fitted(rounded_box("KYX_AbSignal", P(0, -0.137, 1.065), (S(0.034), S(0.015), S(0.034)), visor, S(0.005)), "mixamorigSpine1")
+
+# Athletic pelvis: one fitted belt, a central groin plate, and independent hip
+# wings.  The thighs begin under the shell, so there is no visible ball joint.
+fitted(frustum("KYX_Belt", P(0, 0.0, 0.915), S(0.30), S(0.25), S(0.105), S(0.16), armor_dark, S(0.012)), "mixamorigHips")
+fitted(front_panel("KYX_GroinPlate", P(0, -0.108, 0.835),
+                   [(S(-0.074), S(0.095)), (S(0.074), S(0.095)),
+                    (S(0.055), S(-0.105)), (0, S(-0.145)), (S(-0.055), S(-0.105))],
+                   S(0.055), armor, S(0.009)), "mixamorigHips")
+for side, tag in ((-1, "L"), (1, "R")):
+    fitted(front_panel(f"KYX_HipWing_{tag}", P(0.165 * side, -0.015, 0.86),
+                       [(S(-0.045), S(0.095)), (S(0.050), S(0.070)),
+                        (S(0.038), S(-0.110)), (S(-0.025), S(-0.135))],
+                       S(0.105), accent, S(0.009)), "mixamorigHips")
+
+# Compact faceted helmet.  The black hood supplies a continuous neck seal; the
+# pale crown is narrow, orange cheek rails frame the face, and the three neon
+# bars form the unmistakable V visor rather than a giant horizontal screen.
+head_center = bone_world(armature, "mixamorigHead", 0.58)
+fitted(ellipsoid("KYX_HelmetHood", head_center + Vector((0, S(0.018), 0)),
+                 (S(0.226), S(0.202), S(0.258)), armor_dark, segments=20, rings=10), "mixamorigHead")
+# A fitted ceramic crown covers the skull in every view.  The former front-only
+# panel left a black bald dome from three-quarter and rear angles, which made a
+# human head look unfinished rather than helmeted.
+fitted(ellipsoid("KYX_HelmetShell", head_center + Vector((0, S(0.018), S(0.072))),
+                 (S(0.238), S(0.220), S(0.270)), armor, segments=24, rings=12), "mixamorigHead")
+fitted(front_panel("KYX_HelmetCrown", head_center + Vector((0, S(-0.108), S(0.030))),
+                   [(S(-0.105), S(-0.042)), (S(-0.100), S(0.086)),
+                    (S(-0.060), S(0.158)), (S(0.060), S(0.158)),
+                    (S(0.100), S(0.086)), (S(0.105), S(-0.042)),
+                    (S(0.064), S(-0.074)), (S(-0.064), S(-0.074))],
+                   S(0.090), armor, S(0.010)), "mixamorigHead")
+for side, tag in ((-1, "L"), (1, "R")):
+    fitted(front_panel(f"KYX_HelmetCheek_{tag}", head_center + Vector((S(0.083 * side), S(-0.128), S(-0.045))),
+                       [(S(-0.036), S(0.076)), (S(0.041), S(0.052)),
+                        (S(0.030), S(-0.082)), (S(-0.018), S(-0.102))],
+                       S(0.048), accent, S(0.007)), "mixamorigHead")
+fitted(front_bar("KYX_VisorBrow", head_center + Vector((0, S(-0.170), S(0.020))),
+                 S(0.132), S(0.025), 0, S(0.018), visor), "mixamorigHead")
+fitted(front_bar("KYX_VisorLeft", head_center + Vector((S(-0.035), S(-0.171), S(-0.025))),
+                 S(0.095), S(0.022), math.radians(-52), S(0.018), visor), "mixamorigHead")
+fitted(front_bar("KYX_VisorRight", head_center + Vector((S(0.035), S(-0.171), S(-0.025))),
+                 S(0.095), S(0.022), math.radians(52), S(0.018), visor), "mixamorigHead")
+fitted(front_panel("KYX_Chin", head_center + Vector((0, S(-0.143), S(-0.112))),
+                   [(S(-0.068), S(0.045)), (S(0.068), S(0.045)),
+                    (S(0.042), S(-0.052)), (0, S(-0.075)), (S(-0.042), S(-0.052))],
+                   S(0.050), armor_dark, S(0.007)), "mixamorigHead")
+
+# Raised orange pauldrons with a pale lower insert.  Unlike the old spheres,
+# these have a shoulder line and never expose a chrome-ball joint.
+for side, label in ((-1, "Left"), (1, "Right")):
+    shoulder_bone = f"mixamorig{label}Shoulder"
+    upper_bone = f"mixamorig{label}Arm"
+    fore_bone = f"mixamorig{label}ForeArm"
+    shoulder_loc = bone_world(armature, upper_bone, 0.10) + Vector((S(0.024 * side), 0, S(0.035)))
+    # A compressed ellipsoid follows the deltoid instead of presenting a
+    # vertical orange box.  It stays rigid to the shoulder while the human arm
+    # remains visible beneath it.
+    fitted(ellipsoid(f"KYX_Pauldron_{label}", shoulder_loc,
+                     (S(0.150), S(0.112), S(0.112)), accent,
+                     rot=(0, math.radians(10 * side), math.radians(-8 * side)),
+                     segments=16, rings=8), shoulder_bone)
+    fitted(front_panel(f"KYX_PauldronInsert_{label}", shoulder_loc + Vector((0, S(-0.080), S(-0.025))),
+                       [(S(-0.046), S(0.046)), (S(0.046), S(0.046)),
+                        (S(0.038), S(-0.046)), (S(-0.038), S(-0.046))],
+                       S(0.025), armor, S(0.005)), shoulder_bone)
+    # Keep the continuous mannequin's anatomical black arm exposed.  The old
+    # long gauntlet shells were authored in the source T-pose and compressed
+    # into floating bulbs when the imported idle clip lowered the arms.  The
+    # shoulder armor and black gloves now preserve the clean human silhouette;
+    # weapon-specific forearm coverage comes from the carried gun itself.
+
+# Legs are built as fitted shells over the continuous mannequin instead of
+# separated blocks.  The knee pads overlap both segments and the boot begins at
+# the ankle, eliminating the floating plates and robotic ball knees.
+for side, label in ((-1, "Left"), (1, "Right")):
+    thigh_bone = f"mixamorig{label}UpLeg"
+    shin_bone = f"mixamorig{label}Leg"
+    foot_bone = f"mixamorig{label}Foot"
+    pieces.append(limb_shell(f"KYX_ThighShell_{label}", armature, thigh_bone,
+                              S(0.072), S(0.061), 0.78, armor, front_offset=S(0.010)))
+    thigh_mid = bone_world(armature, thigh_bone, 0.48) + Vector((S(0.070 * side), S(-0.045), 0))
+    thigh_rail = rounded_box(f"KYX_ThighRail_{label}", thigh_mid,
+                             (S(0.035), S(0.032), S(0.255)), accent, S(0.007))
+    align_long_axis(thigh_rail, bone_vector(armature, thigh_bone))
+    fitted(thigh_rail, thigh_bone)
+    knee_loc = bone_world(armature, shin_bone, 0.035) + Vector((0, S(-0.060), S(0.005)))
+    fitted(front_panel(f"KYX_Knee_{label}", knee_loc,
+                       [(S(-0.062), S(0.055)), (S(0.062), S(0.055)),
+                        (S(0.052), S(-0.060)), (0, S(-0.085)), (S(-0.052), S(-0.060))],
+                       S(0.080), armor_dark, S(0.010)), shin_bone)
+    pieces.append(limb_shell(f"KYX_ShinShell_{label}", armature, shin_bone,
+                              S(0.064), S(0.056), 0.78, armor, front_offset=S(0.008)))
+    shin_mid = bone_world(armature, shin_bone, 0.56) + Vector((S(0.060 * side), S(-0.045), 0))
+    shin_rail = rounded_box(f"KYX_ShinRail_{label}", shin_mid,
+                            (S(0.029), S(0.029), S(0.250)), accent, S(0.006))
+    align_long_axis(shin_rail, bone_vector(armature, shin_bone))
+    fitted(shin_rail, shin_bone)
+    ankle = bone_world(armature, foot_bone, 0.08) + Vector((0, S(-0.018), S(0.012)))
+    fitted(ellipsoid(f"KYX_AnkleCuff_{label}", ankle,
+                     (S(0.145), S(0.155), S(0.105)), armor_dark, segments=16, rings=8), foot_bone)
+    foot_mid = bone_world(armature, foot_bone, 0.62) + Vector((0, S(-0.010), S(0.025)))
+    boot = rounded_box(f"KYX_Boot_{label}", foot_mid,
+                       (S(0.145), S(0.235), S(0.090)), armor, S(0.018))
+    align_long_axis(boot, bone_vector(armature, foot_bone))
+    fitted(boot, foot_bone)
+    boot_band = rounded_box(f"KYX_BootBand_{label}", foot_mid + Vector((0, S(-0.012), S(0.040))),
+                            (S(0.154), S(0.045), S(0.022)), accent, S(0.005))
+    fitted(boot_band, foot_bone)
+
+# Slim rear pack closes the silhouette without making the torso hunch forward.
+fitted(frustum("KYX_Backpack", P(0, 0.132, 1.28), S(0.175), S(0.145), S(0.25), S(0.052), armor_dark, S(0.012)), "mixamorigSpine2")
+for side, tag in ((-1, "L"), (1, "R")):
+    fitted(rounded_box(f"KYX_BackRail_{tag}", P(0.074 * side, 0.190, 1.31),
+                       (S(0.032), S(0.022), S(0.220)), accent, S(0.006)), "mixamorigSpine2")
+
 # Export only the production character hierarchy.
 for obj in bpy.context.scene.objects:
     obj.select_set(bool(obj.get("kyx_export")))
 bpy.context.view_layer.objects.active = armature
+# Armor is authored against REST, but animation sampling must evaluate POSE.
+# Exporting while the armature remained in REST produced correctly named clips
+# whose every bone collapsed to two identical keys (static/folded bots).
+armature.data.pose_position = "POSE"
+# Quaternius' character faces Blender -Y, which arrives in Three.js as local
+# +Z. Armature object transforms are consumed by glTF skin export, so a plain
+# armature rotation does not survive as a runtime forward-axis correction.
+# Put the complete rig under an exported empty; that root node is preserved and
+# turns model plus animation together onto KYX's local -Z gameplay forward.
+forward_root = bpy.data.objects.new("KYX_ForwardRoot", None)
+bpy.context.collection.objects.link(forward_root)
+forward_root.rotation_euler[2] = math.pi
+mark(forward_root, "root")
+forward_root.select_set(True)
+armature.parent = forward_root
 
 bpy.ops.export_scene.gltf(
     filepath=str(OUT_GLB),
@@ -510,7 +742,13 @@ bpy.context.scene.camera = cam
 mark(cam, "preview", export=False)
 
 scene = bpy.context.scene
-scene.render.engine = "BLENDER_EEVEE"
+# The Windows headless WGL path can crash after a successful glTF export when
+# EEVEE asks for a pixel format.  Use Blender's CPU renderer for deterministic
+# CI/review plates; this does not affect the exported realtime materials.
+scene.render.engine = "CYCLES"
+scene.cycles.device = "CPU"
+scene.cycles.samples = 16
+scene.cycles.use_denoising = False
 scene.render.resolution_x = 560
 scene.render.resolution_y = 760
 scene.render.resolution_percentage = 100
@@ -521,8 +759,8 @@ scene.render.resolution_percentage = 100
 
 target = Vector((cx, cy, z0 + S(1.02)))
 views = {
-    "front": Vector((cx, cy - S(4.0), z0 + S(1.13))),
-    "quarter": Vector((cx + S(2.75), cy - S(3.55), z0 + S(1.20))),
+    "front": Vector((cx, cy + S(4.0), z0 + S(1.13))),
+    "quarter": Vector((cx + S(2.75), cy + S(3.55), z0 + S(1.20))),
     "side": Vector((cx + S(4.15), cy, z0 + S(1.15))),
 }
 for name, location in views.items():

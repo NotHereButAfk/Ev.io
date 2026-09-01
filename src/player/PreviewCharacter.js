@@ -379,6 +379,13 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin = null, opts = {}) {
+  // The default Vanguard is authored and animated in Blender. Prefer it before
+  // the procedural roster check so gameplay callers that explicitly opt in do
+  // not silently fall back to the old block-built body.
+  if (armorTypeId === 'vanguard' && opts.allowHuman === true && isHumanSoldierReady()) {
+    const human = buildHumanSoldier(skin, armorTypeId, armorSkin);
+    if (human) return human;
+  }
   // Low-poly cel-shaded models own their whole look (their own toon materials +
   // outlines. The connected HeroBody is the default gameplay chassis: one
   // continuous skinned surface with integrated helmet, chest and leg armor,

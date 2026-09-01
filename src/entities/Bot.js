@@ -165,10 +165,9 @@ export class Bot {
     const skin = DEFAULT_BOT_SKIN;
     this.armorTypeId = armorTypeId;
     this.skin = skin;
-    // Bots use the same connected arena-exosuit family as the player. Keep the
-    // retired layered Soldier path explicitly disabled so an asset-load race
-    // cannot put a gun back inside the older bulky vest/glove silhouette.
-    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: false });
+    // Bots use the exact Blender-authored default warrior and its native rig.
+    // If the asset is still loading, the builder retains its safe fallback.
+    this.mesh = buildPreviewCharacter(skin, armorTypeId, null, { allowHuman: true });
     this._isHuman = !!this.mesh.userData?.isHuman;
     this.bodyMat = this.mesh.userData.primaryMat;
 
