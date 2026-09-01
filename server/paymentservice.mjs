@@ -1,13 +1,9 @@
 import { randomUUID } from 'crypto';
-import { ARMOR_SKINS } from '../src/player/ArmorSkins.js';
-import { WEAPON_SKINS } from '../src/weapons/WeaponSkins.js';
+import { STORE_ITEMS } from './storecatalog.mjs';
 
 const PRICE = { common: '20.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
 const TERMS_VERSION = '2026-08-31';
-const items = new Map([
-  ...ARMOR_SKINS.filter((skin) => !skin.starter).map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'character', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
-  ...WEAPON_SKINS.map((skin) => [skin.id, { id: skin.id, name: skin.name, kind: 'weapon', rarity: skin.rarity, price: PRICE[skin.rarity] }]),
-]);
+const items = new Map(STORE_ITEMS.map((skin) => [skin.id, { ...skin, price: PRICE[skin.rarity] }]));
 
 const send = (res, status, value) => {
   const payload = JSON.stringify(value);
