@@ -1179,6 +1179,12 @@ export class Game {
     }
     this._authoritativeMapTarget = mapId;
     this._pendingMapId = mapId;
+    // A server has now been selected. Replace the JOINING card with the actual
+    // authoritative arena card even when the preview happened to use the same
+    // map, so connection and map preparation remain two visible phases.
+    if (initial) {
+      this._showMapLoading(this._joiningModeId || this._mode?.id || 'deathmatch', mapId, { autoHide: false });
+    }
     if (mapId === this.world.currentMapId && !this._authoritativeMapTransitioning) {
       return Promise.resolve(this.world.currentMap);
     }
@@ -1194,7 +1200,7 @@ export class Game {
       try {
         while (this.world.currentMapId !== this._authoritativeMapTarget) {
           const target = this._authoritativeMapTarget;
-          await this._activateMap(target);
+          await this._activateMap(target, { deferFinish: initial });
         }
         this._authNet?.client?.resetPresentation?.();
         this.weaponSystem?.resetMotionState?.();
@@ -1384,6 +1390,7 @@ export class Game {
   }
 
   async _prepareAuthoritativeMatch(name, modeId) {
+    this._joiningModeId = modeId;
     this._showServerJoining(modeId);
     const match = await findAvailableMatch(authNetTargets());
     if (!match?.url) throw new Error('No public server is available');
@@ -1406,10 +1413,12 @@ export class Game {
     }
   }
 
-  _finishServerJoining() {
-    const elapsed = performance.now() - (this._serverJoinShownAt || 0);
+  async _finishServerJoining() {
     clearTimeout(this._serverJoinTimer);
-    this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), Math.max(0, 1800 - elapsed));
+    this._setMapLoadingPhase('Arena ready — joining match...', 100, true);
+    // The authoritative bridge awaits this fade before resolving readyPromise,
+    // so _startGame cannot spawn the player behind a still-loading arena.
+    await this._finishMapLoading(900);
   }
 
   _showMapLoading(modeId, mapId = this.world.currentMapId, { autoHide = true } = {}) {
@@ -1533,7 +1542,7 @@ export class Game {
     this.menu.showMain();
   }
 
-  async _activateMap(mapId) {
+  async _activateMap(mapId, { deferFinish = false } = {}) {
     if (!mapId || mapId === this.world.currentMapId) {
       this._pendingMapId = null;
       return this.world.currentMap;
@@ -1548,7 +1557,8 @@ export class Game {
       if (this.state === 'playing') {
         this.pickupSystem = this._createPickupSystem();
       }
-      await this._finishMapLoading(1800);
+      if (deferFinish) this._setMapLoadingPhase('Preparing spawn...', 88);
+      else await this._finishMapLoading(1800);
       this._pendingMapId = null;
       return map;
     } catch (error) {

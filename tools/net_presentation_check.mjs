@@ -86,6 +86,8 @@ ok('remote directional animation owns its scratch vector',
 const game = readFileSync(new URL('../src/core/Game.js', import.meta.url), 'utf8');
 ok('authoritative join does not spawn a duplicate local roster', /if \(expectsAuth\)[\s\S]*?botManager\.clear\(\)[\s\S]*?serverSim\.stop\(\)/.test(game));
 ok('authoritative map rotation loads immediately without a stale-map leaderboard',
-  /while \(this\.world\.currentMapId !== this\._authoritativeMapTarget\)[\s\S]*?await this\._activateMap\(target\)/.test(game));
+  /while \(this\.world\.currentMapId !== this\._authoritativeMapTarget\)[\s\S]*?await this\._activateMap\(target(?:,|\))/.test(game));
+ok('authoritative join waits for the arena-ready transition before releasing play',
+  /await game\._finishServerJoining\?\.\(\);[\s\S]*?this\.ready = true;[\s\S]*?this\._resolveReady/.test(bridge));
 
 console.log(`net presentation passed (${passed} checks)`);

@@ -134,9 +134,12 @@ export class AuthNetBridge {
     this.client.onSnapshot = () => {
       if (!this._welcomed || this.ready || this._starting) return;
       this._starting = true;
-      this._mapReady.then(() => {
+      this._mapReady.then(async () => {
+          // Do not release the ready promise on the same tick that map loading
+          // completes. Finish the explicit ARENA READY phase first; Game starts
+          // the player only after this promise resolves.
+          await game._finishServerJoining?.();
           this.ready = true;
-          game._finishServerJoining?.();
           this._resolveReady?.(this);
         }).catch((error) => {
           console.error('[map] authoritative map load failed', error);
