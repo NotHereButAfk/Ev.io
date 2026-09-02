@@ -74,19 +74,16 @@ function createTracerMesh() {
 // the worst case), and recoil moves the whole gun back toward the eye. Keeping
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
-const VIEWMODEL_Z = -0.90;
+const VIEWMODEL_Z = -0.93;
 // EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
 // the bottom of the screen: its butt exits near the lower centre/right while
 // the muzzle rises to the open space left of the reticle. The offset and cant
 // are shared by every firearm so swapping weapons never changes handedness.
-const VIEWMODEL_X = 0.10;
-const VIEWMODEL_Y = -0.40;
-// Weapon-only first person: keep the gun large and readable like the reference
-// while world/player weapons retain their physical third-person scale.
-// The rear stock is cropped from first-person Quaternius models below, so the
-// useful barrel/receiver section can stay genuinely close and large instead
-// of shrinking the complete world model to make its stock tolerable.
-const VIEWMODEL_SCALE = 2.35;
+const VIEWMODEL_X = 0.035;
+const VIEWMODEL_Y = -0.395;
+// Keep the gun and the matching first-person arms large and readable like the
+// reference while world/player weapons retain their physical third-person scale.
+const VIEWMODEL_SCALE = 1.80;
 const MELEE_VIEWMODEL_SCALE = 0.96;
 const FIREARM_CARRY_SCALE = Object.freeze({
   pistol: 0.95,
@@ -97,7 +94,13 @@ const FIREARM_CARRY_SCALE = Object.freeze({
   launcher: 0.90,
   precision: 1.08,
 });
-const VIEWMODEL_PITCH = 0.68;
+const FIREARM_MODEL_SCALE = Object.freeze({
+  // AR_3 is about 20% longer than the reference AR_1 after normalization. Its
+  // own correction keeps the M16 readable at 60-degree FOV without shrinking
+  // the correctly framed M4.
+  m16: 0.82,
+});
+const VIEWMODEL_PITCH = 0.87;
 const VIEWMODEL_YAW = 0.83;
 const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
@@ -136,7 +139,9 @@ function firearmViewmodelScale(def, aspect) {
     1,
   );
   const carry = weaponHandPose(def?.id).carry;
-  return (FIREARM_CARRY_SCALE[carry] || 1.18) * responsive;
+  return (FIREARM_CARRY_SCALE[carry] || 1.18)
+    * (FIREARM_MODEL_SCALE[def?.id] || 1)
+    * responsive;
 }
 
 function viewmodelReloadScale(aspect) {
@@ -181,76 +186,6 @@ const _adsSpecialBox = new THREE.Box3();
 const _adsPoint = new THREE.Vector3();
 const _adsCorner = new THREE.Vector3();
 const _adsInverse = new THREE.Matrix4();
-
-// The Quaternius pack uses complete world models. Their long shoulder stocks
-// are correct on remote soldiers and pickups, but become an enormous white
-// wedge when the same single-piece mesh is placed close to the first-person
-// camera. Crop only the rear portion in the viewmodel shader. Source geometry
-// is authored muzzle-forward on +X, so the stock occupies the low-X end.
-const FIRST_PERSON_REAR_CROP = Object.freeze({
-  compact: 0.16,
-  rifle: 0.30,
-  shotgun: 0.27,
-  support: 0.30,
-  launcher: 0.20,
-  precision: 0.27,
-});
-
-export function cropFirstPersonRearStock(group) {
-  if (group?.userData?.modelSource !== 'quaternius') return false;
-  const carry = weaponHandPose(group.userData.weaponId).carry;
-  const cropRatio = FIRST_PERSON_REAR_CROP[carry] || 0;
-  if (cropRatio <= 0) return false;
-
-  let minX = Infinity;
-  let maxX = -Infinity;
-  group.traverse((object) => {
-    if (!object.isMesh || !object.geometry) return;
-    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
-    const box = object.geometry.boundingBox;
-    if (!box) return;
-    minX = Math.min(minX, box.min.x);
-    maxX = Math.max(maxX, box.max.x);
-  });
-  if (!Number.isFinite(minX) || maxX - minX < 0.001) return false;
-
-  const cutoff = minX + (maxX - minX) * cropRatio;
-  const cutoffLiteral = cutoff.toFixed(6);
-  group.traverse((object) => {
-    if (!object.isMesh) return;
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    for (const material of materials) {
-      if (!material || material.userData?.firstPersonRearCrop !== undefined) continue;
-      const previousCompile = material.onBeforeCompile;
-      const previousCacheKey = material.customProgramCacheKey?.bind(material);
-      material.onBeforeCompile = function onBeforeCompile(shader, renderer) {
-        previousCompile?.call(this, shader, renderer);
-        shader.vertexShader = shader.vertexShader
-          .replace(
-            '#include <common>',
-            '#include <common>\nvarying float vKyxWeaponLongitudinal;',
-          )
-          .replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\nvKyxWeaponLongitudinal = position.x;',
-          );
-        shader.fragmentShader = shader.fragmentShader
-          .replace(
-            '#include <common>',
-            '#include <common>\nvarying float vKyxWeaponLongitudinal;',
-          )
-          .replace(
-            'void main() {',
-            `void main() {\n  if (vKyxWeaponLongitudinal < ${cutoffLiteral}) discard;`,
-          );
-      };
-      material.customProgramCacheKey = () => `${previousCacheKey?.() || ''}|kyx-rear:${cutoffLiteral}`;
-      material.userData.firstPersonRearCrop = cutoff;
-      material.needsUpdate = true;
-    }
-  });
-  return true;
-}
 
 // Measure a weapon's rear sight in its own coordinate system. Authored models
 // can provide an exact `sight_point`; otherwise optic glass is preferred and a
@@ -350,7 +285,6 @@ export function prepareFirstPersonModel(group) {
     object.renderOrder = 1000;
     object.frustumCulled = false;
   });
-  cropFirstPersonRearStock(group);
 }
 
 export class WeaponSystem {
@@ -648,35 +582,35 @@ export class WeaponSystem {
       // the entire visible arm reading as one featureless cylinder.
       const forearm = segment(
         wrist, armorEnd,
-        support ? 0.043 : 0.052,
-        support ? 0.052 : 0.067,
+        support ? 0.055 : 0.052,
+        support ? 0.074 : 0.067,
         support ? this.armPlateMat : this.gloveMat,
         8,
       );
       forearm.name = 'viewmodel_forearm';
-      // EV.IO visibly braces the handguard with the support forearm.  Keep its
-      // compact forearm shell, while the longer shoulder segment below stays
-      // hidden so it leaves the lower edge without becoming a second pole.
+      // EV.IO visibly braces the handguard with the support forearm. Keep the
+      // compact forearm shell and taper the shoulder segment into the lower
+      // edge so it reads as one bent arm rather than a disconnected glove.
       forearm.visible = true;
       arm.add(forearm);
       const upperSleeve = segment(
         armorEnd, sleeveEnd,
-        support ? 0.050 : 0.066,
-        support ? 0.058 : 0.084,
+        support ? 0.082 : 0.066,
+        support ? 0.110 : 0.084,
         this.sleeveMat,
         8,
       );
       upperSleeve.name = 'viewmodel_upper_sleeve';
-      // Preserve the authored support rig for future poses without drawing its
-      // upper sleeve into the current one-arm first-person silhouette.
-      upperSleeve.visible = !support;
+      // Both sleeves are part of the first-person silhouette; one-handed weapon
+      // poses hide the complete support arm below.
+      upperSleeve.visible = true;
       arm.add(upperSleeve);
       const elbowJoint = new THREE.Mesh(
-        new THREE.SphereGeometry(0.056, 10, 7), this.cuffMat,
+        new THREE.SphereGeometry(support ? 0.074 : 0.056, 10, 7), this.cuffMat,
       );
       elbowJoint.name = 'viewmodel_elbow';
       elbowJoint.position.copy(armorEnd);
-      elbowJoint.visible = !support;
+      elbowJoint.visible = true;
       arm.add(elbowJoint);
 
       arm.add(segment(
@@ -687,7 +621,17 @@ export class WeaponSystem {
         this.cuffMat,
       ));
 
-      arm.traverse((object) => { if (object.isMesh) object.castShadow = true; });
+      arm.traverse((object) => {
+        if (!object.isMesh) return;
+        object.castShadow = true;
+        // Keep the first-person hands in the same depth-independent render
+        // layer as the gun. Draw them after the gun so the fingers visibly
+        // wrap the grips instead of vanishing into nearby floors and walls.
+        object.material.depthTest = false;
+        object.material.depthWrite = false;
+        object.renderOrder = 1001;
+        object.frustumCulled = false;
+      });
       return arm;
     };
 
@@ -697,7 +641,7 @@ export class WeaponSystem {
       rotation: new THREE.Euler(-0.08, 0.16, -0.08),
       // Compact lower-right exit: ev.io keeps the glove attached to the pistol
       // grip and lets a dark, thick sleeve leave frame without a long arm tube.
-      elbow: new THREE.Vector3(0.25, -0.42, 0.02),
+      elbow: new THREE.Vector3(0.25, -0.47, 0.02),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -709,7 +653,7 @@ export class WeaponSystem {
       // The support shoulder exits toward the lower-left instead of extending
       // as a near-vertical pole. After the 0.74 viewmodel scale this is a
       // plausible 0.74m hand-to-shoulder reach, versus the old 1.33m on screen.
-      elbow: new THREE.Vector3(0.65, -0.72, 0.40),
+      elbow: new THREE.Vector3(0.58, -0.68, 0.30),
       support: true,
     });
     support.scale.setScalar(0.72);
@@ -724,32 +668,48 @@ export class WeaponSystem {
     const def = this.currentDef;
     const pose = weaponHandPose(def?.id);
     const portrait = this.camera.aspect < 1;
+    const narrow = this.camera.aspect < 1.5;
+    // The world camera also controls the user's gameplay FOV. Counter-scale
+    // just the hand geometry around its fixed grip contacts so 60-degree FOV
+    // does not turn a gauntlet into half the screen and 110-degree FOV does not
+    // reduce it to a detached speck.
+    const handFovScale = THREE.MathUtils.clamp(
+      Math.tan(THREE.MathUtils.degToRad(this.camera.fov * 0.5))
+        / Math.tan(THREE.MathUtils.degToRad(78 * 0.5)),
+      0.70,
+      1.25,
+    );
 
     // gripArm's palm centre is offset (0,-.006,-.034) from its group origin.
     // Convert the desired physical contact point back to that group origin.
     const trigger = pose.trigger;
     this.armGroup.position.set(
       trigger[0],
-      trigger[1] + 0.006,
+      trigger[1] + 0.006 + (narrow ? 0.065 : 0),
       trigger[2] + 0.034,
     );
     this.armGroup.scale.set(
-      portrait ? 0.72 : 0.90,
-      portrait ? 1 : 0.90,
-      portrait ? 0.72 : 0.90,
+      (portrait ? 0.72 : (narrow ? 0.78 : 0.90)) * handFovScale,
+      (portrait ? 1 : (narrow ? 0.86 : 0.90)) * handFovScale,
+      (portrait ? 0.72 : (narrow ? 0.78 : 0.90)) * handFovScale,
     );
 
     const support = pose.support;
-    this.supportArmGroup.position.set(support[0], support[1] + 0.006, support[2] + 0.034);
-    this.supportArmGroup.scale.set(
-      portrait ? 0.60 : 0.72,
-      portrait ? 0.76 : 0.72,
-      portrait ? 0.60 : 0.72,
+    this.supportArmGroup.position.set(
+      support[0],
+      support[1] + 0.006 + (narrow ? 0.035 : 0),
+      support[2] + 0.034,
     );
-    // The owner uses a weapon-only first-person composition; the full hands,
-    // arms and two-handed soldier carry remain visible to other players.
-    this.armGroup.visible = false;
-    this.supportArmGroup.visible = false;
+    this.supportArmGroup.scale.set(
+      (portrait ? 0.60 : (narrow ? 0.66 : 0.72)) * handFovScale,
+      (portrait ? 0.76 : (narrow ? 0.70 : 0.72)) * handFovScale,
+      (portrait ? 0.60 : (narrow ? 0.66 : 0.72)) * handFovScale,
+    );
+    // EV.IO's first-person rifle silhouette includes both the trigger hand and
+    // the bracing hand under the fore-end. One-handed weapons keep the support
+    // hand hidden through their authored pose setting.
+    this.armGroup.visible = true;
+    this.supportArmGroup.visible = pose.supportVisible !== false;
     this.armGroup.userData.gripTarget = trigger.slice();
     this.supportArmGroup.userData.gripTarget = support.slice();
   }
@@ -774,6 +734,9 @@ export class WeaponSystem {
   setArmAppearance({ plate, sleeve, glove, accent }) {
     this.armPlateMat.color.setHex(plate).multiplyScalar(0.34);
     this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.30);
+    const sleeveHsl = {};
+    this.sleeveMat.color.getHSL(sleeveHsl);
+    this.sleeveMat.color.setHSL(sleeveHsl.h, sleeveHsl.s, Math.max(0.10, sleeveHsl.l));
     this.gloveMat.color.setHex(glove).multiplyScalar(0.90);
     // Near-black cosmetics need to remain legible against the map's charcoal
     // floors. Preserve the hue but maintain enough value to read the grip.
@@ -901,9 +864,8 @@ export class WeaponSystem {
     }
     const cur = this.loadout[index];
     if (cur) this.models.get(cur.id).group.visible = true;
-    // Seat the hands against this weapon's own grip and handguard. The support
-    // rig only renders its glove and cuff; its forearm and upper sleeve remain
-    // hidden, avoiding the old pair of full-screen arm tubes.
+    // Seat the hands against this weapon's own grip and handguard. The same
+    // contact table drives the remote Soldier's right/left hand targets.
     this._applyViewmodelHandPose();
     // Kick off the raise animation — the new gun eases up from lowered.
     this._raiseT = 0;

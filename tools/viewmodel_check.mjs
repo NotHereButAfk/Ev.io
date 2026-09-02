@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MAIN_WEAPON_IDS, WEAPONS } from '../src/weapons/weaponDefs.js';
+import { weaponHandPose } from '../src/weapons/WeaponHandPoses.js';
 
 // WeaponTextures creates canvases while the procedural fallbacks are built.
 // Geometry is all this probe needs, so a no-op 2D context keeps the check
@@ -32,7 +33,6 @@ globalThis.ProgressEvent ??= class ProgressEvent {
 const {
   WeaponSystem,
   adsMountForSight,
-  cropFirstPersonRearStock,
   measureWeaponSight,
   prepareFirstPersonModel,
   shouldHideAdsViewmodel,
@@ -125,40 +125,6 @@ prepareFirstPersonModel(importedSideProbe);
 prepareFirstPersonModel(importedSideProbe);
 assert(importedSideProbe.scale.x === -1,
   'imported first-person gun does not expose the near receiver side');
-
-// Complete Quaternius world models include long shoulder stocks. The remote
-// model must stay intact, but the first-person copy crops only that low-X rear
-// section so it cannot turn into a giant wedge in the bottom-right corner.
-const croppedRifleProbe = new THREE.Group();
-croppedRifleProbe.userData.modelSource = 'quaternius';
-croppedRifleProbe.userData.weaponId = 'm4';
-const croppedRifleMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(2, 1, 1),
-  new THREE.MeshStandardMaterial(),
-);
-croppedRifleProbe.add(croppedRifleMesh);
-prepareFirstPersonModel(croppedRifleProbe);
-assert(Math.abs(croppedRifleMesh.material.userData.firstPersonRearCrop + 0.4) < 1e-6,
-  `rifle rear crop is ${croppedRifleMesh.material.userData.firstPersonRearCrop} (expected -0.4)`);
-const shaderProbe = {
-  vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
-  fragmentShader: '#include <common>\nvoid main() {\n}',
-};
-croppedRifleMesh.material.onBeforeCompile(shaderProbe, {});
-assert(shaderProbe.vertexShader.includes('vKyxWeaponLongitudinal = position.x'),
-  'first-person rear crop does not pass the source longitudinal coordinate');
-assert(shaderProbe.fragmentShader.includes('vKyxWeaponLongitudinal < -0.400000'),
-  'first-person rear crop does not discard the oversized stock');
-
-const uncroppedSidearmProbe = new THREE.Group();
-uncroppedSidearmProbe.userData.modelSource = 'quaternius';
-uncroppedSidearmProbe.userData.weaponId = 'sidearm';
-uncroppedSidearmProbe.add(new THREE.Mesh(
-  new THREE.BoxGeometry(2, 1, 1),
-  new THREE.MeshStandardMaterial(),
-));
-assert(cropFirstPersonRearStock(uncroppedSidearmProbe) === false,
-  'compact sidearm incorrectly loses its rear geometry');
 
 for (const [side, arm] of [
   ['trigger', system.armGroup],
@@ -508,15 +474,15 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-assert(system.weaponMount.position.x >= 0.08 && system.weaponMount.position.x <= 0.12,
+assert(system.weaponMount.position.x >= 0.02 && system.weaponMount.position.x <= 0.05,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.42 && system.weaponMount.position.y <= -0.38,
+assert(system.weaponMount.position.y >= -0.42 && system.weaponMount.position.y <= -0.37,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
-assert(system.weaponMount.position.z >= -0.92 && system.weaponMount.position.z <= -0.88,
+assert(system.weaponMount.position.z >= -0.95 && system.weaponMount.position.z <= -0.91,
   `EV.IO rifle depth drifted (${system.weaponMount.position.z})`);
-assert(system.weaponMount.scale.x >= 2.32 && system.weaponMount.scale.x <= 2.38,
+assert(system.weaponMount.scale.x >= 1.77 && system.weaponMount.scale.x <= 1.83,
   `EV.IO rifle first-person scale drifted (${system.weaponMount.scale.x})`);
-assert(system.weaponMount.rotation.x >= 0.66 && system.weaponMount.rotation.x <= 0.70,
+assert(system.weaponMount.rotation.x >= 0.84 && system.weaponMount.rotation.x <= 0.90,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
 assert(system.weaponMount.rotation.y >= 0.81 && system.weaponMount.rotation.y <= 0.85,
   `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
@@ -601,9 +567,23 @@ for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
 }
 
 activate(WEAPONS.find((def) => def.id === 'm4'));
-let worstGlove = { value: 0, label: 'weapon-only' };
-assert(!system.armGroup.visible && !system.supportArmGroup.visible,
-  'first-person must not render hands or sleeves');
+let worstGlove = { value: Infinity, label: '' };
+assert(system.armGroup.visible && system.supportArmGroup.visible,
+  'two-handed rifle must render both first-person hands');
+const m4HandPose = weaponHandPose('m4');
+assert(system.armGroup.userData.viewmodelHand === 'trigger'
+  && system.supportArmGroup.userData.viewmodelHand === 'support',
+  'first-person handedness no longer matches the remote Soldier hold');
+assert(JSON.stringify(system.armGroup.userData.gripTarget) === JSON.stringify(m4HandPose.trigger)
+  && JSON.stringify(system.supportArmGroup.userData.gripTarget) === JSON.stringify(m4HandPose.support),
+  'first- and third-person M4 hands no longer share the same grip contacts');
+for (const arm of [system.armGroup, system.supportArmGroup]) {
+  arm.traverse((object) => {
+    if (!object.isMesh) return;
+    assert(!object.material.depthTest && !object.material.depthWrite && object.renderOrder >= 1001,
+      `${arm.userData.viewmodelHand} hand can disappear into world geometry`);
+  });
+}
 for (const stateName of ['idle', 'sprint', 'reload']) {
   player.isSprinting = stateName === 'sprint';
   player.velocity.z = stateName === 'sprint' ? 10.85 : 0;
@@ -635,7 +615,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // bottom edge while the closed grip itself stays readable.
         const minimum = side === 'support'
           ? (viewport.aspect < 1 ? 0.08 : 0.18)
-          : (viewport.aspect < 1 ? 0.15 : 0.34);
+          : (viewport.aspect < 1.5 ? 0.15 : 0.34);
         assert(
           ratio >= minimum,
           `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible (${JSON.stringify(lastGloveBounds)})`,
@@ -644,7 +624,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // curved/tapered cylinders; 36% keeps the real arm pixels compact while
         // allowing a sleeve to cross the frame edge during the sprint carry.
         const maxArea = side === 'support'
-          ? (viewport.aspect < 1 ? 0.30 : 0.18)
+          ? (viewport.aspect < 1.5 ? 0.30 : 0.25)
           : (viewport.aspect < 1 ? 0.56 : 0.40);
         const armArea = meshViewportArea(glove);
         assert(
@@ -667,13 +647,14 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   reloadState.isReloading = false;
 }
 
-assert(!system.armGroup.visible && !system.supportArmGroup.visible,
-  'rifle viewmodel unexpectedly renders hands');
+assert(system.armGroup.visible && system.supportArmGroup.visible,
+  'rifle viewmodel lost its two-hand hold');
 assert(
-  system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === false,
-  'support hand grew a second full-screen upper arm',
+  system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === true,
+  'support forearm no longer continues naturally through the lower-left edge',
 );
 activate(WEAPONS.find((def) => def.id === 'sidearm'));
+assert(system.armGroup.visible, 'one-handed sidearm lost its trigger hand');
 assert(!system.supportArmGroup.visible, 'one-handed sidearm renders a stray support hand');
 
 function advanceSeconds(seconds, fps, beforeFrame = null) {
