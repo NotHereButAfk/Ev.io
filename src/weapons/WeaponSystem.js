@@ -79,11 +79,14 @@ const VIEWMODEL_Z = -0.90;
 // the bottom of the screen: its butt exits near the lower centre/right while
 // the muzzle rises to the open space left of the reticle. The offset and cant
 // are shared by every firearm so swapping weapons never changes handedness.
-const VIEWMODEL_X = -0.06;
-const VIEWMODEL_Y = -0.30;
+const VIEWMODEL_X = 0.10;
+const VIEWMODEL_Y = -0.40;
 // Weapon-only first person: keep the gun large and readable like the reference
 // while world/player weapons retain their physical third-person scale.
-const VIEWMODEL_SCALE = 1.20;
+// The rear stock is cropped from first-person Quaternius models below, so the
+// useful barrel/receiver section can stay genuinely close and large instead
+// of shrinking the complete world model to make its stock tolerable.
+const VIEWMODEL_SCALE = 2.35;
 const MELEE_VIEWMODEL_SCALE = 0.96;
 const FIREARM_CARRY_SCALE = Object.freeze({
   pistol: 0.95,
@@ -178,6 +181,76 @@ const _adsSpecialBox = new THREE.Box3();
 const _adsPoint = new THREE.Vector3();
 const _adsCorner = new THREE.Vector3();
 const _adsInverse = new THREE.Matrix4();
+
+// The Quaternius pack uses complete world models. Their long shoulder stocks
+// are correct on remote soldiers and pickups, but become an enormous white
+// wedge when the same single-piece mesh is placed close to the first-person
+// camera. Crop only the rear portion in the viewmodel shader. Source geometry
+// is authored muzzle-forward on +X, so the stock occupies the low-X end.
+const FIRST_PERSON_REAR_CROP = Object.freeze({
+  compact: 0.16,
+  rifle: 0.30,
+  shotgun: 0.27,
+  support: 0.30,
+  launcher: 0.20,
+  precision: 0.27,
+});
+
+export function cropFirstPersonRearStock(group) {
+  if (group?.userData?.modelSource !== 'quaternius') return false;
+  const carry = weaponHandPose(group.userData.weaponId).carry;
+  const cropRatio = FIRST_PERSON_REAR_CROP[carry] || 0;
+  if (cropRatio <= 0) return false;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  group.traverse((object) => {
+    if (!object.isMesh || !object.geometry) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    const box = object.geometry.boundingBox;
+    if (!box) return;
+    minX = Math.min(minX, box.min.x);
+    maxX = Math.max(maxX, box.max.x);
+  });
+  if (!Number.isFinite(minX) || maxX - minX < 0.001) return false;
+
+  const cutoff = minX + (maxX - minX) * cropRatio;
+  const cutoffLiteral = cutoff.toFixed(6);
+  group.traverse((object) => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (!material || material.userData?.firstPersonRearCrop !== undefined) continue;
+      const previousCompile = material.onBeforeCompile;
+      const previousCacheKey = material.customProgramCacheKey?.bind(material);
+      material.onBeforeCompile = function onBeforeCompile(shader, renderer) {
+        previousCompile?.call(this, shader, renderer);
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            '#include <common>',
+            '#include <common>\nvarying float vKyxWeaponLongitudinal;',
+          )
+          .replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\nvKyxWeaponLongitudinal = position.x;',
+          );
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            '#include <common>\nvarying float vKyxWeaponLongitudinal;',
+          )
+          .replace(
+            'void main() {',
+            `void main() {\n  if (vKyxWeaponLongitudinal < ${cutoffLiteral}) discard;`,
+          );
+      };
+      material.customProgramCacheKey = () => `${previousCacheKey?.() || ''}|kyx-rear:${cutoffLiteral}`;
+      material.userData.firstPersonRearCrop = cutoff;
+      material.needsUpdate = true;
+    }
+  });
+  return true;
+}
 
 // Measure a weapon's rear sight in its own coordinate system. Authored models
 // can provide an exact `sight_point`; otherwise optic glass is preferred and a
@@ -277,6 +350,7 @@ export function prepareFirstPersonModel(group) {
     object.renderOrder = 1000;
     object.frustumCulled = false;
   });
+  cropFirstPersonRearStock(group);
 }
 
 export class WeaponSystem {

@@ -27,7 +27,7 @@ export const QUATERNIUS_GUNS = Object.freeze({
 // game's camera/world forward direction (-Z). Fallback muzzle markers are added
 // after this transform so they cannot accidentally trigger a second 180° flip.
 export const QUATERNIUS_FORWARD_YAW = Math.PI / 2;
-const QUATERNIUS_LENGTH = Object.freeze({
+export const QUATERNIUS_LENGTH = Object.freeze({
   sidearm: 0.30, uzi: 0.44, levershotgun: 0.82, m4: 0.89, m16: 1.07,
   rifle: 0.87, lmg: 0.98, rpg: 1.00, boltsniper: 0.92, magnum: 0.34,
   battlerifle: 0.98, needler: 0.54, plasmarifle: 0.65, dmr: 0.88,

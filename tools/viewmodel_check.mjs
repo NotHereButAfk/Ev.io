@@ -32,11 +32,17 @@ globalThis.ProgressEvent ??= class ProgressEvent {
 const {
   WeaponSystem,
   adsMountForSight,
+  cropFirstPersonRearStock,
   measureWeaponSight,
   prepareFirstPersonModel,
   shouldHideAdsViewmodel,
 } = await import('../src/weapons/WeaponSystem.js');
-const { orientWeaponModelForward } = await import('../src/weapons/WeaponModels.js');
+const {
+  orientWeaponModelForward,
+  QUATERNIUS_FORWARD_YAW,
+  QUATERNIUS_GUNS,
+  QUATERNIUS_LENGTH,
+} = await import('../src/weapons/WeaponModels.js');
 
 const assert = (ok, message) => {
   if (!ok) throw new Error(message);
@@ -50,16 +56,40 @@ async function loadGlb(relativePath) {
   });
 }
 
+async function loadGltf(relativePath) {
+  const json = fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+  return new Promise((resolve, reject) => {
+    new GLTFLoader().parse(json, '', resolve, reject);
+  });
+}
+
 const [sidearmGlb, authoredGlb, legacyGlb] = await Promise.all([
   loadGlb('../public/sidearm.glb'),
   loadGlb('../public/weapons_authored.glb'),
   loadGlb('../public/weapons.glb'),
 ]);
 
+const quaterniusSources = new Map(await Promise.all(
+  Object.entries(QUATERNIUS_GUNS).map(async ([id, model]) => {
+    const gltf = await loadGltf(`../public/vendor/quaternius/scifi-weapons/${model}.gltf`);
+    const root = gltf.scene;
+    root.rotation.y = QUATERNIUS_FORWARD_YAW;
+    root.updateMatrixWorld(true);
+    const rawSize = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+    root.scale.setScalar(QUATERNIUS_LENGTH[id] / Math.max(0.001, rawSize.z));
+    root.updateMatrixWorld(true);
+    const normalized = new THREE.Box3().setFromObject(root);
+    const center = normalized.getCenter(new THREE.Vector3());
+    root.position.set(-center.x, 0.06 - center.y, -center.z);
+    return [id, root];
+  }),
+));
+
 function shippedSource(def) {
   if (def.proceduralModel) return null;
   const name = `weapon_${def.id}`;
-  return (def.id === 'sidearm' ? sidearmGlb.scene.getObjectByName(name) : null)
+  return quaterniusSources.get(def.id)
+    || (def.id === 'sidearm' ? sidearmGlb.scene.getObjectByName(name) : null)
     || authoredGlb.scene.getObjectByName(name)
     || legacyGlb.scene.getObjectByName(name)
     || null;
@@ -96,6 +126,40 @@ prepareFirstPersonModel(importedSideProbe);
 assert(importedSideProbe.scale.x === -1,
   'imported first-person gun does not expose the near receiver side');
 
+// Complete Quaternius world models include long shoulder stocks. The remote
+// model must stay intact, but the first-person copy crops only that low-X rear
+// section so it cannot turn into a giant wedge in the bottom-right corner.
+const croppedRifleProbe = new THREE.Group();
+croppedRifleProbe.userData.modelSource = 'quaternius';
+croppedRifleProbe.userData.weaponId = 'm4';
+const croppedRifleMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 1, 1),
+  new THREE.MeshStandardMaterial(),
+);
+croppedRifleProbe.add(croppedRifleMesh);
+prepareFirstPersonModel(croppedRifleProbe);
+assert(Math.abs(croppedRifleMesh.material.userData.firstPersonRearCrop + 0.4) < 1e-6,
+  `rifle rear crop is ${croppedRifleMesh.material.userData.firstPersonRearCrop} (expected -0.4)`);
+const shaderProbe = {
+  vertexShader: '#include <common>\nvoid main() {\n#include <begin_vertex>\n}',
+  fragmentShader: '#include <common>\nvoid main() {\n}',
+};
+croppedRifleMesh.material.onBeforeCompile(shaderProbe, {});
+assert(shaderProbe.vertexShader.includes('vKyxWeaponLongitudinal = position.x'),
+  'first-person rear crop does not pass the source longitudinal coordinate');
+assert(shaderProbe.fragmentShader.includes('vKyxWeaponLongitudinal < -0.400000'),
+  'first-person rear crop does not discard the oversized stock');
+
+const uncroppedSidearmProbe = new THREE.Group();
+uncroppedSidearmProbe.userData.modelSource = 'quaternius';
+uncroppedSidearmProbe.userData.weaponId = 'sidearm';
+uncroppedSidearmProbe.add(new THREE.Mesh(
+  new THREE.BoxGeometry(2, 1, 1),
+  new THREE.MeshStandardMaterial(),
+));
+assert(cropFirstPersonRearStock(uncroppedSidearmProbe) === false,
+  'compact sidearm incorrectly loses its rear geometry');
+
 for (const [side, arm] of [
   ['trigger', system.armGroup],
   ['support', system.supportArmGroup],
@@ -118,7 +182,12 @@ for (const def of WEAPONS) {
   system.kickGroup.remove(record.group);
   const group = new THREE.Group();
   const clone = source.clone(true);
-  clone.position.set(0, 0, 0);
+  if (quaterniusSources.has(def.id)) {
+    group.userData.modelSource = 'quaternius';
+    group.userData.weaponId = def.id;
+  } else {
+    clone.position.set(0, 0, 0);
+  }
   let muzzle = null;
   clone.traverse((obj) => { if (!muzzle && /^muzzle_point/.test(obj.name)) muzzle = obj; });
   if (muzzle) {
@@ -197,10 +266,40 @@ function activate(def) {
   settle();
 }
 
+// Shader-cropped stock vertices are not rendered, so exclude them from the
+// projection and eye-plane checks just as the GPU does. Using setFromObject()
+// here would keep measuring the deliberately invisible world-model stock.
+const _visibleBoxPoint = new THREE.Vector3();
+const _visibleMeshBox = new THREE.Box3();
+function visibleViewmodelBox(root) {
+  root.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().makeEmpty();
+  root.traverse((object) => {
+    if (!object.isMesh || !object.visible || !object.geometry) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const cutoff = materials
+      .map((material) => material?.userData?.firstPersonRearCrop)
+      .find(Number.isFinite);
+    const position = object.geometry.getAttribute('position');
+    if (Number.isFinite(cutoff) && position) {
+      for (let i = 0; i < position.count; i++) {
+        if (position.getX(i) < cutoff) continue;
+        _visibleBoxPoint.fromBufferAttribute(position, i).applyMatrix4(object.matrixWorld);
+        box.expandByPoint(_visibleBoxPoint);
+      }
+      return;
+    }
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    if (!object.geometry.boundingBox) return;
+    _visibleMeshBox.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
+    box.union(_visibleMeshBox);
+  });
+  return box;
+}
+
 function nearDepth(root) {
   camera.updateMatrixWorld(true);
-  root.updateWorldMatrix(true, true);
-  return -new THREE.Box3().setFromObject(root).max.z;
+  return -visibleViewmodelBox(root).max.z;
 }
 
 function projectedRatioForBox(box) {
@@ -227,15 +326,13 @@ function projectedRatioForBox(box) {
 }
 
 function projectedRatio(root) {
-  root.updateWorldMatrix(true, true);
-  return projectedRatioForBox(new THREE.Box3().setFromObject(root));
+  return projectedRatioForBox(visibleViewmodelBox(root));
 }
 
 function projectedBounds(root) {
-  root.updateWorldMatrix(true, true);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
+  const box = visibleViewmodelBox(root);
   const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
   for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
     for (const z of [box.min.z, box.max.z]) {
@@ -250,8 +347,7 @@ function projectedBounds(root) {
 }
 
 function viewportArea(root) {
-  root.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(root);
+  const box = visibleViewmodelBox(root);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
   const bounds = [Infinity, -Infinity, Infinity, -Infinity];
@@ -279,8 +375,7 @@ function meshViewportArea(root) {
 
 let lastGloveBounds = null;
 function gloveRatio(group) {
-  group.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(group);
+  const box = visibleViewmodelBox(group);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
   const bounds = [Infinity, -Infinity, Infinity, -Infinity];
@@ -304,8 +399,7 @@ function gloveRatio(group) {
 
 let lastEdgeBounds = null;
 function reachesViewportEdge(root) {
-  root.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(root);
+  const box = visibleViewmodelBox(root);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
   let minX = Infinity, maxX = -Infinity, minY = Infinity;
@@ -414,13 +508,13 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-assert(system.weaponMount.position.x >= -0.08 && system.weaponMount.position.x <= -0.04,
+assert(system.weaponMount.position.x >= 0.08 && system.weaponMount.position.x <= 0.12,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.32 && system.weaponMount.position.y <= -0.28,
+assert(system.weaponMount.position.y >= -0.42 && system.weaponMount.position.y <= -0.38,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
 assert(system.weaponMount.position.z >= -0.92 && system.weaponMount.position.z <= -0.88,
   `EV.IO rifle depth drifted (${system.weaponMount.position.z})`);
-assert(system.weaponMount.scale.x >= 1.18 && system.weaponMount.scale.x <= 1.22,
+assert(system.weaponMount.scale.x >= 2.32 && system.weaponMount.scale.x <= 2.38,
   `EV.IO rifle first-person scale drifted (${system.weaponMount.scale.x})`);
 assert(system.weaponMount.rotation.x >= 0.66 && system.weaponMount.rotation.x <= 0.70,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
