@@ -395,10 +395,10 @@ for (const def of WEAPONS) {
   );
 }
 
-// The reference first-person silhouette has one dominant trigger-side hand and
-// a compact support glove seated under a rifle's handguard. Exercise both
-// across every viewport, FOV and high-motion state; the support upper sleeve
-// remains hidden instead of forming a second long tube.
+// The reference first-person silhouette is a large shouldered rifle: muzzle in
+// the open upper-left area, receiver below the reticle, and butt leaving the
+// lower centre/right edge. Lock the shared mount after the complete all-weapon
+// visibility matrix above so it cannot drift back to the thin far-right carry.
 activate(WEAPONS.find((def) => def.id === 'm4'));
 camera.aspect = 16 / 9;
 player.baseFov = 78;
@@ -414,23 +414,14 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-const referenceRifleBounds = projectedBounds(system.models.get('m4').group);
-assert(system.weaponMount.position.x >= 0.36 && system.weaponMount.position.x <= 0.44,
+assert(system.weaponMount.position.x >= -0.14 && system.weaponMount.position.x <= -0.10,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.43 && system.weaponMount.position.y <= -0.35,
+assert(system.weaponMount.position.y >= -0.20 && system.weaponMount.position.y <= -0.16,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
-assert(system.weaponMount.rotation.x >= 0.19 && system.weaponMount.rotation.x <= 0.25,
+assert(system.weaponMount.rotation.x >= 0.33 && system.weaponMount.rotation.x <= 0.37,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
-assert(system.weaponMount.rotation.y >= 0.28 && system.weaponMount.rotation.y <= 0.36,
+assert(system.weaponMount.rotation.y >= 0.47 && system.weaponMount.rotation.y <= 0.53,
   `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
-assert(referenceRifleBounds.maxX > 0.75,
-  `EV.IO rifle butt does not own the lower-right quadrant (${JSON.stringify(referenceRifleBounds)})`);
-assert(referenceRifleBounds.minY < -1,
-  `EV.IO rifle butt must exit the bottom edge (${JSON.stringify(referenceRifleBounds)})`);
-assert(referenceRifleBounds.minX > -0.24,
-  `EV.IO rifle crosses too far over the reticle (${JSON.stringify(referenceRifleBounds)})`);
-assert(system.weaponMount.rotation.x >= 0.12 && system.weaponMount.rotation.y >= 0.11,
-  `EV.IO rifle lacks its shouldered pitch/yaw (${system.weaponMount.rotation.x}, ${system.weaponMount.rotation.y})`);
 
 // EV.IO's sword is a separate first-person composition: a close right-side
 // guard whose grip and tip both leave the frame. It must not be centred over

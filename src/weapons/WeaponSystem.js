@@ -76,17 +76,27 @@ function createTracerMesh() {
 // leaving every shipped model clear of the camera's near plane.
 const VIEWMODEL_Z = -0.80;
 // EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
-// the bottom of the screen: its butt exits the lower-right corner while the
-// muzzle rises back toward the reticle.  The offset and three-axis cant are one
-// shared transform so the weapon and both gripping hands cannot drift apart.
-const VIEWMODEL_X = 0.40;
-const VIEWMODEL_Y = -0.39;
+// the bottom of the screen: its butt exits near the lower centre/right while
+// the muzzle rises to the open space left of the reticle. The offset and cant
+// are shared by every firearm so swapping weapons never changes handedness.
+const VIEWMODEL_X = -0.12;
+const VIEWMODEL_Y = -0.18;
 // Weapon-only first person: keep the gun large and readable like the reference
 // while world/player weapons retain their physical third-person scale.
-const VIEWMODEL_SCALE = 0.96;
-const VIEWMODEL_PITCH = 0.22;
-const VIEWMODEL_YAW = 0.32;
-const VIEWMODEL_ROLL = -0.055;
+const VIEWMODEL_SCALE = 1.30;
+const MELEE_VIEWMODEL_SCALE = 0.96;
+const FIREARM_CARRY_SCALE = Object.freeze({
+  pistol: 1.06,
+  compact: 1.16,
+  rifle: VIEWMODEL_SCALE,
+  shotgun: 1.14,
+  support: 1.08,
+  launcher: 0.96,
+  precision: 1.10,
+});
+const VIEWMODEL_PITCH = 0.35;
+const VIEWMODEL_YAW = 0.50;
+const VIEWMODEL_ROLL = -0.04;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
 // oversized blade rises almost vertically and leaves the top of the frame.
@@ -111,6 +121,19 @@ const REFERENCE_ASPECT = 16 / 9;
 // does not drift all the way into the corner.
 function viewmodelAspectScale(aspect) {
   return THREE.MathUtils.clamp((aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT, 0.32, 1.15);
+}
+
+// The desktop reference intentionally uses a large, close weapon. Preserve it
+// at 16:9 and wider, but scale the same carry down on narrow/mobile canvases so
+// a long rifle does not become a clipped strip with no readable silhouette.
+function firearmViewmodelScale(def, aspect) {
+  const responsive = THREE.MathUtils.clamp(
+    (aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT,
+    0.72,
+    1,
+  );
+  const carry = weaponHandPose(def?.id).carry;
+  return (FIREARM_CARRY_SCALE[carry] || 1.18) * responsive;
 }
 
 function viewmodelReloadScale(aspect) {
@@ -374,7 +397,7 @@ export class WeaponSystem {
     this.weaponMount.position.set(
       VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
     this.weaponMount.rotation.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, VIEWMODEL_ROLL);
-    this.weaponMount.scale.setScalar(VIEWMODEL_SCALE);
+    this.weaponMount.scale.setScalar(firearmViewmodelScale(this.currentDef, this.camera.aspect));
     this.camera.add(this.weaponMount);
 
     // Dedicated viewmodel key light — a short-range light parented to the camera
@@ -1906,13 +1929,21 @@ export class WeaponSystem {
       ? SWORD_VIEWMODEL_Y - sprintCarry * 0.075
       : VIEWMODEL_Y + sprintDropY;
     const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - sprintCarry * 0.025 : VIEWMODEL_Z;
+    const activeViewmodelScale = swordGuard
+      ? MELEE_VIEWMODEL_SCALE
+      : firearmViewmodelScale(def, this.camera.aspect);
+    this.weaponMount.scale.setScalar(activeViewmodelScale);
     // The mount was solved from the actual model bounds at construction time.
     // Using that physical sight anchor here keeps every gun centred without a
     // per-weapon screen-offset table or changing third-person weapon scale.
-    const measuredAdsMount = this.models.get(def.id)?.adsMount;
-    const adsX = measuredAdsMount?.x ?? 0;
-    const adsY = (measuredAdsMount?.y ?? ADS_SIGHT_Y) - ADS_VIEWMODEL_DROP;
-    const adsZ = measuredAdsMount?.z ?? ADS_SIGHT_DEPTH;
+    const measuredSight = this.models.get(def.id)?.sight;
+    const adsX = measuredSight ? -measuredSight.x * activeViewmodelScale : 0;
+    const adsY = (measuredSight
+      ? -measuredSight.y * activeViewmodelScale + ADS_SIGHT_Y
+      : ADS_SIGHT_Y) - ADS_VIEWMODEL_DROP;
+    const adsZ = measuredSight
+      ? ADS_SIGHT_DEPTH - measuredSight.z * activeViewmodelScale
+      : ADS_SIGHT_DEPTH;
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;
     const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV
