@@ -1580,7 +1580,8 @@ export class WeaponSystem {
       this.audio.playShot(def.sound || 'rifle');
     }
     // Shell casing clink (not for melee, rocket, or shotgun — they eject differently)
-    if (def.kind !== 'rocket' && def.kind !== 'melee' && def.sound !== 'shotgun') {
+    if (def.kind !== 'rocket' && def.kind !== 'melee'
+        && def.id !== 'levershotgun' && def.id !== 'energyshotgun') {
       this.audio.playShellCasing();
     }
     if (def.kind === 'rocket') {

@@ -3,13 +3,22 @@
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { WEAPON_AUDIO_PROFILES } from '../src/core/AudioManager.js';
+import { WEAPONS } from '../src/weapons/weaponDefs.js';
 
-const rifle = WEAPON_AUDIO_PROFILES.rifle;
+const rifle = WEAPON_AUDIO_PROFILES.m4;
 assert.equal(rifle.gain, 0.8, 'Auto Rifle must respect EV.IO mg volume 0.8');
 assert.ok(rifle.dur <= 0.08, 'automatic report must stay short and readable');
 assert.ok(rifle.reverb <= 0.12, 'Auto Rifle tail must not smear full-auto cadence');
 assert.ok(rifle.subGain <= 0.2, 'Auto Rifle must avoid an exaggerated bass boom');
 assert.ok(rifle.mech >= 0.18, 'Auto Rifle needs a clear mechanical bolt tick');
+
+const firearms = WEAPONS.filter((weapon) => weapon.kind !== 'melee');
+assert.equal(new Set(firearms.map((weapon) => weapon.sound)).size, firearms.length,
+  'every firearm must declare its own sound id');
+for (const weapon of firearms) {
+  assert.ok(WEAPON_AUDIO_PROFILES[weapon.sound],
+    `${weapon.id} is missing its custom audio profile ${weapon.sound}`);
+}
 
 const source = readFileSync(new URL('../src/core/AudioManager.js', import.meta.url), 'utf8');
 assert.match(source, /Math\.random\(\).*\(b - a\)/, 'shots need randomized pitch/level');

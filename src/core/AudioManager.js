@@ -1,19 +1,28 @@
 // Lightweight procedural sound effects via WebAudio — no external audio assets needed.
 export const WEAPON_AUDIO_PROFILES = Object.freeze({
+  // Each firearm has its own acoustic fingerprint. Shared category profiles
+  // remain below as safe fallbacks for future weapons and old saved data.
   sidearm: { dur: 0.105, body: 340, crackHz: 3300, sub: 96, dist: 4.0, reverb: 0.16, gain: 0.82 },
+  uzi: { dur: 0.058, body: 365, bodyGain: 0.30, crackHz: 4300, crack: 0.42, sub: 112, subGain: 0.10, dist: 2.6, reverb: 0.06, gain: 0.67, mech: 0.18, mechHz: 3100 },
+  levershotgun: { dur: 0.31, body: 108, bodyGain: 0.78, crackHz: 1450, crack: 0.62, sub: 48, subGain: 0.68, dist: 9.5, reverb: 0.52, gain: 0.96, mech: 0.15, mechHz: 1250 },
+  m4: { dur: 0.078, body: 310, bodyGain: 0.46, crackHz: 3400, crack: 0.30, click: 0.68, clickHP: 1900, sub: 98, subGain: 0.18, dist: 3.5, reverb: 0.12, gain: 0.80, mech: 0.20, mechHz: 2050 },
+  m16: { dur: 0.092, body: 275, bodyGain: 0.52, crackHz: 4750, crack: 0.48, click: 0.76, clickHP: 2200, sub: 82, subGain: 0.22, dist: 5.4, reverb: 0.16, gain: 0.82, mech: 0.14, mechHz: 2450 },
+  rifle: { dur: 0.112, body: 224, bodyGain: 0.58, crackHz: 3900, crack: 0.43, click: 0.70, sub: 72, subGain: 0.27, dist: 6.3, reverb: 0.22, gain: 0.86, mech: 0.13, mechHz: 1860 },
+  lmg: { dur: 0.145, body: 176, bodyGain: 0.68, crackHz: 2850, crack: 0.40, sub: 61, subGain: 0.42, dist: 7.8, reverb: 0.27, gain: 0.90, mech: 0.21, mechHz: 1480 },
+  rpg: { dur: 0.38, body: 68, bodyGain: 0.72, crackHz: 980, crack: 0.28, sub: 36, subGain: 0.72, dist: 8.8, reverb: 0.46, gain: 0.94, mech: 0.08, mechHz: 720 },
+  boltsniper: { dur: 0.38, body: 86, bodyGain: 0.82, crackHz: 6100, crack: 0.72, sub: 44, subGain: 0.58, dist: 10.5, reverb: 0.61, gain: 0.98, mech: 0.18, mechHz: 1180 },
+  magnum: { dur: 0.155, body: 205, bodyGain: 0.70, crackHz: 4050, crack: 0.58, sub: 70, subGain: 0.40, dist: 7.2, reverb: 0.23, gain: 0.91, mech: 0.22, mechHz: 1750 },
+  battlerifle: { dur: 0.098, body: 258, bodyGain: 0.56, crackHz: 4450, crack: 0.50, sub: 78, subGain: 0.25, dist: 5.9, reverb: 0.18, gain: 0.85, mech: 0.19, mechHz: 2300 },
+  needler: { dur: 0.052, body: 520, bodyGain: 0.23, crackHz: 6900, crack: 0.34, click: 0.46, sub: 145, subGain: 0.05, dist: 2.2, reverb: 0.19, gain: 0.62, mech: 0.05, mechHz: 5200 },
+  plasmarifle: { dur: 0.086, body: 410, bodyGain: 0.32, crackHz: 2550, crack: 0.25, click: 0.40, sub: 118, subGain: 0.12, dist: 2.8, reverb: 0.31, gain: 0.70, mech: 0.04, mechHz: 3900 },
+  dmr: { dur: 0.17, body: 150, bodyGain: 0.70, crackHz: 5300, crack: 0.62, sub: 56, subGain: 0.45, dist: 8.2, reverb: 0.36, gain: 0.93, mech: 0.20, mechHz: 1320 },
+  fuelrod: { dur: 0.43, body: 54, bodyGain: 0.70, crackHz: 760, crack: 0.22, click: 0.30, sub: 31, subGain: 0.76, dist: 8.2, reverb: 0.66, gain: 0.92, mech: 0.03, mechHz: 540 },
+  concussion: { dur: 0.27, body: 102, bodyGain: 0.62, crackHz: 1850, crack: 0.36, click: 0.46, sub: 45, subGain: 0.55, dist: 7.1, reverb: 0.53, gain: 0.88, mech: 0.06, mechHz: 920 },
+  energyshotgun: { dur: 0.25, body: 138, bodyGain: 0.66, crackHz: 2350, crack: 0.55, click: 0.58, sub: 52, subGain: 0.50, dist: 8.6, reverb: 0.44, gain: 0.93, mech: 0.09, mechHz: 1550 },
+  // Legacy category fallbacks for old saved data and future weapons.
   smg: { dur: 0.065, body: 300, crackHz: 3500, sub: 96, dist: 3.0, reverb: 0.09, gain: 0.72 },
   shotgun: { dur: 0.24, body: 125, crackHz: 1700, sub: 58, dist: 8.0, reverb: 0.38, gain: 0.94 },
-  // EV.IO's Auto Rifle uses the compact `mg` report at volume 0.8. This is an
-  // original procedural approximation: short synthetic crack, restrained low
-  // end, audible bolt tick, and little tail so automatic fire stays readable.
-  rifle: {
-    dur: 0.078, body: 310, bodyGain: 0.46, crackHz: 3400, crack: 0.30,
-    click: 0.68, clickHP: 1900, sub: 98, subGain: 0.18, dist: 3.5,
-    reverb: 0.12, gain: 0.80, mech: 0.20, mechHz: 2050,
-  },
-  lmg: { dur: 0.13, body: 190, crackHz: 2800, sub: 68, dist: 7.0, reverb: 0.25, gain: 0.88 },
   sniper: { dur: 0.34, body: 95, crackHz: 5600, sub: 50, dist: 10, reverb: 0.55, gain: 0.96 },
-  rpg: { dur: 0.36, body: 76, crackHz: 1200, sub: 42, dist: 9, reverb: 0.48, gain: 0.94 },
 });
 
 export class AudioManager {
