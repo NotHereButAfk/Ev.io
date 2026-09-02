@@ -1179,11 +1179,15 @@ export class Game {
     }
     this._authoritativeMapTarget = mapId;
     this._pendingMapId = mapId;
-    // A server has now been selected. Replace the JOINING card with the actual
-    // authoritative arena card even when the preview happened to use the same
-    // map, so connection and map preparation remain two visible phases.
+    // Keep matchmaking and authoritative arena preparation on one continuous
+    // loading card. Gameplay still waits for both promises, but the player sees
+    // one combined lobby/map transition rather than two screens flashing.
     if (initial) {
-      this._showMapLoading(this._joiningModeId || this._mode?.id || 'deathmatch', mapId, { autoHide: false });
+      this._showMapLoading(
+        this._joiningModeId || this._mode?.id || 'deathmatch',
+        mapId,
+        { autoHide: false, joining: true },
+      );
     }
     if (mapId === this.world.currentMapId && !this._authoritativeMapTransitioning) {
       return Promise.resolve(this.world.currentMap);
@@ -1354,9 +1358,9 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const name = el.querySelector('.ml-name');
-    if (name) name.textContent = 'JOINING MATCH';
+    if (name) name.textContent = 'JOINING LOBBY';
     const building = document.getElementById('ml-building');
-    if (building) building.textContent = 'Finding an available match...';
+    if (building) building.textContent = 'Finding lobby and preparing arena...';
     const region = document.getElementById('ml-region');
     if (region) region.textContent = 'kryx.live';
     const mode = document.getElementById('ml-mode');
@@ -1369,7 +1373,7 @@ export class Game {
     clearTimeout(this._serverJoinTimer);
     this._serverJoinShownAt = performance.now();
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
-    this._setMapLoadingPhase('Finding an available match...', 12);
+    this._setMapLoadingPhase('Joining lobby and loading map...', 12);
   }
 
   _showServerJoinError(message = 'No public server is available') {
@@ -1415,18 +1419,24 @@ export class Game {
 
   async _finishServerJoining() {
     clearTimeout(this._serverJoinTimer);
-    this._setMapLoadingPhase('Arena ready — joining match...', 100, true);
+    this._setMapLoadingPhase('Lobby joined — arena ready', 100, true);
     // The authoritative bridge awaits this fade before resolving readyPromise,
     // so _startGame cannot spawn the player behind a still-loading arena.
     await this._finishMapLoading(900);
   }
 
-  _showMapLoading(modeId, mapId = this.world.currentMapId, { autoHide = true } = {}) {
+  _showMapLoading(
+    modeId,
+    mapId = this.world.currentMapId,
+    { autoHide = true, joining = false } = {},
+  ) {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const map = getImportedMap(mapId);
     const building = document.getElementById('ml-building');
-    if (building) building.textContent = 'Loading arena geometry...';
+    if (building) building.textContent = joining
+      ? 'Joining lobby and loading arena...'
+      : 'Loading arena geometry...';
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
@@ -1440,7 +1450,9 @@ export class Game {
       koth: 'King of the Hill', survival: 'Firefight',
     };
     const name = el.querySelector('.ml-name');
-    if (name) name.textContent = map.name.toUpperCase();
+    if (name) name.textContent = joining
+      ? `JOINING ${map.name.toUpperCase()}`
+      : map.name.toUpperCase();
     const region = document.getElementById('ml-region');
     if (region) region.textContent = map.region;
     const mode = document.getElementById('ml-mode');
@@ -1458,7 +1470,10 @@ export class Game {
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     this._mapLoadingShownAt = performance.now();
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
-    this._setMapLoadingPhase('Loading arena geometry...', 46);
+    this._setMapLoadingPhase(
+      joining ? 'Joining lobby and loading arena...' : 'Loading arena geometry...',
+      46,
+    );
     if (autoHide) {
       this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
       this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
@@ -1549,7 +1564,11 @@ export class Game {
     }
     this.pickupSystem?.dispose();
     this.pickupSystem = null;
-    this._showMapLoading(this._mode?.id || 'deathmatch', mapId, { autoHide: false });
+    this._showMapLoading(
+      this._joiningModeId || this._mode?.id || 'deathmatch',
+      mapId,
+      { autoHide: false, joining: deferFinish },
+    );
     try {
       const map = await this.world.loadMap(mapId);
       this._configureMapCamera(map);
