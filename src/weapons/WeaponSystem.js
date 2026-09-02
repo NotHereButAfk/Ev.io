@@ -74,29 +74,29 @@ function createTracerMesh() {
 // the worst case), and recoil moves the whole gun back toward the eye. Keeping
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
-const VIEWMODEL_Z = -0.80;
+const VIEWMODEL_Z = -0.90;
 // EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
 // the bottom of the screen: its butt exits near the lower centre/right while
 // the muzzle rises to the open space left of the reticle. The offset and cant
 // are shared by every firearm so swapping weapons never changes handedness.
-const VIEWMODEL_X = -0.12;
-const VIEWMODEL_Y = -0.18;
+const VIEWMODEL_X = -0.06;
+const VIEWMODEL_Y = -0.30;
 // Weapon-only first person: keep the gun large and readable like the reference
 // while world/player weapons retain their physical third-person scale.
-const VIEWMODEL_SCALE = 1.30;
+const VIEWMODEL_SCALE = 1.20;
 const MELEE_VIEWMODEL_SCALE = 0.96;
 const FIREARM_CARRY_SCALE = Object.freeze({
-  pistol: 1.06,
-  compact: 1.16,
+  pistol: 0.95,
+  compact: 1.08,
   rifle: VIEWMODEL_SCALE,
-  shotgun: 1.14,
-  support: 1.08,
-  launcher: 0.96,
-  precision: 1.10,
+  shotgun: 1.08,
+  support: 1.02,
+  launcher: 0.90,
+  precision: 1.08,
 });
-const VIEWMODEL_PITCH = 0.35;
-const VIEWMODEL_YAW = 0.50;
-const VIEWMODEL_ROLL = -0.04;
+const VIEWMODEL_PITCH = 0.68;
+const VIEWMODEL_YAW = 0.83;
+const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
 // oversized blade rises almost vertically and leaves the top of the frame.
@@ -672,9 +672,8 @@ export class WeaponSystem {
       portrait ? 0.76 : 0.72,
       portrait ? 0.60 : 0.72,
     );
-    this.supportArmGroup.visible = pose.supportVisible !== false && def?.kind !== 'melee';
-    // First person deliberately renders only the weapon. The complete hands,
-    // arms and soldier carry remain visible to other players in world space.
+    // The owner uses a weapon-only first-person composition; the full hands,
+    // arms and two-handed soldier carry remain visible to other players.
     this.armGroup.visible = false;
     this.supportArmGroup.visible = false;
     this.armGroup.userData.gripTarget = trigger.slice();

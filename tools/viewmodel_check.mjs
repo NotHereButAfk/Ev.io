@@ -414,13 +414,17 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-assert(system.weaponMount.position.x >= -0.14 && system.weaponMount.position.x <= -0.10,
+assert(system.weaponMount.position.x >= -0.08 && system.weaponMount.position.x <= -0.04,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.20 && system.weaponMount.position.y <= -0.16,
+assert(system.weaponMount.position.y >= -0.32 && system.weaponMount.position.y <= -0.28,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
-assert(system.weaponMount.rotation.x >= 0.33 && system.weaponMount.rotation.x <= 0.37,
+assert(system.weaponMount.position.z >= -0.92 && system.weaponMount.position.z <= -0.88,
+  `EV.IO rifle depth drifted (${system.weaponMount.position.z})`);
+assert(system.weaponMount.scale.x >= 1.18 && system.weaponMount.scale.x <= 1.22,
+  `EV.IO rifle first-person scale drifted (${system.weaponMount.scale.x})`);
+assert(system.weaponMount.rotation.x >= 0.66 && system.weaponMount.rotation.x <= 0.70,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
-assert(system.weaponMount.rotation.y >= 0.47 && system.weaponMount.rotation.y <= 0.53,
+assert(system.weaponMount.rotation.y >= 0.81 && system.weaponMount.rotation.y <= 0.85,
   `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
 
 // EV.IO's sword is a separate first-person composition: a close right-side
