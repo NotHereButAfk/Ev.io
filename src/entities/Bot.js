@@ -5,7 +5,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyRifleCarry, restRifleTransform } from '../player/RifleCarry.js';
 import { applyWalkCycle } from '../player/Locomotion.js';
 import { applyMeleeCarry } from '../player/Actions.js';
-import { directionToBodyYaw } from '../player/Facing.js';
+import { directionToBodyYaw, turnBodyYaw } from '../player/Facing.js';
 import { getSkin } from '../player/skins.js';
 import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botArenaDetectionDistance, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
@@ -859,9 +859,9 @@ export class Bot {
 
     // Smooth turn toward the desired facing — no more instant snap-arounds.
     if (this._yawInit) {
-      let d = this._targetYaw - this.mesh.rotation.y;
-      d = ((d + Math.PI) % (Math.PI * 2)) - Math.PI;   // shortest way round
-      this.mesh.rotation.y += d * Math.min(1, dt * 9);
+      this.mesh.rotation.y = turnBodyYaw(
+        this.mesh.rotation.y, this._targetYaw, dt, 3.2
+      );
     } else { this.mesh.rotation.y = this._targetYaw; this._yawInit = true; }
 
     // Recoil impulse decays (the weapon-anim block below applies the kick to the

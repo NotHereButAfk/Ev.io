@@ -6,6 +6,7 @@ import {
   cameraYawToBodyYaw,
   directionToBodyYaw,
   movementInBodySpace,
+  turnBodyYaw,
 } from '../src/player/Facing.js';
 
 const EPS = 1e-8;
@@ -30,6 +31,17 @@ assert(near(turningTravel.forward, 1), 'visible forward travel became a sideways
 assert(near(turningTravel.right, 0), 'visible forward travel has false strafe');
 const rightTravel = movementInBodySpace(1, 0, 0);
 assert(near(rightTravel.forward, 0) && near(rightTravel.right, 1), 'body-space strafe projection is inverted');
+
+let boundedYaw = Math.PI - 0.02;
+for (let i = 0; i < 60; i++) {
+  const before = boundedYaw;
+  boundedYaw = turnBodyYaw(boundedYaw, -Math.PI + 0.2, 1 / 60, 3.2);
+  let step = boundedYaw - before;
+  step = ((step + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  assert(Math.abs(step) <= 3.2 / 60 + 1e-8, `body spun too fast (${step})`);
+}
+assert(Math.abs(boundedYaw - (-Math.PI + 0.2)) < 0.01,
+  'body yaw did not take the short path across the seam');
 
 // A movement-derived yaw starts from atan2(dx, dz), which describes local +Z.
 // directionToBodyYaw must rotate local -Z onto the requested world vector.

@@ -36,11 +36,10 @@ export const STATURE = +(EYE_HEIGHT / 0.936).toFixed(3);   // 1.816
 /**
  * World presentation scale for human-controlled characters.
  *
- * Bots keep the full 1.816m chassis so they remain easy to read in combat.
- * Human players render a little shorter, matching the smaller arena-player
- * silhouette without changing the controller capsule or first-person camera.
+ * Players and bots share one enlarged presentation silhouette. Gameplay
+ * capsules and the first-person camera remain unchanged.
  */
-export const PLAYER_WORLD_MODEL_SCALE = 0.95;
+export const PLAYER_WORLD_MODEL_SCALE = 1.5;
 
 const at = (frac) => +(frac * STATURE).toFixed(4);
 

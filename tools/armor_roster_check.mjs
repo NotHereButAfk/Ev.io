@@ -43,11 +43,11 @@ for (const id of PLAYABLE_ARMOR_IDS) {
   assert.notEqual(body.userData?.isHuman, true, `${id} unexpectedly built the retired Soldier body`);
 }
 
-assert.ok(PLAYER_WORLD_MODEL_SCALE < 1 && PLAYER_WORLD_MODEL_SCALE >= 0.9,
-  'human-controlled world model scale must be smaller without becoming toy-sized');
+assert.equal(PLAYER_WORLD_MODEL_SCALE, 1.5,
+  'players and bots must use the requested 1.5x presentation scale');
 const bridgeSource = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
-assert.match(bridgeSource, /modelScale:\s*isBot\s*\?\s*1\s*:\s*PLAYER_WORLD_MODEL_SCALE/,
-  'network humans and bots do not apply their intended relative scales');
+assert.match(bridgeSource, /modelScale:\s*PLAYER_WORLD_MODEL_SCALE/,
+  'network humans and bots do not apply the same enlarged scale');
 assert.match(bridgeSource, /isBot\s*\?\s*DEFAULT_REMOTE_SKIN\s*:/,
   'network bots do not render with the default player skin');
 assert.match(bridgeSource, /isBot\s*\?\s*PLAYABLE_ARMOR_IDS\[0\]/,
@@ -65,8 +65,8 @@ for (const path of ['../src/entities/Bot.js', '../src/net/AuthNetBridge.js']) {
     `${path} does not consume the shared playable armor roster`);
   assert.doesNotMatch(source, /\['assault',\s*'recon',\s*'heavy',\s*'stealth'\]/,
     `${path} still hard-codes the retired Soldier roster`);
-  assert.match(source, /allowHuman:\s*false/,
-    `${path} still permits the retired Soldier runtime fallback`);
+  assert.match(source, /allowHuman:\s*true/,
+    `${path} does not request the shared authored player model`);
 }
 
 console.log('armor roster passed: 3 connected exosuits, legacy saves migrated, bots/remotes unified');

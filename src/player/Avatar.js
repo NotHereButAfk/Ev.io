@@ -6,7 +6,7 @@ import { getWeapon } from '../weapons/weaponDefs.js';
 import { applyWalkCycle, triggerHop } from './Locomotion.js';
 import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
-import { cameraYawToBodyYaw, movementInBodySpace } from './Facing.js';
+import { cameraYawToBodyYaw, movementInBodySpace, turnBodyYaw } from './Facing.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -236,9 +236,7 @@ export class Avatar {
     const yaw = cameraYawToBodyYaw(s.yaw || 0);
     if (!this._yawInit) { g.rotation.y = yaw; this._yawInit = true; }
     else {
-      let d = yaw - g.rotation.y;
-      d = ((d + Math.PI) % (Math.PI * 2)) - Math.PI;
-      g.rotation.y += d * Math.min(1, dt * 14);
+      g.rotation.y = turnBodyYaw(g.rotation.y, yaw, dt, 4.2);
     }
 
     // Presentation LOD never touches network interpolation or position/yaw.
