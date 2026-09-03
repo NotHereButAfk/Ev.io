@@ -14,7 +14,7 @@ export const WEAPON_HAND_POSES = Object.freeze({
   magnum:        { trigger: [0.010, -0.112, 0.105], support: [-0.054, -0.098, 0.090], reload: [-0.025, -0.235, 0.105], supportVisible: false, carry: 'pistol' },
   uzi:           { trigger: [0.010, -0.060, 0.040], support: [-0.010, 0.020, -0.105], reload: [-0.040, -0.190, 0.020], carry: 'compact' },
   levershotgun:  { trigger: [0.010, -0.088, 0.140], support: [-0.012, 0.016, -0.255], reload: [-0.040, -0.225, -0.035], carry: 'shotgun' },
-  m4:            { trigger: [0.012, 0.020, 0.080], support: [-0.012, 0.026, -0.335], reload: [-0.040, -0.260, -0.020] },
+  m4:            { trigger: [0.012, -0.092, 0.200], support: [-0.012, -0.035, -0.440], reload: [-0.040, -0.260, -0.020] },
   m16:           { trigger: [0.012, -0.088, 0.200], support: [-0.012, 0.020, -0.270], reload: [-0.040, -0.250, -0.030] },
   rifle:         { trigger: [0.012, -0.100, 0.150], support: [-0.012, 0.018, -0.225], reload: [-0.040, -0.250, -0.020] },
   lmg:           { trigger: [0.012, -0.114, 0.220], support: [-0.012, 0.012, -0.280], reload: [-0.050, -0.265, 0.010], carry: 'support' },

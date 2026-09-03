@@ -79,8 +79,8 @@ const VIEWMODEL_Z = -0.93;
 // the bottom of the screen: its butt exits near the lower centre/right while
 // the muzzle rises to the open space left of the reticle. The offset and cant
 // are shared by every firearm so swapping weapons never changes handedness.
-const VIEWMODEL_X = 0.035;
-const VIEWMODEL_Y = -0.395;
+const VIEWMODEL_X = 0.110;
+const VIEWMODEL_Y = -0.445;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
 const VIEWMODEL_SCALE = 1.80;
@@ -100,8 +100,8 @@ const FIREARM_MODEL_SCALE = Object.freeze({
   // the correctly framed M4.
   m16: 0.82,
 });
-const VIEWMODEL_PITCH = 0.87;
-const VIEWMODEL_YAW = 0.83;
+const VIEWMODEL_PITCH = 0.78;
+const VIEWMODEL_YAW = 0.98;
 const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
@@ -127,6 +127,15 @@ const REFERENCE_ASPECT = 16 / 9;
 // does not drift all the way into the corner.
 function viewmodelAspectScale(aspect) {
   return THREE.MathUtils.clamp((aspect || REFERENCE_ASPECT) / REFERENCE_ASPECT, 0.32, 1.15);
+}
+
+// Portrait and narrow low-FOV cameras crop the lower-right shoulder pocket far
+// more aggressively than desktop. Lift only those layouts; the 16:9 reference
+// coordinates remain untouched while mobile keeps the trigger hand on screen.
+function viewmodelVerticalPosition(aspect, fov = 78) {
+  const narrow = THREE.MathUtils.clamp((1.5 - (aspect || REFERENCE_ASPECT)) / 0.94, 0, 1);
+  const lowFov = THREE.MathUtils.clamp((78 - (fov || 78)) / 18, 0, 1);
+  return VIEWMODEL_Y + lowFov * 0.245 + narrow * (0.140 + lowFov * 0.040);
 }
 
 // The desktop reference intentionally uses a large, close weapon. Preserve it
@@ -335,7 +344,8 @@ export class WeaponSystem {
     this._swayVelX = 0; this._swayVelY = 0;   // smoothed mouse velocity
     this._bobPhase = 0;                       // continuous bob phase (own clock)
     this._mountPos = new THREE.Vector3(
-      VIEWMODEL_X * viewmodelAspectScale(camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
+      VIEWMODEL_X * viewmodelAspectScale(camera.aspect),
+      viewmodelVerticalPosition(camera.aspect, camera.fov), VIEWMODEL_Z);
     this._mountRot = new THREE.Vector3(VIEWMODEL_PITCH, VIEWMODEL_YAW, VIEWMODEL_ROLL);
     this._raiseT = 1;                         // 0=just switched (lowered) → 1=up
     this._wasGrounded = true;                 // viewmodel landing impulse edge
@@ -403,7 +413,8 @@ export class WeaponSystem {
     // The weapon and visible trigger-side arm share this deeper mount. Moving
     // the model alone would clear the stock but detach the hand from its grip.
     this.weaponMount.position.set(
-      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z);
+      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect),
+      viewmodelVerticalPosition(this.camera.aspect, this.camera.fov), VIEWMODEL_Z);
     this.weaponMount.rotation.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, VIEWMODEL_ROLL);
     this.weaponMount.scale.setScalar(firearmViewmodelScale(this.currentDef, this.camera.aspect));
     this.camera.add(this.weaponMount);
@@ -491,6 +502,7 @@ export class WeaponSystem {
     const box = (w, h, d, material) => new THREE.Mesh(
       new THREE.BoxGeometry(w, h, d), material,
     );
+    this._handSurfaceMeshes = [];
     const up = new THREE.Vector3(0, 1, 0);
     const segment = (a, b, startRadius, endRadius, material, sides = 6) => {
       const direction = b.clone().sub(a);
@@ -518,13 +530,18 @@ export class WeaponSystem {
       hand.name = 'viewmodel_grip';
       arm.add(hand);
 
-      const palm = box(0.086, 0.058, 0.094, this.gloveMat);
+      const palm = box(
+        support ? 0.102 : 0.094,
+        support ? 0.066 : 0.062,
+        support ? 0.118 : 0.106,
+        this.gloveMat,
+      );
       palm.name = 'viewmodel_palm';
       palm.position.set(0, -0.006, -0.034);
       palm.rotation.x = support ? -0.08 : 0.10;
       hand.add(palm);
 
-      const handPlate = box(0.070, 0.012, 0.060, this.armPlateMat);
+      const handPlate = box(0.070, 0.012, 0.060, this.gloveMat);
       handPlate.name = 'viewmodel_hand_plate';
       handPlate.position.set(0, 0.026, -0.020);
       handPlate.rotation.x = palm.rotation.x;
@@ -532,7 +549,12 @@ export class WeaponSystem {
 
       // A single closed finger curl reads as a hand wrapped around the grip.
       // Four separate capsules looked like detached claws at gameplay scale.
-      const fingerCurl = box(0.082, 0.044, 0.064, this.gloveMat);
+      const fingerCurl = box(
+        support ? 0.096 : 0.088,
+        support ? 0.048 : 0.046,
+        support ? 0.074 : 0.068,
+        this.gloveMat,
+      );
       fingerCurl.name = 'viewmodel_finger_curl';
       fingerCurl.position.set(0, -0.032, -0.060);
       fingerCurl.rotation.x = support ? 0.32 : 0.52;
@@ -542,7 +564,7 @@ export class WeaponSystem {
       // deliberately muted map lighting without turning the glove into a set
       // of detached capsule fingers.
       for (const x of [-0.021, 0.021]) {
-        const knuckle = box(0.027, 0.010, 0.033, this.armPlateMat);
+        const knuckle = box(0.027, 0.010, 0.033, this.gloveMat);
         knuckle.name = 'viewmodel_knuckle';
         knuckle.position.set(x, 0.032, -0.044);
         knuckle.rotation.x = palm.rotation.x;
@@ -553,17 +575,20 @@ export class WeaponSystem {
         new THREE.CapsuleGeometry(0.012, 0.032, 3, 7),
         this.gloveMat,
       );
+      thumb.name = 'viewmodel_thumb';
       thumb.position.set(sign * 0.044, -0.002, -0.018);
       thumb.rotation.set(0.62, 0, -sign * 0.78);
       hand.add(thumb);
 
-      arm.add(segment(
+      const wristBridge = segment(
         new THREE.Vector3(0, -0.005, 0.018),
         new THREE.Vector3(0, -0.030, 0.098),
         0.035,
         0.042,
         this.gloveMat,
-      ));
+      );
+      wristBridge.name = 'viewmodel_wrist';
+      arm.add(wristBridge);
       const wrist = new THREE.Vector3(0, -0.025, 0.080);
       const sleeveEnd = new THREE.Vector3(sign * elbow.x, elbow.y, elbow.z);
       // Put a readable elbow in the silhouette. A single wrist→shoulder line
@@ -582,8 +607,8 @@ export class WeaponSystem {
       // the entire visible arm reading as one featureless cylinder.
       const forearm = segment(
         wrist, armorEnd,
-        support ? 0.055 : 0.052,
-        support ? 0.074 : 0.067,
+        support ? 0.046 : 0.044,
+        support ? 0.058 : 0.056,
         support ? this.armPlateMat : this.gloveMat,
         8,
       );
@@ -595,8 +620,8 @@ export class WeaponSystem {
       arm.add(forearm);
       const upperSleeve = segment(
         armorEnd, sleeveEnd,
-        support ? 0.082 : 0.066,
-        support ? 0.110 : 0.084,
+        support ? 0.058 : 0.052,
+        support ? 0.074 : 0.068,
         this.sleeveMat,
         8,
       );
@@ -606,30 +631,39 @@ export class WeaponSystem {
       upperSleeve.visible = true;
       arm.add(upperSleeve);
       const elbowJoint = new THREE.Mesh(
-        new THREE.SphereGeometry(support ? 0.074 : 0.056, 10, 7), this.cuffMat,
+        new THREE.SphereGeometry(support ? 0.047 : 0.043, 8, 6), this.cuffMat,
       );
       elbowJoint.name = 'viewmodel_elbow';
       elbowJoint.position.copy(armorEnd);
       elbowJoint.visible = true;
       arm.add(elbowJoint);
 
-      arm.add(segment(
+      const cuff = segment(
         new THREE.Vector3(0, -0.024, 0.072),
         new THREE.Vector3(0, -0.029, 0.098),
         0.046,
         0.046,
         this.cuffMat,
-      ));
+      );
+      cuff.name = 'viewmodel_cuff';
+      arm.add(cuff);
 
       arm.traverse((object) => {
         if (!object.isMesh) return;
         object.castShadow = true;
-        // Keep the first-person hands in the same depth-independent render
-        // layer as the gun. Draw them after the gun so the fingers visibly
-        // wrap the grips instead of vanishing into nearby floors and walls.
+        // Keep the whole first-person rig independent of world depth. Sleeves
+        // are drawn before the gun, then only the closed hand is drawn after
+        // it. This makes the palm wrap the grip without laying the forearm and
+        // elbow over the receiver like disconnected armour pieces.
         object.material.depthTest = false;
         object.material.depthWrite = false;
-        object.renderOrder = 1001;
+        const handSurface = object.name === 'viewmodel_palm'
+          || object.name === 'viewmodel_hand_plate'
+          || object.name === 'viewmodel_finger_curl'
+          || object.name === 'viewmodel_knuckle'
+          || object.name === 'viewmodel_thumb';
+        object.renderOrder = handSurface ? 1001 : 999;
+        if (handSurface) this._handSurfaceMeshes.push(object);
         object.frustumCulled = false;
       });
       return arm;
@@ -641,7 +675,7 @@ export class WeaponSystem {
       rotation: new THREE.Euler(-0.08, 0.16, -0.08),
       // Compact lower-right exit: ev.io keeps the glove attached to the pistol
       // grip and lets a dark, thick sleeve leave frame without a long arm tube.
-      elbow: new THREE.Vector3(0.25, -0.47, 0.02),
+      elbow: new THREE.Vector3(0.35, -0.65, 0.02),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -649,11 +683,11 @@ export class WeaponSystem {
     const support = gripArm({
       side: 'left',
       position: new THREE.Vector3(-0.050, -0.095, -0.175),
-      rotation: new THREE.Euler(-0.05, -0.40, 0.08),
+      rotation: new THREE.Euler(-0.05, -0.22, -0.14),
       // The support shoulder exits toward the lower-left instead of extending
       // as a near-vertical pole. After the 0.74 viewmodel scale this is a
       // plausible 0.74m hand-to-shoulder reach, versus the old 1.33m on screen.
-      elbow: new THREE.Vector3(0.58, -0.68, 0.30),
+      elbow: new THREE.Vector3(0.85, -0.62, 0.16),
       support: true,
     });
     support.scale.setScalar(0.72);
@@ -689,21 +723,22 @@ export class WeaponSystem {
       trigger[2] + 0.034,
     );
     this.armGroup.scale.set(
-      (portrait ? 0.72 : (narrow ? 0.78 : 0.90)) * handFovScale,
-      (portrait ? 1 : (narrow ? 0.86 : 0.90)) * handFovScale,
-      (portrait ? 0.72 : (narrow ? 0.78 : 0.90)) * handFovScale,
+      (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
+      (portrait ? 0.94 : (narrow ? 0.84 : 0.86)) * handFovScale,
+      (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
     );
 
     const support = pose.support;
+    const supportDepthComp = portrait ? 0.20 : (narrow ? 0.08 : 0);
     this.supportArmGroup.position.set(
       support[0],
       support[1] + 0.006 + (narrow ? 0.035 : 0),
-      support[2] + 0.034,
+      support[2] + 0.034 + supportDepthComp,
     );
     this.supportArmGroup.scale.set(
-      (portrait ? 0.60 : (narrow ? 0.66 : 0.72)) * handFovScale,
+      (portrait ? 0.60 : (narrow ? 0.65 : 0.72)) * handFovScale,
       (portrait ? 0.76 : (narrow ? 0.70 : 0.72)) * handFovScale,
-      (portrait ? 0.60 : (narrow ? 0.66 : 0.72)) * handFovScale,
+      (portrait ? 0.60 : (narrow ? 0.65 : 0.72)) * handFovScale,
     );
     // EV.IO's first-person rifle silhouette includes both the trigger hand and
     // the bracing hand under the fore-end. One-handed weapons keep the support
@@ -712,6 +747,15 @@ export class WeaponSystem {
     this.supportArmGroup.visible = pose.supportVisible !== false;
     this.armGroup.userData.gripTarget = trigger.slice();
     this.supportArmGroup.userData.gripTarget = support.slice();
+  }
+
+  _updateViewmodelHandLayers() {
+    // At hip fire the palms draw over the weapon so they visibly close around
+    // both grips. Once ADS begins, render them beneath the gun instead: the
+    // support glove remains physically attached but cannot paint over the rear
+    // sight or appear as a loose block inside the aiming window.
+    const handOrder = this.scopeT > 0.28 ? 999 : 1001;
+    for (const mesh of this._handSurfaceMeshes || []) mesh.renderOrder = handOrder;
   }
 
   /**
@@ -742,7 +786,7 @@ export class WeaponSystem {
     // floors. Preserve the hue but maintain enough value to read the grip.
     const gloveHsl = {};
     this.gloveMat.color.getHSL(gloveHsl);
-    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.16, gloveHsl.l));
+    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.24, gloveHsl.l));
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
     this.cuffMat.emissiveIntensity = 0.05;
@@ -930,7 +974,8 @@ export class WeaponSystem {
     this._shotBloom = 0;
     this.prevMouseDown = false;
     this._mountPos.set(
-      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect), VIEWMODEL_Y, VIEWMODEL_Z,
+      VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect),
+      viewmodelVerticalPosition(this.camera.aspect, this.camera.fov), VIEWMODEL_Z,
     );
     this._mountRot.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, VIEWMODEL_ROLL);
     this.weaponMount?.position.copy(this._mountPos);
@@ -1768,6 +1813,7 @@ export class WeaponSystem {
     // the same motion rather than disappearing on the first held frame.
     const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
     this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
+    this._updateViewmodelHandLayers();
     this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT, wantScope);
     // Aiming keeps a trace of organic motion, but removes enough viewmodel
     // travel that the physical sight and fixed scope overlay do not disagree.
@@ -1962,7 +2008,7 @@ export class WeaponSystem {
       : baseX + sprintShiftX;
     const hipY = swordGuard
       ? SWORD_VIEWMODEL_Y - sprintCarry * 0.075
-      : VIEWMODEL_Y + sprintDropY;
+      : viewmodelVerticalPosition(this.camera.aspect, this.camera.fov) + sprintDropY;
     const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - sprintCarry * 0.025 : VIEWMODEL_Z;
     const activeViewmodelScale = swordGuard
       ? MELEE_VIEWMODEL_SCALE

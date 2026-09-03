@@ -474,17 +474,17 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-assert(system.weaponMount.position.x >= 0.02 && system.weaponMount.position.x <= 0.05,
+assert(system.weaponMount.position.x >= 0.10 && system.weaponMount.position.x <= 0.12,
   `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.42 && system.weaponMount.position.y <= -0.37,
+assert(system.weaponMount.position.y >= -0.46 && system.weaponMount.position.y <= -0.43,
   `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
 assert(system.weaponMount.position.z >= -0.95 && system.weaponMount.position.z <= -0.91,
   `EV.IO rifle depth drifted (${system.weaponMount.position.z})`);
 assert(system.weaponMount.scale.x >= 1.77 && system.weaponMount.scale.x <= 1.83,
   `EV.IO rifle first-person scale drifted (${system.weaponMount.scale.x})`);
-assert(system.weaponMount.rotation.x >= 0.84 && system.weaponMount.rotation.x <= 0.90,
+assert(system.weaponMount.rotation.x >= 0.75 && system.weaponMount.rotation.x <= 0.81,
   `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
-assert(system.weaponMount.rotation.y >= 0.81 && system.weaponMount.rotation.y <= 0.85,
+assert(system.weaponMount.rotation.y >= 0.95 && system.weaponMount.rotation.y <= 1.01,
   `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
 
 // EV.IO's sword is a separate first-person composition: a close right-side
@@ -571,6 +571,11 @@ let worstGlove = { value: Infinity, label: '' };
 assert(system.armGroup.visible && system.supportArmGroup.visible,
   'two-handed rifle must render both first-person hands');
 const m4HandPose = weaponHandPose('m4');
+assert(m4HandPose.trigger[1] <= -0.085 && m4HandPose.trigger[2] >= 0.19,
+  `M4 trigger hand left the rear pistol grip (${JSON.stringify(m4HandPose.trigger)})`);
+assert(m4HandPose.support[1] >= -0.045 && m4HandPose.support[1] <= -0.025
+  && m4HandPose.support[2] <= -0.43,
+  `M4 support hand left the forward handguard (${JSON.stringify(m4HandPose.support)})`);
 assert(system.armGroup.userData.viewmodelHand === 'trigger'
   && system.supportArmGroup.userData.viewmodelHand === 'support',
   'first-person handedness no longer matches the remote Soldier hold');
@@ -580,7 +585,13 @@ assert(JSON.stringify(system.armGroup.userData.gripTarget) === JSON.stringify(m4
 for (const arm of [system.armGroup, system.supportArmGroup]) {
   arm.traverse((object) => {
     if (!object.isMesh) return;
-    assert(!object.material.depthTest && !object.material.depthWrite && object.renderOrder >= 1001,
+    const handSurface = object.name === 'viewmodel_palm'
+      || object.name === 'viewmodel_hand_plate'
+      || object.name === 'viewmodel_finger_curl'
+      || object.name === 'viewmodel_knuckle'
+      || object.name === 'viewmodel_thumb';
+    const correctLayer = handSurface ? object.renderOrder >= 1001 : object.renderOrder <= 999;
+    assert(!object.material.depthTest && !object.material.depthWrite && correctLayer,
       `${arm.userData.viewmodelHand} hand can disappear into world geometry`);
   });
 }
@@ -615,7 +626,7 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // bottom edge while the closed grip itself stays readable.
         const minimum = side === 'support'
           ? (viewport.aspect < 1 ? 0.08 : 0.18)
-          : (viewport.aspect < 1.5 ? 0.15 : 0.34);
+          : (viewport.aspect < 1.5 ? 0.15 : 0.30);
         assert(
           ratio >= minimum,
           `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible (${JSON.stringify(lastGloveBounds)})`,
@@ -727,6 +738,19 @@ assert(spread(sprintSamples, 'blend') < 1e-10, 'sprint carry blend changes with 
 assert(spread(adsSamples, 'blend') < 1e-10, 'ADS blend changes with refresh rate');
 assert(spread(sprintSamples, 'fov') < 1e-9, 'sprint FOV changes with refresh rate');
 assert(spread(adsSamples, 'fov') < 1e-9, 'ADS FOV changes with refresh rate');
+
+// The hands wrap over the gun at hip fire, but must move beneath its render
+// layer while aiming so a depth-independent glove cannot cover the rear sight.
+activate(WEAPONS.find((def) => def.id === 'm4'));
+resetMotionState();
+input.rightMouseDown = true;
+advanceSeconds(0.5, 60);
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 999),
+  'ADS glove still renders over the sight picture');
+input.rightMouseDown = false;
+advanceSeconds(0.5, 60);
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 1001),
+  'hip-fire glove did not return over the physical grips');
 
 // The recoil spring used to be Euler-integrated and visibly recovered at a
 // different rate on 30Hz displays. Its full position and rotation state must
