@@ -1,9 +1,15 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { WEAPONS, isMainWeaponId, isMatchPickupWeaponId } from './weaponDefs.js';
 import { weaponHandPose } from './WeaponHandPoses.js';
 import { buildWeaponModel, onWeaponModelsReady } from './WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from './WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from './SwordSkins.js';
+import {
+  buildViewmodelArm,
+  preloadViewmodelArms,
+  tintViewmodelArm,
+} from '../player/ViewmodelArms.js';
 import {
   advanceFireCooldown,
   isRunningAndFiring,
@@ -451,10 +457,105 @@ export class WeaponSystem {
     }
     this._setActiveModel(0);
     this._buildArm();
+    preloadViewmodelArms((ready) => {
+      if (ready) this._installAuthoredViewmodelArms();
+    });
 
     // The viewmodels above are procedural (the GLB loads async and is rarely
     // ready this early). Swap in the detailed Blender models once it arrives.
     onWeaponModelsReady(() => this._refreshModels());
+  }
+
+  _installAuthoredViewmodelArms() {
+    this._handSurfaceMeshes = [];
+    const makeArm = (side, support) => {
+      const model = buildViewmodelArm(side);
+      if (!model) return null;
+      const arm = new THREE.Group();
+      arm.userData.viewmodelHand = support ? 'support' : 'trigger';
+      arm.userData.authoredViewArm = true;
+      arm.userData.sleeveLength = support ? 0.74 : 0.78;
+
+      const grip = new THREE.Group();
+      grip.name = 'viewmodel_grip';
+      arm.add(grip);
+      // The baked asset is wrist-centred. Move the centre of its closed palm
+      // onto the authored weapon contact, while retaining the exact bent arm
+      // and gauntlet from the player model.
+      model.position.set(
+        support ? -0.043 : 0.028,
+        support ? -0.075 : -0.080,
+        support ? -0.053 : -0.017,
+      );
+      grip.add(model);
+
+      if (support) {
+        // The exported first-person asset intentionally stops at the elbow so
+        // no shoulder mass can enter the camera. Continue the same dark suit
+        // through the lower-left edge with a short tapered bridge behind the
+        // authored forearm guard.
+        const start = new THREE.Vector3(-0.225, -0.165, -0.030);
+        const end = new THREE.Vector3(-0.665, -0.710, 0.180);
+        const direction = end.clone().sub(start);
+        const extension = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.086, 0.062, direction.length(), 10),
+          this.sleeveMat.clone(),
+        );
+        extension.name = 'viewmodel_upper_sleeve_extension';
+        extension.position.copy(start).add(end).multiplyScalar(0.5);
+        extension.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+        extension.material.depthTest = false;
+        extension.material.depthWrite = false;
+        extension.renderOrder = 998;
+        extension.frustumCulled = false;
+        model.add(extension);
+      }
+
+      model.traverse((object) => {
+        if (!object.isMesh) return;
+        const handSurface = /_Hand$/i.test(object.name);
+        if (handSurface) {
+          object.userData.viewmodelPart = 'glove';
+          object.name = 'viewmodel_palm';
+          object.userData.authoredViewArm = true;
+          this._handSurfaceMeshes.push(object);
+        } else if (/_Sleeve$/i.test(object.name)) {
+          object.userData.viewmodelPart = 'sleeve';
+          object.name = 'viewmodel_upper_sleeve';
+        } else if (/ForearmGuard/i.test(object.name)) {
+          object.userData.viewmodelPart = 'plate';
+          object.name = 'viewmodel_gauntlet';
+        }
+        object.renderOrder = handSurface ? 1001 : 999;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) {
+          material.depthTest = false;
+          material.depthWrite = false;
+        }
+      });
+      tintViewmodelArm(arm, this._armAppearance || {
+        plate: 0xc4c6d4,
+        sleeve: 0x202428,
+        glove: 0x0d1013,
+        accent: 0xc7ff34,
+      });
+      return arm;
+    };
+
+    const trigger = makeArm('Right', false);
+    const support = makeArm('Left', true);
+    if (!trigger || !support) return;
+    if (this.armGroup) this.kickGroup.remove(this.armGroup);
+    if (this.supportArmGroup) this.kickGroup.remove(this.supportArmGroup);
+    this.armGroup = trigger;
+    this.supportArmGroup = support;
+    // GunIdle already supplies a natural wrist roll. These small corrections
+    // align that baked hold with the first-person weapon's local forward axis.
+    trigger.rotation.set(-0.02, 0.08, -0.04);
+    support.rotation.set(-0.03, -0.10, -0.08);
+    this.kickGroup.add(trigger, support);
+    this._applyViewmodelHandPose();
+    this._updateViewmodelHandLayers();
   }
 
   // Rebuild every viewmodel (e.g. after the weapon GLB finishes loading),
@@ -493,14 +594,19 @@ export class WeaponSystem {
       color: 0x353e4a, roughness: 0.58, metalness: 0.08, envMapIntensity: 1.0,
     });
     this.cuffMat = new THREE.MeshStandardMaterial({
-      color: 0x0c0e12, roughness: 0.6, metalness: 0.08,
+      color: 0x79cbd6, roughness: 0.48, metalness: 0.18,
+      emissive: 0x79cbd6, emissiveIntensity: 0.05,
+    });
+    this.jointMat = new THREE.MeshStandardMaterial({
+      color: 0x0c0e12, roughness: 0.66, metalness: 0.06,
     });
     this.armPlateMat = new THREE.MeshStandardMaterial({
       color: 0x657080, roughness: 0.5, metalness: 0.26, envMapIntensity: 0.8,
     });
 
-    const box = (w, h, d, material) => new THREE.Mesh(
-      new THREE.BoxGeometry(w, h, d), material,
+    const rounded = (w, h, d, radius, material) => new THREE.Mesh(
+      new RoundedBoxGeometry(w, h, d, 3, Math.min(radius, w * 0.22, h * 0.22, d * 0.22)),
+      material,
     );
     this._handSurfaceMeshes = [];
     const up = new THREE.Vector3(0, 1, 0);
@@ -514,12 +620,19 @@ export class WeaponSystem {
       mesh.quaternion.setFromUnitVectors(up, direction.normalize());
       return mesh;
     };
+    const plateAlong = (a, b, width, depth, material, offset = new THREE.Vector3()) => {
+      const direction = b.clone().sub(a);
+      const mesh = rounded(width, direction.length(), depth, Math.min(width, depth) * 0.15, material);
+      mesh.position.copy(a).add(b).multiplyScalar(0.5).add(offset);
+      mesh.quaternion.setFromUnitVectors(up, direction.normalize());
+      return mesh;
+    };
 
-    // Distinct closed-grip poses replace the old negatively-scaled clone. The
-    // sleeve still exits below the camera, but its authored length stays within
-    // a real arm. The previous endpoints were 1.64m / 1.80m from the wrist —
-    // longer than the whole character's shoulder-to-floor distance — which is
-    // why first person showed two black poles attached to otherwise good hands.
+    // This is the first-person version of the authored KYX warrior arm: dark
+    // fitted undersuit, flared hard-surface gauntlet, bright outer rail, dark
+    // wrist seal, knuckle plate and an actually closed glove.  The previous
+    // rig used one cylinder for each limb and one box for each hand, which is
+    // why it never resembled the skinned player even when its colours matched.
     const gripArm = ({ side, position, rotation, elbow, support = false }) => {
       const sign = side === 'left' ? -1 : 1;
       const arm = new THREE.Group();
@@ -530,120 +643,156 @@ export class WeaponSystem {
       hand.name = 'viewmodel_grip';
       arm.add(hand);
 
-      const palm = box(
-        support ? 0.102 : 0.094,
-        support ? 0.066 : 0.062,
-        support ? 0.118 : 0.106,
-        this.gloveMat,
+      // Palm and fingers sit around the physical contact point. The palm is
+      // deliberately dark like the third-person glove; the armour colour is
+      // reserved for the plate on the back of the hand and forearm.
+      const palm = rounded(
+        support ? 0.096 : 0.090,
+        support ? 0.074 : 0.070,
+        support ? 0.112 : 0.104,
+        0.014, this.gloveMat,
       );
       palm.name = 'viewmodel_palm';
-      palm.position.set(0, -0.006, -0.034);
-      palm.rotation.x = support ? -0.08 : 0.10;
+      palm.position.set(0, -0.004, -0.031);
+      palm.rotation.set(support ? -0.14 : 0.08, 0, sign * (support ? 0.04 : 0.02));
       hand.add(palm);
 
-      const handPlate = box(0.070, 0.012, 0.060, this.gloveMat);
+      const handPlate = rounded(
+        support ? 0.062 : 0.058,
+        0.014,
+        support ? 0.052 : 0.048,
+        0.006, this.armPlateMat,
+      );
       handPlate.name = 'viewmodel_hand_plate';
-      handPlate.position.set(0, 0.026, -0.020);
-      handPlate.rotation.x = palm.rotation.x;
+      handPlate.position.set(0, 0.035, -0.021);
+      handPlate.rotation.copy(palm.rotation);
       hand.add(handPlate);
 
-      // A single closed finger curl reads as a hand wrapped around the grip.
-      // Four separate capsules looked like detached claws at gameplay scale.
-      const fingerCurl = box(
-        support ? 0.096 : 0.088,
-        support ? 0.048 : 0.046,
-        support ? 0.074 : 0.068,
-        this.gloveMat,
+      // The connected lower finger pad supplies the closed silhouette; four
+      // shallow finger segments on top make it read as a hand instead of the
+      // floating cube seen in the reported screenshot.
+      const fingerCurl = rounded(
+        support ? 0.092 : 0.084,
+        support ? 0.044 : 0.042,
+        support ? 0.078 : 0.070,
+        0.011, this.gloveMat,
       );
       fingerCurl.name = 'viewmodel_finger_curl';
-      fingerCurl.position.set(0, -0.032, -0.060);
-      fingerCurl.rotation.x = support ? 0.32 : 0.52;
+      fingerCurl.position.set(0, -0.037, -0.057);
+      fingerCurl.rotation.x = support ? 0.38 : 0.54;
       hand.add(fingerCurl);
 
-      // Two shallow knuckle ribs keep the closed silhouette readable under the
-      // deliberately muted map lighting without turning the glove into a set
-      // of detached capsule fingers.
-      for (const x of [-0.021, 0.021]) {
-        const knuckle = box(0.027, 0.010, 0.033, this.gloveMat);
+      for (const x of [-0.030, -0.010, 0.010, 0.030]) {
+        const knuckle = rounded(0.017, 0.013, 0.043, 0.005, this.gloveMat);
         knuckle.name = 'viewmodel_knuckle';
-        knuckle.position.set(x, 0.032, -0.044);
-        knuckle.rotation.x = palm.rotation.x;
+        knuckle.position.set(x, 0.039, -0.042);
+        knuckle.rotation.set(palm.rotation.x - 0.06, 0, sign * -0.015);
         hand.add(knuckle);
       }
 
       const thumb = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.012, 0.032, 3, 7),
+        new THREE.CapsuleGeometry(0.013, support ? 0.038 : 0.034, 4, 8),
         this.gloveMat,
       );
       thumb.name = 'viewmodel_thumb';
-      thumb.position.set(sign * 0.044, -0.002, -0.018);
-      thumb.rotation.set(0.62, 0, -sign * 0.78);
+      thumb.position.set(sign * 0.047, -0.001, -0.025);
+      thumb.rotation.set(support ? 0.72 : 0.62, 0.10, -sign * (support ? 0.88 : 0.78));
       hand.add(thumb);
 
       const wristBridge = segment(
-        new THREE.Vector3(0, -0.005, 0.018),
-        new THREE.Vector3(0, -0.030, 0.098),
-        0.035,
-        0.042,
+        new THREE.Vector3(0, -0.005, 0.020),
+        new THREE.Vector3(0, -0.031, 0.100),
+        0.037,
+        0.043,
         this.gloveMat,
+        10,
       );
       wristBridge.name = 'viewmodel_wrist';
       arm.add(wristBridge);
-      const wrist = new THREE.Vector3(0, -0.025, 0.080);
+      const wrist = new THREE.Vector3(0, -0.027, 0.084);
       const sleeveEnd = new THREE.Vector3(sign * elbow.x, elbow.y, elbow.z);
-      // Put a readable elbow in the silhouette. A single wrist→shoulder line
-      // makes even correctly sized geometry look telescopic in perspective.
-      // The bright shell stops at the elbow; the darker upper sleeve turns out
-      // toward the shoulder and disappears into the lower/side frame.
-      const armorEnd = new THREE.Vector3(
-        sign * (support ? 0.10 : 0.08),
-        support ? -0.15 : -0.14,
-        support ? 0.02 : 0.03,
-      );
+      // Only the forearm belongs in a first-person camera. Keep the anatomical
+      // elbow at the lower frame edge, then let the unseen upper arm continue
+      // outside the viewport. Putting an elbow halfway up the screen was what
+      // made the old support limb look like a skinny upper-arm pole.
+      const armorEnd = wrist.clone().lerp(sleeveEnd, support ? 0.64 : 0.58);
       arm.userData.sleeveLength = wrist.distanceTo(sleeveEnd);
 
-      // A short hard-surface forearm shell followed by a dark flexible sleeve.
-      // Splitting the silhouette here matches the third-person exosuit and stops
-      // the entire visible arm reading as one featureless cylinder.
+      // Continuous dark anatomy underneath the armour. The wider elbow end and
+      // ten-sided section match the faceted-but-human proportions of the live
+      // Blender body without producing another featureless pole.
       const forearm = segment(
         wrist, armorEnd,
-        support ? 0.046 : 0.044,
-        support ? 0.058 : 0.056,
-        support ? this.armPlateMat : this.gloveMat,
-        8,
+        support ? 0.054 : 0.050,
+        support ? 0.088 : 0.080,
+        this.sleeveMat,
+        10,
       );
       forearm.name = 'viewmodel_forearm';
-      // EV.IO visibly braces the handguard with the support forearm. Keep the
-      // compact forearm shell and taper the shoulder segment into the lower
-      // edge so it reads as one bent arm rather than a disconnected glove.
       forearm.visible = true;
       arm.add(forearm);
+
+      // Authored KYX gauntlet: a broad white/skin-coloured outer shell, dark
+      // wrist seal, thin accent rail and elbow cap. These proportions mirror
+      // KYX_ForearmGuard and KYX_Gauntlet in the actual player asset.
+      // The player's authored model has a compact flared cuff near the hand,
+      // not a white plank covering the entire arm. Leave most of the shaped
+      // dark forearm visible and armour only the wrist-side third.
+      const guardStart = wrist.clone().lerp(armorEnd, 0.08);
+      const guardEnd = wrist.clone().lerp(armorEnd, 0.40);
+      const guard = plateAlong(
+        guardStart, guardEnd,
+        support ? 0.118 : 0.106,
+        support ? 0.076 : 0.070,
+        this.armPlateMat,
+        new THREE.Vector3(0, 0.008, -0.012),
+      );
+      guard.name = 'viewmodel_gauntlet';
+      arm.add(guard);
+      const rail = plateAlong(
+        wrist.clone().lerp(armorEnd, 0.16),
+        wrist.clone().lerp(armorEnd, 0.36),
+        0.016, 0.011, this.cuffMat,
+        new THREE.Vector3(sign * (support ? 0.055 : 0.049), 0.011, -0.038),
+      );
+      rail.name = 'viewmodel_gauntlet_accent';
+      arm.add(rail);
+
       const upperSleeve = segment(
         armorEnd, sleeveEnd,
-        support ? 0.058 : 0.052,
-        support ? 0.074 : 0.068,
+        support ? 0.088 : 0.080,
+        support ? 0.110 : 0.098,
         this.sleeveMat,
-        8,
+        10,
       );
       upperSleeve.name = 'viewmodel_upper_sleeve';
-      // Both sleeves are part of the first-person silhouette; one-handed weapon
-      // poses hide the complete support arm below.
       upperSleeve.visible = true;
       arm.add(upperSleeve);
       const elbowJoint = new THREE.Mesh(
-        new THREE.SphereGeometry(support ? 0.047 : 0.043, 8, 6), this.cuffMat,
+        new THREE.SphereGeometry(support ? 0.087 : 0.079, 10, 8), this.jointMat,
       );
       elbowJoint.name = 'viewmodel_elbow';
       elbowJoint.position.copy(armorEnd);
       elbowJoint.visible = true;
       arm.add(elbowJoint);
+      const elbowCapStart = wrist.clone().lerp(armorEnd, 0.88);
+      const elbowCap = plateAlong(
+        elbowCapStart, armorEnd,
+        support ? 0.122 : 0.110,
+        support ? 0.078 : 0.072,
+        this.armPlateMat,
+        new THREE.Vector3(0, 0.006, -0.010),
+      );
+      elbowCap.name = 'viewmodel_elbow_plate';
+      arm.add(elbowCap);
 
       const cuff = segment(
-        new THREE.Vector3(0, -0.024, 0.072),
-        new THREE.Vector3(0, -0.029, 0.098),
-        0.046,
-        0.046,
-        this.cuffMat,
+        new THREE.Vector3(0, -0.023, 0.071),
+        new THREE.Vector3(0, -0.031, 0.104),
+        0.048,
+        0.049,
+        this.jointMat,
+        10,
       );
       cuff.name = 'viewmodel_cuff';
       arm.add(cuff);
@@ -673,9 +822,9 @@ export class WeaponSystem {
       side: 'right',
       position: new THREE.Vector3(0.012, -0.102, 0.165),
       rotation: new THREE.Euler(-0.08, 0.16, -0.08),
-      // Compact lower-right exit: ev.io keeps the glove attached to the pistol
-      // grip and lets a dark, thick sleeve leave frame without a long arm tube.
-      elbow: new THREE.Vector3(0.35, -0.65, 0.02),
+      // The trigger elbow bends toward the lower-right shoulder pocket instead
+      // of vanishing behind the receiver as a straight wrist extension.
+      elbow: new THREE.Vector3(0.46, -0.66, 0.12),
     });
     this.kickGroup.add(trigger);
     this.armGroup = trigger;
@@ -684,10 +833,9 @@ export class WeaponSystem {
       side: 'left',
       position: new THREE.Vector3(-0.050, -0.095, -0.175),
       rotation: new THREE.Euler(-0.05, -0.22, -0.14),
-      // The support shoulder exits toward the lower-left instead of extending
-      // as a near-vertical pole. After the 0.74 viewmodel scale this is a
-      // plausible 0.74m hand-to-shoulder reach, versus the old 1.33m on screen.
-      elbow: new THREE.Vector3(0.85, -0.62, 0.16),
+      // A pronounced elbow turn gives the left arm two readable human segments:
+      // forearm to handguard, upper arm to the lower-left edge.
+      elbow: new THREE.Vector3(0.72, -0.68, 0.24),
       support: true,
     });
     support.scale.setScalar(0.72);
@@ -714,13 +862,15 @@ export class WeaponSystem {
       1.25,
     );
 
-    // gripArm's palm centre is offset (0,-.006,-.034) from its group origin.
-    // Convert the desired physical contact point back to that group origin.
+    // The fallback palm has a small internal centre offset. The authored arm is
+    // already palm-centred by its Blender bake, so its wrist wrapper lands on
+    // the physical contact without inheriting that legacy correction.
     const trigger = pose.trigger;
+    const triggerAuthored = this.armGroup.userData.authoredViewArm;
     this.armGroup.position.set(
       trigger[0],
-      trigger[1] + 0.006 + (narrow ? 0.065 : 0),
-      trigger[2] + 0.034,
+      trigger[1] + (triggerAuthored ? 0 : 0.006) + (narrow ? 0.065 : 0),
+      trigger[2] + (triggerAuthored ? -0.100 : 0.034),
     );
     this.armGroup.scale.set(
       (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
@@ -729,16 +879,23 @@ export class WeaponSystem {
     );
 
     const support = pose.support;
+    const supportAuthored = this.supportArmGroup.userData.authoredViewArm;
     const supportDepthComp = portrait ? 0.20 : (narrow ? 0.08 : 0);
+    const supportWidthScale = supportAuthored
+      ? (portrait ? 0.49 : (narrow ? 0.65 : 0.70))
+      : (portrait ? 0.43 : 0.54);
+    const supportLengthScale = supportAuthored
+      ? (portrait ? 0.62 : (narrow ? 0.70 : 0.70))
+      : (portrait ? 0.52 : 0.54);
     this.supportArmGroup.position.set(
       support[0],
-      support[1] + 0.006 + (narrow ? 0.035 : 0),
-      support[2] + 0.034 + supportDepthComp,
+      support[1] + (supportAuthored ? 0 : 0.006) + (narrow ? 0.035 : 0),
+      support[2] + (supportAuthored ? 0.080 : 0.034) + supportDepthComp,
     );
     this.supportArmGroup.scale.set(
-      (portrait ? 0.60 : (narrow ? 0.65 : 0.72)) * handFovScale,
-      (portrait ? 0.76 : (narrow ? 0.70 : 0.72)) * handFovScale,
-      (portrait ? 0.60 : (narrow ? 0.65 : 0.72)) * handFovScale,
+      supportWidthScale * handFovScale,
+      supportLengthScale * handFovScale,
+      supportWidthScale * handFovScale,
     );
     // EV.IO's first-person rifle silhouette includes both the trigger hand and
     // the bracing hand under the fore-end. One-handed weapons keep the support
@@ -755,7 +912,14 @@ export class WeaponSystem {
     // support glove remains physically attached but cannot paint over the rear
     // sight or appear as a loose block inside the aiming window.
     const handOrder = this.scopeT > 0.28 ? 999 : 1001;
-    for (const mesh of this._handSurfaceMeshes || []) mesh.renderOrder = handOrder;
+    for (const mesh of this._handSurfaceMeshes || []) {
+      // The authored glove is one continuous palm/finger mesh with real depth.
+      // Drawing that whole mesh over the receiver paints a fist on top of the
+      // gun. Keep it behind the weapon; only its outside fingers and knuckles
+      // remain visible around the grip. The fallback's separated finger pieces
+      // still use the over/under layer swap below.
+      mesh.renderOrder = mesh.userData.authoredViewArm ? 999 : handOrder;
+    }
   }
 
   /**
@@ -776,7 +940,11 @@ export class WeaponSystem {
 
   /** Apply the exact equipped character palette to the first-person gauntlet. */
   setArmAppearance({ plate, sleeve, glove, accent }) {
-    this.armPlateMat.color.setHex(plate).multiplyScalar(0.34);
+    this._armAppearance = { plate, sleeve, glove, accent };
+    // Use the same readable plate value as the authored third-person armour.
+    // The old 0.34 multiplier turned white/orange armour into an unrelated gray
+    // stick, which is especially obvious when the local player is beside a bot.
+    this.armPlateMat.color.setHex(plate).multiplyScalar(0.82);
     this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.30);
     const sleeveHsl = {};
     this.sleeveMat.color.getHSL(sleeveHsl);
@@ -786,10 +954,17 @@ export class WeaponSystem {
     // floors. Preserve the hue but maintain enough value to read the grip.
     const gloveHsl = {};
     this.gloveMat.color.getHSL(gloveHsl);
-    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.24, gloveHsl.l));
+    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.09, gloveHsl.l));
+    this.jointMat.color.copy(this.gloveMat.color).multiplyScalar(0.52);
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
     this.cuffMat.emissiveIntensity = 0.05;
+    if (this.armGroup?.userData.authoredViewArm) {
+      tintViewmodelArm(this.armGroup, this._armAppearance);
+    }
+    if (this.supportArmGroup?.userData.authoredViewArm) {
+      tintViewmodelArm(this.supportArmGroup, this._armAppearance);
+    }
   }
 
   /** Apply a cosmetic weapon finish to all gun (non-melee) models. */
