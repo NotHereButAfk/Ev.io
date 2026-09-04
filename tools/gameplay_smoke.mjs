@@ -225,7 +225,7 @@ try {
   // enough animation frames.
   await page.waitForFunction(() => {
     const ws = (window.__game || window.game)?.weaponSystem;
-    return ws?.scopeT > 0.9 && ws.camera.fov < 47;
+    return ws?.scopeT > 0.9 && ws.camera.fov < 53;
   }, null, { timeout: 8000 });
   const adsState = await game(`return { scopeT:g.weaponSystem.scopeT,
     visible:g.weaponSystem.kickGroup.visible,
@@ -235,7 +235,7 @@ try {
     ry:g.weaponSystem.weaponMount.rotation.y,
     rz:g.weaponSystem.weaponMount.rotation.z };`);
   assert(adsState.scopeT > 0.9 && adsState.visible
-    && adsState.fov > 44 && adsState.fov < 47
+    && adsState.fov > 51 && adsState.fov < 53
     && adsState.z < -0.35
     // Pitch can still carry the independent landing pulse from the jump probe.
     && Math.abs(adsState.rx) < 0.12

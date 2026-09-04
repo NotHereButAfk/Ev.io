@@ -212,8 +212,8 @@ const ADS_SIGHT_Y = -0.018;
 // At 0.012 the camera looked straight down the receiver and the orange upper
 // housing became a solid vertical slab over the target. The shot still follows
 // the centre reticle; this is presentation-only clearance.
-const ADS_VIEWMODEL_DROP = 0.075;
-const DEFAULT_ADS_FOV = 46;
+const ADS_VIEWMODEL_DROP = 0.115;
+const DEFAULT_ADS_FOV = 52;
 const ADS_PITCH = 0;
 const ADS_YAW = 0;
 const ADS_ROLL = 0;
@@ -551,10 +551,12 @@ export class WeaponSystem {
     if (this.supportArmGroup) this.kickGroup.remove(this.supportArmGroup);
     this.armGroup = trigger;
     this.supportArmGroup = support;
-    // GunIdle already supplies a natural wrist roll. These small corrections
-    // align that baked hold with the first-person weapon's local forward axis.
+    // GunIdle already supplies the shoulder/elbow bend and natural wrist roll.
+    // Only a small local correction is needed here.  The old 0.78-radian
+    // support-arm pitch stacked a second 45-degree bend onto the baked pose,
+    // producing the long disconnected diagonal arm seen in first person.
     trigger.rotation.set(-0.02, 0.08, -0.04);
-    support.rotation.set(0.78, -0.10, -0.08);
+    support.rotation.set(0.18, -0.08, -0.06);
     this.kickGroup.add(trigger, support);
     this._applyViewmodelHandPose();
     this._updateViewmodelHandLayers();
@@ -879,19 +881,19 @@ export class WeaponSystem {
       trigger[2] + (triggerAuthored ? 0 : 0.034),
     );
     this.armGroup.scale.set(
-      (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
-      (portrait ? 0.94 : (narrow ? 0.84 : 0.86)) * handFovScale,
-      (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
+      (portrait ? 0.76 : (narrow ? 0.82 : 0.88)) * handFovScale,
+      (portrait ? 0.96 : (narrow ? 0.86 : 0.88)) * handFovScale,
+      (portrait ? 0.76 : (narrow ? 0.82 : 0.88)) * handFovScale,
     );
 
     const support = pose.support;
     const supportAuthored = this.supportArmGroup.userData.authoredViewArm;
     const supportDepthComp = portrait ? 0.20 : (narrow ? 0.08 : 0);
     const supportWidthScale = supportAuthored
-      ? (portrait ? 0.49 : (narrow ? 0.65 : 0.70))
+      ? (portrait ? 0.57 : (narrow ? 0.76 : 0.86))
       : (portrait ? 0.43 : 0.54);
     const supportLengthScale = supportAuthored
-      ? (portrait ? 0.62 : (narrow ? 0.70 : 0.70))
+      ? (portrait ? 0.70 : (narrow ? 0.80 : 0.86))
       : (portrait ? 0.52 : 0.54);
     this.supportArmGroup.position.set(
       support[0],
@@ -1984,13 +1986,17 @@ export class WeaponSystem {
     // Every EV.IO firearm can zoom. Regular guns remain visible and travel
     // onto their physical sight axis; snipers hand off to the overlay late in
     // the same motion rather than disappearing on the first held frame.
-    const wantScope = def.kind !== 'melee' && input.rightMouseDown && !player.isSprinting;
+    const wantScope = def.kind !== 'melee'
+      && input.rightMouseDown
+      && !player.isSprinting
+      && !st.isReloading;
     this.scopeT = expDamp(this.scopeT, wantScope ? 1 : 0, def.adsSpeed || 11, dt);
     this._updateViewmodelHandLayers();
     this.kickGroup.visible = !shouldHideAdsViewmodel(def, this.scopeT, wantScope);
-    // Aiming keeps a trace of organic motion, but removes enough viewmodel
-    // travel that the physical sight and fixed scope overlay do not disagree.
-    const adsMotionScale = THREE.MathUtils.lerp(1, def.scoped ? 0.05 : 0.10, this.scopeT);
+    // Full ADS is a stable sight picture. Movement remains visible in the
+    // world/camera, but viewmodel breathing, sway, and gait bob fade completely
+    // instead of driving the receiver up and down across the target.
+    const adsMotionScale = 1 - this.scopeT;
     const sprintFovBoost = this._sprintT * 6;
     const aimedFov = def.scoped ? 28 : (def.adsFov ?? DEFAULT_ADS_FOV);
     const targetFov = THREE.MathUtils.lerp(player.baseFov + sprintFovBoost, aimedFov, this.scopeT);
@@ -2152,8 +2158,9 @@ export class WeaponSystem {
     const rBell = reloadP > 0 ? Math.sin(Math.PI * reloadP) : 0;
     const rack  = reloadP > 0 ? Math.exp(-Math.pow((reloadP - 0.62) / 0.055, 2)) : 0;
     const reloadFrameScale = viewmodelReloadScale(this.camera.aspect);
-    const framedBell = rBell * reloadFrameScale;
-    const framedRack = rack * reloadFrameScale;
+    const adsClearance = 1 - this.scopeT;
+    const framedBell = rBell * reloadFrameScale * adsClearance;
+    const framedRack = rack * reloadFrameScale * adsClearance;
 
     // ADS + sprint blends → SMOOTHED mount target, then eased (no snap on
     // start/stop sprint or scope in/out).
@@ -2203,7 +2210,8 @@ export class WeaponSystem {
     const tgtX = THREE.MathUtils.lerp(hipX, adsX, adsEase)
       + (bobH + 0.05 * framedBell) * aspectScale;
     const tgtY = THREE.MathUtils.lerp(hipY, adsY, adsEase) + bobV
-      - 0.07 * framedBell - 0.015 * framedRack - landPulse * 0.055;
+      - 0.07 * framedBell - 0.015 * framedRack
+      - landPulse * 0.055 * adsClearance;
     const tgtZ = THREE.MathUtils.lerp(hipZ, adsZ, adsEase);
     this._mountPos.x = expDamp(this._mountPos.x, tgtX, 20, dt);
     this._mountPos.y = expDamp(this._mountPos.y, tgtY, 20, dt);
@@ -2211,7 +2219,8 @@ export class WeaponSystem {
     const targetMountPitch = swordGuard
       ? SWORD_VIEWMODEL_PITCH - sprintCarry * 0.055 + landPulse * 0.05
       : THREE.MathUtils.lerp(VIEWMODEL_PITCH + sprintCarry * 0.06, ADS_PITCH, adsEase)
-        + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12;
+        + 0.50 * framedBell + 0.14 * framedRack
+        + landPulse * 0.12 * adsClearance;
     const targetMountYaw = swordGuard
       ? SWORD_VIEWMODEL_YAW + sprintCarry * 0.025
       : THREE.MathUtils.lerp(VIEWMODEL_YAW, ADS_YAW, adsEase);

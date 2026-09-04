@@ -36,10 +36,12 @@ export const STATURE = +(EYE_HEIGHT / 0.936).toFixed(3);   // 1.816
 /**
  * World presentation scale for human-controlled characters.
  *
- * Players and bots share one enlarged presentation silhouette. Gameplay
- * capsules and the first-person camera remain unchanged.
+ * Players, bots, gameplay capsules, and the first-person camera must describe
+ * the same body.  Scaling only the rendered mesh made a 1.816 m character
+ * appear 2.724 m tall while its eyes and collision capsule stayed at 1.70 m;
+ * that is why first-person felt waist-high next to every other player.
  */
-export const PLAYER_WORLD_MODEL_SCALE = 1.5;
+export const PLAYER_WORLD_MODEL_SCALE = 1.0;
 
 const at = (frac) => +(frac * STATURE).toFixed(4);
 

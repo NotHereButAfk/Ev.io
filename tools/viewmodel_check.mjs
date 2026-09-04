@@ -789,7 +789,11 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // gauntlet and bicep meshes. The summed mesh boxes intentionally count
         // those pixels several times, so allow that complete body-matched arm a
         // larger accounting ceiling while preserving the fallback art budget.
-        const maxArea = authoredArms ? 0.92 : (side === 'support'
+        // The authored body-matched arm now uses the player's actual limb
+        // thickness instead of the old 0.70 miniature. Its overlapping armor,
+        // sleeve and glove boxes can sum to 100% even though the inspected
+        // pixels occupy only the lower corner of the frame.
+        const maxArea = authoredArms ? 1.08 : (side === 'support'
           ? (viewport.aspect < 1.5 ? 0.30 : 0.25)
           : (viewport.aspect < 1 ? 0.56 : 0.40));
         const armArea = meshViewportArea(glove);
@@ -869,7 +873,7 @@ function resetMotionState() {
 
 // The blend state itself must be identical after the same elapsed time,
 // regardless of how many render frames divided that interval.
-activate(WEAPONS.find((def) => def.id === 'boltsniper'));
+activate(WEAPONS.find((def) => def.id === 'm4'));
 const rates = [30, 60, 144];
 const sprintSamples = [];
 const adsSamples = [];
@@ -943,38 +947,51 @@ assert(Math.abs(knifeGrip[1] + 0.020) < 1e-9 && Math.abs(knifeGrip[2] - 0.120) <
   'knife glove must close around the authored handle centre');
 assert(Math.abs(system.kickGroup.rotation.y + 0.28) < 1e-9,
   'knife must use its compact forward guard instead of the long sword pose');
-activate(WEAPONS.find((def) => def.id === 'boltsniper'));
+activate(WEAPONS.find((def) => def.id === 'm4'));
 
 // Feed the same physical look velocity at each refresh rate. Full ADS should
-// retain only a small trace of movement, and that result should itself remain
+// remove viewmodel movement, and that result should itself remain
 // stable at 30/60/144 Hz.
 const adsStability = [];
 for (const fps of rates) {
   resetMotionState();
   input.rightMouseDown = true;
   player.velocity.z = 6.6;
+  const mountY = [];
   advanceSeconds(1.2, fps, (dt) => {
     input.mouseDX = 600 * dt;
     input.mouseDY = -300 * dt;
+    if (system.scopeT > 0.995) mountY.push(system.weaponMount.position.y);
   });
   adsStability.push({
     fps,
     scope: system.scopeT,
     bob: system._bobAmt,
     sway: Math.hypot(system.swayGroup.rotation.x, system.swayGroup.rotation.y),
+    travel: Math.max(...mountY) - Math.min(...mountY),
   });
 }
 for (const sample of adsStability) {
   assert(sample.scope > 0.999, `ADS did not settle at ${sample.fps}Hz`);
-  assert(sample.bob < 0.0015, `ADS walk bob is ${sample.bob.toFixed(5)}m at ${sample.fps}Hz`);
-  assert(sample.sway < 0.002, `ADS look sway is ${sample.sway.toFixed(5)}rad at ${sample.fps}Hz`);
+  assert(sample.bob < 0.0001, `ADS walk bob is ${sample.bob.toFixed(5)}m at ${sample.fps}Hz`);
+  assert(sample.sway < 0.0001, `ADS look sway is ${sample.sway.toFixed(5)}rad at ${sample.fps}Hz`);
+  assert(sample.travel < 0.001,
+    `ADS gun travels ${sample.travel.toFixed(5)}m through the sightline at ${sample.fps}Hz`);
 }
-assert(!system.kickGroup.visible, 'scoped ADS leaves the gun and arms blocking the optic');
+assert(system.kickGroup.visible, 'ordinary ADS incorrectly hides the physical gun');
 input.rightMouseDown = false;
 advanceSeconds(0.25, 60);
 assert(system.kickGroup.visible, 'viewmodel did not return after leaving the scope');
 assert(spread(adsStability, 'bob') < 1e-6, 'ADS bob changes with refresh rate');
 assert(spread(adsStability, 'sway') < 2e-5, 'ADS sway changes with refresh rate');
+
+activate(WEAPONS.find((def) => def.id === 'boltsniper'));
+input.rightMouseDown = true;
+advanceSeconds(0.5, 60);
+assert(!system.kickGroup.visible, 'scoped ADS leaves the gun and arms blocking the optic');
+input.rightMouseDown = false;
+advanceSeconds(0.25, 60);
+assert(system.kickGroup.visible, 'scoped viewmodel did not return after leaving the optic');
 
 // Exercise the complete transition at 240Hz. Ordinary guns bring their actual
 // measured rear sight onto the centre axis; true scoped optics disappear only
@@ -995,16 +1012,16 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
       && Math.abs(system.weaponMount.rotation.y) < 0.012
       && Math.abs(system.weaponMount.rotation.z) < 0.012,
       `${def.id} zoom does not settle squarely onto its sight axis`);
-    if (MAIN_WEAPON_IDS.includes(def.id)) {
+    if (!def.scoped) {
       const record = system.models.get(def.id);
-      assert(Math.abs(camera.fov - 46) < 0.3,
+      assert(Math.abs(camera.fov - (def.adsFov ?? 52)) < 0.3,
         `${def.id} zoom is too tight or too weak (${camera.fov.toFixed(2)})`);
       camera.updateMatrixWorld(true);
       record.group.updateWorldMatrix(true, true);
       const sightNdc = record.sight.clone().applyMatrix4(record.group.matrixWorld).project(camera);
       assert(Math.abs(sightNdc.x) < 0.025,
         `${def.id} rear sight misses horizontal screen centre (${sightNdc.x.toFixed(3)})`);
-      assert(sightNdc.y < -0.15 && sightNdc.y > -0.38,
+      assert(sightNdc.y < -0.35 && sightNdc.y > -0.58,
         `${def.id} rear sight does not clear the reticle (${sightNdc.y.toFixed(3)})`);
       assert(system.weaponMount.position.z < -0.35 && system.weaponMount.position.z > -1.15,
         `${def.id} ADS depth over-crops or loses the gun (${system.weaponMount.position.z.toFixed(3)})`);

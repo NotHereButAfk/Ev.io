@@ -43,11 +43,11 @@ for (const id of PLAYABLE_ARMOR_IDS) {
   assert.notEqual(body.userData?.isHuman, true, `${id} unexpectedly built the retired Soldier body`);
 }
 
-assert.equal(PLAYER_WORLD_MODEL_SCALE, 1.5,
-  'players and bots must use the requested 1.5x presentation scale');
+assert.equal(PLAYER_WORLD_MODEL_SCALE, 1.0,
+  'rendered players and bots must match the gameplay camera/capsule stature');
 const bridgeSource = readFileSync(new URL('../src/net/AuthNetBridge.js', import.meta.url), 'utf8');
 assert.match(bridgeSource, /modelScale:\s*PLAYER_WORLD_MODEL_SCALE/,
-  'network humans and bots do not apply the same enlarged scale');
+  'network humans and bots do not apply the shared gameplay scale');
 assert.match(bridgeSource, /isBot\s*\?\s*DEFAULT_REMOTE_SKIN\s*:/,
   'network bots do not render with the default player skin');
 assert.match(bridgeSource, /DEFAULT_REMOTE_BOT_ARMOR_ID\s*=\s*'vanguard'/,
