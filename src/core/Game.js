@@ -49,6 +49,7 @@ import { KILL_MULTIPLIER } from './RarityPerks.js';
 import { ZombieManager } from '../entities/ZombieManager.js';
 import { SurvivalManager } from './SurvivalManager.js';
 import { DeathmatchManager } from './DeathmatchManager.js';
+import { buildSpectatorTour, spectatorTourCurves, makeSpectatorClearance } from './SpectatorTour.js';
 import { ServerSim } from './ServerSim.js';
 import { NetClient } from './NetClient.js';
 import { preloadZombieModel } from '../entities/Zombie.js';
@@ -506,6 +507,19 @@ export class Game {
   }
 
   _configureMapCamera(map) {
+    this._camTour = null;
+    this._camClearSegment = makeSpectatorClearance(this.world);
+    if (map.spectatorRoutes?.length) {
+      this._camTour = buildSpectatorTour(map.spectatorRoutes, this._camClearSegment);
+      if (this._camTour) {
+        this._camRoutes = [this._camTour];
+        this._camWpts = this._camTour;
+        this._resetSpectatorCamera();
+        this.menuCamera.far = 600;
+        this.menuCamera.updateProjectionMatrix();
+        return;
+      }
+    }
     // Imported routes are authored from valid player viewpoints. Float along
     // every lane, then briefly dissolve between lanes so touring the complete
     // arena never exposes a camera cut or crosses solid map geometry.
@@ -562,6 +576,14 @@ export class Game {
   }
 
   _rebuildSpectatorCurves() {
+    if (this._camTour) {
+      const tour = spectatorTourCurves(this._camTour, this._camClearSegment);
+      this._camPath = tour.path;
+      this._camLookPath = tour.look;
+      this._camCycleDuration = Math.max(12, tour.length / 2.2);
+      this._camStallTime = 0;
+      return;
+    }
     const closed = this._camRoutes?.length === 1;
     this._camPath = new THREE.CatmullRomCurve3(
       this._camWpts.map((w) => w.p.clone()), closed, 'centripetal', 0.5,
@@ -586,6 +608,16 @@ export class Game {
     this.menuCamera.position.copy(this._camRenderPos);
     this.menuCamera.lookAt(this._camRenderLook);
     this._camPoseReady = true;
+  }
+
+  _resetSpectatorCamera() {
+    this._camRouteIndex = 0;
+    this._camWpts = this._camRoutes[0];
+    this._camTravelTime = 0;
+    this._camFadeIn = 0;
+    this.canvas.style.opacity = '1';
+    this._rebuildSpectatorCurves();
+    this._snapSpectatorCamera();
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -1469,13 +1501,17 @@ export class Game {
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     this._mapLoadingShownAt = performance.now();
+    this._spectatorLoading = true;
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
     this._setMapLoadingPhase(
       joining ? 'Joining lobby and loading arena...' : 'Loading arena geometry...',
       46,
     );
     if (autoHide) {
-      this._mlTimer1 = setTimeout(() => el.classList.add('ml-fade'), 2600);
+      this._mlTimer1 = setTimeout(() => {
+        this._spectatorLoading = false;
+        el.classList.add('ml-fade');
+      }, 2600);
       this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
     }
   }
@@ -1489,12 +1525,15 @@ export class Game {
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     await delay(Math.max(0, minimumDisplayMs - elapsed));
     if (sequence !== this._mapLoadingSequence) return;
+    this._resetSpectatorCamera();
+    this._spectatorLoading = false;
     el.classList.add('ml-fade');
     await delay(320);
     if (sequence === this._mapLoadingSequence) el.classList.add('hidden');
   }
 
   _hideMapLoading() {
+    this._spectatorLoading = false;
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
@@ -1538,6 +1577,7 @@ export class Game {
     if (this._playerBody) { this.world.scene.remove(this._playerBody); this._playerBody = null; }
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state = 'menu';
+    this._resetSpectatorCamera();
     this.mobileControls?.hide();
     this.menu.hidePause();
     this.menu.hideGameOver();
@@ -1560,6 +1600,7 @@ export class Game {
   async _activateMap(mapId, { deferFinish = false } = {}) {
     if (!mapId || mapId === this.world.currentMapId) {
       this._pendingMapId = null;
+      this._resetSpectatorCamera();
       return this.world.currentMap;
     }
     this.pickupSystem?.dispose();
@@ -2376,6 +2417,9 @@ export class Game {
     // Do not let a decode/GC hitch become a quarter-second camera leap. The
     // route is presentation-only, so losing a little tour time is preferable
     // to visible judder. Normal frames still advance at real elapsed time.
+    // Do not consume the visible fly-through while map decoding or joining is
+    // hidden behind a loader. The reveal starts with a settled camera pose.
+    if (this._spectatorLoading || !this.world.currentMap) return;
     const cameraStep = THREE.MathUtils.clamp(cameraDt, 0, 1 / 30);
     this._camTravelTime += cameraStep;
     const fadeWindow = 0.18;
@@ -2417,7 +2461,7 @@ export class Game {
     const minimumCameraStep = Math.max(cameraStep, 1 / 240) * 0.05;
     this._camStallTime = movedSq < minimumCameraStep * minimumCameraStep
       ? this._camStallTime + cameraStep : 0;
-    if (this._camStallTime > 0.45) {
+    if (!this._camTour && this._camStallTime > 0.45) {
       this._camTravelTime = (this._camTravelTime + this._camCycleDuration * 0.06) % this._camCycleDuration;
       this._camStallTime = 0;
       this._camPath.getPointAt(this._camTravelTime / this._camCycleDuration, this._camPos);

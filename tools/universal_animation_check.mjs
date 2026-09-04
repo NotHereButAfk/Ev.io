@@ -69,11 +69,14 @@ if (!fixture.tracks.some((track) => track.name.includes('[thighL]'))) {
 
 for (const sourcePath of ['../src/entities/Bot.js', '../src/player/Avatar.js', '../src/core/Game.js']) {
   const runtimeSource = fs.readFileSync(new URL(sourcePath, import.meta.url), 'utf8');
-  if (!/applyUniversalLocomotion\s*\(/.test(runtimeSource)) {
-    throw new Error(`${sourcePath} does not sample the authored character animation`);
+  const samplesHumanRig = /\.mixer\??\.update\s*\(dt\)[\s\S]*?\.armorTick\?\.\(dt\)/.test(runtimeSource);
+  const samplesUniversalRig = /applyUniversalLocomotion\s*\(/.test(runtimeSource);
+  const hasProceduralFallback = /applyWalkCycle\s*\(/.test(runtimeSource);
+  if (!(samplesHumanRig || samplesUniversalRig)) {
+    throw new Error(`${sourcePath} does not sample an authored character animation path`);
   }
-  if (!/\|\|\s*applyWalkCycle\s*\(/.test(runtimeSource)) {
-    throw new Error(`${sourcePath} lost its safe procedural fallback`);
+  if (!hasProceduralFallback) {
+    throw new Error(`${sourcePath} lost its safe procedural animation fallback`);
   }
 }
 const animatorSource = fs.readFileSync(new URL('../src/player/UniversalAnimations.js', import.meta.url), 'utf8');

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { retargetKyxLocomotionClips } from '../src/player/HumanSoldier.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { createHumanActionPose, sampleHumanActionPose } from '../src/player/HumanActionMotion.js';
 import {
@@ -121,9 +122,16 @@ const gltf = await new Promise((resolve, reject) => {
   new GLTFLoader().parse(buffer, '', resolve, reject);
 });
 const AUTHORED_KYX = !!gltf.scene.getObjectByName('KYX_HelmetShell');
-const clips = Object.fromEntries(gltf.animations.map((clip) => [clip.name, clip]));
+const motionBytes = fs.readFileSync(new URL('../public/kyx-locomotion.glb', import.meta.url));
+const motionGltf = await new Promise((resolve, reject) => new GLTFLoader().parse(
+  motionBytes.buffer.slice(motionBytes.byteOffset, motionBytes.byteOffset + motionBytes.byteLength),
+  '', resolve, reject,
+));
+const clips = Object.fromEntries(
+  retargetKyxLocomotionClips(motionGltf.animations).map((clip) => [clip.name, clip]),
+);
 for (const name of ['Idle', 'Walk', 'Run']) {
-  assert(clips[name], `kyx-player.glb is missing its ${name} clip`);
+  assert(clips[name], `kyx-locomotion.glb is missing its ${name} clip`);
 }
 
 // Exercise the carry against frames that put the shoulders in materially

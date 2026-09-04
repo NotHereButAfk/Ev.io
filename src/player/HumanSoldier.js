@@ -47,36 +47,92 @@ function _asMapToonMaterial(source) {
   return material;
 }
 
+const SOURCE_BONE_NAMES = Object.freeze({
+  root: 'mixamorigRoot',
+  'DEF-hips': 'mixamorigHips',
+  'DEF-spine001': 'mixamorigSpine',
+  'DEF-spine002': 'mixamorigSpine1',
+  'DEF-spine003': 'mixamorigSpine2',
+  'DEF-neck': 'mixamorigNeck',
+  'DEF-head': 'mixamorigHead',
+  'DEF-thighL': 'mixamorigLeftUpLeg', 'DEF-shinL': 'mixamorigLeftLeg',
+  'DEF-footL': 'mixamorigLeftFoot', 'DEF-toeL': 'mixamorigLeftToeBase',
+  'DEF-thighR': 'mixamorigRightUpLeg', 'DEF-shinR': 'mixamorigRightLeg',
+  'DEF-footR': 'mixamorigRightFoot', 'DEF-toeR': 'mixamorigRightToeBase',
+});
+
+function sourceBoneName(name) {
+  if (SOURCE_BONE_NAMES[name]) return SOURCE_BONE_NAMES[name];
+  let match = /^DEF-(shoulder|upper_arm|forearm|hand)(L|R)$/.exec(name);
+  if (match) {
+    const side = match[2] === 'L' ? 'Left' : 'Right';
+    const part = { shoulder: 'Shoulder', upper_arm: 'Arm', forearm: 'ForeArm', hand: 'Hand' }[match[1]];
+    return `mixamorig${side}${part}`;
+  }
+  match = /^DEF-(?:f_)?(index|middle|ring|pinky|thumb)(\d\d)(L|R)$/.exec(name);
+  if (match) {
+    const side = match[3] === 'L' ? 'Left' : 'Right';
+    const finger = match[1][0].toUpperCase() + match[1].slice(1);
+    return `mixamorig${side}Hand${finger}${Number(match[2])}`;
+  }
+  return name;
+}
+
+export function retargetKyxLocomotionClips(clips) {
+  return clips.map((source) => {
+    const clip = source.clone();
+    for (const track of clip.tracks) {
+      const dot = track.name.lastIndexOf('.');
+      if (dot < 0) continue;
+      track.name = `${sourceBoneName(track.name.slice(0, dot))}${track.name.slice(dot)}`;
+      // The library sprint sinks its toes below the Idle/Walk ground plane.
+      // Preserve the existing measured correction without re-exporting any
+      // rotations through Blender (the operation that broke the torso).
+      if (clip.name === 'Run' && track.name === 'mixamorigHips.position') {
+        for (let i = 2; i < track.values.length; i += 3) track.values[i] += 0.037;
+      }
+    }
+    return clip;
+  });
+}
+
 export function preloadHumanSoldier(onLoad) {
   if (_template) { onLoad?.(true); return; }
   if (onLoad) _callbacks.push(onLoad);
   if (_loading) return;
   _loading = true;
-  // Blender-authored KYX warrior: continuous skinned anatomy, fitted armor,
-  // and the production locomotion/action clips live in one runtime asset.
-  new GLTFLoader().load('/kyx-player.glb',
-    (gltf) => {
-      gltf.scene.traverse((o) => {
+  // Blender-authored body plus untouched source-space locomotion. Re-exporting
+  // the actions through Blender altered their rest rotations and made the live
+  // bots fold and somersault. This compact source clip keeps the original walk.
+  const loader = new GLTFLoader();
+  let bodyGltf = null, motionGltf = null, failed = false;
+  const fail = (err) => {
+    if (failed) return;
+    failed = true;
+    console.warn('[HumanSoldier] load failed:', err?.message);
+    _loading = false;
+    _callbacks.splice(0).forEach((cb) => cb(false));
+  };
+  const finish = () => {
+    if (failed || !bodyGltf || !motionGltf) return;
+    try {
+      bodyGltf.scene.traverse((o) => {
         if (o.isMesh) {
           o.castShadow = true;
           o.receiveShadow = true;
           o.frustumCulled = false; // skinned bounds expand past the bind pose
         }
       });
-      _template = { scene: gltf.scene, animations: gltf.animations };
+      _template = {
+        scene: bodyGltf.scene,
+        animations: retargetKyxLocomotionClips(motionGltf.animations),
+      };
       _loading  = false;
       _callbacks.splice(0).forEach((cb) => cb(true));
-    },
-    undefined,
-    (err) => {
-      console.warn('[HumanSoldier] load failed:', err?.message);
-      _loading = false;
-      // Never leave gameplay callers waiting forever and never let them assume
-      // the authored rig exists. They can now present RETRY instead of silently
-      // constructing the emergency block body.
-      _callbacks.splice(0).forEach((cb) => cb(false));
-    }
-  );
+    } catch (error) { fail(error); }
+  };
+  loader.load('/kyx-player.glb', (gltf) => { bodyGltf = gltf; finish(); }, undefined, fail);
+  loader.load('/kyx-locomotion.glb', (gltf) => { motionGltf = gltf; finish(); }, undefined, fail);
 }
 
 export function isHumanSoldierReady() { return !!_template; }
@@ -247,7 +303,9 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
   // ── Per-armor motion: animation speed + additive stance + animated armour ──
   const motion = ARMOR_MOTION[armorTypeId] || ARMOR_MOTION.assault;
   const baseTS = motion.speed;
-  mixer.timeScale = baseTS;
+  // The mixer owns fade scheduling: its clock must always run forward. Only
+  // individual gait clips may reverse when a player/bot backpedals.
+  mixer.timeScale = 1;
 
   // ── Bone lookup (Mixamo rig) ────────────────────────────────────────────────
   // Cached once so armorTick doesn't traverse the skeleton every frame. Any
@@ -550,7 +608,10 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     let bodyDrop = 0;
     root.position.y = _rootBaseY;
     _currentTimeScale = dampHumanTimeScale(_currentTimeScale, _targetTimeScale, dt);
-    mixer.timeScale = _currentTimeScale;
+    mixer.timeScale = 1;
+    actions.idle?.setEffectiveTimeScale(baseTS);
+    actions.walk?.setEffectiveTimeScale(_currentTimeScale);
+    actions.run?.setEffectiveTimeScale(_currentTimeScale);
     _strideScale += (_targetStrideScale - _strideScale) * (1 - Math.exp(-8 * dt));
     _strafeLean += (_targetStrafeLean - _strafeLean) * (1 - Math.exp(-10 * dt));
     const gaitPhase = current && current !== actions.idle
@@ -600,7 +661,7 @@ export function buildHumanSoldier(skin = null, armorTypeId = 'assault', armorSki
     _sAimYaw   += (_aimYaw   - _sAimYaw)   * aimEase;
     _sAimPitch += (_aimPitch - _sAimPitch) * aimEase;
     let lowerYawDelta = _targetLowerYaw - _lowerYaw;
-    lowerYawDelta = ((lowerYawDelta + Math.PI) % (Math.PI * 2)) - Math.PI;
+    lowerYawDelta = THREE.MathUtils.euclideanModulo(lowerYawDelta + Math.PI, Math.PI * 2) - Math.PI;
     _lowerYaw += lowerYawDelta * (1 - Math.exp(-12 * dt));
 
     // Momentum lean: tilt forward when accelerating into a run, back when stopping.

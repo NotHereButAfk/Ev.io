@@ -21,7 +21,7 @@ assert.match(
 );
 assert.match(
   gameSource,
-  /async _activateMap\(mapId\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?await this\.world\.loadMap\(mapId\)[\s\S]*?await this\._finishMapLoading\(1800\)/,
+  /async _activateMap\(mapId(?:,\s*[^)]*)?\)[\s\S]*?_showMapLoading\([^;]+autoHide:\s*false[\s\S]*?await this\.world\.loadMap\(mapId\)[\s\S]*?await this\._finishMapLoading\(1800\)/,
   'between-game map loading must be readiness-bound and readable',
 );
 

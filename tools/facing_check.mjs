@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { retargetKyxLocomotionClips } from '../src/player/HumanSoldier.js';
 import {
   bodyForwardAtYaw,
   cameraYawToBodyYaw,
@@ -67,8 +68,13 @@ const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byt
 const gltf = await new Promise((resolve, reject) => {
   new GLTFLoader().parse(buffer, '', resolve, reject);
 });
-const walk = gltf.animations.find((clip) => clip.name === 'Walk');
-assert(walk, 'kyx-player.glb is missing its Walk clip');
+const motionBytes = fs.readFileSync(new URL('../public/kyx-locomotion.glb', import.meta.url));
+const motionGltf = await new Promise((resolve, reject) => new GLTFLoader().parse(
+  motionBytes.buffer.slice(motionBytes.byteOffset, motionBytes.byteOffset + motionBytes.byteLength),
+  '', resolve, reject,
+));
+const walk = retargetKyxLocomotionClips(motionGltf.animations).find((clip) => clip.name === 'Walk');
+assert(walk, 'kyx-locomotion.glb is missing its Walk clip');
 
 const mixer = new THREE.AnimationMixer(gltf.scene);
 mixer.clipAction(walk).play();

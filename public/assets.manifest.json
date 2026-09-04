@@ -1,17 +1,32 @@
 {
-  "generated": "2026-09-01T15:54:02.195Z",
+  "generated": "2026-09-04T05:27:52.325Z",
   "budgets": {
     "maxBytes": 3670016,
     "maxVerts": 120000,
     "maxMeshes": 64
   },
   "totals": {
-    "assets": 8,
-    "bytes": 10245444,
-    "vertices": 180654,
-    "megabytes": 9.77
+    "assets": 10,
+    "bytes": 10998456,
+    "vertices": 187480,
+    "megabytes": 10.49
   },
   "assets": [
+    {
+      "file": "kyx-locomotion.glb",
+      "bytes": 411008,
+      "sha256": "16272cb13607d8d1",
+      "glbVersion": 2,
+      "meshes": 0,
+      "primitives": 0,
+      "vertices": 0,
+      "triangles": 0,
+      "nodes": 55,
+      "hasUV": false,
+      "compressed": false,
+      "binBytes": 293112,
+      "warnings": []
+    },
     {
       "file": "kyx-player.glb",
       "bytes": 2128792,
@@ -25,6 +40,21 @@
       "hasUV": true,
       "compressed": false,
       "binBytes": 1376504,
+      "warnings": []
+    },
+    {
+      "file": "kyx-view-arms.glb",
+      "bytes": 342004,
+      "sha256": "5afb24f40b232486",
+      "glbVersion": 2,
+      "meshes": 8,
+      "primitives": 8,
+      "vertices": 6826,
+      "triangles": 11180,
+      "nodes": 10,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 334600,
       "warnings": []
     },
     {

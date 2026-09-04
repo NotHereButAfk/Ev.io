@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
+import { buildSpectatorTour, spectatorTourCurves } from '../src/core/SpectatorTour.js';
 
 const source = readFileSync(new URL('../src/core/Game.js', import.meta.url), 'utf8');
 assert.match(source, /new THREE\.CatmullRomCurve3\([\s\S]*?closed, 'centripetal'/,
@@ -41,6 +42,28 @@ assert.match(source, /bot\.healthBarGroup\.visible = false/,
   'menu bots must not spend draw calls on combat-only health bars');
 assert.doesNotMatch(source, /Math\.max\(54, this\._camPath\.getLength\(\) \/ 6\.5\)/,
   'spectator must not retain the old nearly-static 54 second minimum');
+assert.match(source, /if \(this\._spectatorLoading \|\| !this\.world\.currentMap\) return/,
+  'spectator route must not advance unseen behind the loading screen');
+assert.match(source, /this\._resetSpectatorCamera\(\)[\s\S]*?this\._spectatorLoading = false[\s\S]*?el\.classList\.add\('ml-fade'\)/,
+  'map reveal must reset the visible fly-through before fading the loader');
+
+const safeNodes = [
+  { p: new THREE.Vector3(0, 2, 0), t: new THREE.Vector3(5, 1, 5) },
+  { p: new THREE.Vector3(8, 2, 0), t: new THREE.Vector3(5, 1, 5) },
+  { p: new THREE.Vector3(8, 2, 8), t: new THREE.Vector3(5, 1, 5) },
+  { p: new THREE.Vector3(0, 2, 8), t: new THREE.Vector3(5, 1, 5) },
+];
+const tour = buildSpectatorTour([safeNodes], () => true);
+assert.ok(tour?.length >= safeNodes.length + 1, 'spectator graph did not tour every connected viewpoint');
+assert.ok(tour[0].p.distanceTo(tour.at(-1).p) < 1e-6, 'collision-safe spectator tour did not close');
+const continuous = spectatorTourCurves(tour, () => true);
+let maximumStep = 0;
+for (let i = 1; i <= 1000; i++) {
+  const a = continuous.path.getPointAt((i - 1) / 1000, new THREE.Vector3());
+  const b = continuous.path.getPointAt(i / 1000, new THREE.Vector3());
+  maximumStep = Math.max(maximumStep, a.distanceTo(b));
+}
+assert.ok(maximumStep < 0.2, `spectator tour contains a visible camera cut (${maximumStep}m)`);
 
 const points = [
   new THREE.Vector3(-20, 12, 30), new THREE.Vector3(30, 15, 20),

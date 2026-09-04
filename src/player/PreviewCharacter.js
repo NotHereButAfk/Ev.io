@@ -13,6 +13,11 @@ const _spartanCbs = [];
  * low-poly cyborgs, legacy soldiers and cosmetic armour use different data.
  */
 export function resolveViewmodelPalette(skin, armorTypeId = 'vanguard', armorSkin = null) {
+  if (armorTypeId === 'vanguard' && !armorSkin && (!skin || skin.id === 'default')) {
+    // The live Vanguard preserves its GLB materials. Its arms must do the same,
+    // rather than inherit the unrelated emergency low-poly body's palette.
+    return { authored: true, plate: 0xcbd0e4, sleeve: 0x242931, glove: 0x242931, accent: 0xff950f };
+  }
   if (armorSkin) {
     const glove = new THREE.Color(armorSkin.secondary).multiplyScalar(0.42).getHex();
     return {

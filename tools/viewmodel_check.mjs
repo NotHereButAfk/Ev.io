@@ -697,9 +697,13 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         // Sum of per-mesh projected boxes intentionally over-estimates the
         // curved/tapered cylinders; 36% keeps the real arm pixels compact while
         // allowing a sleeve to cross the frame edge during the sprint carry.
-        const maxArea = side === 'support'
+        // The authored player arm includes overlapping underside, armor shell,
+        // gauntlet and bicep meshes. The summed mesh boxes intentionally count
+        // those pixels several times, so allow that complete body-matched arm a
+        // larger accounting ceiling while preserving the fallback art budget.
+        const maxArea = authoredArms ? 0.92 : (side === 'support'
           ? (viewport.aspect < 1.5 ? 0.30 : 0.25)
-          : (viewport.aspect < 1 ? 0.56 : 0.40);
+          : (viewport.aspect < 1 ? 0.56 : 0.40));
         const armArea = meshViewportArea(glove);
         assert(
           armArea <= maxArea,

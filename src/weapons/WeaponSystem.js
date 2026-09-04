@@ -85,7 +85,7 @@ const VIEWMODEL_Z = -0.98;
 // The lower mount crops the buttstock at the bottom/right while retaining the
 // full-size receiver and both grip contacts. These are our presentation
 // settings, not measured constants from the reference game.
-const VIEWMODEL_X = 0.23;
+const VIEWMODEL_X = 0.20;
 const VIEWMODEL_Y = -0.50;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
@@ -106,8 +106,8 @@ const FIREARM_MODEL_SCALE = Object.freeze({
   // the correctly framed M4.
   m16: 0.82,
 });
-const VIEWMODEL_PITCH = 0.25;
-const VIEWMODEL_YAW = 0.30;
+const VIEWMODEL_PITCH = 0.14;
+const VIEWMODEL_YAW = 0.23;
 const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
@@ -490,28 +490,6 @@ export class WeaponSystem {
       model.position.copy(palmCenter).negate();
       grip.add(model);
 
-      if (support) {
-        // The exported first-person asset intentionally stops at the elbow so
-        // no shoulder mass can enter the camera. Continue the same dark suit
-        // through the lower-left edge with a short tapered bridge behind the
-        // authored forearm guard.
-        const start = new THREE.Vector3(-0.225, -0.165, -0.030);
-        const end = new THREE.Vector3(-0.665, -0.710, 0.180);
-        const direction = end.clone().sub(start);
-        const extension = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.086, 0.062, direction.length(), 10),
-          this.sleeveMat.clone(),
-        );
-        extension.name = 'viewmodel_upper_sleeve_extension';
-        extension.position.copy(start).add(end).multiplyScalar(0.5);
-        extension.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
-        extension.material.depthTest = false;
-        extension.material.depthWrite = false;
-        extension.renderOrder = 998;
-        extension.frustumCulled = false;
-        model.add(extension);
-      }
-
       model.traverse((object) => {
         if (!object.isMesh) return;
         const handSurface = /_Hand$/i.test(object.name);
@@ -553,7 +531,7 @@ export class WeaponSystem {
     // GunIdle already supplies a natural wrist roll. These small corrections
     // align that baked hold with the first-person weapon's local forward axis.
     trigger.rotation.set(-0.02, 0.08, -0.04);
-    support.rotation.set(-0.03, -0.10, -0.08);
+    support.rotation.set(0.78, -0.10, -0.08);
     this.kickGroup.add(trigger, support);
     this._applyViewmodelHandPose();
     this._updateViewmodelHandLayers();
@@ -944,8 +922,8 @@ export class WeaponSystem {
   }
 
   /** Apply the exact equipped character palette to the first-person gauntlet. */
-  setArmAppearance({ plate, sleeve, glove, accent }) {
-    this._armAppearance = { plate, sleeve, glove, accent };
+  setArmAppearance({ plate, sleeve, glove, accent, authored = false }) {
+    this._armAppearance = { plate, sleeve, glove, accent, authored };
     // Use the same readable plate value as the authored third-person armour.
     // The old 0.34 multiplier turned white/orange armour into an unrelated gray
     // stick, which is especially obvious when the local player is beside a bot.

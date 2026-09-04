@@ -41,11 +41,10 @@ def arm_group_names(side, part):
             for name in bpy.data.objects[BODY_NAME].vertex_groups.keys()
             if name.startswith(f"{prefix}Hand")
         }
-    # First person should show the forearm, not the shoulder and upper arm. The
-    # latter forms a large disconnected mass at the lower edge once projected
-    # through a wide gameplay FOV. The authored forearm still reaches the frame
-    # edge after the normal viewmodel scale.
-    return {f"{prefix}ForeArm"}
+    # Keep the real elbow and upper sleeve. Cutting at the elbow required a
+    # procedural cylinder extension in-game, which did not match the body.
+    # Exclude shoulder/chest weights so no torso can enter the viewmodel.
+    return {f"{prefix}ForeArm", f"{prefix}Arm"}
 
 
 def isolate_weighted_part(source, side, part):
@@ -96,7 +95,10 @@ def freeze_object(source, wrist_world, name):
 def armor_sources(side):
     suffix = "Left" if side == "Left" else "Right"
     return [
+        bpy.data.objects.get(f"KYX_Gauntlet_{suffix}"),
         bpy.data.objects.get(f"KYX_ForearmGuard_{suffix}"),
+        bpy.data.objects.get(f"KYX_Bicep_{suffix}"),
+        bpy.data.objects.get(f"KYX_BicepGuard_{suffix}"),
     ]
 
 

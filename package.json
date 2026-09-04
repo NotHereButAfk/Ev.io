@@ -20,6 +20,7 @@
     "test:map-lighting": "node tests/map-lighting.test.mjs",
     "test:facing": "node tools/facing_check.mjs",
     "test:human-motion": "node tools/human_locomotion_check.mjs",
+    "test:human-pose": "node tools/human_pose_stability_check.mjs",
     "test:universal-animation": "node tools/universal_animation_check.mjs",
     "test:human-carry": "node tools/human_rifle_carry_check.mjs",
     "test:rifle-reference": "node tests/rifle-carry-reference.test.mjs",

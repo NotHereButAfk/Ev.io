@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { retargetKyxLocomotionClips } from '../src/player/HumanSoldier.js';
 import {
   dampHumanTimeScale,
   HUMAN_CLIP_SPEED,
@@ -97,6 +98,12 @@ const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byt
 const gltf = await new Promise((resolve, reject) => {
   new GLTFLoader().parse(buffer, '', resolve, reject);
 });
+const motionBytes = fs.readFileSync(new URL('../public/kyx-locomotion.glb', import.meta.url));
+const motionGltf = await new Promise((resolve, reject) => new GLTFLoader().parse(
+  motionBytes.buffer.slice(motionBytes.byteOffset, motionBytes.byteOffset + motionBytes.byteLength),
+  '', resolve, reject,
+));
+const runtimeClips = retargetKyxLocomotionClips(motionGltf.animations);
 
 const SAMPLE_COUNT = 720;
 const cyclicDistance = (a, b) => {
@@ -193,7 +200,7 @@ function sampleWarpedRun(sourceClip, strideScale) {
 }
 
 const clips = Object.fromEntries(
-  gltf.animations
+  runtimeClips
     .filter((clip) => ['Idle', 'Walk', 'Run'].includes(clip.name))
     .map((clip) => [clip.name.toLowerCase(), clip])
 );

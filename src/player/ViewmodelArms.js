@@ -26,7 +26,13 @@ export function preloadViewmodelArms(onLoad) {
 }
 
 function cloneMaterial(material) {
-  const clone = material.clone();
+  // Same material construction as the live player's authored body.
+  const clone = new THREE.MeshToonMaterial({
+    color: material.color.clone(), transparent: material.transparent,
+    opacity: material.opacity, alphaTest: material.alphaTest, side: material.side,
+  });
+  clone.name = material.name;
+  clone.userData.authoredColor = material.color.getHex();
   clone.depthTest = false;
   clone.depthWrite = false;
   return clone;
@@ -63,7 +69,7 @@ export function buildViewmodelArm(side, sourceTemplate = template) {
   return root;
 }
 
-export function tintViewmodelArm(root, { plate, sleeve, glove, accent }) {
+export function tintViewmodelArm(root, { plate, sleeve, glove, accent, authored = false }) {
   if (!root) return;
   const colors = {
     plate: new THREE.Color(plate).multiplyScalar(0.82),
@@ -80,6 +86,11 @@ export function tintViewmodelArm(root, { plate, sleeve, glove, accent }) {
           : 'sleeve');
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
+      if (authored && material.userData.authoredColor !== undefined) {
+        material.color.setHex(material.userData.authoredColor);
+        material.emissive?.setHex(0);
+        continue;
+      }
       material.color.copy(colors[role]);
       if (material.emissive) {
         material.emissive.copy(role === 'accent' ? colors.accent : new THREE.Color(0x000000));
