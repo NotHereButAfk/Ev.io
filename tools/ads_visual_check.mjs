@@ -30,11 +30,13 @@ try {
     const g = window.__game || window.game;
     return g && !document.getElementById('hud')?.classList.contains('hidden');
   }, null, { timeout: 60000 });
-  await page.waitForFunction(() => {
-    const thumbs = [...document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb')];
-    return thumbs.length > 0
-      && thumbs.every((thumb) => thumb.style.backgroundImage.includes('data:image/png'));
-  }, null, { timeout: 8000 });
+  if (!process.env.SKIP_HUD_THUMBS) {
+    await page.waitForFunction(() => {
+      const thumbs = [...document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb')];
+      return thumbs.length > 0
+        && thumbs.every((thumb) => thumb.style.backgroundImage.includes('data:image/png'));
+    }, null, { timeout: 8000 });
+  }
   // The HUD becomes visible slightly before the first rendered map frame.
   // Wait through that handoff so the first firearm cannot produce a false
   // black capture while the later weapons appear healthy.
@@ -46,7 +48,9 @@ try {
     withRealModel: [...document.querySelectorAll('#weapon-slots .weapon-slot .ws-thumb')]
       .filter((thumb) => thumb.style.backgroundImage.includes('data:image/png')).length,
   }));
-  if (!hudSlots.total || hudSlots.withThumb !== hudSlots.total || hudSlots.withRealModel !== hudSlots.total) {
+  if (!process.env.SKIP_HUD_THUMBS
+      && (!hudSlots.total || hudSlots.withThumb !== hudSlots.total
+        || hudSlots.withRealModel !== hudSlots.total)) {
     throw new Error(`in-match weapon inventory is incomplete: ${JSON.stringify(hudSlots)}`);
   }
   await page.screenshot({ path: path.join(OUT, 'inventory-hud.png') });
@@ -70,12 +74,17 @@ try {
       ws.currentIndex = 0;
       ws._rebuildKeyMap();
       ws._setActiveModel(0);
-      g.input.rightMouseDown = true;
+      g.input.rightMouseDown = false;
       g._menuOpen = false;
       g.menu?.hidePause?.();
       ['top-nav', 'nav-side', 'share-game', 'social-icons', 'center-play']
         .forEach((nodeId) => document.getElementById(nodeId)?.classList.add('hidden'));
     }, weaponId);
+    await page.waitForTimeout(160);
+    if (process.env.CAPTURE_HIP) {
+      await page.screenshot({ path: path.join(OUT, `${weaponId}-hip.png`) });
+    }
+    await page.evaluate(() => { (window.__game || window.game).input.rightMouseDown = true; });
     await page.waitForFunction(() => (window.__game || window.game)?.weaponSystem?.scopeT > 0.98,
       null, { timeout: 8000 });
     await page.waitForTimeout(160);

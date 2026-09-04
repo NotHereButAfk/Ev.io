@@ -102,31 +102,32 @@ def armor_sources(side):
     ]
 
 
-def close_gloves(armature):
-    """Close the authored fingers around a weapon-sized cylinder.
+def curl_gloves(armature):
+    """Add a restrained grip curl without replacing the animated hand pose.
 
-    Mixamo finger bones use local +Y down the finger and local X as the curl
-    hinge on this asset. The shipped GunIdle clip positions the shoulders and
-    wrists correctly but leaves fingers relaxed; overriding only these small
-    bones produces the same glove mesh in a real grip instead of an open hand.
+    The old bake assigned absolute XYZ values to mirrored Mixamo bones. That
+    discarded each finger's GunIdle basis and forced differently rolled bones
+    through one another. Post-multiplying a local rotation preserves the
+    authored pose while bending each phalanx naturally around the grip.
     """
-    bends = (1.08, 1.18, 0.74)
+    bends = (0.52, 0.72, 0.48)
     for side in ("Left", "Right"):
         for finger in ("Index", "Middle", "Ring", "Pinky"):
             for index, bend in enumerate(bends, 1):
                 bone = armature.pose.bones.get(f"mixamorig{side}Hand{finger}{index}")
-                if not bone:
-                    continue
-                bone.rotation_mode = "XYZ"
-                bone.rotation_euler = (bend, 0.0, 0.0)
-        # Fold the thumb across the first two fingers. Its bind roll differs
-        # from the straight fingers, so a restrained local-Z turn is enough.
-        for index, bend in enumerate((0.54, 0.68, 0.52), 1):
+                if bone:
+                    bone.matrix_basis = bone.matrix_basis @ Matrix.Rotation(
+                        bend, 4, "X"
+                    )
+        # The thumb closes across the side of the grip with a much smaller
+        # rotation so it remains distinct instead of collapsing into the palm.
+        thumb_sign = -1.0 if side == "Left" else 1.0
+        for index, bend in enumerate((0.30, 0.38, 0.24), 1):
             bone = armature.pose.bones.get(f"mixamorig{side}HandThumb{index}")
-            if not bone:
-                continue
-            bone.rotation_mode = "XYZ"
-            bone.rotation_euler = (0.12, 0.0, -bend if side == "Left" else bend)
+            if bone:
+                bone.matrix_basis = bone.matrix_basis @ Matrix.Rotation(
+                    thumb_sign * bend, 4, "Z"
+                )
 
 
 armature = bpy.data.objects[ARMATURE_NAME]
@@ -135,7 +136,7 @@ reset_pose(armature)
 armature.animation_data_create()
 armature.animation_data.action = bpy.data.actions[POSE_ACTION]
 bpy.context.scene.frame_set(POSE_FRAME)
-close_gloves(armature)
+curl_gloves(armature)
 bpy.context.view_layer.update()
 
 baked_roots = []

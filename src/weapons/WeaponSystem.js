@@ -921,12 +921,10 @@ export class WeaponSystem {
     // sight or appear as a loose block inside the aiming window.
     const handOrder = this.scopeT > 0.28 ? 999 : 1001;
     for (const mesh of this._handSurfaceMeshes || []) {
-      // The authored glove is one continuous palm/finger mesh with real depth.
-      // Drawing that whole mesh over the receiver paints a fist on top of the
-      // gun. Keep it behind the weapon; only its outside fingers and knuckles
-      // remain visible around the grip. The fallback's separated finger pieces
-      // still use the over/under layer swap below.
-      mesh.renderOrder = mesh.userData.authoredViewArm ? 999 : handOrder;
+      // At hip fire the real player glove crosses the weapon layer so its
+      // fingers visibly wrap the grip. ADS returns the glove beneath the
+      // receiver, preventing it from covering the rear sight.
+      mesh.renderOrder = handOrder;
     }
   }
 

@@ -736,7 +736,7 @@ for (const arm of [system.armGroup, system.supportArmGroup]) {
       || object.name === 'viewmodel_finger_curl'
       || object.name === 'viewmodel_knuckle'
       || object.name === 'viewmodel_thumb';
-    const correctLayer = handSurface && !authoredArms ? object.renderOrder >= 1001 : object.renderOrder <= 999;
+    const correctLayer = handSurface ? object.renderOrder >= 1001 : object.renderOrder <= 999;
     assert(!object.material.depthTest && !object.material.depthWrite && correctLayer,
       `${arm.userData.viewmodelHand} hand can disappear into world geometry`);
   });
@@ -908,7 +908,7 @@ assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 999),
   'ADS glove still renders over the sight picture');
 input.rightMouseDown = false;
 advanceSeconds(0.5, 60);
-assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === (authoredArms ? 999 : 1001)),
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 1001),
   'hip-fire glove did not return over the physical grips');
 
 // The recoil spring used to be Euler-integrated and visibly recovered at a
