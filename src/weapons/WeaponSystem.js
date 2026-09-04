@@ -77,9 +77,9 @@ function createTracerMesh() {
 
 // How far in front of the eye the viewmodel sits. The asynchronously loaded
 // authored guns have much longer stocks than the procedural fallbacks (DMR is
-// the worst case), and recoil moves the whole gun back toward the eye. Keeping
-// the shared mount farther out preserves the hand-to-grip relationship while
-// leaving every shipped model clear of the camera's near plane.
+// the worst case). Keeping the shared mount farther out preserves the
+// hand-to-grip relationship while leaving every shipped model clear of the
+// camera's near plane.
 const VIEWMODEL_Z = -0.98;
 // Shoulder the firearm toward the scene, not sideways across the camera.
 // The lower mount crops the buttstock at the bottom/right while retaining the
@@ -1876,9 +1876,10 @@ export class WeaponSystem {
     const activeSkinDef = this._activeSkinFor?.(this.currentDef?.id);
     if (activeSkinDef?.fireEmbers) this._spawnFireEmbers();
 
-    // Recoil impulse: a displacement kick PLUS a velocity punch, so the spring
-    // launches fast and settles smoothly (juicier than a pure position offset).
-    this._applyViewmodelRecoil(def.recoil);
+    // Keep the first-person weapon planted when a round leaves the barrel.
+    // Camera recoil, accuracy bloom, muzzle flash, tracers, sound and the
+    // third-person firing pose still communicate the shot; moving the gun mesh
+    // itself made automatic fire wobble away from its carefully aligned hold.
     if (this.applyRecoilToPlayer) {
       this.applyRecoilToPlayer(def.cameraRecoil ?? def.recoil * 0.6);
     }

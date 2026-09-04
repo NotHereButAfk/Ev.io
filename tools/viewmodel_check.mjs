@@ -1067,6 +1067,32 @@ assert(softLanding >= 0.17 && softLanding <= 0.25, `soft landing strength is ${s
 assert(hardLanding >= 1 && hardLanding <= 1.2, `hard landing strength is ${hardLanding}`);
 assert(hardLanding > softLanding * 4, 'landing response does not scale with impact velocity');
 
+// Firing feedback must not displace the first-person gun. Gameplay/camera
+// recoil remains independent, but the authored weapon and its hands stay on
+// their carefully aligned mount through every shot.
+activate(WEAPONS.find((def) => def.id === 'm4'));
+settle();
+const fireKickBefore = {
+  position: system.kickPos.clone(),
+  rotation: system.kickRotX,
+};
+const originalHitscan = system._doHitscanShot;
+const originalShell = system._spawnShell;
+const originalFlash = system._flash;
+const originalSmoke = system._spawnMuzzleSmoke;
+system._doHitscanShot = noop;
+system._spawnShell = noop;
+system._flash = noop;
+system._spawnMuzzleSmoke = noop;
+system._fire(world, [], player, botManager);
+system._doHitscanShot = originalHitscan;
+system._spawnShell = originalShell;
+system._flash = originalFlash;
+system._spawnMuzzleSmoke = originalSmoke;
+assert(system.kickPos.equals(fireKickBefore.position)
+  && system.kickRotX === fireKickBefore.rotation,
+  'shooting displaces the first-person gun');
+
 console.log(
   `viewmodel passed: ${WEAPONS.length} shipped weapons, `
   + `${viewports.length * fovs.length} FOV/aspect frames; `
