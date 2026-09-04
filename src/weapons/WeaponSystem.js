@@ -91,20 +91,30 @@ const VIEWMODEL_Y = -0.50;
 // reference while world/player weapons retain their physical third-person scale.
 const VIEWMODEL_SCALE = 1.80;
 const MELEE_VIEWMODEL_SCALE = 0.96;
+// The imported pack is already normalized to believable world lengths.  The
+// old carry table then shrank every non-rifle a second time (launchers to 0.90
+// versus the M4's 1.80), which is why swapping away from the M4 made the gun
+// and both attached hands collapse in size.  Keep category differences small:
+// model length still distinguishes a pistol, SMG, rifle and launcher, while
+// the close first-person presentation remains readable for the full arsenal.
 const FIREARM_CARRY_SCALE = Object.freeze({
-  pistol: 0.95,
-  compact: 1.08,
+  pistol: 1.45,
+  compact: 1.55,
   rifle: VIEWMODEL_SCALE,
-  shotgun: 1.08,
-  support: 1.02,
-  launcher: 0.90,
-  precision: 1.08,
+  shotgun: 1.55,
+  support: 1.62,
+  launcher: 1.40,
+  precision: 1.62,
 });
 const FIREARM_MODEL_SCALE = Object.freeze({
   // AR_3 is about 20% longer than the reference AR_1 after normalization. Its
   // own correction keeps the M16 readable at 60-degree FOV without shrinking
   // the correctly framed M4.
   m16: 0.82,
+  // These two pack meshes have unusually broad silhouettes.  Their small
+  // corrections retain the same hand contacts without covering the reticle.
+  needler: 0.85,
+  energyshotgun: 0.72,
 });
 const VIEWMODEL_PITCH = 0.14;
 const VIEWMODEL_YAW = 0.23;
@@ -157,6 +167,18 @@ function firearmViewmodelScale(def, aspect) {
   return (FIREARM_CARRY_SCALE[carry] || 1.18)
     * (FIREARM_MODEL_SCALE[def?.id] || 1)
     * responsive;
+}
+
+function firearmViewmodelDepth(def) {
+  // The bulky launchers extend farther behind their trigger contact than the
+  // other pack meshes. Seat the complete gun-and-hands rig slightly farther
+  // forward so the larger, readable launcher cannot cross the eye plane during
+  // recoil or reload.
+  const carry = weaponHandPose(def?.id).carry;
+  if (carry === 'launcher') return -1.10;
+  if (carry === 'precision' || carry === 'support') return -1.08;
+  if (carry === 'shotgun') return -1.04;
+  return VIEWMODEL_Z;
 }
 
 function viewmodelReloadScale(aspect) {
@@ -420,7 +442,8 @@ export class WeaponSystem {
     // the model alone would clear the stock but detach the hand from its grip.
     this.weaponMount.position.set(
       VIEWMODEL_X * viewmodelAspectScale(this.camera.aspect),
-      viewmodelVerticalPosition(this.camera.aspect, this.camera.fov), VIEWMODEL_Z);
+      viewmodelVerticalPosition(this.camera.aspect, this.camera.fov),
+      firearmViewmodelDepth(this.currentDef));
     this.weaponMount.rotation.set(VIEWMODEL_PITCH, VIEWMODEL_YAW, VIEWMODEL_ROLL);
     this.weaponMount.scale.setScalar(firearmViewmodelScale(this.currentDef, this.camera.aspect));
     this.camera.add(this.weaponMount);
@@ -924,21 +947,13 @@ export class WeaponSystem {
   /** Apply the exact equipped character palette to the first-person gauntlet. */
   setArmAppearance({ plate, sleeve, glove, accent, authored = false }) {
     this._armAppearance = { plate, sleeve, glove, accent, authored };
-    // Use the same readable plate value as the authored third-person armour.
-    // The old 0.34 multiplier turned white/orange armour into an unrelated gray
-    // stick, which is especially obvious when the local player is beside a bot.
-    this.armPlateMat.color.setHex(plate).multiplyScalar(0.82);
-    this.sleeveMat.color.setHex(sleeve).multiplyScalar(0.30);
-    const sleeveHsl = {};
-    this.sleeveMat.color.getHSL(sleeveHsl);
-    this.sleeveMat.color.setHSL(sleeveHsl.h, sleeveHsl.s, Math.max(0.10, sleeveHsl.l));
-    this.gloveMat.color.setHex(glove).multiplyScalar(0.90);
-    // Near-black cosmetics need to remain legible against the map's charcoal
-    // floors. Preserve the hue but maintain enough value to read the grip.
-    const gloveHsl = {};
-    this.gloveMat.color.getHSL(gloveHsl);
-    this.gloveMat.color.setHSL(gloveHsl.h, gloveHsl.s, Math.max(0.09, gloveHsl.l));
-    this.jointMat.color.copy(this.gloveMat.color).multiplyScalar(0.52);
+    // These values are already resolved from the equipped third-person body.
+    // Applying another brightness multiplier here made the FPS gloves and
+    // sleeves look like an unrelated skin.
+    this.armPlateMat.color.setHex(plate);
+    this.sleeveMat.color.setHex(sleeve);
+    this.gloveMat.color.setHex(glove);
+    this.jointMat.color.setHex(glove);
     this.cuffMat.color.setHex(accent);
     this.cuffMat.emissive.setHex(accent);
     this.cuffMat.emissiveIntensity = 0.05;
@@ -2167,7 +2182,9 @@ export class WeaponSystem {
     const hipY = swordGuard
       ? SWORD_VIEWMODEL_Y - sprintCarry * 0.075
       : viewmodelVerticalPosition(this.camera.aspect, this.camera.fov) + sprintDropY;
-    const hipZ = swordGuard ? SWORD_VIEWMODEL_Z - sprintCarry * 0.025 : VIEWMODEL_Z;
+    const hipZ = swordGuard
+      ? SWORD_VIEWMODEL_Z - sprintCarry * 0.025
+      : firearmViewmodelDepth(def);
     const activeViewmodelScale = swordGuard
       ? MELEE_VIEWMODEL_SCALE
       : firearmViewmodelScale(def, this.camera.aspect);

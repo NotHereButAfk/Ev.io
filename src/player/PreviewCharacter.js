@@ -19,10 +19,16 @@ export function resolveViewmodelPalette(skin, armorTypeId = 'vanguard', armorSki
     return { authored: true, plate: 0xcbd0e4, sleeve: 0x242931, glove: 0x242931, accent: 0xff950f };
   }
   if (armorSkin) {
-    const glove = new THREE.Color(armorSkin.secondary).multiplyScalar(0.42).getHex();
+    // Match tintHumanSoldier's actual rendered materials, rather than sending
+    // raw catalog swatches to a second, unrelated darkening pass.
+    const plate = new THREE.Color(armorSkin.primary).multiplyScalar(0.92).getHex();
+    const sleeve = new THREE.Color(armorSkin.secondary)
+      .lerp(new THREE.Color(0x4b5766), 0.42).getHex();
+    const glove = new THREE.Color(armorSkin.secondary)
+      .lerp(new THREE.Color(0x303844), 0.28).multiplyScalar(0.72).getHex();
     return {
-      plate: armorSkin.primary,
-      sleeve: armorSkin.secondary,
+      plate,
+      sleeve,
       glove,
       accent: armorSkin.emissive ?? armorSkin.primary,
     };

@@ -50,19 +50,19 @@ assert.match(bridgeSource, /modelScale:\s*PLAYER_WORLD_MODEL_SCALE/,
   'network humans and bots do not apply the same enlarged scale');
 assert.match(bridgeSource, /isBot\s*\?\s*DEFAULT_REMOTE_SKIN\s*:/,
   'network bots do not render with the default player skin');
-assert.match(bridgeSource, /isBot\s*\?\s*PLAYABLE_ARMOR_IDS\[0\]/,
+assert.match(bridgeSource, /DEFAULT_REMOTE_BOT_ARMOR_ID\s*=\s*'vanguard'/,
   'network bots do not render with the default player armor');
 
 const botSource = readFileSync(new URL('../src/entities/Bot.js', import.meta.url), 'utf8');
 assert.match(botSource, /DEFAULT_BOT_SKIN\s*=\s*getSkin\('default'\)/,
   'local bots do not use the default player skin');
-assert.match(botSource, /DEFAULT_BOT_ARMOR_ID\s*=\s*PLAYABLE_ARMOR_IDS\[0\]/,
+assert.match(botSource, /DEFAULT_BOT_ARMOR_ID\s*=\s*'vanguard'/,
   'local bots do not use the default player armor');
 
+assert.match(bridgeSource, /PLAYABLE_ARMOR_IDS/,
+  'network players do not consume the shared playable armor roster');
 for (const path of ['../src/entities/Bot.js', '../src/net/AuthNetBridge.js']) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8');
-  assert.match(source, /PLAYABLE_ARMOR_IDS/,
-    `${path} does not consume the shared playable armor roster`);
   assert.doesNotMatch(source, /\['assault',\s*'recon',\s*'heavy',\s*'stealth'\]/,
     `${path} still hard-codes the retired Soldier roster`);
   assert.match(source, /allowHuman:\s*true/,

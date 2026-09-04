@@ -9,7 +9,6 @@ import { directionToBodyYaw, turnBodyYaw } from '../player/Facing.js';
 import { getSkin } from '../player/skins.js';
 import { BOT_DASH, BOT_RETALIATION_AIM_SCALE, BOT_TACTICS, advanceBotMagazine, advanceBurst, botAimErrorMeters, botArenaDetectionDistance, botDashBonusSpeed, botLoadoutForId, chooseCombatSteering, chooseReachableRoamPoint, isBotDashLaneSafe } from './BotCombat.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from '../player/DeathAnimation.js';
-import { PLAYABLE_ARMOR_IDS } from '../player/ArmorTypes.js';
 import { PLAYER_WORLD_MODEL_SCALE } from '../player/Proportions.js';
 
 const _STILL = { bob: 0, lean: 0, swing: 0 };
@@ -51,7 +50,10 @@ let nextId = 1;
 // Bots share the exact default player presentation. Names and BOT badges keep
 // them readable without giving AI opponents a separate model/skin roster.
 const DEFAULT_BOT_SKIN = getSkin('default');
-const DEFAULT_BOT_ARMOR_ID = PLAYABLE_ARMOR_IDS[0];
+// Bots always use the same authored default body as a fresh player.  Keep this
+// explicit so reordering the selectable armour menu cannot silently reskin
+// every bot in a later update.
+const DEFAULT_BOT_ARMOR_ID = 'vanguard';
 
 function buildHealthBar() {
   const group = new THREE.Group();

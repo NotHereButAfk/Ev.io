@@ -44,6 +44,7 @@ const REMOTE_SKINS = [
   { primary: 0xc9d2d8, secondary: 0x2a3238 }, { primary: 0xe0902c, secondary: 0x33240c },
 ];
 const DEFAULT_REMOTE_SKIN = getSkin('default');
+const DEFAULT_REMOTE_BOT_ARMOR_ID = 'vanguard';
 function hashId(id) {
   const s = String(id);
   let h = 0;
@@ -170,7 +171,7 @@ export class AuthNetBridge {
     // you saw of yourself.
     const avatar = new Avatar(this.scene, {
       skin: isBot ? DEFAULT_REMOTE_SKIN : REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
-      armorTypeId: isBot ? PLAYABLE_ARMOR_IDS[0]
+      armorTypeId: isBot ? DEFAULT_REMOTE_BOT_ARMOR_ID
         : PLAYABLE_ARMOR_IDS[hashId(id) % PLAYABLE_ARMOR_IDS.length],
       weaponId: 'm4',
       // Network peers and simulated bots share the Blender-authored default.

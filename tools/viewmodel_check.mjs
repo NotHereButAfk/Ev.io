@@ -109,6 +109,50 @@ if (authoredArms) {
     'the shipped player-arm mesh must be installed in the authored pose check');
 }
 
+// The first-person arms must use the already-resolved third-person palette
+// exactly.  A second shading pass here was the reason equipped hands looked
+// like a different skin even though the correct model had loaded.
+const paletteProbe = {
+  plate: 0x3479c9,
+  sleeve: 0x2c405d,
+  glove: 0x172334,
+  accent: 0xff5a21,
+};
+system.setArmAppearance(paletteProbe);
+if (authoredArms) {
+  const seen = new Set();
+  for (const arm of [system.armGroup, system.supportArmGroup]) {
+    arm.traverse((object) => {
+      if (!object.isMesh || !object.userData.viewmodelPart) return;
+      const role = object.userData.viewmodelPart;
+      if (!(role in paletteProbe)) return;
+      seen.add(role);
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        assert(material.color.getHex() === paletteProbe[role],
+          `${role} viewmodel material does not match the equipped body palette`);
+      }
+    });
+  }
+  for (const role of ['plate', 'sleeve', 'glove']) {
+    assert(seen.has(role), `authored viewmodel arm has no ${role} surface`);
+  }
+} else {
+  assert(system.armPlateMat.color.getHex() === paletteProbe.plate,
+    'fallback plate does not match the equipped body palette');
+  assert(system.sleeveMat.color.getHex() === paletteProbe.sleeve,
+    'fallback sleeve does not match the equipped body palette');
+  assert(system.gloveMat.color.getHex() === paletteProbe.glove,
+    'fallback glove does not match the equipped body palette');
+}
+system.setArmAppearance({
+  authored: true,
+  plate: 0xcbd0e4,
+  sleeve: 0x242931,
+  glove: 0x242931,
+  accent: 0xff950f,
+});
+
 // The GLB pack uses an inverted-hull child named `outline`. That technique
 // cannot share a depth-independent first-person pass or its back faces cover
 // the colored receiver. Keep the base gun on top of the world and suppress only
@@ -400,6 +444,8 @@ const fovs = [60, 78, 110];
 let worstRestDepth = { value: Infinity, label: '' };
 let worstActionDepth = { value: Infinity, label: '' };
 let worstWeaponFrame = { value: Infinity, label: '' };
+const firearmFraming = [];
+const reportMode = process.env.VIEWMODEL_REPORT === '1';
 
 for (const def of WEAPONS) {
   activate(def);
@@ -422,7 +468,9 @@ for (const def of WEAPONS) {
       const ratio = projectedRatio(model);
       const label = `${def.id}/${viewport.label}/${fov}`;
       if (ratio < worstWeaponFrame.value) worstWeaponFrame = { value: ratio, label };
-      assert(ratio >= 0.04, `${label} leaves only ${(ratio * 100).toFixed(1)}% of its projected box visible`);
+      if (!reportMode) {
+        assert(ratio >= 0.04, `${label} leaves only ${(ratio * 100).toFixed(1)}% of its projected box visible`);
+      }
     }
   }
 
@@ -430,6 +478,19 @@ for (const def of WEAPONS) {
   player.baseFov = 78;
   camera.fov = 78;
   tick(45);
+
+  if (def.kind !== 'melee') {
+    const bounds = projectedBounds(model);
+    firearmFraming.push({
+      id: def.id,
+      carry: weaponHandPose(def.id).carry,
+      scale: system.weaponMount.scale.x,
+      width: Math.max(0, Math.min(1, bounds.maxX) - Math.max(-1, bounds.minX)),
+      height: Math.max(0, Math.min(1, bounds.maxY) - Math.max(-1, bounds.minY)),
+      area: viewportArea(model),
+      bounds,
+    });
+  }
 
   if (authoredArms) {
     const model = system.models.get(def.id).group;
@@ -475,10 +536,12 @@ for (const def of WEAPONS) {
     }
   }
   if (actionDepth < worstActionDepth.value) worstActionDepth = { value: actionDepth, label: def.id };
-  assert(
-    actionDepth >= camera.near + 0.03,
-    `${def.id} action reaches ${actionDepth.toFixed(3)}m from the eye plane (near=${camera.near})`,
-  );
+  if (!reportMode) {
+    assert(
+      actionDepth >= camera.near + 0.03,
+      `${def.id} action reaches ${actionDepth.toFixed(3)}m from the eye plane (near=${camera.near})`,
+    );
+  }
 }
 
 // A first-person hold must point into the scene, not display a broadside gun.
@@ -581,6 +644,31 @@ for (let i = 0; i < swordFrames; i++) {
   const centerX = (bounds.minX + bounds.maxX) * 0.5;
   greatestSwordDrop = Math.max(greatestSwordDrop, swordGuardBounds.maxY - bounds.maxY);
   greatestSwordSideShift = Math.max(greatestSwordSideShift, Math.abs(centerX - swordGuardCenterX));
+}
+
+if (reportMode) {
+  console.table(firearmFraming.map(({ bounds, ...row }) => ({
+    ...row,
+    scale: row.scale.toFixed(3),
+    width: row.width.toFixed(3),
+    height: row.height.toFixed(3),
+    area: row.area.toFixed(3),
+    minX: bounds.minX.toFixed(3),
+    maxX: bounds.maxX.toFixed(3),
+    minY: bounds.minY.toFixed(3),
+    maxY: bounds.maxY.toFixed(3),
+  })));
+}
+
+for (const frame of firearmFraming) {
+  assert(frame.scale >= 1.10 && frame.scale <= 1.82,
+    `${frame.id} first-person scale ${frame.scale.toFixed(3)} is outside the fitted arsenal range`);
+  assert(frame.area >= 0.03 && frame.area <= 0.55,
+    `${frame.id} occupies ${(frame.area * 100).toFixed(1)}% of the desktop view`);
+  if (frame.carry === 'launcher') {
+    assert(frame.area >= 0.08,
+      `${frame.id} launcher is still smaller than the fitted first-person presentation`);
+  }
 }
 const swordRecoveredBounds = projectedBounds(swordModel);
 assert(greatestSwordDrop > 0.70 && greatestSwordDrop > greatestSwordSideShift * 1.05,

@@ -47,18 +47,12 @@ export function buildViewmodelArm(side, sourceTemplate = template) {
   const source = sourceTemplate?.getObjectByName(`KYX_ViewArm_${side}`);
   if (!source) return null;
   const root = source.clone(true);
-  const materialClones = new Map();
   root.traverse((object) => {
     if (!object.isMesh) return;
     if (Array.isArray(object.material)) {
-      object.material = object.material.map((material) => {
-        if (!materialClones.has(material)) materialClones.set(material, cloneMaterial(material));
-        return materialClones.get(material);
-      });
+      object.material = object.material.map((material) => cloneMaterial(material));
     } else {
-      const material = object.material;
-      if (!materialClones.has(material)) materialClones.set(material, cloneMaterial(material));
-      object.material = materialClones.get(material);
+      object.material = cloneMaterial(object.material);
     }
     object.castShadow = false;
     object.receiveShadow = false;
@@ -72,8 +66,11 @@ export function buildViewmodelArm(side, sourceTemplate = template) {
 export function tintViewmodelArm(root, { plate, sleeve, glove, accent, authored = false }) {
   if (!root) return;
   const colors = {
-    plate: new THREE.Color(plate).multiplyScalar(0.82),
-    sleeve: new THREE.Color(sleeve).multiplyScalar(0.34),
+    // PreviewCharacter has already resolved the actual rendered body colours.
+    // Do not shade them again here or the local hands diverge from the skin
+    // other players see.
+    plate: new THREE.Color(plate),
+    sleeve: new THREE.Color(sleeve),
     glove: new THREE.Color(glove),
     accent: new THREE.Color(accent),
   };
