@@ -9,7 +9,7 @@ export function preloadViewmodelArms(onLoad) {
   if (template) { onLoad?.(true); return; }
   // Contract/unit tests instantiate WeaponSystem in Node, where a site-root URL
   // has no origin. Keep the procedural fallback there; browsers perform the
-  // real asset swap as soon as the 352 KB bake arrives.
+  // real asset swap as soon as the compact arm bake arrives.
   if (typeof window === 'undefined') { onLoad?.(false); return; }
   if (onLoad) callbacks.push(onLoad);
   if (loading) return;
@@ -35,10 +35,10 @@ function cloneMaterial(material) {
 /**
  * Clone one arm baked from the same KYX_Warrior mesh shown to other players.
  * Its origin is the wrist and its fingers already use the authored GunIdle
- * pose, so WeaponSystem only has to seat that wrist on a weapon grip.
+ * pose. WeaponSystem measures the closed palm before seating it on a grip.
  */
-export function buildViewmodelArm(side) {
-  const source = template?.getObjectByName(`KYX_ViewArm_${side}`);
+export function buildViewmodelArm(side, sourceTemplate = template) {
+  const source = sourceTemplate?.getObjectByName(`KYX_ViewArm_${side}`);
   if (!source) return null;
   const root = source.clone(true);
   const materialClones = new Map();

@@ -80,13 +80,13 @@ function createTracerMesh() {
 // the worst case), and recoil moves the whole gun back toward the eye. Keeping
 // the shared mount farther out preserves the hand-to-grip relationship while
 // leaving every shipped model clear of the camera's near plane.
-const VIEWMODEL_Z = -0.93;
-// EV.IO's hip-fire rifle is shouldered diagonally rather than laid flat across
-// the bottom of the screen: its butt exits near the lower centre/right while
-// the muzzle rises to the open space left of the reticle. The offset and cant
-// are shared by every firearm so swapping weapons never changes handedness.
-const VIEWMODEL_X = 0.110;
-const VIEWMODEL_Y = -0.445;
+const VIEWMODEL_Z = -0.98;
+// Shoulder the firearm toward the scene, not sideways across the camera.
+// The lower mount crops the buttstock at the bottom/right while retaining the
+// full-size receiver and both grip contacts. These are our presentation
+// settings, not measured constants from the reference game.
+const VIEWMODEL_X = 0.23;
+const VIEWMODEL_Y = -0.50;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
 const VIEWMODEL_SCALE = 1.80;
@@ -106,8 +106,8 @@ const FIREARM_MODEL_SCALE = Object.freeze({
   // the correctly framed M4.
   m16: 0.82,
 });
-const VIEWMODEL_PITCH = 0.78;
-const VIEWMODEL_YAW = 0.98;
+const VIEWMODEL_PITCH = 0.25;
+const VIEWMODEL_YAW = 0.30;
 const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
@@ -466,10 +466,10 @@ export class WeaponSystem {
     onWeaponModelsReady(() => this._refreshModels());
   }
 
-  _installAuthoredViewmodelArms() {
+  _installAuthoredViewmodelArms(armFactory = buildViewmodelArm) {
     this._handSurfaceMeshes = [];
     const makeArm = (side, support) => {
-      const model = buildViewmodelArm(side);
+      const model = armFactory(side);
       if (!model) return null;
       const arm = new THREE.Group();
       arm.userData.viewmodelHand = support ? 'support' : 'trigger';
@@ -479,14 +479,15 @@ export class WeaponSystem {
       const grip = new THREE.Group();
       grip.name = 'viewmodel_grip';
       arm.add(grip);
-      // The baked asset is wrist-centred. Move the centre of its closed palm
-      // onto the authored weapon contact, while retaining the exact bent arm
-      // and gauntlet from the player model.
-      model.position.set(
-        support ? -0.043 : 0.028,
-        support ? -0.075 : -0.080,
-        support ? -0.053 : -0.017,
-      );
+      // The bake is wrist-centred, not palm-centred. Anchor the actual closed
+      // glove, rather than guessing another offset whenever the camera changes.
+      // The glove then closes around the same grip used by the third-person player.
+      const palm = model.getObjectByName(`KYX_View${side}_Hand`);
+      if (!palm) return null;
+      model.updateWorldMatrix(true, true);
+      const palmCenter = new THREE.Box3().setFromObject(palm).getCenter(new THREE.Vector3());
+      model.worldToLocal(palmCenter);
+      model.position.copy(palmCenter).negate();
       grip.add(model);
 
       if (support) {
@@ -863,14 +864,16 @@ export class WeaponSystem {
     );
 
     // The fallback palm has a small internal centre offset. The authored arm is
-    // already palm-centred by its Blender bake, so its wrist wrapper lands on
-    // the physical contact without inheriting that legacy correction.
+    // palm-centred at installation, so it follows the physical contact without
+    // inheriting the old hand-placement depth correction.
     const trigger = pose.trigger;
     const triggerAuthored = this.armGroup.userData.authoredViewArm;
     this.armGroup.position.set(
       trigger[0],
-      trigger[1] + (triggerAuthored ? 0 : 0.006) + (narrow ? 0.065 : 0),
-      trigger[2] + (triggerAuthored ? -0.100 : 0.034),
+      // The wrist contact sits below the closed palm on a pistol grip. Seat
+      // the glove 3cm above it so the fingers wrap the handle, not its base.
+      trigger[1] + (triggerAuthored ? 0.030 : 0.006) + (narrow ? 0.065 : 0),
+      trigger[2] + (triggerAuthored ? 0 : 0.034),
     );
     this.armGroup.scale.set(
       (portrait ? 0.72 : (narrow ? 0.78 : 0.86)) * handFovScale,
@@ -890,7 +893,7 @@ export class WeaponSystem {
     this.supportArmGroup.position.set(
       support[0],
       support[1] + (supportAuthored ? 0 : 0.006) + (narrow ? 0.035 : 0),
-      support[2] + (supportAuthored ? 0.080 : 0.034) + supportDepthComp,
+      support[2] + (supportAuthored ? 0 : 0.034) + supportDepthComp,
     );
     this.supportArmGroup.scale.set(
       supportWidthScale * handFovScale,
@@ -2167,14 +2170,14 @@ export class WeaponSystem {
     // raised it 12cm, contradicting the intended carry and forcing implausibly
     // long sleeves just to keep them connected to the bottom of the frame.
     const sprintDrop = THREE.MathUtils.lerp(
-      -0.02, 0.14, THREE.MathUtils.clamp((this.camera.fov - 60) / 18, 0, 1),
+      -0.02, 0.08, THREE.MathUtils.clamp((this.camera.fov - 60) / 18, 0, 1),
     );
     // A moving shot is a combat pose, not a full sprint carry. Leave a small
     // amount of bob/cant so speed still reads, while keeping both hands and
     // the muzzle in a usable firing lane.
     const sprintCarry = this._sprintT * (1 - 0.72 * this._movingFireT);
     const sprintDropY  = -sprintCarry * sprintDrop;
-    const sprintShiftX = -sprintCarry * 0.12 * aspectScale;
+    const sprintShiftX = -sprintCarry * 0.04 * aspectScale;
     // Reload (mine) and the landing pulse (Codex's) are independent offsets on
     // the same mount, so they simply sum.
     const hipX = swordGuard
@@ -2210,7 +2213,7 @@ export class WeaponSystem {
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     const targetMountPitch = swordGuard
       ? SWORD_VIEWMODEL_PITCH - sprintCarry * 0.055 + landPulse * 0.05
-      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + sprintCarry * 0.22, ADS_PITCH, adsEase)
+      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + sprintCarry * 0.06, ADS_PITCH, adsEase)
         + 0.50 * framedBell + 0.14 * framedRack + landPulse * 0.12;
     const targetMountYaw = swordGuard
       ? SWORD_VIEWMODEL_YAW + sprintCarry * 0.025

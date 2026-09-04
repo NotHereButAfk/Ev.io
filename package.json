@@ -32,7 +32,7 @@
     "test:player-death": "node tools/player_death_check.mjs",
     "test:grenades": "node tools/grenade_contract_check.mjs",
     "test:zombie-death": "node tools/zombie_death_check.mjs",
-    "test:viewmodel": "node tools/viewmodel_check.mjs",
+    "test:viewmodel": "node tools/viewmodel_check.mjs && node tools/viewmodel_check.mjs --authored-arms",
     "test:ads-visual": "node tools/ads_visual_check.mjs",
     "test:gun-models": "node tools/quaternius_gun_check.mjs",
     "test:weapon-skins": "node tools/weapon_skin_sets_check.mjs",

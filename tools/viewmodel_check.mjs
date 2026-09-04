@@ -100,6 +100,14 @@ const camera = new THREE.PerspectiveCamera(78, 16 / 9, 0.02, 300);
 scene.add(camera);
 const audio = new Proxy({}, { get: () => noop });
 const system = new WeaponSystem(camera, scene, audio);
+const authoredArms = process.argv.includes('--authored-arms') || process.env.KYX_TEST_AUTHORED_ARMS === '1';
+if (authoredArms) {
+  const { buildViewmodelArm } = await import('../src/player/ViewmodelArms.js');
+  const armsGlb = await loadGlb('../public/kyx-view-arms.glb');
+  system._installAuthoredViewmodelArms((side) => buildViewmodelArm(side, armsGlb.scene));
+  assert(system.armGroup.userData.authoredViewArm && system.supportArmGroup.userData.authoredViewArm,
+    'the shipped player-arm mesh must be installed in the authored pose check');
+}
 
 // The GLB pack uses an inverted-hull child named `outline`. That technique
 // cannot share a depth-independent first-person pass or its back faces cover
@@ -423,6 +431,23 @@ for (const def of WEAPONS) {
   camera.fov = 78;
   tick(45);
 
+  if (authoredArms) {
+    const pose = weaponHandPose(def.id);
+    system.kickGroup.updateWorldMatrix(true, true);
+    for (const [side, arm] of [['trigger', system.armGroup], ['support', system.supportArmGroup]]) {
+      if (!arm.visible) continue;
+      const palm = arm.getObjectByName('viewmodel_palm');
+      palm.geometry.computeBoundingBox();
+      const centre = palm.geometry.boundingBox.getCenter(new THREE.Vector3());
+      palm.localToWorld(centre);
+      system.kickGroup.worldToLocal(centre);
+      const contact = new THREE.Vector3(...pose[side]);
+      if (side === 'trigger') contact.y += 0.030; // closed palm sits above wrist contact
+      const error = centre.distanceTo(contact);
+      assert(error < 0.015, `${def.id} ${side} shipped palm misses its grip by ${(error * 100).toFixed(1)}cm`);
+    }
+  }
+
   let actionDepth = Infinity;
   if (def.kind === 'melee') {
     system.swingPhase = 0;
@@ -455,10 +480,10 @@ for (const def of WEAPONS) {
   );
 }
 
-// The reference first-person silhouette is a large shouldered rifle: muzzle in
-// the open upper-left area, receiver below the reticle, and butt leaving the
-// lower centre/right edge. Lock the shared mount after the complete all-weapon
-// visibility matrix above so it cannot drift back to the thin far-right carry.
+// A first-person hold must point into the scene, not display a broadside gun.
+// The old test locked the rejected 56-degree yaw / 45-degree pitch as "EV.IO"
+// constants and consequently passed the visibly wrong pose. Check the actual
+// forward axis and projected framing instead, retaining the full weapon scale.
 activate(WEAPONS.find((def) => def.id === 'm4'));
 camera.aspect = 16 / 9;
 player.baseFov = 78;
@@ -474,18 +499,16 @@ staleSidearm.visible = true;
 tick(1);
 assert(activeM4.visible && !staleSidearm.visible,
   'equipped firearm did not recover from a stale hidden viewmodel state');
-assert(system.weaponMount.position.x >= 0.10 && system.weaponMount.position.x <= 0.12,
-  `EV.IO rifle shoulder offset drifted (${system.weaponMount.position.x})`);
-assert(system.weaponMount.position.y >= -0.46 && system.weaponMount.position.y <= -0.43,
-  `EV.IO rifle vertical placement drifted (${system.weaponMount.position.y})`);
-assert(system.weaponMount.position.z >= -0.95 && system.weaponMount.position.z <= -0.91,
-  `EV.IO rifle depth drifted (${system.weaponMount.position.z})`);
+const hipForward = new THREE.Vector3(0, 0, -1).applyEuler(system.weaponMount.rotation);
+assert(-hipForward.z > 0.90 && Math.abs(hipForward.x) < 0.35 && Math.abs(hipForward.y) < 0.35,
+  `hip-fire gun is presented broadside instead of forward (${hipForward.toArray()})`);
+const hipRifleBounds = projectedBounds(activeM4);
+assert(hipRifleBounds.maxY < 0.10 && hipRifleBounds.maxY > -0.55,
+  `hip-fire receiver must sit below the target area (${JSON.stringify(hipRifleBounds)})`);
+assert(hipRifleBounds.minY < -1 && hipRifleBounds.maxX > 0.35,
+  `hip-fire stock must exit the lower-right frame (${JSON.stringify(hipRifleBounds)})`);
 assert(system.weaponMount.scale.x >= 1.77 && system.weaponMount.scale.x <= 1.83,
-  `EV.IO rifle first-person scale drifted (${system.weaponMount.scale.x})`);
-assert(system.weaponMount.rotation.x >= 0.75 && system.weaponMount.rotation.x <= 0.81,
-  `EV.IO rifle diagonal pitch drifted (${system.weaponMount.rotation.x})`);
-assert(system.weaponMount.rotation.y >= 0.95 && system.weaponMount.rotation.y <= 1.01,
-  `EV.IO rifle shoulder yaw drifted (${system.weaponMount.rotation.y})`);
+  `correcting the angle must not shrink the rifle (${system.weaponMount.scale.x})`);
 
 // EV.IO's sword is a separate first-person composition: a close right-side
 // guard whose grip and tip both leave the frame. It must not be centred over
@@ -590,7 +613,7 @@ for (const arm of [system.armGroup, system.supportArmGroup]) {
       || object.name === 'viewmodel_finger_curl'
       || object.name === 'viewmodel_knuckle'
       || object.name === 'viewmodel_thumb';
-    const correctLayer = handSurface ? object.renderOrder >= 1001 : object.renderOrder <= 999;
+    const correctLayer = handSurface && !authoredArms ? object.renderOrder >= 1001 : object.renderOrder <= 999;
     assert(!object.material.depthTest && !object.material.depthWrite && correctLayer,
       `${arm.userData.viewmodelHand} hand can disappear into world geometry`);
   });
@@ -616,19 +639,24 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
         ['support', system.supportArmGroup],
       ]) {
         if (!glove.visible) continue;
-        const grip = glove.getObjectByName('viewmodel_grip') || glove;
+        const grip = authoredArms
+          ? glove.getObjectByName('viewmodel_palm')
+          : (glove.getObjectByName('viewmodel_grip') || glove);
         const ratio = gloveRatio(grip);
         const label = `${stateName}/${viewport.label}/${fov}/${side}`;
-        if (ratio < worstGlove.value) worstGlove = { value: ratio, label };
-        // Mid-reload intentionally lets part of the trigger glove leave frame;
-        // at least 34% remains on landscape and 15% on portrait. The lower
-        // EV-style framing intentionally lets the sleeve continue through the
-        // bottom edge while the closed grip itself stays readable.
+        if (side === 'support' && ratio < worstGlove.value) worstGlove = { value: ratio, label };
+        // Keep the bracing glove readable throughout the pose; the rear hand
+        // may be cropped below the camera along with its shouldered stock.
         const minimum = side === 'support'
           ? (viewport.aspect < 1 ? 0.08 : 0.18)
           : (viewport.aspect < 1.5 ? 0.15 : 0.30);
+        // A shouldered rifle crops the rear pistol grip naturally at the lower
+        // edge. Do not turn the whole gun broadside just to expose that hand.
+        // The support glove must remain visible; a cropped trigger glove must
+        // be below the frame, never lost above/left or over the target area.
+        const croppedTrigger = side === 'trigger' && lastGloveBounds[3] < -0.70;
         assert(
-          ratio >= minimum,
+          ratio >= minimum || croppedTrigger,
           `${label} leaves only ${(ratio * 100).toFixed(1)}% of the glove visible (${JSON.stringify(lastGloveBounds)})`,
         );
         // Sum of per-mesh projected boxes intentionally over-estimates the
@@ -749,7 +777,7 @@ assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 999),
   'ADS glove still renders over the sight picture');
 input.rightMouseDown = false;
 advanceSeconds(0.5, 60);
-assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 1001),
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === (authoredArms ? 999 : 1001)),
   'hip-fire glove did not return over the physical grips');
 
 // The recoil spring used to be Euler-integrated and visibly recovered at a
@@ -901,7 +929,7 @@ console.log(
   + `rest clearance=${worstRestDepth.value.toFixed(3)}m (${worstRestDepth.label}), `
   + `action clearance=${worstActionDepth.value.toFixed(3)}m (${worstActionDepth.label}), `
   + `weapon frame=${(worstWeaponFrame.value * 100).toFixed(1)}% (${worstWeaponFrame.label}), `
-  + `glove frame=${(worstGlove.value * 100).toFixed(1)}% (${worstGlove.label}); `
+  + `support glove frame=${(worstGlove.value * 100).toFixed(1)}% (${worstGlove.label}); `
   + `30/60/144Hz blends match, ADS bob=${Math.max(...adsStability.map((s) => s.bob)).toFixed(4)}m, `
   + `ADS sway=${Math.max(...adsStability.map((s) => s.sway)).toFixed(4)}rad, `
   + `landing=${softLanding.toFixed(2)}x/${hardLanding.toFixed(2)}x`,
