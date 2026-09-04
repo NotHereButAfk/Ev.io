@@ -585,6 +585,7 @@ export class WeaponSystem {
     // states (map transition, respawn, or a model refresh during a switch),
     // which could leave every replacement hidden for the rest of the match.
     this._ensureActiveModelVisibility();
+    this._applyViewmodelHandPose();
   }
 
   _buildArm() {
@@ -849,7 +850,8 @@ export class WeaponSystem {
   _applyViewmodelHandPose() {
     if (!this.armGroup || !this.supportArmGroup) return;
     const def = this.currentDef;
-    const pose = weaponHandPose(def?.id);
+    const model = this.models.get(def?.id)?.group;
+    const pose = weaponHandPose(model?.userData?.weaponId ? model : def?.id);
     const portrait = this.camera.aspect < 1;
     const narrow = this.camera.aspect < 1.5;
     // The world camera also controls the user's gameplay FOV. Counter-scale

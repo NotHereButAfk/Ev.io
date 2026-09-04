@@ -432,7 +432,8 @@ for (const def of WEAPONS) {
   tick(45);
 
   if (authoredArms) {
-    const pose = weaponHandPose(def.id);
+    const model = system.models.get(def.id).group;
+    const pose = weaponHandPose(model.userData.weaponId ? model : def.id);
     system.kickGroup.updateWorldMatrix(true, true);
     for (const [side, arm] of [['trigger', system.armGroup], ['support', system.supportArmGroup]]) {
       if (!arm.visible) continue;
@@ -593,12 +594,46 @@ activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
 assert(system.armGroup.visible && system.supportArmGroup.visible,
   'two-handed rifle must render both first-person hands');
-const m4HandPose = weaponHandPose('m4');
-assert(m4HandPose.trigger[1] <= -0.085 && m4HandPose.trigger[2] >= 0.19,
-  `M4 trigger hand left the rear pistol grip (${JSON.stringify(m4HandPose.trigger)})`);
-assert(m4HandPose.support[1] >= -0.045 && m4HandPose.support[1] <= -0.025
-  && m4HandPose.support[2] <= -0.43,
-  `M4 support hand left the forward handguard (${JSON.stringify(m4HandPose.support)})`);
+const m4HandPose = weaponHandPose(system.models.get('m4').group);
+// Check actual mesh contact, not the fallback's outdated grip coordinates.
+// A source-specific profile must keep the procedural load placeholder intact.
+assert(weaponHandPose('m4').trigger[2] === 0.20, 'fallback M4 grip changed');
+assert(m4HandPose.trigger[2] < 0.07 && m4HandPose.trigger[2] > -0.03,
+  'supplied M4 hand is behind the pistol grip in the stock gap');
+assert(m4HandPose.support[2] > -0.30 && m4HandPose.support[2] < -0.15,
+  'supplied M4 support is at the muzzle instead of the fore-end');
+const suppliedM4 = quaterniusSources.get('m4');
+suppliedM4.updateMatrixWorld(true);
+function surfaceDistance(root, point) {
+  let best = Infinity;
+  const triangle = new THREE.Triangle();
+  const nearest = new THREE.Vector3();
+  root.traverse((mesh) => {
+    if (!mesh.isMesh) return;
+    const position = mesh.geometry.attributes.position;
+    const index = mesh.geometry.index;
+    const count = index ? index.count : position.count;
+    for (let i = 0; i < count; i += 3) {
+      for (const [corner, offset] of [[triangle.a, 0], [triangle.b, 1], [triangle.c, 2]]) {
+        corner.fromBufferAttribute(position, index ? index.getX(i + offset) : i + offset)
+          .applyMatrix4(mesh.matrixWorld);
+      }
+      triangle.closestPointToPoint(point, nearest);
+      best = Math.min(best, point.distanceTo(nearest));
+    }
+  });
+  return best;
+}
+const m4TriggerPalm = new THREE.Vector3(...m4HandPose.trigger);
+m4TriggerPalm.y += 0.030;
+assert(surfaceDistance(suppliedM4, m4TriggerPalm) < 0.025,
+  'supplied M4 trigger palm is grabbing empty space');
+assert(surfaceDistance(suppliedM4, new THREE.Vector3(...m4HandPose.support)) < 0.035,
+  'supplied M4 support hand is not touching the fore-end');
+const outdatedM4Palm = new THREE.Vector3(...weaponHandPose('m4').trigger);
+outdatedM4Palm.y += 0.030;
+assert(surfaceDistance(suppliedM4, outdatedM4Palm) > 0.035,
+  'mesh-contact test no longer distinguishes the rejected stock-gap pose');
 assert(system.armGroup.userData.viewmodelHand === 'trigger'
   && system.supportArmGroup.userData.viewmodelHand === 'support',
   'first-person handedness no longer matches the remote Soldier hold');

@@ -38,7 +38,23 @@ const RESOLVED_WEAPON_HAND_POSES = Object.freeze(Object.fromEntries(
   ]),
 ));
 
+// Contacts measured on the supplied pack after its +X -> -Z normalization.
+// The fallback M4 has a different receiver: reusing its rear grip makes the
+// imported AR_1's trigger hand grab below the stock, with the support at the
+// muzzle. Resolve by model source so fallback loading and third-person IK use
+// the right contacts without changing either mesh or its dimensions.
+const QUATERNIUS_HAND_POSES = Object.freeze({
+  m4: Object.freeze({
+    ...RESOLVED_WEAPON_HAND_POSES.m4,
+    trigger: [0.012, -0.035, 0.030],
+    support: [-0.020, -0.045, -0.230],
+  }),
+});
+
 export function weaponHandPose(weaponOrId) {
   const id = typeof weaponOrId === 'string' ? weaponOrId : weaponOrId?.userData?.weaponId;
+  if (weaponOrId?.userData?.modelSource === 'quaternius' && QUATERNIUS_HAND_POSES[id]) {
+    return QUATERNIUS_HAND_POSES[id];
+  }
   return RESOLVED_WEAPON_HAND_POSES[id] || DEFAULT_WEAPON_HAND_POSE;
 }
