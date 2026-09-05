@@ -85,7 +85,7 @@ const VIEWMODEL_Z = -0.98;
 // The lower mount crops the buttstock at the bottom/right while retaining the
 // full-size receiver and both grip contacts. These are our presentation
 // settings, not measured constants from the reference game.
-const VIEWMODEL_X = 0.20;
+const VIEWMODEL_X = 0.26;
 const VIEWMODEL_Y = -0.50;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
@@ -287,10 +287,9 @@ export function adsMountForSight(
   );
 }
 
-// Camera children still participate in the world depth buffer in Three.js.
-// Without a dedicated viewmodel pass, a wall close to the player can therefore
-// erase most (or all) of the held gun. Clone the model materials so disabling
-// depth testing here never leaks to third-person guns, pickups, or thumbnails.
+// The dedicated viewmodel pass clears world depth first. Gun parts then use
+// normal depth testing to hide rear surfaces without clipping against walls.
+// Clone materials so viewmodel settings cannot affect pickups or remote guns.
 export function prepareFirstPersonModel(group) {
   // Quaternius firearms are authored for a left-side showcase render. In the
   // lower-right first-person carry that exposes the far side of the receiver,
@@ -316,10 +315,10 @@ export function prepareFirstPersonModel(group) {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
       if (!material) continue;
-      material.depthTest = false;
-      material.depthWrite = false;
+      material.depthTest = true;
+      material.depthWrite = true;
     }
-    object.renderOrder = 1000;
+    object.renderOrder = 0;
     object.frustumCulled = false;
   });
 }
@@ -433,7 +432,42 @@ export class WeaponSystem {
     this.applyRecoilToPlayer = null; // (amount) => void
   }
 
+  renderViewmodel(renderer, world) {
+    if (!this.weaponMount.visible) return;
+    const sources = [world._hemisphere, world._sun, world._rim];
+    sources.forEach((source, index) => {
+      const light = this.viewLights[index];
+      light.visible = !!source;
+      if (source) {
+        light.color.copy(source.color);
+        light.intensity = source.intensity;
+        light.position.copy(source.position);
+        if (source.groundColor) light.groundColor.copy(source.groundColor);
+        if (source.target) light.target.position.copy(source.target.position);
+      }
+    });
+    const parent = this.weaponMount.parent;
+    const autoClear = renderer.autoClear;
+    this.camera.updateWorldMatrix(true, false);
+    this.viewAnchor.matrix.copy(this.camera.matrixWorld);
+    this.viewAnchor.add(this.weaponMount);
+    try {
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      renderer.render(this.viewScene, this.camera);
+    } finally {
+      parent.add(this.weaponMount);
+      renderer.autoClear = autoClear;
+    }
+  }
+
   _buildViewmodels() {
+    this.viewScene = new THREE.Scene();
+    this.viewAnchor = new THREE.Group();
+    this.viewAnchor.matrixAutoUpdate = false;
+    this.viewScene.add(this.viewAnchor);
+    this.viewLights = [new THREE.HemisphereLight(), new THREE.DirectionalLight(), new THREE.DirectionalLight()];
+    this.viewScene.add(...this.viewLights);
     this.weaponMount = new THREE.Object3D();
     // The reference rifle owns the lower-right quadrant but stays slim enough
     // to leave the arena readable. Keep the stock crossing the lower/right
@@ -528,11 +562,11 @@ export class WeaponSystem {
           object.userData.viewmodelPart = 'plate';
           object.name = 'viewmodel_gauntlet';
         }
-        object.renderOrder = handSurface ? 1001 : 999;
+        object.renderOrder = 0;
         const materials = Array.isArray(object.material) ? object.material : [object.material];
         for (const material of materials) {
-          material.depthTest = false;
-          material.depthWrite = false;
+          material.depthTest = true;
+          material.depthWrite = true;
         }
       });
       tintViewmodelArm(arm, this._armAppearance || {
@@ -805,18 +839,16 @@ export class WeaponSystem {
       arm.traverse((object) => {
         if (!object.isMesh) return;
         object.castShadow = true;
-        // Keep the whole first-person rig independent of world depth. Sleeves
-        // are drawn before the gun, then only the closed hand is drawn after
-        // it. This makes the palm wrap the grip without laying the forearm and
-        // elbow over the receiver like disconnected armour pieces.
-        object.material.depthTest = false;
-        object.material.depthWrite = false;
+        // The separate viewmodel pass isolates world depth; retain internal
+        // depth so sleeves, fingers and receiver occlude each other correctly.
+        object.material.depthTest = true;
+        object.material.depthWrite = true;
         const handSurface = object.name === 'viewmodel_palm'
           || object.name === 'viewmodel_hand_plate'
           || object.name === 'viewmodel_finger_curl'
           || object.name === 'viewmodel_knuckle'
           || object.name === 'viewmodel_thumb';
-        object.renderOrder = handSurface ? 1001 : 999;
+        object.renderOrder = 0;
         if (handSurface) this._handSurfaceMeshes.push(object);
         object.frustumCulled = false;
       });
@@ -905,25 +937,18 @@ export class WeaponSystem {
       supportLengthScale * handFovScale,
       supportWidthScale * handFovScale,
     );
-    // EV.IO's first-person rifle silhouette includes both the trigger hand and
-    // the bracing hand under the fore-end. One-handed weapons keep the support
-    // hand hidden through their authored pose setting.
+    // First-person framing exposes only the trigger arm. Third-person grip
+    // contacts and the remote player's two-handed hold are unchanged.
     this.armGroup.visible = true;
-    this.supportArmGroup.visible = pose.supportVisible !== false;
+    this.supportArmGroup.visible = false;
     this.armGroup.userData.gripTarget = trigger.slice();
     this.supportArmGroup.userData.gripTarget = support.slice();
   }
 
   _updateViewmodelHandLayers() {
-    // At hip fire the palms draw over the weapon so they visibly close around
-    // both grips. Once ADS begins, render them beneath the gun instead: the
-    // support glove remains physically attached but cannot paint over the rear
-    // sight or appear as a loose block inside the aiming window.
-    const handOrder = this.scopeT > 0.28 ? 999 : 1001;
+    // Hands and gun share real depth in the isolated viewmodel pass.
+    const handOrder = 0;
     for (const mesh of this._handSurfaceMeshes || []) {
-      // At hip fire the real player glove crosses the weapon layer so its
-      // fingers visibly wrap the grip. ADS returns the glove beneath the
-      // receiver, preventing it from covering the rear sight.
       mesh.renderOrder = handOrder;
     }
   }

@@ -2518,12 +2518,19 @@ export class Game {
     }
 
     const camera = this.state === 'playing' ? this.player.camera : this.menuCamera;
+    const mount = this.weaponSystem.weaponMount;
+    const showWeapon = mount.visible;
+    mount.visible = false;
     if (!this.renderer.info.autoReset) this.renderer.info.reset();
     if (this._bloomEnabled && this.composer) {
       this.renderPass.camera = camera;
       this.composer.render();
     } else {
       this.renderer.render(this.world.scene, camera);
+    }
+    mount.visible = showWeapon;
+    if (this.state === 'playing' && showWeapon) {
+      this.weaponSystem.renderViewmodel(this.renderer, this.world);
     }
     this._sampleRuntimePerformance(rawDt);
     this.input.endFrame();

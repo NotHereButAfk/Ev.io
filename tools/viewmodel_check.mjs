@@ -164,7 +164,7 @@ depthProbeOutline.name = 'outline';
 depthProbeBody.add(depthProbeOutline);
 depthProbe.add(depthProbeBody);
 prepareFirstPersonModel(depthProbe);
-assert(!depthProbeBody.material.depthTest && !depthProbeBody.material.depthWrite,
+assert(depthProbeBody.material.depthTest && depthProbeBody.material.depthWrite,
   'first-person body still shares the world depth buffer');
 assert(depthProbeOutline.visible === false,
   'first-person inverted-hull outline still covers the colored gun');
@@ -680,8 +680,8 @@ for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
 
 activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
-assert(system.armGroup.visible && system.supportArmGroup.visible,
-  'two-handed rifle must render both first-person hands');
+assert(system.armGroup.visible && !system.supportArmGroup.visible,
+  'first-person rifle must show only the trigger arm');
 const m4HandPose = weaponHandPose(system.models.get('m4').group);
 // Check actual mesh contact, not the fallback's outdated grip coordinates.
 // A source-specific profile must keep the procedural load placeholder intact.
@@ -736,8 +736,8 @@ for (const arm of [system.armGroup, system.supportArmGroup]) {
       || object.name === 'viewmodel_finger_curl'
       || object.name === 'viewmodel_knuckle'
       || object.name === 'viewmodel_thumb';
-    const correctLayer = handSurface ? object.renderOrder >= 1001 : object.renderOrder <= 999;
-    assert(!object.material.depthTest && !object.material.depthWrite && correctLayer,
+    const correctLayer = object.renderOrder === 0;
+    assert(object.material.depthTest && object.material.depthWrite && correctLayer,
       `${arm.userData.viewmodelHand} hand can disappear into world geometry`);
   });
 }
@@ -817,8 +817,8 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   reloadState.isReloading = false;
 }
 
-assert(system.armGroup.visible && system.supportArmGroup.visible,
-  'rifle viewmodel lost its two-hand hold');
+assert(system.armGroup.visible && !system.supportArmGroup.visible,
+  'rifle viewmodel must keep its second arm hidden');
 assert(
   system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === true,
   'support forearm no longer continues naturally through the lower-left edge',
@@ -904,11 +904,11 @@ activate(WEAPONS.find((def) => def.id === 'm4'));
 resetMotionState();
 input.rightMouseDown = true;
 advanceSeconds(0.5, 60);
-assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 999),
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 0),
   'ADS glove still renders over the sight picture');
 input.rightMouseDown = false;
 advanceSeconds(0.5, 60);
-assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 1001),
+assert(system._handSurfaceMeshes.every((mesh) => mesh.renderOrder === 0),
   'hip-fire glove did not return over the physical grips');
 
 // The recoil spring used to be Euler-integrated and visibly recovered at a
@@ -1032,9 +1032,9 @@ for (const def of WEAPONS.filter((weapon) => weapon.kind !== 'melee')) {
           return;
         }
         const materials = Array.isArray(object.material) ? object.material : [object.material];
-        assert(materials.every((material) => !material.depthTest && !material.depthWrite),
+        assert(materials.every((material) => material.depthTest && material.depthWrite),
           `${def.id} viewmodel can still be hidden by world geometry`);
-        assert(object.renderOrder >= 1000, `${def.id} viewmodel render order is not isolated`);
+        assert(object.renderOrder === 0, `${def.id} viewmodel must use depth ordering`);
       });
     }
   }
@@ -1099,7 +1099,7 @@ console.log(
   + `rest clearance=${worstRestDepth.value.toFixed(3)}m (${worstRestDepth.label}), `
   + `action clearance=${worstActionDepth.value.toFixed(3)}m (${worstActionDepth.label}), `
   + `weapon frame=${(worstWeaponFrame.value * 100).toFixed(1)}% (${worstWeaponFrame.label}), `
-  + `support glove frame=${(worstGlove.value * 100).toFixed(1)}% (${worstGlove.label}); `
+  + `support arm hidden; `
   + `30/60/144Hz blends match, ADS bob=${Math.max(...adsStability.map((s) => s.bob)).toFixed(4)}m, `
   + `ADS sway=${Math.max(...adsStability.map((s) => s.sway)).toFixed(4)}rad, `
   + `landing=${softLanding.toFixed(2)}x/${hardLanding.toFixed(2)}x`,
