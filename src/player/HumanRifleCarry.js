@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { weaponHandPose } from '../weapons/WeaponHandPoses.js';
 
 // Body-local weapon poses. The muzzle is model-local -Z and the soldier faces
 // body-local -Z, so AIM is nearly identity. PATROL matches the supplied real
@@ -117,6 +118,19 @@ export const HUMAN_HANDGUARD_LOCAL = new THREE.Vector3(-0.08, -0.02, 0.15);
 // bottom-centre. The X clearance places the palm around the mag body.
 export const HUMAN_MAG_LOCAL = new THREE.Vector3(-0.08, -0.15, 0.02);
 
+// Resolve contacts from the displayed mesh, including imported-pack overrides.
+// Wrist targets sit just behind the palm contact; using one M4 target for every
+// model made otherwise accurate IK grab empty space on pickups and sidearms.
+export function humanHandContacts(weapon) {
+  if (weapon.userData.humanHandContacts) return weapon.userData.humanHandContacts;
+  const pose = weaponHandPose(weapon);
+  return weapon.userData.humanHandContacts = {
+    trigger: new THREE.Vector3(...pose.trigger),
+    support: new THREE.Vector3(...pose.support),
+    reload: new THREE.Vector3(...pose.reload),
+  };
+}
+
 const REFERENCE_STOCK_BACK = 0.445;
 const _bounds = new THREE.Box3();
 const _partBounds = new THREE.Box3();
@@ -197,6 +211,16 @@ function armReach(arm, forearm, hand) {
 function fitSupportTargetWithinReach(body, weapon, localTarget, shoulderBone, reach) {
   if (!shoulderBone || reach <= 1e-5) return;
   body.updateMatrixWorld(true);
+  // First slide along the actual fore-end toward the receiver. Moving the
+  // target straight toward the shoulder pulled the hand sideways off the gun.
+  const shoulderLocal = V[31].copy(worldPosition(shoulderBone, V[27]));
+  weapon.worldToLocal(shoulderLocal);
+  const startZ = localTarget.z;
+  const endZ = Math.max(startZ, humanHandContacts(weapon).trigger.z);
+  const closestZ = THREE.MathUtils.clamp(shoulderLocal.z, startZ, endZ);
+  const originalDistance = V[26].copy(localTarget).applyMatrix4(weapon.matrixWorld)
+    .distanceTo(worldPosition(shoulderBone, V[27]));
+  if (originalDistance > reach * 0.992) localTarget.z = closestZ;
   const target = V[26].copy(localTarget).applyMatrix4(weapon.matrixWorld);
   const shoulder = worldPosition(shoulderBone, V[27]);
   const towardShoulder = V[28].subVectors(shoulder, target);
@@ -222,7 +246,7 @@ function fitSupportTargetWithinReach(body, weapon, localTarget, shoulderBone, re
 function keepTriggerGripReachable(body, weapon, shoulderBone, reach) {
   if (!shoulderBone || reach <= 1e-5) return;
   body.updateMatrixWorld(true);
-  const target = V[26].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
+  const target = V[26].copy(humanHandContacts(weapon).trigger).applyMatrix4(weapon.matrixWorld);
   const shoulder = worldPosition(shoulderBone, V[27]);
   const towardShoulder = V[28].subVectors(shoulder, target);
   const distance = towardShoulder.length();
@@ -410,11 +434,12 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
     weapon.quaternion.copy(smoothing.quaternion);
   }
 
-  const supportLocal = V[15].copy(HUMAN_HANDGUARD_LOCAL);
+  const contacts = humanHandContacts(weapon);
+  const supportLocal = V[15].copy(contacts.support);
   if (reload > 0) {
     const inT = smoothstep(reload / 0.28);
     const outT = smoothstep((reload - 0.74) / 0.26);
-    supportLocal.lerp(HUMAN_MAG_LOCAL, inT * (1 - outT));
+    supportLocal.lerp(contacts.reload, inT * (1 - outT));
   }
   if (!(state.throwP > 0)) {
     fitSupportTargetWithinReach(
@@ -427,7 +452,7 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
   }
   (weapon.userData.humanSupportLocal ||= new THREE.Vector3()).copy(supportLocal);
   body.updateMatrixWorld(true);
-  const gripWorld = V[14].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
+  const gripWorld = V[14].copy(contacts.trigger).applyMatrix4(weapon.matrixWorld);
   solveArm(body, rig.rArm, rig.rFore, rig.rHand, gripWorld, 1);
 
   // During a reload the support hand moves decisively to the magazine, seats
@@ -441,9 +466,9 @@ export function applyHumanRifleCarry(body, rig, weapon, state = {}) {
 
 export function humanRifleGripError(rig, weapon) {
   if (!rig || !weapon) return { right: Infinity, left: Infinity };
-  const grip = V[14].copy(HUMAN_GRIP_LOCAL).applyMatrix4(weapon.matrixWorld);
+  const grip = V[14].copy(humanHandContacts(weapon).trigger).applyMatrix4(weapon.matrixWorld);
   const support = V[15].copy(
-    weapon.userData.humanSupportLocal || HUMAN_HANDGUARD_LOCAL
+    weapon.userData.humanSupportLocal || humanHandContacts(weapon).support
   ).applyMatrix4(weapon.matrixWorld);
   return {
     right: rig.rHand ? worldPosition(rig.rHand, V[16]).distanceTo(grip) : Infinity,

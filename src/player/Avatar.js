@@ -87,12 +87,16 @@ export class Avatar {
     if (!force && id === this.weaponId) return;
     const isSwap = this.weaponId !== null;
     this.weaponId = id;
+    this._weaponAssetReady = hasLoadedWeaponModel(id);
     if (this.weapon) { this.group.remove(this.weapon); this.weapon = null; }
     const def = getWeapon(id);
     if (!def) return;
     if (this.isHuman && this.group.userData.attachWeapon) {
       const built = buildWeaponModel(def, { procedural: true });
       this.group.userData.attachWeapon(built?.group || null, def.kind === 'melee');
+      // Keep the live reference so the asynchronous asset-ready check can
+      // replace the startup mesh for remote humans and bots as well.
+      this.weapon = built?.group || null;
       if (isSwap) this.group.userData.triggerAction?.('swap');
       return;
     }
@@ -130,7 +134,7 @@ export class Avatar {
    */
   update(dt, s) {
     const g = this.group;
-    if (this.weapon && this.weapon.userData.modelSource !== 'quaternius'
+    if (this.weapon && !this._weaponAssetReady
         && hasLoadedWeaponModel(this.weaponId)) this.setWeapon(this.weaponId, true);
     const alive = s.alive !== false;
 

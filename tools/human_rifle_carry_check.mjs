@@ -6,6 +6,7 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { createHumanActionPose, sampleHumanActionPose } from '../src/player/HumanActionMotion.js';
 import {
   applyHumanRifleCarry,
+  humanHandContacts,
   HUMAN_GRIP_LOCAL,
   HUMAN_HANDGUARD_LOCAL,
   HUMAN_LOW_READY_AIM,
@@ -238,7 +239,7 @@ function measure(spec, armorName, armor, def) {
 
   applyHumanRifleCarry(body, rig, weapon, spec);
   body.updateMatrixWorld(true);
-  const rightTarget = HUMAN_GRIP_LOCAL.clone().applyMatrix4(weapon.matrixWorld);
+  const rightTarget = humanHandContacts(weapon).trigger.clone().applyMatrix4(weapon.matrixWorld);
   const leftTarget = (
     weapon.userData.humanSupportLocal?.clone()
     || expectedSupportLocal(spec.reload || 0)
