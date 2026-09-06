@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-04T05:27:52.325Z",
+  "generated": "2026-09-06T10:27:52.263Z",
   "budgets": {
     "maxBytes": 3670016,
     "maxVerts": 120000,
@@ -45,7 +45,7 @@
     {
       "file": "kyx-view-arms.glb",
       "bytes": 342004,
-      "sha256": "5afb24f40b232486",
+      "sha256": "3f382e559b468edf",
       "glbVersion": 2,
       "meshes": 8,
       "primitives": 8,
