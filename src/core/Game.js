@@ -445,6 +445,7 @@ export class Game {
   async _runConnectSequence() {
     if (this._startupInFlight) return;
     this._startupInFlight = true;
+    this.menu.hideMain();
     const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const connectScreen = document.getElementById('connect-screen');
     connectScreen?.classList.remove('hidden', 'fade-out', 'boot-error');
@@ -488,10 +489,28 @@ export class Game {
       await delay(240);
       connectScreen?.classList.add('hidden');
 
-      this._setMapLoadingPhase('Loading arena geometry...', 24);
-      const map = await this.world.startInitialLoad({
-        onProgress: (label, progress) => this._setMapLoadingPhase(label, progress),
-      });
+      let map;
+      if (targets.length) {
+        // Prepare the real lobby once, before exposing Play. Its welcome owns
+        // the map ID, so we never decode a preview map and then join another.
+        this._setMapLoadingPhase('Preparing player for the lobby...', null);
+        if (!await this._ensureHumanPresentationReady()) {
+          throw new Error('The player model could not be loaded. Please retry.');
+        }
+        if (!UserAccount.isLoggedIn() && !UserAccount.isGuest()) UserAccount.guest();
+        const username = UserAccount.isLoggedIn() ? UserAccount.current() : '__guest__';
+        await this._prepareAuthoritativeMatch(UserAccount.getDisplayName(username), 'deathmatch', match);
+        map = this.world.currentMap;
+      } else {
+        this._setMapLoadingPhase('Loading arena geometry...', 24);
+        map = await this.world.startInitialLoad({
+          onProgress: (label, progress) => this._setMapLoadingPhase(label, progress),
+        });
+        this._setMapLoadingPhase('Preparing player...', 92);
+        if (!await this._ensureHumanPresentationReady()) {
+          throw new Error('The player model could not be loaded. Please retry.');
+        }
+      }
       this._ensureEnvironment();
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
@@ -889,8 +908,13 @@ export class Game {
           name = UserAccount.getDisplayName('__guest__');
         }
         const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
-        if (publicMode && authNetTargets().length) {
+        if (publicMode && this._authoritativeMapPromise) await this._authoritativeMapPromise;
+        if (publicMode && authNetTargets().length && !this._hasPreparedLobby()) {
           await this._prepareAuthoritativeMatch(name, modeId);
+        }
+        if (!publicMode) {
+          this._authNet?.disconnect?.();
+          this._authNet = null;
         }
         this._startGame(name, skinId, modeId, armorTypeId);
       } catch (error) {
@@ -1441,10 +1465,16 @@ export class Game {
     this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), 3500);
   }
 
-  async _prepareAuthoritativeMatch(name, modeId) {
+  _hasPreparedLobby() {
+    return !!(this._authNet?.ready && this._authNet.client?.connected
+      && !this._authoritativeMapTransitioning
+      && this.world.currentMapId === this._authNet.client.mapId);
+  }
+
+  async _prepareAuthoritativeMatch(name, modeId, preparedMatch = null) {
     this._joiningModeId = modeId;
     this._showServerJoining(modeId);
-    const match = await findAvailableMatch(authNetTargets());
+    const match = preparedMatch || await findAvailableMatch(authNetTargets());
     if (!match?.url) throw new Error('No public server is available');
     this._selectedAuthNetUrl = match.url;
     this._selectedMatch = match;
@@ -1452,7 +1482,7 @@ export class Game {
     this._authNet?.disconnect?.();
     this._authNet = new AuthNetBridge(this, match.url);
     const timeout = new Promise((_, reject) => {
-      this._authJoinTimer = setTimeout(() => reject(new Error('The selected server did not answer')), 10000);
+      this._authJoinTimer = setTimeout(() => reject(new Error('Lobby preparation timed out. Please retry.')), 60000);
     });
     try {
       await Promise.race([this._authNet.readyPromise, timeout]);
@@ -1467,6 +1497,9 @@ export class Game {
 
   async _finishServerJoining() {
     clearTimeout(this._serverJoinTimer);
+    // During cold startup the outer sequence also prepares environment/camera.
+    // It owns the single fade and exposes Play only after every stage completes.
+    if (this._startupInFlight) return;
     this._setMapLoadingPhase('Lobby joined — arena ready', 100, true);
     // The authoritative bridge awaits this fade before resolving readyPromise,
     // so _startGame cannot spawn the player behind a still-loading arena.
@@ -1621,7 +1654,7 @@ export class Game {
     this._playerDowned = false;
     this._respawnRemaining = 0;
     this._respawnDeadline = 0;
-    this.menu.showMain();
+    this._startupReadyPromise = this._runConnectSequence();
   }
 
   async _activateMap(mapId, { deferFinish = false } = {}) {
@@ -2390,7 +2423,7 @@ export class Game {
   }
 
   _spawnMenuBots() {
-    if (this._menuBotsActive) return;
+    if (this._menuBotsActive || this._authNet?.client?.connected) return;
     this.botManager.setEnabled(true);
     this._menuBotsActive = true;
     this._menuBotSpawnCooldown = 0;

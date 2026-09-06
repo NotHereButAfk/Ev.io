@@ -149,7 +149,7 @@ export class AuthNetBridge {
     };
     this.client.onMapChange = (mapId, match) => {
       this._needsSpawnFacing = true;
-      game._onAuthoritativeMap?.(mapId, match, false);
+      game._onAuthoritativeMap?.(mapId, match, false)?.catch(() => {});
     };
     this.client.connect();
   }
