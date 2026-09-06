@@ -108,6 +108,56 @@ try {
     throw new Error(`rotated game did not start cleanly: ${JSON.stringify(rotation)}`);
   }
 
+  // A failed rotation keeps the old arena intact and must not spawn a match.
+  const recovery = await page.evaluate(async () => {
+    const game = window.__game || window.game;
+    const originalLoad = game.world.loadMap.bind(game.world);
+    const originalStart = game._startGame.bind(game);
+    let starts = 0;
+    game._startGame = (...args) => { starts++; return originalStart(...args); };
+    game.world.loadMap = async () => { throw new Error('Injected map failure'); };
+    game._showLeaderboard();
+    const before = game.world.currentMapId;
+    await game._restart();
+    const blocked = starts === 0 && game.world.currentMapId === before
+      && !document.getElementById('ml-retry').classList.contains('hidden');
+    game.world.loadMap = originalLoad;
+    await game._mapRetry();
+    game._startGame = originalStart;
+    return { blocked, starts, changed: game.world.currentMapId !== before,
+      hidden: document.getElementById('map-loading').classList.contains('hidden') };
+  });
+  if (!recovery.blocked || recovery.starts !== 1 || !recovery.changed || !recovery.hidden) {
+    throw new Error(`failed rotation did not recover safely: ${JSON.stringify(recovery)}`);
+  }
+
+  const retryPage = await browser.newPage();
+  await retryPage.addInitScript(() => { window.requestAnimationFrame = () => 0; });
+  await retryPage.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.fulfill({
+    status: 200, contentType: 'text/css', body: '',
+  }));
+  let failMap = true;
+  await retryPage.route('**/*.evmap', async (route) => {
+    if (failMap) await route.fulfill({ status: 503, body: 'Unavailable' });
+    else await route.continue();
+  });
+  await retryPage.goto(url, { waitUntil: 'domcontentloaded' });
+  await retryPage.waitForSelector('#boot-retry:not(.hidden)', { timeout: 60000 });
+  const failedBoot = await retryPage.evaluate(() => ({
+    ready: document.getElementById('boot-status').textContent === 'READY',
+    percent: Number.parseInt(document.getElementById('boot-percent').textContent),
+    menuVisible: !document.getElementById('top-nav').classList.contains('hidden'),
+  }));
+  if (failedBoot.ready || failedBoot.percent >= 100 || failedBoot.menuVisible) {
+    throw new Error(`failed boot exposed readiness: ${JSON.stringify(failedBoot)}`);
+  }
+  failMap = false;
+  await retryPage.click('#boot-retry');
+  await retryPage.waitForFunction(() => document.getElementById('boot-status').textContent === 'READY', null, {
+    timeout: 60000, polling: 100,
+  });
+  await retryPage.close();
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mobile.route(/fonts\.(?:googleapis|gstatic)\.com/, (route) => route.fulfill({
     status: 200, contentType: 'text/css', body: '',
@@ -133,7 +183,7 @@ try {
   if (mobileScreenshot) await mobile.screenshot({ path: mobileScreenshot });
   await mobile.close();
   const relevantConsoleErrors = consoleErrors.filter(({ text, url: source }) => (
-    !/fonts\.(?:googleapis|gstatic)\.com/i.test(`${text} ${source}`)
+    !/fonts\.(?:googleapis|gstatic)\.com|Injected map failure/i.test(`${text} ${source}`)
   ));
   const relevantFailures = failedRequests.filter((request) => (
     !/fonts\.(?:googleapis|gstatic)\.com/i.test(request)

@@ -290,6 +290,9 @@ export class Game {
     document.getElementById('boot-retry')?.addEventListener('click', () => {
       this._startupReadyPromise = this._runConnectSequence();
     });
+    document.getElementById('ml-retry')?.addEventListener('click', () => {
+      this._mapRetry?.();
+    });
     // Match entry awaits this exact promise. The menu is initialized before
     // the arena decode so the fly-through can appear promptly, but a Play
     // click must not spawn combatants from World's temporary origin fallback.
@@ -416,6 +419,7 @@ export class Game {
   // sequence held both cards on unrelated multi-second timers.
   _setStartupProgress(status, progress, detail = status) {
     const value = Math.max(0, Math.min(100, Math.round(progress)));
+    this._startupProgress = value;
     const screen = document.getElementById('connect-screen');
     const statusEl = document.getElementById('boot-status');
     const detailEl = document.getElementById('boot-detail');
@@ -433,7 +437,7 @@ export class Game {
     const screen = document.getElementById('connect-screen');
     screen?.classList.remove('hidden', 'fade-out');
     screen?.classList.add('boot-error');
-    this._setStartupProgress('CONNECTION FAILED', this._startupProgress || 0,
+    this._setStartupProgress('LOADING FAILED', this._startupProgress || 0,
       String(error?.message || error || 'Unable to finish loading').slice(0, 96));
     document.getElementById('boot-retry')?.classList.remove('hidden');
   }
@@ -470,10 +474,8 @@ export class Game {
       this._setStartupProgress('LOADING GAME...', 72, 'Preparing gameplay systems...');
       this._startupProgress = 92;
       this._setStartupProgress('PREPARING MATCH...', 92, 'Preparing menu and match systems...');
-      this._initAuth();
       await delay(80);
-      this._startupProgress = 100;
-      this._setStartupProgress('READY', 100, 'Game systems ready');
+      this._setStartupProgress('LOADING ARENA...', 92, 'Preparing the arena...');
 
       // Startup and arena loading are two real stages. The branded shell owns
       // scripts/session/models; the map card then owns the actual geometry
@@ -487,13 +489,16 @@ export class Game {
       connectScreen?.classList.add('hidden');
 
       this._setMapLoadingPhase('Loading arena geometry...', 24);
-      const map = await this.world.startInitialLoad();
-      this._setMapLoadingPhase('Building collision and spawn data...', 76);
+      const map = await this.world.startInitialLoad({
+        onProgress: (label, progress) => this._setMapLoadingPhase(label, progress),
+      });
       this._ensureEnvironment();
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
       this._setMapLoadingPhase('Preparing arena presentation...', 92);
       await this._finishMapLoading(650);
+      this._setStartupProgress('READY', 100, 'Arena ready');
+      this._initAuth();
       this._schedulePresentationPreloads();
     } catch (error) {
       console.error('[startup] load failed', error);
@@ -1242,8 +1247,14 @@ export class Game {
         this.weaponSystem?.resetMotionState?.();
         this._resetDeathAnimation?.();
         return this.world.currentMap;
+      } catch (error) {
+        this._showMapLoadError(error, () => {
+          this._onAuthoritativeMap(this._authoritativeMapTarget, match)
+            .catch(() => {}); // failure remains on the retry card
+        });
+        throw error;
       } finally {
-        this._authoritativeMapTransitioning = false;
+        this._authoritativeMapTransitioning = this.world.currentMapId !== this._authoritativeMapTarget;
         this._pendingMapId = null;
         this._authoritativeMapPromise = null;
       }
@@ -1403,6 +1414,11 @@ export class Game {
     if (tip) tip.textContent = 'Connecting to the authoritative arena';
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
+    this._mapRetry = null;
+    document.getElementById('ml-retry')?.classList.add('hidden');
+    this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
+    this._mapLoadingShownAt = performance.now();
+    this._spectatorLoading = true;
     this._serverJoinShownAt = performance.now();
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
     this._setMapLoadingPhase('Joining lobby and loading map...', 12);
@@ -1460,7 +1476,7 @@ export class Game {
   _showMapLoading(
     modeId,
     mapId = this.world.currentMapId,
-    { autoHide = true, joining = false } = {},
+    { joining = false } = {},
   ) {
     const el = document.getElementById('map-loading');
     if (!el) return;
@@ -1499,21 +1515,16 @@ export class Game {
     if (tip) tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
 
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
+    this._mapRetry = null;
+    document.getElementById('ml-retry')?.classList.add('hidden');
     this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
     this._mapLoadingShownAt = performance.now();
     this._spectatorLoading = true;
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
     this._setMapLoadingPhase(
       joining ? 'Joining lobby and loading arena...' : 'Loading arena geometry...',
-      46,
+      null,
     );
-    if (autoHide) {
-      this._mlTimer1 = setTimeout(() => {
-        this._spectatorLoading = false;
-        el.classList.add('ml-fade');
-      }, 2600);
-      this._mlTimer2 = setTimeout(() => el.classList.add('hidden'), 3300);
-    }
   }
 
   async _finishMapLoading(minimumDisplayMs = 0) {
@@ -1533,6 +1544,8 @@ export class Game {
   }
 
   _hideMapLoading() {
+    this._mapRetry = null;
+    document.getElementById('ml-retry')?.classList.add('hidden');
     this._spectatorLoading = false;
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
@@ -1545,8 +1558,22 @@ export class Game {
     const status = document.getElementById('ml-building');
     const fill = document.getElementById('ml-progress-fill');
     if (status) status.textContent = label;
-    if (fill) fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    const bar = el?.querySelector('.ml-progress');
+    const value = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : null;
+    if (fill) fill.style.width = value === null ? '35%' : `${value}%`;
+    bar?.classList.toggle('indeterminate', value === null);
+    if (value === null) bar?.removeAttribute('aria-valuenow');
+    else bar?.setAttribute('aria-valuenow', String(value));
+    bar?.setAttribute('aria-valuetext', label);
     el?.classList.toggle('ml-arena-ready', ready);
+  }
+
+  _showMapLoadError(error, retry) {
+    this._setMapLoadingPhase('Arena loading failed. Please retry.', 0);
+    const tip = document.getElementById('ml-tip');
+    if (tip) tip.textContent = String(error?.message || 'Unable to load arena').slice(0, 160);
+    this._mapRetry = retry;
+    document.getElementById('ml-retry')?.classList.remove('hidden');
   }
 
   _openMenu() {
@@ -1611,7 +1638,9 @@ export class Game {
       { autoHide: false, joining: deferFinish },
     );
     try {
-      const map = await this.world.loadMap(mapId);
+      const map = await this.world.loadMap(mapId, {
+        onProgress: (label, progress) => this._setMapLoadingPhase(label, progress),
+      });
       this._configureMapCamera(map);
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       if (this.state === 'playing') {
@@ -1623,7 +1652,6 @@ export class Game {
       return map;
     } catch (error) {
       this._pendingMapId = null;
-      this._hideMapLoading();
       throw error;
     }
   }
@@ -1650,7 +1678,9 @@ export class Game {
     try {
       await this._activateMap(nextMapId);
     } catch (error) {
-      console.error('[map] rotation failed; retaining current imported map', error);
+      console.error('[map] rotation failed', error);
+      this._showMapLoadError(error, () => this._restart());
+      return;
     }
     this._startGame(
       this.player.name,
