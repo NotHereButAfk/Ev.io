@@ -43,30 +43,31 @@ try {
     timeout: 5000, polling: 25,
   });
   if (screenshot) await page.screenshot({ path: screenshot });
-  await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
+  await page.waitForFunction(() => /arena geometry/.test(document.getElementById('boot-detail')?.textContent), null, {
     timeout: 60000, polling: 25,
   });
   const mapStage = await page.evaluate(() => ({
-    visible: !document.getElementById('map-loading')?.classList.contains('hidden'),
-    phase: document.getElementById('ml-building')?.textContent,
-    progress: document.getElementById('ml-progress-fill')?.style.width,
+    visible: !document.getElementById('connect-screen')?.classList.contains('hidden'),
+    mapHidden: document.getElementById('map-loading')?.classList.contains('hidden'),
+    phase: document.getElementById('boot-detail')?.textContent,
+    progress: document.getElementById('boot-progress-fill')?.style.width,
     earlyOptionalAssets: performance.getEntriesByType('resource')
       .map((entry) => entry.name)
       .filter((name) => /(?:soldier|player|spartan|zombie|weapons(?:_authored)?|sidearm)\.glb|universal-animation-library|vendor\/quaternius\/scifi-weapons/i.test(name)),
   }));
-  if (!mapStage.visible || !/arena|collision|presentation/i.test(mapStage.phase || '')) {
-    throw new Error(`real map-loading stage was skipped: ${JSON.stringify(mapStage)}`);
+  if (!mapStage.visible || !mapStage.mapHidden || mapStage.progress === '100%') {
+    throw new Error(`map preparation escaped the single boot screen: ${JSON.stringify(mapStage)}`);
   }
   if (mapStage.earlyOptionalAssets.length) {
     throw new Error(`optional presentation assets competed with the first map: ${JSON.stringify(mapStage.earlyOptionalAssets)}`);
   }
   if (mapScreenshot) await page.screenshot({ path: mapScreenshot });
-  await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null, {
+  await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
     timeout: 60000, polling: 25,
   });
   const readyAt = Date.now();
   const connectDuration = readyAt - connectSeenAt;
-  if (connectDuration < 1100 || connectDuration > 30000) {
+  if (connectDuration < 240 || connectDuration > 30000) {
     throw new Error(`startup handoff took ${connectDuration}ms`);
   }
   await page.waitForFunction(() => !document.getElementById('top-nav')?.classList.contains('hidden'), null, {
@@ -83,6 +84,22 @@ try {
   if (completedLoader.phase !== 'READY' || completedLoader.progress !== '100%'
       || completedLoader.percent !== '100%' || !completedLoader.mapHidden) {
     throw new Error(`startup loader did not finish truthfully: ${JSON.stringify(completedLoader)}`);
+  }
+
+  const combinedJoin = await page.evaluate(async () => {
+    const game = window.__game || window.game;
+    game._showServerJoining('deathmatch');
+    const sequence = game._mapLoadingSequence;
+    const shownAt = game._mapLoadingShownAt;
+    await game._onAuthoritativeMap(game.world.currentMapId, {}, true);
+    const continuous = game._mapLoadingSequence === sequence
+      && game._mapLoadingShownAt === shownAt
+      && !document.getElementById('map-loading').classList.contains('hidden');
+    await game._finishServerJoining();
+    return { continuous, hidden: document.getElementById('map-loading').classList.contains('hidden') };
+  });
+  if (!combinedJoin.continuous || !combinedJoin.hidden) {
+    throw new Error(`lobby/map loading restarted or failed to finish: ${JSON.stringify(combinedJoin)}`);
   }
 
   // Exercise the actual post-match path, not just the map registry. A local

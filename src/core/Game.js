@@ -472,28 +472,20 @@ export class Game {
       this._setStartupProgress('PREPARING MATCH...', 92, 'Preparing menu and match systems...');
       this._initAuth();
       await delay(80);
-      this._startupProgress = 100;
-      this._setStartupProgress('READY', 100, 'Game systems ready');
-
-      // Startup and arena loading are two real stages. The branded shell owns
-      // scripts/session/models; the map card then owns the actual geometry
-      // decode. Keeping the card visible before starting the decode prevents a
-      // black canvas or an already-finished menu from flashing underneath.
-      this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false });
-      this._setMapLoadingPhase('Waiting for arena stream...', 8);
-      await delay(80);
-      connectScreen?.classList.add('fade-out');
-      await delay(240);
-      connectScreen?.classList.add('hidden');
-
-      this._setMapLoadingPhase('Loading arena geometry...', 24);
+      // Keep the branded shell up through initial map preparation. The match
+      // card belongs to the combined lobby/map join, not a second boot screen.
+      this._setStartupProgress('PREPARING MATCH...', 92, 'Loading arena geometry...');
       const map = await this.world.startInitialLoad();
-      this._setMapLoadingPhase('Building collision and spawn data...', 76);
+      this._setStartupProgress('PREPARING MATCH...', 96, 'Building collision and spawn data...');
       this._ensureEnvironment();
       this.previewCharacter.position.copy(this.world.previewPedestalPos);
       this._configureMapCamera(map);
-      this._setMapLoadingPhase('Preparing arena presentation...', 92);
-      await this._finishMapLoading(650);
+      this._startupProgress = 100;
+      this._setStartupProgress('READY', 100, 'Game and arena ready');
+      await delay(180);
+      connectScreen?.classList.add('fade-out');
+      await delay(240);
+      connectScreen?.classList.add('hidden');
       this._schedulePresentationPreloads();
     } catch (error) {
       console.error('[startup] load failed', error);
@@ -1222,6 +1214,7 @@ export class Game {
       );
     }
     if (mapId === this.world.currentMapId && !this._authoritativeMapTransitioning) {
+      this._pendingMapId = null;
       return Promise.resolve(this.world.currentMap);
     }
     if (this._authoritativeMapPromise) return this._authoritativeMapPromise;
@@ -1390,7 +1383,7 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const name = el.querySelector('.ml-name');
-    if (name) name.textContent = 'JOINING LOBBY';
+    if (name) name.textContent = 'LOADING MATCH';
     const building = document.getElementById('ml-building');
     if (building) building.textContent = 'Finding lobby and preparing arena...';
     const region = document.getElementById('ml-region');
@@ -1404,6 +1397,9 @@ export class Game {
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
     clearTimeout(this._serverJoinTimer);
     this._serverJoinShownAt = performance.now();
+    this._mapLoadingShownAt = this._serverJoinShownAt;
+    this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
+    this._spectatorLoading = true;
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
     this._setMapLoadingPhase('Joining lobby and loading map...', 12);
   }
@@ -1483,7 +1479,7 @@ export class Game {
     };
     const name = el.querySelector('.ml-name');
     if (name) name.textContent = joining
-      ? `JOINING ${map.name.toUpperCase()}`
+      ? `LOADING ${map.name.toUpperCase()}`
       : map.name.toUpperCase();
     const region = document.getElementById('ml-region');
     if (region) region.textContent = map.region;
@@ -1499,8 +1495,11 @@ export class Game {
     if (tip) tip.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
 
     clearTimeout(this._mlTimer1); clearTimeout(this._mlTimer2);
-    this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
-    this._mapLoadingShownAt = performance.now();
+    // A welcome/map response updates the existing join card, not a new load.
+    if (!joining || el.classList.contains('hidden')) {
+      this._mapLoadingSequence = (this._mapLoadingSequence || 0) + 1;
+      this._mapLoadingShownAt = performance.now();
+    }
     this._spectatorLoading = true;
     el.classList.remove('hidden', 'ml-fade', 'ml-arena-ready');
     this._setMapLoadingPhase(
