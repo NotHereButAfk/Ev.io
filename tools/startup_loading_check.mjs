@@ -43,26 +43,26 @@ try {
     timeout: 5000, polling: 25,
   });
   if (screenshot) await page.screenshot({ path: screenshot });
-  await page.waitForFunction(() => /arena geometry/.test(document.getElementById('boot-detail')?.textContent), null, {
+  await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
     timeout: 60000, polling: 25,
   });
   const mapStage = await page.evaluate(() => ({
-    visible: !document.getElementById('connect-screen')?.classList.contains('hidden'),
-    mapHidden: document.getElementById('map-loading')?.classList.contains('hidden'),
-    phase: document.getElementById('boot-detail')?.textContent,
-    progress: document.getElementById('boot-progress-fill')?.style.width,
+    visible: !document.getElementById('map-loading')?.classList.contains('hidden'),
+    phase: document.getElementById('ml-building')?.textContent,
+    progress: document.getElementById('ml-progress-fill')?.style.width,
+    gameProgress: document.getElementById('boot-progress-fill')?.style.width,
     earlyOptionalAssets: performance.getEntriesByType('resource')
       .map((entry) => entry.name)
       .filter((name) => /(?:soldier|player|spartan|zombie|weapons(?:_authored)?|sidearm)\.glb|universal-animation-library|vendor\/quaternius\/scifi-weapons/i.test(name)),
   }));
-  if (!mapStage.visible || !mapStage.mapHidden || mapStage.progress === '100%') {
-    throw new Error(`map preparation escaped the single boot screen: ${JSON.stringify(mapStage)}`);
+  if (!mapStage.visible || mapStage.gameProgress !== '100%' || mapStage.progress === '100%') {
+    throw new Error(`combined match loader did not follow completed game loading: ${JSON.stringify(mapStage)}`);
   }
   if (mapStage.earlyOptionalAssets.length) {
     throw new Error(`optional presentation assets competed with the first map: ${JSON.stringify(mapStage.earlyOptionalAssets)}`);
   }
   if (mapScreenshot) await page.screenshot({ path: mapScreenshot });
-  await page.waitForFunction(() => document.getElementById('connect-screen')?.classList.contains('hidden'), null, {
+  await page.waitForFunction(() => document.getElementById('map-loading')?.classList.contains('hidden'), null, {
     timeout: 60000, polling: 25,
   });
   const readyAt = Date.now();

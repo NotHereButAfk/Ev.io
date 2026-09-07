@@ -452,40 +452,41 @@ export class Game {
       this._startupProgress = 10;
       this._setStartupProgress('LOADING GAME...', 10, 'Loading player session...');
 
-      const targets = authNetTargets();
-      this._startupProgress = 22;
-      this._setStartupProgress(targets.length ? 'CONNECTING...' : 'LOADING GAME...', 22,
-        targets.length ? 'Finding an available server...' : 'Preparing local match...');
-      const match = targets.length ? await findAvailableMatch(targets) : null;
-      if (match) {
-        this._selectedAuthNetUrl = match.url;
-        this._selectedMatch = match;
-        if (match.mapId) {
-          this._initialMapId = getImportedMap(match.mapId).id;
-          this.world._initialMapId = this._initialMapId;
-        }
-      }
-
       this._startupProgress = 72;
       this._setStartupProgress('LOADING GAME...', 72, 'Preparing gameplay systems...');
       this._startupProgress = 92;
       this._setStartupProgress('PREPARING MATCH...', 92, 'Preparing menu and match systems...');
       this._initAuth();
       await delay(80);
-      // Keep the branded shell up through initial map preparation. The match
-      // card belongs to the combined lobby/map join, not a second boot screen.
-      this._setStartupProgress('PREPARING MATCH...', 92, 'Loading arena geometry...');
-      const map = await this.world.startInitialLoad();
-      this._setStartupProgress('PREPARING MATCH...', 96, 'Building collision and spawn data...');
-      this._ensureEnvironment();
-      this.previewCharacter.position.copy(this.world.previewPedestalPos);
-      this._configureMapCamera(map);
       this._startupProgress = 100;
-      this._setStartupProgress('READY', 100, 'Game and arena ready');
+      this._setStartupProgress('READY', 100, 'Game loaded');
       await delay(180);
+      // Paint the next card behind the outgoing shell, but do not start map
+      // decoding or network joining until the game-loading fade has finished.
+      this._showServerJoining('deathmatch');
       connectScreen?.classList.add('fade-out');
       await delay(240);
       connectScreen?.classList.add('hidden');
+      const targets = authNetTargets();
+      if (targets.length) {
+        if (!this.currentUsername || UserAccount.isGuest()) {
+          if (!UserAccount.isGuest()) UserAccount.guest();
+          this._onAuth('__guest__');
+        }
+        const name = UserAccount.getDisplayName(this.currentUsername);
+        // Welcome selects the real map; the bridge waits for both that map
+        // and the first snapshot before finishing this same loading card.
+        await this._prepareAuthoritativeMatch(name, 'deathmatch', { continueLoading: true });
+        this._ensureEnvironment();
+      } else {
+        this._showMapLoading('deathmatch', this._initialMapId, { autoHide: false, joining: true });
+        const map = await this.world.startInitialLoad();
+        this._ensureEnvironment();
+        this.previewCharacter.position.copy(this.world.previewPedestalPos);
+        this._configureMapCamera(map);
+        await this._finishServerJoining();
+      }
+      this.menu.showMain();
       this._schedulePresentationPreloads();
     } catch (error) {
       console.error('[startup] load failed', error);
@@ -627,7 +628,7 @@ export class Game {
     if (username) {
       document.getElementById('player-name').value = UserAccount.getDisplayName(username);
     }
-    this.menu.showMain();
+    if (!this._startupInFlight) this.menu.showMain();
   }
 
   // ── Settings application ────────────────────────────────────────────────────
@@ -878,6 +879,12 @@ export class Game {
         const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
         if (publicMode && authNetTargets().length) {
           await this._prepareAuthoritativeMatch(name, modeId);
+        } else if (!publicMode && this._authNet) {
+          // Leaving the prepared public lobby for survival must not keep its
+          // snapshots/map rotations attached to the local survival game.
+          this._authNet.disconnect();
+          this._authNet = undefined;
+          this._netDriven = false;
         }
         this._startGame(name, skinId, modeId, armorTypeId);
       } catch (error) {
@@ -1421,9 +1428,13 @@ export class Game {
     this._serverJoinTimer = setTimeout(() => this._hideMapLoading(), 3500);
   }
 
-  async _prepareAuthoritativeMatch(name, modeId) {
+  async _prepareAuthoritativeMatch(name, modeId, { continueLoading = false } = {}) {
+    // PLAY uses the lobby prepared after boot instead of disconnecting and
+    // presenting a second join screen. A dead connection still reconnects.
+    if (this._authNet?.ready && this._authNet.client.connected
+        && this._joiningModeId === modeId && this.player.name === name) return;
     this._joiningModeId = modeId;
-    this._showServerJoining(modeId);
+    if (!continueLoading) this._showServerJoining(modeId);
     const match = await findAvailableMatch(authNetTargets());
     if (!match?.url) throw new Error('No public server is available');
     this._selectedAuthNetUrl = match.url;
