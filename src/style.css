@@ -4297,6 +4297,16 @@ html, body {
   background: #d7e83e; box-shadow: 0 0 9px rgba(215,232,62,.6);
   transition: width .3s ease;
 }
+.ml-progress.indeterminate > span { animation: ml-progress-slide 1.2s ease-in-out infinite; }
+@keyframes ml-progress-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+#ml-retry { margin-top: 20px; }
+@media (max-height: 540px) {
+  .ml-panel { padding-top: 75px; overflow-y: auto; }
+  .ml-tip { position: static; margin-top: 20px; padding-bottom: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ml-progress.indeterminate > span, .ml-spinner { animation: none; }
+}
 .ml-tip {
   position: absolute; bottom: 25px; left: 20px; right: 20px; z-index: 4;
   color: #d9e83e; font-size: 11px; letter-spacing: 0.2px;

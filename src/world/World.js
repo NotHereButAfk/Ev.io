@@ -58,8 +58,8 @@ export class World {
     this.ready = autoLoad ? this.loadMap(initialMapId) : null;
   }
 
-  startInitialLoad() {
-    if (!this.ready) this.ready = this.loadMap(this._initialMapId);
+  startInitialLoad(options) {
+    if (!this.ready) this.ready = this.loadMap(this._initialMapId, options);
     return this.ready;
   }
 
@@ -84,18 +84,35 @@ export class World {
     this._rim.intensity = profile.rimIntensity;
   }
 
-  async loadMap(mapId) {
+  async loadMap(mapId, { onProgress = () => {} } = {}) {
     const definition = getImportedMap(mapId);
     if (this.currentMapId === definition.id && this.currentMap) return this.currentMap;
 
     const token = ++this._loadToken;
-    const map = await loadEvMap(definition.url);
+    const map = await loadEvMap(definition.url, { onProgress });
     if (token !== this._loadToken) {
       disposeRoot(map.root);
       disposeRoot(map.colliderRoot);
       return this.currentMap;
     }
 
+    onProgress('Building collision and spawn data...', 88);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (token !== this._loadToken) {
+      disposeRoot(map.root);
+      disposeRoot(map.colliderRoot);
+      return this.currentMap;
+    }
+    // Build before replacing the current arena so a failed collision build
+    // cannot leave the live world with disposed geometry and no valid floor.
+    let octree;
+    try {
+      octree = new Octree().fromGraphNode(map.colliderRoot);
+    } catch (error) {
+      disposeRoot(map.root);
+      disposeRoot(map.colliderRoot);
+      throw error;
+    }
     if (this._mapRoot) this.scene.remove(this._mapRoot);
     disposeRoot(this._mapRoot);
     disposeRoot(this._mapColliderRoot);
@@ -104,7 +121,7 @@ export class World {
     this.currentMap = { ...map, definition };
     this._mapRoot = map.root;
     this._mapColliderRoot = map.colliderRoot;
-    this._mapOctree = new Octree().fromGraphNode(map.colliderRoot);
+    this._mapOctree = octree;
     this._mapBounds = map.bounds;
     this._raycastMeshes = map.raycastMeshes;
     this._raycastBoxes = [];

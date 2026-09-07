@@ -411,8 +411,21 @@ export function parseEvMap(buffer) {
 
 async function loadTexture(record) {
   const url = URL.createObjectURL(new Blob([record.bytes], { type: record.mime }));
+  let timer;
+  let expired = false;
   try {
-    const texture = await new THREE.TextureLoader().loadAsync(url);
+    const texture = await Promise.race([
+      new THREE.TextureLoader().loadAsync(url).then((loaded) => {
+        if (expired) loaded.dispose();
+        return loaded;
+      }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          expired = true;
+          reject(new Error('Arena texture loading timed out. Please retry.'));
+        }, 15000);
+      }),
+    ]);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -637,10 +650,36 @@ export function buildEvMapScene(parsed, textures = []) {
   };
 }
 
-export async function loadEvMap(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Unable to load ${url}: ${response.status}`);
-  const parsed = parseEvMap(await response.arrayBuffer());
-  const textures = await Promise.all(parsed.textures.map(loadTexture));
+export async function loadEvMap(url, { onProgress = () => {}, timeoutMs = 30000 } = {}) {
+  // Abort the actual transfer: racing a timer alone leaves a late map response
+  // alive after Retry and can allow it to replace a newer arena.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let buffer;
+  onProgress('Downloading arena...', null);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Unable to load arena (${response.status}). Please retry.`);
+    buffer = await response.arrayBuffer();
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Arena download timed out. Check your connection and retry.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    clearTimeout(timer);
+  }
+  onProgress('Decoding arena geometry...', 60);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const parsed = parseEvMap(buffer);
+  onProgress('Loading arena textures...', 70);
+  const results = await Promise.allSettled(parsed.textures.map(loadTexture));
+  const failure = results.find((result) => result.status === 'rejected');
+  if (failure) {
+    for (const result of results) if (result.status === 'fulfilled') result.value.dispose();
+    throw failure.reason;
+  }
+  const textures = results.map((result) => result.value);
+  onProgress('Building arena geometry...', 80);
+  await new Promise((resolve) => setTimeout(resolve, 0));
   return buildEvMapScene(parsed, textures);
 }
