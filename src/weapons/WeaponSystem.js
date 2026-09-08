@@ -85,7 +85,7 @@ const VIEWMODEL_Z = -0.98;
 // The lower mount crops the buttstock at the bottom/right while retaining the
 // full-size receiver and both grip contacts. These are our presentation
 // settings, not measured constants from the reference game.
-const VIEWMODEL_X = 0.26;
+const VIEWMODEL_X = 0.36;
 const VIEWMODEL_Y = -0.50;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
@@ -117,7 +117,7 @@ const FIREARM_MODEL_SCALE = Object.freeze({
   energyshotgun: 0.72,
 });
 const VIEWMODEL_PITCH = 0.14;
-const VIEWMODEL_YAW = 0.23;
+const VIEWMODEL_YAW = 0.10;
 const VIEWMODEL_ROLL = -0.03;
 // EV.IO's sword uses a dedicated close right-side guard. It is not centred in
 // front of the reticle: the grip enters through the lower-right edge while the
@@ -937,10 +937,11 @@ export class WeaponSystem {
       supportLengthScale * handFovScale,
       supportWidthScale * handFovScale,
     );
-    // First-person framing exposes only the trigger arm. Third-person grip
-    // contacts and the remote player's two-handed hold are unchanged.
+    // Keep both grip contacts rendered. The support hand belongs underneath
+    // the handguard; hiding it leaves the weapon visibly unsupported. Framing,
+    // rather than removing an arm, determines which forearm enters the view.
     this.armGroup.visible = true;
-    this.supportArmGroup.visible = false;
+    this.supportArmGroup.visible = pose.supportVisible !== false;
     this.armGroup.userData.gripTarget = trigger.slice();
     this.supportArmGroup.userData.gripTarget = support.slice();
   }

@@ -691,12 +691,38 @@ export class AuthRoom {
       const dx = p._botRoamTarget[0] - p.state.px;
       const dz = p._botRoamTarget[2] - p.state.pz;
       let yaw = Math.atan2(-dx, -dz);
+      // Validate the heading actually passed to MoveSim, not a future target
+      // heading while aim smoothing is still turning the bot into a wall.
+      p._botAimYaw = smoothBotAim(p._botAimYaw, yaw, cfg.aimTurnSpeed * 0.75, 1 / TICK_HZ);
+      yaw = p._botAimYaw;
       const blocked = rayVsBoxes(
         this.simWorld, p.state.px, p.state.py + 0.8, p.state.pz,
         -Math.sin(yaw), 0, -Math.cos(yaw), 2.2,
       ) < 2.0;
       let moveX = blocked ? p._botStrafe : 0;
       let moveZ = blocked ? 0.35 : 1;
+      if (blocked) {
+        // Choose an open grounded escape lane, rather than repeatedly pushing
+        // diagonally against the same wall. Side rays include body clearance.
+        let bestClearance = 0;
+        for (const angle of [0.55, -0.55, 1.1, -1.1, Math.PI]) {
+          const mx = Math.sin(angle), mz = Math.cos(angle);
+          if (!this._botGroundSafe(p, mx, mz, yaw)) continue;
+          const wx = Math.cos(yaw) * mx - Math.sin(yaw) * mz;
+          const wz = -Math.sin(yaw) * mx - Math.cos(yaw) * mz;
+          let clearance = 4;
+          for (const side of [-0.4, 0.4]) {
+            clearance = Math.min(clearance, rayVsBoxes(this.simWorld,
+              p.state.px - wz * side, p.state.py + 0.8, p.state.pz + wx * side,
+              wx, 0, wz, 4));
+          }
+          if (clearance > bestClearance) {
+            bestClearance = clearance;
+            moveX = mx; moveZ = mz;
+          }
+        }
+        if (bestClearance < 1) p._botRoamTarget = null;
+      }
       [moveX, moveZ] = this._separateBotMove(p, moveX, moveZ, yaw);
       if (!this._botGroundSafe(p, moveX, moveZ, yaw)) {
         const alternatives = [[-p._botStrafe, 0], [p._botStrafe, 0], [0, -1]];
@@ -715,7 +741,6 @@ export class AuthRoom {
           moveX = p._botStrafe;
         }
       }
-      p._botAimYaw = smoothBotAim(p._botAimYaw, yaw, cfg.aimTurnSpeed * 0.75, 1 / TICK_HZ);
       // Bots use sprint whenever a verified patrol lane points forward. Their
       // difficulty still controls decisions and aim, not whether they cross
       // the map at an active running pace.
@@ -743,7 +768,9 @@ export class AuthRoom {
     if (this.tick < p._botReactionUntil) p._botState = BOT_STATES.REACT;
     else p._botState = hasVisual ? BOT_STATES.ENGAGE : BOT_STATES.SEARCH;
 
-    const holdGround = p._botHoldGroundTargetId === target.id;
+    // Stop to return fire only while the attacker remains visible. Searching
+    // for an opponent behind cover must not leave a bot rooted in place.
+    const holdGround = p._botHoldGroundTargetId === target.id && hasVisual;
 
     if (this.tick >= p._botNextDecisionTick) {
       p._botNextDecisionTick = this.tick + secondsToTicks(cfg.decisionInterval);

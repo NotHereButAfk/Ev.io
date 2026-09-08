@@ -38,6 +38,32 @@ function cloneMaterial(material) {
   return clone;
 }
 
+// The third-person bake ends at the shoulder. In the closer first-person
+// camera that open end can enter the frame. Continue only the proximal sleeve
+// toward the off-screen shoulder, leaving the glove and forearm grip intact.
+// Apply the same continuous deformation to sleeve and armour so their seams
+// stay together. Clone geometry: the cached template also serves other arms.
+function continueUpperArm(mesh, side) {
+  if (/_Hand$/i.test(mesh.name)) return;
+  const geometry = mesh.geometry.clone();
+  const positions = geometry.getAttribute('position');
+  const direction = side === 'Left' ? -1 : 1;
+  for (let i = 0; i < positions.count; i++) {
+    const z = positions.getZ(i);
+    const t = THREE.MathUtils.clamp((z - 0.18) / 0.25, 0, 1);
+    const blend = t * t * (3 - 2 * t);
+    positions.setXYZ(i,
+      positions.getX(i) + direction * 0.12 * blend,
+      positions.getY(i) - 0.20 * blend,
+      z + 0.30 * blend);
+  }
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  mesh.geometry = geometry;
+}
+
 /**
  * Clone one arm baked from the same KYX_Warrior mesh shown to other players.
  * Its origin is the wrist and its fingers already use the authored GunIdle
@@ -49,6 +75,7 @@ export function buildViewmodelArm(side, sourceTemplate = template) {
   const root = source.clone(true);
   root.traverse((object) => {
     if (!object.isMesh) return;
+    continueUpperArm(object, side);
     if (Array.isArray(object.material)) {
       object.material = object.material.map((material) => cloneMaterial(material));
     } else {

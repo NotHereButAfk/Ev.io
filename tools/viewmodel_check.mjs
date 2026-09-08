@@ -680,8 +680,8 @@ for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
 
 activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
-assert(system.armGroup.visible && !system.supportArmGroup.visible,
-  'first-person rifle must show only the trigger arm');
+assert(system.armGroup.visible && system.supportArmGroup.visible,
+  'first-person rifle must retain both grip contacts, including the support hand');
 const m4HandPose = weaponHandPose(system.models.get('m4').group);
 // Check actual mesh contact, not the fallback's outdated grip coordinates.
 // A source-specific profile must keep the procedural load placeholder intact.
@@ -817,8 +817,8 @@ for (const stateName of ['idle', 'sprint', 'reload']) {
   reloadState.isReloading = false;
 }
 
-assert(system.armGroup.visible && !system.supportArmGroup.visible,
-  'rifle viewmodel must keep its second arm hidden');
+assert(system.armGroup.visible && system.supportArmGroup.visible,
+  'rifle viewmodel must retain the support arm after reload');
 assert(
   system.supportArmGroup.getObjectByName('viewmodel_upper_sleeve')?.visible === true,
   'support forearm no longer continues naturally through the lower-left edge',
@@ -1099,7 +1099,7 @@ console.log(
   + `rest clearance=${worstRestDepth.value.toFixed(3)}m (${worstRestDepth.label}), `
   + `action clearance=${worstActionDepth.value.toFixed(3)}m (${worstActionDepth.label}), `
   + `weapon frame=${(worstWeaponFrame.value * 100).toFixed(1)}% (${worstWeaponFrame.label}), `
-  + `support arm hidden; `
+  + `support visibility follows weapon grip profile; `
   + `30/60/144Hz blends match, ADS bob=${Math.max(...adsStability.map((s) => s.bob)).toFixed(4)}m, `
   + `ADS sway=${Math.max(...adsStability.map((s) => s.sway)).toFixed(4)}rad, `
   + `landing=${softLanding.toFixed(2)}x/${hardLanding.toFixed(2)}x`,
