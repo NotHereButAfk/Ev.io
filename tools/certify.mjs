@@ -79,7 +79,10 @@ const AUTO = [
     fn: () => { const r = run('npm run test:tps-camera'); return { ok: r.ok && /first-person lock and spectator framing passed/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G3+G4', phase: 'Phase 4/5/10', name: 'Authoritative netcode + combat + ability authority/abuse',
     fn: () => { const r = run('node authnet_test.mjs', join(root, 'server')); const m = r.out.match(/(\d+) passed, (\d+) failed/);
-                return { ok: !!m && m[2] === '0', detail: m ? `${m[1]} authority/abuse proofs pass` : tail(r.out) }; } },
+                const failures = r.out.split(/\r?\n/).filter(line => /^(FAIL|not ok|fail)/i.test(line.trim()));
+                return { ok: r.ok && !!m && m[2] === '0', detail: m
+                  ? `${m[1]} authority/abuse proofs pass, ${m[2]} fail${failures.length ? ': ' + failures.join('; ') : ''}`
+                  : tail(r.out) }; } },
   { id: 'G5-graybox', phase: 'Phase 6', name: 'Arena topology (reachability at 2/4/8p)',
     fn: () => { const r = run('npm run arena:metrics'); return { ok: r.ok && /topology looks healthy/.test(r.out), detail: 'no dead zones, combat scales' }; } },
   { id: 'G8-perf', phase: 'Phase 9', name: 'Stress + soak (20Hz budget under load)',
