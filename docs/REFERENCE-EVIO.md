@@ -250,3 +250,42 @@ above.
 **Don't state ev.io behaviour as fact in code comments, commit messages or docs
 unless it's tagged [known]/[verified] here or the owner told you.** Write "our
 design choice" instead — visual evidence is not evidence for mechanics.
+
+---
+
+## September 2026 follow-up evidence
+
+## September 7–8, 2026 browser observations
+
+Reference: https://ev.io/ viewed through the user's Edge browser and the
+Codex in-app browser. These are visual observations, not recovered source
+constants or a complete gameplay certification.
+
+- Observed first-person rifle: lower-right placement, rear cropped by the
+  bottom edge, support glove/forearm visible beneath the forward receiver.
+  The rifle is viewed along its length rather than as a broad side profile.
+- A firing input was followed by 49 rounds remaining. This confirms a shot,
+  not the full recoil envelope, fire cadence, or input latency.
+- Observed loading labels included Connecting to game server and Building
+  map, followed by the map menu with Click to Play.
+- Observed menu camera background was blurred; gameplay was not.
+- In-app EV.IO gameplay entry produced a pointer-lock error. Its spectator
+  mode worked. Native Edge reached a first-person view, but sustained movement
+  and held right-click aim were not reliably tested with the available controls.
+
+## Not verified
+
+Exact FOV, camera height, gun transforms, ADS transition, animation curves,
+collision dimensions, movement speed and per-weapon grips remain unmeasured.
+Do not call KYX a 1:1 match based on these observations or automated tests.
+
+## KYX corrections derived from the comparison
+
+- Retain the support hand for weapons whose shared grip profile requires it.
+- Continue the first-person shoulder sleeve outside the camera instead of
+  exposing its cut end; leave glove and forearm contact vertices unchanged.
+- Move the firearm mount right and reduce its side-facing yaw without changing
+  mesh shape or third-person weapon scale. These offsets are KYX design choices.
+
+Full-body art refinement and a sustained side-by-side gameplay comparison are
+still outstanding. Passing geometry tests alone does not establish visual quality.
