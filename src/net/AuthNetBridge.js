@@ -9,6 +9,7 @@
 // ServerSim path is completely untouched when no target is configured.
 
 import * as THREE from 'three';
+import { isMatchPickupWeaponId } from '../weapons/weaponDefs.js';
 import { SHIELD_PER_STACK } from '../core/ShieldConfig.js';
 import { PLAYER_WORLD_MODEL_SCALE, STATURE } from '../player/Proportions.js';
 // Just above each rendered crown. Human avatars use a slightly smaller world
@@ -277,7 +278,7 @@ export class AuthNetBridge {
     this.game.kills = c.self.kills ?? this.game.kills;
     this.game.deaths = c.self.deaths ?? this.game.deaths;
     this.game.score = c.self.score ?? this.game.score;
-    const weaponState = this.game.weaponSystem?.currentState;
+    const weaponState = this.game.weaponSystem?.state.get(c.self.wid);
     if (weaponState && def?.kind !== 'melee') {
       weaponState.magAmmo = c.self.mag ?? weaponState.magAmmo;
       weaponState.reserveAmmo = c.self.reserve ?? weaponState.reserveAmmo;
@@ -361,18 +362,34 @@ export class AuthNetBridge {
 
   _syncAuthoritativeLoadout() {
     const weapons = this.game.weaponSystem;
-    const matchWeapon = this.client.self.matchWeapon || null;
-    if (matchWeapon && weapons?.mapGunId !== matchWeapon) {
-      const def = weapons.addMapGun?.(matchWeapon);
-      if (def) {
-        this.game.hud?.buildWeaponSlots?.(weapons.getHudInfo().slots, weapons.currentIndex);
-        this.game.hud?.addKillFeed?.(`PICKED UP — ${def.name}`);
-      }
-    } else if (!matchWeapon && weapons?.mapGunId) {
+    if (!weapons) return;
+    const self = this.client.self;
+    const ids = [...new Set(self.matchWeapons ?? (self.matchWeapon ? [self.matchWeapon] : []))]
+      .filter(isMatchPickupWeaponId);
+    const current = weapons.loadout.filter(w => isMatchPickupWeaponId(w.id)).map(w => w.id);
+    let changed = false;
+    if (current.some(id => !ids.includes(id))) {
       weapons.resetLoadout?.();
       weapons.resetState?.(this.player.baseFov);
-      this.game.hud?.buildWeaponSlots?.(weapons.getHudInfo().slots, weapons.currentIndex);
+      changed = true;
     }
+    for (const id of ids) {
+      if (weapons.loadout.some(w => w.id === id)) continue;
+      const def = weapons.addMapGun?.(id);
+      if (def) {
+        this.game.hud?.addKillFeed?.(`PICKED UP — ${def.name}`);
+        changed = true;
+      }
+    }
+    // Duplicate pickups can replenish an unequipped weapon. Sync by weapon id,
+    // not by the selected slot, and don't rebuild/refill the inventory per frame.
+    for (const [id, ammo] of Object.entries(self.weaponAmmo || {})) {
+      const state = weapons.state.get(id);
+      if (!state) continue;
+      if (Number.isFinite(ammo.mag)) state.magAmmo = ammo.mag;
+      if (Number.isFinite(ammo.reserve)) state.reserveAmmo = ammo.reserve;
+    }
+    if (changed) this.game.hud?.buildWeaponSlots?.(weapons.getHudInfo().slots, weapons.currentIndex);
   }
 
   _resolveRookCollision(next, previous) {

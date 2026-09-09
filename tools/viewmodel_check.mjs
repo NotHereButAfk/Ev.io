@@ -271,6 +271,23 @@ function settle() {
   tick(90);
 }
 
+// All map-only guns coexist; repeating a pickup refills without changing slots.
+system.setLoadout('m4', 'sword');
+const pickupDefs = WEAPONS.filter(w => w.kind !== 'melee' && !MAIN_WEAPON_IDS.includes(w.id));
+for (const gun of pickupDefs) system.addMapGun(gun.id);
+assert(system.loadout.length === pickupDefs.length + 2, 'map weapons replaced one another');
+const selectedBeforeRefill = system.currentDef.id;
+const refillGun = pickupDefs[0];
+system.state.get(refillGun.id).magAmmo = 0;
+system.state.get(refillGun.id).reserveAmmo = 0;
+system.addMapGun(refillGun.id);
+assert(system.currentDef.id === selectedBeforeRefill, 'duplicate pickup switched the selected gun');
+assert(system.loadout.length === pickupDefs.length + 2, 'duplicate weapon slot created');
+assert(system.state.get(refillGun.id).magAmmo === refillGun.magSize
+  && system.state.get(refillGun.id).reserveAmmo === refillGun.reserveMax, 'duplicate pickup did not refill');
+system.resetLoadout();
+assert(system.loadout.map(w => w.id).join(',') === 'm4,sword', 'death inventory reset kept pickups');
+
 function activate(def) {
   if (def.kind === 'melee') {
     system.setLoadout('m4', def.id);

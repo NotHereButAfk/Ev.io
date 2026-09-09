@@ -8,7 +8,7 @@
     "start": "node authserver.mjs",
     "relay": "node index.js",
     "auth": "node authserver.mjs",
-    "test:auth": "node authnet_test.mjs",
+    "test:auth": "node pickup_inventory_test.mjs && node authnet_test.mjs",
     "test:payments": "node paymentservice_test.mjs",
     "test:static": "node static_test.mjs"
   },

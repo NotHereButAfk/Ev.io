@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { AuthRoom } from './authroom.mjs';
+import { MATCH_PICKUP_WEAPON_IDS } from '../src/weapons/weaponDefs.js';
+const room = new AuthRoom(undefined, { targetPopulation: 0, lootSeed: 1 });
+const messages = [];
+const id = room.add(message => messages.push(message), 'PickupInventoryProbe');
+const player = room.players.get(id);
+const pad = room.lootPads[0];
+let seq = 0;
+function collect(gunId) {
+  Object.assign(pad, { active: true, lootType: 'weapon', gunId });
+  Object.assign(player.state, { px: pad.x, py: pad.y, pz: pad.z });
+  return room.onPickup(id, { padId: pad.padId, seq: ++seq });
+}
+for (const gun of MATCH_PICKUP_WEAPON_IDS) assert(collect(gun), `cannot collect ${gun}`);
+assert.equal(player.matchWeapons.size, MATCH_PICKUP_WEAPON_IDS.length);
+const first = MATCH_PICKUP_WEAPON_IDS[0];
+const expected = { ...player.ammo[first] };
+const active = player.wid;
+player.ammo[first].mag = 0;
+player.ammo[first].reserve = 0;
+assert(collect(first));
+assert.deepEqual(player.ammo[first], expected);
+assert.equal(player.wid, active, 'duplicate pickup switched active weapon');
+assert.equal(player.matchWeapons.size, MATCH_PICKUP_WEAPON_IDS.length);
+assert(!collect('m4'), 'starting main weapon accepted as map-only pickup');
+room.update();
+const snapshot = messages.findLast(message => message.t === 'snapshot');
+assert.deepEqual(snapshot.you.matchWeapons, MATCH_PICKUP_WEAPON_IDS);
+assert.deepEqual(snapshot.you.weaponAmmo[first], expected, 'refill missing from inventory snapshot');
+room._resetLifeInventory(player);
+assert.equal(player.matchWeapons.size, 0);
+assert.deepEqual(Object.keys(player.ammo), ['m4']);
+console.log('Pickup inventory passed: all distinct weapons retained, duplicates refill, death clears pickups');

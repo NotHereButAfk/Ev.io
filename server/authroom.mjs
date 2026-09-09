@@ -1081,14 +1081,16 @@ export class AuthRoom {
       p.maxShield = next.maxShield;
       p.shieldRegenDelay = 0;
     } else if (pad.lootType === 'weapon' && isMatchPickupWeaponId(pad.gunId)) {
-      p.matchWeapons.clear();
+      const alreadyOwned = p.matchWeapons.has(pad.gunId);
       p.matchWeapons.add(pad.gunId);
-      p.wid = pad.gunId;
+      if (!alreadyOwned) p.wid = pad.gunId;
       const weapon = WEAPONS[pad.gunId];
       p.ammo[pad.gunId] = { mag: weapon.mag, reserve: weapon.reserve };
-      p.mag = weapon.mag;
-      p.reloadUntil = 0;
-      p.reloadWid = null;
+      if (p.wid === pad.gunId) p.mag = weapon.mag;
+      if (!alreadyOwned || p.reloadWid === pad.gunId) {
+        p.reloadUntil = 0;
+        p.reloadWid = null;
+      }
     } else {
       return false;
     }
@@ -1514,6 +1516,8 @@ export class AuthRoom {
                health: p.health, shield: p.shield, maxShield: p.maxShield, alive: p.alive,
                wid: p.wid, mainWid: p.mainWid,
                matchWeapon: Array.from(p.matchWeapons)[0] || null,
+               matchWeapons: Array.from(p.matchWeapons),
+               weaponAmmo: p.ammo,
                mag: p.mag, reserve: ammo.reserve,
                reloading: p.reloadWid === p.wid && p.reloadUntil > now,
                reloadTicks: p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0,

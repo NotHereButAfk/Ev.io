@@ -164,6 +164,7 @@ export class HUD {
   }
 
   buildWeaponSlots(slots, activeIndex) {
+    this.weaponSlots.style.setProperty('--carried-slot-count', String(Math.max(1, slots.length)));
     const buildToken = (this._weaponSlotBuildToken || 0) + 1;
     this._weaponSlotBuildToken = buildToken;
     this.weaponSlots.innerHTML = '';

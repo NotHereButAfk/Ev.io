@@ -192,6 +192,8 @@ export class AuthClient {
     this.self = { health: y.health, shield: y.shield, maxShield: y.maxShield ?? 0, alive: y.alive,
                   wid: y.wid || this.self.wid, mainWid: y.mainWid || this.self.mainWid,
                   matchWeapon: y.matchWeapon ?? null,
+                  matchWeapons: y.matchWeapons ?? (y.matchWeapon ? [y.matchWeapon] : []),
+                  weaponAmmo: y.weaponAmmo ?? {},
                   mag: y.mag, reserve: y.reserve ?? this.self.reserve,
                   reloading: !!y.reloading, reloadTicks: y.reloadTicks ?? 0,
                   reloadDuration: y.reloadDuration ?? 0,

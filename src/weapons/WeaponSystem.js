@@ -1046,7 +1046,10 @@ export class WeaponSystem {
     let gunSlot = 1;
     this.loadout.forEach((w, i) => {
       if (w.kind === 'melee') this.keyMap.set('KeyZ', i);
-      else this.keyMap.set(`Digit${gunSlot++}`, i);
+      else {
+        if (gunSlot <= 10) this.keyMap.set(`Digit${gunSlot % 10}`, i);
+        gunSlot++;
+      }
     });
   }
 
@@ -1065,9 +1068,8 @@ export class WeaponSystem {
     this._setActiveModel(0);
   }
 
-  // Add a map-collected POWER weapon as an extra slot alongside the main gun, so
-  // the HUD shows [main gun, power gun, melee]. Switches to it and refills it.
-  // Picking up a different power weapon replaces the power slot (you carry one).
+  // Keep each distinct map weapon until death. Duplicates refill their own
+  // ammo without adding a slot or interrupting the currently equipped weapon.
   addMapGun(gunId) {
     const def = this.allWeapons.find((w) => w.id === gunId && isMatchPickupWeaponId(w.id));
     if (!def) return null;
@@ -1075,13 +1077,15 @@ export class WeaponSystem {
                || this.loadout.find((w) => w.kind !== 'melee');
     const melee = this.allWeapons.find((w) => w.id === this._meleeId && w.kind === 'melee')
                || this.loadout.find((w) => w.kind === 'melee');
+    const alreadyOwned = this.loadout.some((w) => w.id === def.id);
     const slots = [];
     if (main) slots.push(main);
-    if (!main || main.id !== def.id) slots.push(def);   // the extra power slot
+    slots.push(...this.loadout.filter((w) => isMatchPickupWeaponId(w.id)));
+    if (!alreadyOwned) slots.push(def);
     if (melee) slots.push(melee);
     this.loadout = slots;
     this.mapGunId = def.id;
-    this.currentIndex = this.loadout.indexOf(def);
+    if (!alreadyOwned) this.currentIndex = this.loadout.indexOf(def);
     this._rebuildKeyMap();
     const st = this.state.get(def.id);
     if (st) {
@@ -1090,7 +1094,7 @@ export class WeaponSystem {
       st.isReloading = false;
       st.reloadTimer = 0;
     }
-    this._setActiveModel(this.currentIndex);
+    if (!alreadyOwned) this._setActiveModel(this.currentIndex);
     return def;
   }
 
@@ -2332,7 +2336,7 @@ export class WeaponSystem {
       this._hudSlotsLoadout = this.loadout;
       let gunSlot = 1;
       this._hudSlots = this.loadout.map((w) => ({
-        key: w.kind === 'melee' ? 'Z' : String(gunSlot++),
+        key: w.kind === 'melee' ? 'Z' : (gunSlot <= 10 ? String(gunSlot++ % 10) : (gunSlot++, '↕')),
         id: w.id,
         name: w.name,
         isMelee: w.kind === 'melee',

@@ -350,7 +350,11 @@ export class PickupSystem {
       if (closeEnough && !player.isDead) {
         // Only collect if it does something useful.
         let needed = false;
-        if (p.type === 'loot' && p.lootType === 'weapon') needed = weaponSystem?.mapGunId !== p.gunId;
+        if (p.type === 'loot' && p.lootType === 'weapon') {
+          const owned = weaponSystem?.loadout.find(w => w.id === p.gunId);
+          const ammo = weaponSystem?.state.get(p.gunId);
+          needed = !owned || ammo?.magAmmo < owned.magSize || ammo?.reserveAmmo < owned.reserveMax;
+        }
         if (p.type === 'loot' && p.lootType === 'shield') needed = player.maxShield < MAX_PICKUP_SHIELD;
         if (p.type === 'health')  needed = player.health  < player.maxHealth;
         if (p.type === 'ammo')    needed = weaponSystem?.loadout.some(w =>

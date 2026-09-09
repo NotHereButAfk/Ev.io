@@ -7157,7 +7157,8 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 }
 #hud .weapon-slot {
   position: relative !important; box-sizing: border-box !important;
-  flex: 0 0 84px !important; width: 100% !important; height: 84px !important;
+  --carried-slot-height: min(84px, calc((100dvh - 220px) / var(--carried-slot-count, 3)));
+  flex: 0 0 var(--carried-slot-height) !important; width: 100% !important; height: var(--carried-slot-height) !important;
   margin: 0 !important; overflow: visible !important; display: block !important;
   background: transparent !important; border: 0 !important;
   border-right: 5px solid rgba(255,255,255,0) !important;
