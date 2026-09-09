@@ -32,7 +32,10 @@ for (const label of ['Auto Rifle', 'Hand Cannon', 'Burst Rifle', 'Sweeper', 'Las
 if (!inventory.includes("label: 'Sword'")) failures.push('inventory category: Sword');
 if (!hud.includes("ammo.className = 'ws-ammo'")) failures.push('weapon HUD exposes per-slot ammo');
 if (!hud.includes("slot.isMelee ? '∞'")) failures.push('weapon HUD exposes EV-style melee infinity');
-if (!css.includes('flex: 0 0 84px !important')) failures.push('weapon HUD preserves EV 200x84 slot geometry');
+if (!css.includes('--carried-slot-height: min(84px, calc((100dvh - 220px) / var(--carried-slot-count, 3)))')
+    || !css.includes('flex: 0 0 var(--carried-slot-height) !important')) {
+  failures.push('weapon HUD sizes slots to fit the carried inventory');
+}
 if (!css.includes('border-right: 5px solid rgba(255,255,255,0)')) failures.push('weapon HUD preserves the EV active rail');
 if (!thumbnails.includes("data:image/svg+xml,")) failures.push('weapon HUD has an immediate pre-render silhouette');
 if (!thumbnails.includes("_hudCache.get(id) ?? _cache.get(id) ?? _hudFallbackThumb(id)")) {
