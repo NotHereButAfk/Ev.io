@@ -44,8 +44,12 @@ jobs:
           chmod 600 ~/.ssh/audit_key
           ssh-keyscan -T 10 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/audit_key -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "$DEPLOY_USER@$DEPLOY_HOST" '
+            set -eu
             systemctl show kryx-game.service -p ActiveState -p SubState -p UnitFileState -p Restart -p RestartUSec -p NRestarts -p ActiveEnterTimestamp
-            systemctl is-enabled kryx-game.service
+            if ! systemctl is-enabled --quiet kryx-game.service; then
+              sudo -n /usr/bin/systemctl enable kryx-game.service
+            fi
+            systemctl is-enabled --quiet kryx-game.service
             systemctl is-active kryx-game.service
           '
   deploy:
