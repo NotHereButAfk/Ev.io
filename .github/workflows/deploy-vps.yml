@@ -24,7 +24,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  audit-service:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify continuous server recovery
+        env:
+          DEPLOY_HOST: ${{ secrets.VPS_HOST }}
+          DEPLOY_USER: ${{ secrets.VPS_USER }}
+          DEPLOY_KEY: ${{ secrets.VPS_SECRET }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/audit_key
+          chmod 600 ~/.ssh/audit_key
+          ssh-keyscan -T 10 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/audit_key -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "$DEPLOY_USER@$DEPLOY_HOST" '
+            systemctl show kryx-game.service -p ActiveState -p SubState -p UnitFileState -p Restart -p RestartUSec -p NRestarts -p ActiveEnterTimestamp
+            systemctl is-enabled kryx-game.service
+            systemctl is-active kryx-game.service
+          '
   deploy:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
