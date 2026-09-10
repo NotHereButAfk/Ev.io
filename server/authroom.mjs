@@ -293,6 +293,13 @@ export class AuthRoom {
 
   _rotateMatch(now = Date.now()) {
     if (now - this.matchStart < this.matchDurationMs) return false;
+    this.previousRound = {
+      start: this.matchStart,
+      rows: Array.from(this.players.values(), p => ({
+        id: p.id, name: p.name, isBot: !!p.isBot,
+        kills: p.kills, deaths: p.deaths, score: p.score,
+      })),
+    };
     // Keep the clock on its global cadence even if the process sleeps or a
     // tick is delayed across more than one complete round.
     const elapsedRounds = Math.max(1, Math.floor((now - this.matchStart) / this.matchDurationMs));
@@ -1501,6 +1508,8 @@ export class AuthRoom {
         mapName: this.arena.name,
         matchStart: this.matchStart,
         matchDurationMs: this.matchDurationMs,
+        serverTime: Date.now(),
+        previousRound: this.previousRound || null,
         arena: rotated || now <= this._arenaBroadcastUntilTick ? this._arenaPayload() : undefined,
         you: { x: p.state.px, y: p.state.py, z: p.state.pz,
                vx: p.state.vx, vy: p.state.vy, vz: p.state.vz,

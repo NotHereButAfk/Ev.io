@@ -1182,6 +1182,7 @@ export class Game {
   // to the real match time and swap the roster to real players. Better a
   // one-time timer jump than a whole match on a private clock.
   _onNetState(matchStart, durationMs, roster, mapId) {
+    if (this._authNet) return; // The legacy relay must never rotate a dedicated room.
     if (!this._isDM || this.state !== 'playing') return;
     if (!this._netDriven) {
       this._netDriven = true;
@@ -1204,6 +1205,18 @@ export class Game {
 
   _onAuthoritativeMap(mapId, match = {}, initial = false) {
     if (!mapId) return Promise.resolve(null);
+    // Keep the old arena visible behind results. The client can receive the
+    // new simulation, but must not render its coordinates on the old map.
+    if (!initial && (this.state === 'leaderboard' || (match.roundEnded && this.state === 'playing'))) {
+      this._pendingMapId = mapId;
+      if (this.state !== 'leaderboard') {
+        this._modeTimer = 0;
+        this._showLeaderboard(match.results?.map(row => ({
+          ...row, isYou: row.id === this._authNet?.client?.you,
+        })));
+      }
+      return Promise.resolve(null);
+    }
     if (Number.isFinite(match.start) && Number.isFinite(match.durationMs)) {
       const remaining = match.durationMs / 1000 - (Date.now() - match.start) / 1000;
       this._modeTimer = THREE.MathUtils.clamp(remaining, 0, match.durationMs / 1000);
@@ -1315,7 +1328,7 @@ export class Game {
 
   // ── Post-match leaderboard ───────────────────────────────────────────────────
 
-  _showLeaderboard() {
+  _showLeaderboard(finalRows = null) {
     this.serverSim?.stop();
     this._saveStats();
     this._menuOpen = false;
@@ -1324,7 +1337,7 @@ export class Game {
 
     // AuthNetBridge clears BotManager on welcome, so the results screen must
     // consume the same complete server roster as the live scoreboard.
-    const rows = buildLeaderboardRows(this._buildScoreboardRows());
+    const rows = buildLeaderboardRows(finalRows || this._buildScoreboardRows());
     const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
 
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
@@ -1356,7 +1369,7 @@ export class Game {
     this.deathEffects.update(dt);
     this._updateMenuScene(dt, cameraDt);
 
-    this._lbTimer -= dt;
+    this._lbTimer -= cameraDt;
     const secsLeft = Math.max(0, Math.ceil(this._lbTimer));
     this.hud.updateLeaderboardCountdown(secsLeft, 10);
 
@@ -2300,7 +2313,10 @@ export class Game {
       // Net-driven matches get their roster/timer resynced from the real
       // server via _onNetState; otherwise fall back to the local simulation.
       if (!this._netDriven) this.serverSim.update(dt);
-      this._modeTimer = Math.max(0, this._modeTimer - dt);
+      const clock = this._authNet?.ready && this._authNet.client?._matchClock;
+      this._modeTimer = clock
+        ? Math.max(0, clock.remaining - (performance.now() - clock.received) / 1000)
+        : Math.max(0, this._modeTimer - dt);
       const mins = Math.floor(this._modeTimer / 60);
       const secs = Math.floor(this._modeTimer % 60);
       this.hud.showDMTimer(`${mins}:${String(secs).padStart(2, '0')}`, this._modeTimer <= 30);

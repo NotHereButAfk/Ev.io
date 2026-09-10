@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { AuthClient } from '../src/net/AuthClient.js';
+import { createState } from '../src/sim/MoveSim.js';
 import { getMode } from '../src/core/GameModes.js';
 import { AuthRoom } from '../server/authroom.mjs';
 import {
@@ -33,10 +36,60 @@ assert.equal(afterRestart.arena.id, beforeRestart.arena.id,
   'server restart reset the active map rotation');
 
 const nextStart = beforeRestart.matchStart + MATCH_DURATION_MS;
+const playerId = beforeRestart.add(() => {}, 'RoundWinner');
+const winner = beforeRestart.players.get(playerId);
+winner.kills = 7;
+winner.score = 700;
+assert.equal(beforeRestart._rotateMatch(nextStart - 1), false, 'map rotated before the round ended');
 assert.equal(beforeRestart._rotateMatch(nextStart + 5), true,
   'continuous room did not advance at the global round boundary');
 assert.equal(beforeRestart.matchStart, nextStart,
   'round rotation drifted away from the fixed wall-clock cadence');
 assert.equal(beforeRestart._arenaIndex, (state.arenaIndex + 1) % arenas.length);
+assert.equal(beforeRestart.previousRound.rows.find(p => p.id === playerId).kills, 7);
+assert.equal(winner.kills, 0, 'new round did not reset live score');
+assert.equal(beforeRestart.previousRound.rows.find(p => p.id === playerId).score, 700,
+  'reset mutated frozen final results');
+
+// Exercise real client reconciliation with a same-map round boundary too.
+const client = new AuthClient('ws://unused');
+client.sim = createState(0, 0, 0);
+client.mapId = arenas[0].id;
+client.matchStart = nextStart - MATCH_DURATION_MS;
+client.matchDurationMs = MATCH_DURATION_MS;
+let changes = 0;
+client.onMapChange = (_id, match) => {
+  changes++;
+  assert.equal(match.roundEnded, true);
+  assert.equal(match.results.find(p => p.id === playerId).kills, 7);
+};
+const snapshot = {
+  tick: 1, ack: 0, mapId: arenas[0].id, matchStart: nextStart,
+  matchDurationMs: MATCH_DURATION_MS, serverTime: nextStart + 42_000,
+  previousRound: beforeRestart.previousRound, players: [],
+  you: { x: 0, y: 0, z: 0, health: 100, alive: true },
+};
+client._reconcile(snapshot);
+client._reconcile(snapshot);
+assert.equal(changes, 1, 'repeated snapshots duplicated the results screen');
+assert.equal(client._matchClock.remaining, 138, 'timer is not derived from server time');
+const roundStart = client.matchStart;
+client._reconcile({ ...snapshot, mapId: 'missing-arena', matchStart: roundStart + MATCH_DURATION_MS });
+assert.equal(client.matchStart, roundStart, 'incomplete map payload consumed the round boundary');
+assert.equal(client.mapId, arenas[0].id, 'incomplete map payload changed the map');
+
+// Run the actual Game transition method without booting the renderer.
+const gameSource = fs.readFileSync(new URL('../src/core/Game.js', import.meta.url), 'utf8');
+const method = gameSource.split('  _onAuthoritativeMap(mapId, match = {}, initial = false) {')[1]
+  .split('\n  // Reconcile which existing bot slots')[0].trim();
+const transition = new Function('mapId', 'match', 'initial', method.slice(0, -1));
+let shown = 0;
+const game = { state: 'playing', _authNet: { client: { you: playerId } },
+  _showLeaderboard(rows) { shown++; this.state = 'leaderboard'; assert(rows[0].isYou); } };
+await transition.call(game, 'next', { roundEnded: true, results: [{ id: playerId }] }, false);
+await transition.call(game, 'next', { roundEnded: true }, false);
+assert.equal(shown, 1);
+assert.equal(game._pendingMapId, 'next', 'next map was not queued behind results');
+assert(gameSource.includes('if (this._authNet) return;'), 'legacy relay can override the dedicated map');
 
 console.log('match clock passed: three-minute rounds survive restarts and rotate continuously');

@@ -149,16 +149,21 @@ export class AuthClient {
     const before = { x: this.sim.px, y: this.sim.py, z: this.sim.pz };
     if (Number.isFinite(snap.tick)) this.lastServerTick = snap.tick;
     const previousMapId = this.mapId;
+    const previousMatchStart = this.matchStart;
     // A map id without its matching collision payload is not actionable. Keep
     // simulating the current map until a repeated rotation payload arrives.
     const requestedMapId = snap.mapId || this.mapId;
     const canAdoptMap = requestedMapId === this.mapId || !!snap.arena;
-    if (canAdoptMap) this.mapId = requestedMapId;
+    // Keep the round identity too: consuming it before the arena arrives
+    // would lose the round-end event on the next complete snapshot.
+    if (!canAdoptMap) return;
+    this.mapId = requestedMapId;
     this.matchStart = snap.matchStart ?? this.matchStart;
     this.matchDurationMs = snap.matchDurationMs ?? this.matchDurationMs;
-    // Do not apply a spawn from an unknown map to the current map. The room
-    // repeats arena metadata, so the next complete snapshot safely catches up.
-    if (!canAdoptMap) return;
+    this._matchClock = {
+      remaining: Math.max(0, (this.matchStart + this.matchDurationMs - (snap.serverTime ?? Date.now())) / 1000),
+      received: performance.now(),
+    };
     if (snap.arena) {
       this.arena = snap.arena;
       this.simWorld = {
@@ -171,7 +176,8 @@ export class AuthClient {
         teleporters: [],
       };
     }
-    const mapChanged = Boolean(previousMapId && this.mapId !== previousMapId);
+    const roundEnded = Number.isFinite(previousMatchStart) && this.matchStart > previousMatchStart;
+    const mapChanged = Boolean(previousMapId && this.mapId !== previousMapId) || roundEnded;
     if (mapChanged) {
       // Inputs were predicted against the previous arena's collision. Replaying
       // them from the new authoritative spawn can carry the player straight
@@ -185,6 +191,8 @@ export class AuthClient {
         start: this.matchStart,
         durationMs: this.matchDurationMs,
         arena: snap.arena || null,
+        roundEnded,
+        results: snap.previousRound?.start === previousMatchStart ? snap.previousRound.rows : null,
       });
     }
     // authoritative self
