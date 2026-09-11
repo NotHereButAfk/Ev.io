@@ -25,6 +25,8 @@ const tail = (s, n = 1) => s.trim().split('\n').slice(-n).join(' ').slice(0, 90)
 
 // Automated gates — each returns {ok, detail}
 const AUTO = [
+  { id: 'G-EV-DEFAULT', phase: 'art', name: 'EV default character animations and Auto Rifle load and fit',
+    fn: () => { const r = run('npm run test:ev-character'); return { ok: r.ok, detail: tail(r.out) }; } },
   { id: 'G-BUILD', phase: '—',    name: 'Production build compiles',
     fn: () => { const r = run('npm run build'); return { ok: r.ok && /built in/.test(r.out), detail: tail(r.out) }; } },
   { id: 'G2', phase: 'Phase 3', name: 'Deterministic movement (fixtures + parity + golden)',

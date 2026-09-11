@@ -1,17 +1,47 @@
 {
-  "generated": "2026-09-06T10:27:52.263Z",
+  "generated": "2026-09-11T07:00:03.795Z",
   "budgets": {
     "maxBytes": 3670016,
     "maxVerts": 120000,
     "maxMeshes": 64
   },
   "totals": {
-    "assets": 10,
-    "bytes": 10998456,
-    "vertices": 187480,
-    "megabytes": 10.49
+    "assets": 12,
+    "bytes": 12613904,
+    "vertices": 230150,
+    "megabytes": 12.03
   },
   "assets": [
+    {
+      "file": "ev-auto-rifle.glb",
+      "bytes": 198512,
+      "sha256": "94be8f70cf6c9ffe",
+      "glbVersion": 2,
+      "meshes": 1,
+      "primitives": 5,
+      "vertices": 26980,
+      "triangles": 3688,
+      "nodes": 6,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 194800,
+      "warnings": []
+    },
+    {
+      "file": "ev-default.glb",
+      "bytes": 1416936,
+      "sha256": "0dc2a5757b91b3e3",
+      "glbVersion": 2,
+      "meshes": 3,
+      "primitives": 10,
+      "vertices": 15690,
+      "triangles": 12663,
+      "nodes": 62,
+      "hasUV": true,
+      "compressed": false,
+      "binBytes": 1020608,
+      "warnings": []
+    },
     {
       "file": "kyx-locomotion.glb",
       "bytes": 411008,

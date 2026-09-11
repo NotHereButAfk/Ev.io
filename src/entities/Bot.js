@@ -253,7 +253,14 @@ export class Bot {
   get isDead() { return !this.alive; }
 
   refreshWeaponModel() {
-    if (this._isHuman || this._isSwordBot || !hasLoadedWeaponModel(this._botGun?.id)) return;
+    if (this._isSwordBot || !hasLoadedWeaponModel(this._botGun?.id)) return;
+    if (this._isHuman) {
+      if (this._heldWeaponReady) return;
+      const def = getWeapon(this._botGun.id);
+      const weapon = def && buildWeaponModel(def)?.group;
+      if (weapon) { this.mesh.userData.attachWeapon(weapon); this._heldWeaponReady = true; }
+      return;
+    }
     if (this._weaponMesh?.userData?.modelSource === 'quaternius') return;
     const def = getWeapon(this._botGun.id);
     const wm = def && buildWeaponModel(def)?.group;

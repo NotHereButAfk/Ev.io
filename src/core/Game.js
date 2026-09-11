@@ -38,7 +38,7 @@ import { Shop } from './Shop.js';
 import { Loadout } from './Loadout.js';
 import { BattlePass } from './BattlePass.js';
 import { getArmorSkin, ARMOR_SKINS } from '../player/ArmorSkins.js';
-import { isHumanSoldierReady, preloadHumanSoldier } from '../player/HumanSoldier.js';
+import { isEvCharacterReady as isHumanSoldierReady, preloadEvCharacter as preloadHumanSoldier } from '../player/EvCharacter.js';
 import { WEAPON_SKINS } from '../weapons/WeaponSkins.js';
 import { MoveBridge, moveSimEnabled } from '../sim/MoveBridge.js';
 import { AuthNetBridge, authNetTarget, authNetTargets } from '../net/AuthNetBridge.js';
@@ -314,7 +314,7 @@ export class Game {
       this.previewCharacter.visible = wasVisible;
       if (isHumanSoldierReady() && this.state === 'playing'
           && this._playerBody && !this._playerBody.userData?.isHuman
-          && !isLowPolyId(this.selectedArmorType)) {
+          && this.selectedArmorType === 'vanguard') {
         this._rebuildPlayerBody(this.selectedArmorType, true);
       }
       if (this._menuBotsActive) {
@@ -2205,7 +2205,7 @@ export class Game {
         aim: (this._tpsAimHold > 0 || this.weaponSystem.scopeT > 0.2) ? 1 : 0,
         move: speed > 0.6 && p.onGround ? 1 : 0,
         run: p.isSprinting ? 1 : 0,
-        firing: this._tpsAimHold > 0 ? 1 : 0,
+        firing: ud.isEvCharacter ? 0 : (this._tpsAimHold > 0 ? 1 : 0),
         scoped: this.weaponSystem.scopeT,
       });
       ud.mixer.update(dt);

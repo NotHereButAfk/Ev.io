@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { metalNormalMap, metalRoughnessMap, polymerNormalMap } from './WeaponTextures.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { buildEvAutoRifle } from './EvAutoRifle.js';
 
 // ── Blender GLB weapon loader ─────────────────────────────────────────────────
 let _weaponTemplate = null, _weaponLoading = false;
@@ -10,7 +11,7 @@ let _weaponTemplate = null, _weaponLoading = false;
 // Per-weapon override GLBs — a dedicated Blender-authored model that supersedes
 // the shared weapons.glb node for that weapon (smoother than the procedural or
 // placeholder build). Each file has a node named `weapon_<id>`.
-const WEAPON_GLB_OVERRIDES = { sidearm: '/sidearm.glb' };
+const WEAPON_GLB_OVERRIDES = { sidearm: '/sidearm.glb', m4: '/ev-auto-rifle.glb' };
 const _overrideTemplates = new Map();   // id -> gltf.scene
 // User-selected Quaternius Sci-Fi Modular Gun Pack (CC0). Each shipped firearm
 // gets a complete authored model; categories without a one-to-one pack entry
@@ -95,11 +96,11 @@ export function onWeaponModelReady(id, cb) {
 }
 
 export function hasLoadedWeaponModel(id) {
-  return _quaterniusTemplates.has(id);
+  return (id === 'm4' && _overrideTemplates.has(id)) || _quaterniusTemplates.has(id);
 }
 
 export function preloadWeaponModels() {
-  if (_weaponTemplate || _weaponLoading) return;
+  if (_allReady || _weaponTemplate || _weaponLoading) return;
   _weaponLoading = true;
   const loader = new GLTFLoader();
   // main atlas + authored atlases + every override; fire ready only once all
@@ -113,8 +114,18 @@ export function preloadWeaponModels() {
     ]),
   ];
   let pending = jobs.length;
+  // A per-weapon callback must wait for both its preferred model and fallback.
+  // Otherwise a fast fallback request permanently thumbnails the old M4.
+  const pendingByWeapon = new Map();
+  for (const [, tag] of jobs) {
+    if (tag.id) pendingByWeapon.set(tag.id, (pendingByWeapon.get(tag.id) || 0) + 1);
+  }
   const done = (tag) => {
-    if (tag.kind === 'quaternius') _fireWeaponReady(tag.id);
+    if (tag.id) {
+      const remaining = pendingByWeapon.get(tag.id) - 1;
+      pendingByWeapon.set(tag.id, remaining);
+      if (remaining === 0) _fireWeaponReady(tag.id);
+    }
     if (--pending === 0) { _weaponLoading = false; _fireReady(); }
   };
   for (const [url, tag] of jobs) {
@@ -177,6 +188,10 @@ function _outlineGeometry(src) {
 }
 
 function _buildFromGLB(weaponDef) {
+  if (weaponDef.id === 'm4') {
+    const original = buildEvAutoRifle(_overrideTemplates.get('m4'), weaponDef);
+    if (original) return original;
+  }
   const name = `weapon_${weaponDef.id}`;
   const supplied = _quaterniusTemplates.get(weaponDef.id) || null;
   let weaponRoot = supplied || _overrideTemplates.get(weaponDef.id)?.getObjectByName(name) || null;
@@ -2528,18 +2543,10 @@ const BUILDERS = {
 };
 
 export function buildWeaponModel(weaponDef, opts = {}) {
-  // Prefer Blender GLB when already loaded. Character-held (third-person)
-  // weapons force the procedural path: the GLB's meshes carry baked-in scene
-  // offsets that place them metres from the group origin, which is harmless
-  // for the FPS viewmodel (built before the GLB loads, so it's procedural)
-  // but puts a hand-held weapon far outside the character.
-  // weaponDef.proceduralModel forces the procedural builder even when the GLB
-  // is loaded — used by the main guns, whose GLB entries are low-detail
-  // placeholders and whose detailed sci-fi look lives in buildSciFiRifle.
-  // The supplied pack is normalized above, so use it for first-person,
-  // third-person carry and pickups alike. Procedural geometry is the instant
-  // fallback only while the external models are still loading.
-  const glb = _quaterniusTemplates.has(weaponDef.id) && _buildFromGLB(weaponDef);
+  // The original Auto Rifle takes precedence for M4. The normalized pack still
+  // supplies other guns and remains the M4 fallback if its override is missing.
+  // Procedural geometry is immediately available while requests are pending.
+  const glb = hasLoadedWeaponModel(weaponDef.id) && _buildFromGLB(weaponDef);
   if (glb) return glb;
 
   // Fall back to procedural
