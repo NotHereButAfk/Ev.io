@@ -8,6 +8,7 @@ import { applyRifleCarry, restRifleTransform } from './RifleCarry.js';
 import { triggerAction, tickActions, applyMeleeCarry } from './Actions.js';
 import { cameraYawToBodyYaw, movementInBodySpace, turnBodyYaw } from './Facing.js';
 import { DEATH_FALL_DURATION, deathFallProgress } from './DeathAnimation.js';
+import { isEvCharacterReady } from './EvCharacter.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // One character body, driven entirely by a state struct.
@@ -42,6 +43,7 @@ export class Avatar {
    */
   constructor(scene, opts = {}) {
     this.scene = scene;
+    this._modelOptions = opts;
     this.group = buildPreviewCharacter(
       opts.skin || null, opts.armorTypeId || 'vanguard', null,
       { allowHuman: opts.allowHuman ?? true });
@@ -133,6 +135,21 @@ export class Avatar {
    *  snapshot only has to carry a boolean rather than a synchronised clock.
    */
   update(dt, s) {
+    // A peer can arrive before an optional asset download finishes. Upgrade
+    // that peer too, preserving its world transform and animation state.
+    if (!this.group.userData.isEvCharacter && (this._modelOptions.armorTypeId || 'vanguard') === 'vanguard'
+        && isEvCharacterReady()) {
+      const old = this.group;
+      this.dispose();
+      this.group = buildPreviewCharacter(this._modelOptions.skin, 'vanguard');
+      this.group.position.copy(old.position);
+      this.group.rotation.copy(old.rotation);
+      this.group.scale.copy(old.scale);
+      this.group.userData.worldModelScale = old.userData.worldModelScale;
+      this.scene.add(this.group);
+      this.isHuman = true; this.rig = null; this.weapon = null;
+      this.setWeapon(this.weaponId, true);
+    }
     const g = this.group;
     if (this.weapon && !this._weaponAssetReady
         && hasLoadedWeaponModel(this.weaponId)) this.setWeapon(this.weaponId, true);

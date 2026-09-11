@@ -53,6 +53,9 @@ const QUATERNIUS_HAND_POSES = Object.freeze({
 
 export function weaponHandPose(weaponOrId) {
   const id = typeof weaponOrId === 'string' ? weaponOrId : weaponOrId?.userData?.weaponId;
+  if (weaponOrId?.userData?.modelSource === 'ev-original' && weaponOrId.userData.authoredHandPose) {
+    return weaponOrId.userData.authoredHandPose;
+  }
   if (weaponOrId?.userData?.modelSource === 'quaternius' && QUATERNIUS_HAND_POSES[id]) {
     return QUATERNIUS_HAND_POSES[id];
   }

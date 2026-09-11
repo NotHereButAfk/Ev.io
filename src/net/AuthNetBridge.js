@@ -172,8 +172,9 @@ export class AuthNetBridge {
     // you saw of yourself.
     const avatar = new Avatar(this.scene, {
       skin: isBot ? DEFAULT_REMOTE_SKIN : REMOTE_SKINS[hashId(id) % REMOTE_SKINS.length],
-      armorTypeId: isBot ? DEFAULT_REMOTE_BOT_ARMOR_ID
-        : PLAYABLE_ARMOR_IDS[hashId(id) % PLAYABLE_ARMOR_IDS.length],
+      // Snapshots do not carry an equipped cosmetic chassis. Show the shared
+      // default instead of inventing a different body from the peer's ID.
+      armorTypeId: DEFAULT_REMOTE_BOT_ARMOR_ID,
       weaponId: 'm4',
       // Network peers and simulated bots share the Blender-authored default.
       allowHuman: true,

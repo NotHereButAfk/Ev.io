@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ARMOR_LOOKS, buildHumanSoldier, isHumanSoldierReady, tintHumanSoldier } from './HumanSoldier.js';
 import { buildLowPolyCharacter, getLowPolyPalette, isLowPolyId } from './LowPolyModels.js';
+import { buildEvCharacter, isEvCharacterReady } from './EvCharacter.js';
 
 // ── Blender-built Spartan GLB (the white/orange armoured soldier) ────────────
 let _spartanTemplate = null, _spartanLoading = false;
@@ -16,7 +17,7 @@ export function resolveViewmodelPalette(skin, armorTypeId = 'vanguard', armorSki
   if (armorTypeId === 'vanguard' && !armorSkin && (!skin || skin.id === 'default')) {
     // The live Vanguard preserves its GLB materials. Its arms must do the same,
     // rather than inherit the unrelated emergency low-poly body's palette.
-    return { authored: true, plate: 0xcbd0e4, sleeve: 0x242931, glove: 0x242931, accent: 0xff950f };
+    return { authored: true, plate: 0xf07808, sleeve: 0x242931, glove: 0x242931, accent: 0xc7ff34 };
   }
   if (armorSkin) {
     // Match tintHumanSoldier's actual rendered materials, rather than sending
@@ -390,6 +391,7 @@ const BUILDERS = {
 };
 
 export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin = null, opts = {}) {
+  if (armorTypeId === 'vanguard' && isEvCharacterReady()) return buildEvCharacter(skin, armorSkin);
   // The default Vanguard is authored and animated in Blender. Prefer it before
   // the procedural roster check so gameplay callers that explicitly opt in do
   // not silently fall back to the old block-built body.
