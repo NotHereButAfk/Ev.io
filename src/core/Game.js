@@ -1403,7 +1403,9 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const name = el.querySelector('.ml-name');
-    if (name) name.textContent = 'LOADING MATCH';
+    const map = getImportedMap(this.world.currentMapId || this._initialMapId);
+    el.style.setProperty('--ml-image', `url("${map.loadingImage}")`);
+    if (name) name.textContent = map.name.toUpperCase();
     const building = document.getElementById('ml-building');
     if (building) building.textContent = 'Finding lobby and preparing arena...';
     const region = document.getElementById('ml-region');
@@ -1485,6 +1487,7 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const map = getImportedMap(mapId);
+    el.style.setProperty('--ml-image', `url("${map.loadingImage}")`);
     const building = document.getElementById('ml-building');
     if (building) building.textContent = joining
       ? 'Joining lobby and loading arena...'
@@ -1502,11 +1505,9 @@ export class Game {
       koth: 'King of the Hill', survival: 'Firefight',
     };
     const name = el.querySelector('.ml-name');
-    if (name) name.textContent = joining
-      ? `LOADING ${map.name.toUpperCase()}`
-      : map.name.toUpperCase();
+    if (name) name.textContent = map.name.toUpperCase();
     const region = document.getElementById('ml-region');
-    if (region) region.textContent = map.region;
+    if (region) region.textContent = this._selectedMatch?.region || 'kryx.live';
     const mode = document.getElementById('ml-mode');
     if (mode) mode.textContent = modeNames[modeId] || 'Deathmatch';
     const players = document.getElementById('ml-players');
@@ -2069,7 +2070,9 @@ export class Game {
     if (sbDown) {
       this._sbRefreshT -= dt;
       if (!this._sbShown || this._sbRefreshT <= 0) {
-        this.hud.showScoreboard(this._buildScoreboardRows(), this._mode?.name || '');
+        this.hud.showScoreboard(this._buildScoreboardRows(), this._mode?.name || '', {
+          ...this.matchStats, earnedCoins: this._pendingCoins || 0,
+        });
         this._sbRefreshT = 0.4;
       }
       this._sbShown = true;

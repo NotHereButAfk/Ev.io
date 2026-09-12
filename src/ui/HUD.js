@@ -79,6 +79,18 @@ export class HUD {
     this._slotEls             = [];
     this._slotAmmoEls         = [];
     this._activeSlot          = -1;
+    this._scoreboardTab = 'leaderboard';
+    const scoreboard = document.getElementById('scoreboard-overlay');
+    scoreboard?.querySelectorAll('[data-sb-tab]').forEach((tab) => {
+      tab.onclick = () => this._selectScoreboardTab(tab.dataset.sbTab);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (!scoreboard || scoreboard.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight'].includes(event.code)) return;
+      event.preventDefault(); event.stopPropagation();
+      const tabs = ['leaderboard', 'earn', 'performance'];
+      const next = (tabs.indexOf(this._scoreboardTab) + (event.code === 'ArrowRight' ? 1 : 2)) % 3;
+      this._selectScoreboardTab(tabs[next]);
+    }, true);
   }
 
   show() { this.root?.classList.remove('hidden'); }
@@ -509,10 +521,22 @@ export class HUD {
   }
 
   // In-game scoreboard (hold TAB). rows: [{name, kills, score, isYou}], sub: mode label.
-  showScoreboard(rows, sub = '') {
+  _selectScoreboardTab(name) {
+    this._scoreboardTab = name;
+    document.querySelectorAll('[data-sb-tab]').forEach((tab) => {
+      const active = tab.dataset.sbTab === name;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      document.getElementById(`sb-${tab.dataset.sbTab}-view`)?.classList.toggle('hidden', !active);
+    });
+  }
+
+  showScoreboard(rows, sub = '', stats = {}) {
     const ov = document.getElementById('scoreboard-overlay');
     const tb = document.getElementById('sb-rows');
     if (!ov || !tb) return;
+    if (ov.classList.contains('hidden')) this._selectScoreboardTab('leaderboard');
     const subEl = document.getElementById('sb-sub');
     if (subEl && sub) subEl.textContent = sub;
     tb.innerHTML = '';
@@ -524,7 +548,12 @@ export class HUD {
 
       const nameTd = document.createElement('td');
       nameTd.className = 'sb-name-cell';
-      nameTd.textContent = r.name;
+      const portrait = document.createElement('img');
+      portrait.className = 'sb-portrait'; portrait.src = '/images/ev-portrait.png';
+      portrait.alt = ''; portrait.width = portrait.height = 34;
+      nameTd.appendChild(portrait);
+      const label = document.createElement('span'); label.className = 'sb-player-name';
+      label.textContent = r.name; nameTd.appendChild(label);
       if (r.isYou) {
         const b = document.createElement('span');
         b.className = 'sb-you-badge'; b.textContent = 'YOU';
@@ -534,13 +563,32 @@ export class HUD {
         b.className = 'sb-bot-badge'; b.textContent = 'BOT';
         nameTd.appendChild(b);
       }
-      tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
+      tr.innerHTML = `<td><span class="${rankCls}">${rank}.</span></td>`;
       tr.appendChild(nameTd);
-      const k = document.createElement('td'); k.className = 'sb-kills'; k.textContent = r.kills;
-      const s = document.createElement('td'); s.className = 'sb-score'; s.textContent = (r.score || 0).toLocaleString();
-      tr.appendChild(k); tr.appendChild(s);
+      const kills = Number.isFinite(r.kills) ? r.kills : 0;
+      const deaths = Number.isFinite(r.deaths) ? r.deaths : 0;
+      for (const value of [(r.score || 0).toLocaleString(), r.assists ?? '—', kills, deaths,
+        deaths ? (kills / deaths).toFixed(1) : String(kills)]) {
+        const cell = document.createElement('td'); cell.textContent = value; tr.appendChild(cell);
+      }
       tb.appendChild(tr);
     });
+    setText(document.getElementById('sb-earned'), Math.floor(stats.earnedCoins || 0).toLocaleString());
+    setText(document.getElementById('sb-spectators'), `Spectators: ${stats.spectators?.join(', ') || '—'}`);
+    const performance = document.getElementById('sb-performance');
+    if (performance) {
+      performance.replaceChildren();
+      for (const [label, value] of [
+        ['Accuracy', `${stats.shotsFired ? ((stats.hits || 0) / stats.shotsFired * 100).toFixed(1) : '0.0'}%`],
+        ['Damage dealt', Math.round(stats.damageDealt || 0).toLocaleString()],
+        ['Shots / hits', `${stats.shotsFired || 0} / ${stats.hits || 0}`],
+        ['Headshots', stats.headshots || 0], ['Best streak', stats.bestStreak || 0],
+      ]) {
+        const term = document.createElement('dt'); term.textContent = label;
+        const detail = document.createElement('dd'); detail.textContent = value;
+        performance.append(term, detail);
+      }
+    }
     ov.classList.remove('hidden');
   }
 
