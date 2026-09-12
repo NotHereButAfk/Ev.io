@@ -5,6 +5,7 @@ export const IMPORTED_MAPS = Object.freeze([
   Object.freeze({
     id: 'daytime-rook',
     name: 'Daytime Rook',
+    loadingImage: '/images/maps/daytime-rook.jpg',
     region: 'Rook Sector',
     fileName: 'RookLit_0.evmap',
     url: '/maps/RookLit_0.evmap',
@@ -26,6 +27,7 @@ export const IMPORTED_MAPS = Object.freeze([
   Object.freeze({
     id: 'winter-graveyard',
     name: 'Winter-Graveyard',
+    loadingImage: '/images/maps/winter-graveyard.jpg',
     region: 'Winter Graveyard',
     fileName: 'XmasGraveyard_1.evmap',
     url: '/maps/XmasGraveyard_1.evmap',

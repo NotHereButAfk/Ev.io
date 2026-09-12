@@ -10,6 +10,7 @@
     "test:move": "node tools/movesim_fixtures.mjs",
     "test:ev-character": "node tools/ev_character_check.mjs && node tools/ev_auto_rifle_check.mjs && node tools/ev_review_check.mjs",
     "test:ev-game": "node tools/ev_game_check.mjs",
+    "test:match-ui": "node tools/match_ui_check.mjs",
     "test:stairs": "node tools/stair_movement_check.mjs",
     "test:gait": "node tools/gait_check.mjs",
     "test:actions": "node tools/action_check.mjs",

@@ -818,25 +818,35 @@
     <!-- ===================== IN-GAME SCOREBOARD (hold TAB) ===================== -->
     <div id="scoreboard-overlay" class="hidden">
       <div class="sb-panel">
-        <div class="sb-head">
-          <div class="sb-title">SCOREBOARD</div>
-          <div class="sb-sub" id="sb-sub">FREE FOR ALL</div>
+        <div class="sb-head"><div id="sb-sub">FREE FOR ALL</div></div>
+        <div class="sb-tabs" role="tablist" aria-label="Match scoreboard">
+          <button class="sb-tab active" id="sb-tab-leaderboard" data-sb-tab="leaderboard" role="tab" aria-selected="true" aria-controls="sb-leaderboard-view">Leaderboard</button>
+          <button class="sb-tab" id="sb-tab-earn" data-sb-tab="earn" role="tab" aria-selected="false" aria-controls="sb-earn-view" tabindex="-1">Earn</button>
+          <button class="sb-tab" id="sb-tab-performance" data-sb-tab="performance" role="tab" aria-selected="false" aria-controls="sb-performance-view" tabindex="-1">Performance</button>
         </div>
-        <div class="sb-tabs">
-          <button class="sb-tab active">LEADERBOARD</button>
-          <button class="sb-tab sb-tab-dim">EARN</button>
-          <button class="sb-tab sb-tab-dim">PERFORMANCE</button>
-        </div>
+        <div id="sb-leaderboard-view" role="tabpanel" aria-labelledby="sb-tab-leaderboard">
         <table class="sb-table">
           <thead><tr>
-            <th class="sb-th-rank">#</th>
+            <th class="sb-th-rank" aria-label="Rank"></th>
             <th class="sb-th-name">PLAYER</th>
-            <th>KILLS</th>
             <th>SCORE</th>
+            <th>ASSISTS</th>
+            <th>KILLS</th>
+            <th>DEATHS</th>
+            <th>K/D</th>
           </tr></thead>
           <tbody id="sb-rows"></tbody>
         </table>
-        <div class="sb-hint">Hold <span class="sb-key">TAB</span> to view scores</div>
+        <div class="sb-spectators" id="sb-spectators">Spectators: —</div>
+        </div>
+        <div id="sb-earn-view" class="sb-detail hidden" role="tabpanel" aria-labelledby="sb-tab-earn">
+          <span class="sb-detail-label">COINS EARNED THIS MATCH</span><strong id="sb-earned">0</strong>
+          <p>Rewards are credited when the match ends.</p>
+        </div>
+        <div id="sb-performance-view" class="sb-detail hidden" role="tabpanel" aria-labelledby="sb-tab-performance">
+          <dl id="sb-performance"></dl>
+        </div>
+        <div class="sb-hint">Hold TAB · ← / → to switch tabs</div>
       </div>
     </div>
     <div id="sponsor-block-warning" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="sponsor-block-title">

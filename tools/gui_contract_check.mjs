@@ -104,10 +104,10 @@ requireMatch(index, /id=["']connect-screen["'][\s\S]*?boot-connect-logo[\s\S]*?b
 for (const loadingClass of ['ml-building', 'ml-panel', 'ml-name', 'ml-spinner']) {
   requireMatch(index, new RegExp(`class=["'][^"']*${loadingClass}`), `arena loading composition: ${loadingClass}`);
 }
-requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(320px,\s*29vw,\s*430px\)/s,
+requireMatch(css, /\.ml-panel[^}]*width:\s*clamp\(260px,\s*23.85vw,\s*454px\)/s,
   'arena loading left information rail');
 requireMatch(css, /@keyframes ml-spin/, 'arena loading activity indicator');
-requireMatch(css, /\.ml-panel[^}]*padding:\s*37vh\s+29px\s+0/s, 'arena loading reference information position');
+requireMatch(css, /\.ml-panel[^}]*padding:\s*34vh\s+28px\s+0/s, 'arena loading reference information position');
 requireMatch(css, /\.ml-tip[^}]*bottom:\s*25px/s, 'arena loading tip position');
 if (/adsbygoogle|data-ad-(?:client|slot)|boot-connect-ad|ml-ad|ad-slot/.test(index + css)) {
   failures.push('advertising placeholders remain disabled until production markup is supplied');
