@@ -9,8 +9,8 @@
 //   • REVALIDATE    — under load: movement stays finite/on-map (no NaN, no
 //     fall-through), respawns keep firing, kill feed keeps flowing.
 //
-//   node tools/stress_soak.mjs            # standard matrix + 3 min soak
-//   node tools/stress_soak.mjs --soak 10  # 10 min soak on the 32p cohort
+//   npm run stress:soak                 # standard matrix + 3 min soak
+//   npm run stress:soak -- --soak 10     # 10 min soak on the 32p cohort
 
 import { AuthRoom } from '../server/authroom.mjs';
 import { AUTHORITY_TEST_ARENA } from './fixtures/authorityArena.mjs';
@@ -101,6 +101,10 @@ const soakTicks = 20 * 60 * soakMin;
 const room = new AuthRoom(AUTHORITY_TEST_ARENA);
 const bots = [];
 for (let i = 0; i < 32; i++) bots.push({ id: room.add(() => {}, `S${i}`), rnd: rng(4200 + i * 97), target: null, retargetIn: 0, fireIn: 0 });
+// Compare retained heap, not short-lived snapshots waiting for V8's next GC.
+// Collection is outside the timed update loop and does not change its budget.
+if (!globalThis.gc) throw new Error('Run with npm run stress:soak (requires --expose-gc)');
+globalThis.gc();
 const mem0 = process.memoryUsage().heapUsed;
 let soakKills = 0, soakBad = 0, maxTick = 0, maxHistory = 0;
 const start = performance.now();
@@ -116,6 +120,7 @@ for (let t = 0; t < soakTicks; t++) {
   }
 }
 const wall = ((performance.now() - start) / 1000).toFixed(1);
+globalThis.gc();
 const mem1 = process.memoryUsage().heapUsed;
 const memGrowth = ((mem1 - mem0) / 1024 / 1024).toFixed(1);
 console.log(`  ticks ${soakTicks}  simulated ${soakMin}min in ${wall}s wall`);

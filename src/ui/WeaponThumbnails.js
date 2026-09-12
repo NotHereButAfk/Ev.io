@@ -20,6 +20,7 @@ import {
 } from '../weapons/WeaponModels.js';
 import { applyWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin } from '../weapons/SwordSkins.js';
+import { disposeModel } from '../core/ModelResources.js';
 
 // Studio-style scene shared by both thumbnail paths. The guns are largely
 // metallic, and metals lit only by punctual lights render near-black — the
@@ -186,7 +187,7 @@ export function renderWeaponSkinned(weaponDef, skin) {
   renderer.render(scene, camera);
   const url = renderer.domElement.toDataURL('image/png');
   scene.remove(g);
-  g.traverse((o) => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
+  disposeModel(g);
   return url;
 }
 
@@ -209,7 +210,7 @@ export function warmWeaponThumbs(onReady) {
 }
 
 function _disposeGroup(g) {
-  g.traverse((o) => { if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); } });
+  disposeModel(g);
 }
 
 function _generateHudThumbs() {

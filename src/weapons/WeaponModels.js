@@ -131,6 +131,7 @@ export function preloadWeaponModels() {
   for (const [url, tag] of jobs) {
     loader.load(url,
       (gltf) => {
+        gltf.scene.traverse((o) => { if (o.isMesh) o.geometry.userData.shared = true; });
         if (tag.kind === 'quaternius') _quaterniusTemplates.set(tag.id, gltf.scene);
         else if (tag.kind === 'override') _overrideTemplates.set(tag.id, gltf.scene);
         else if (tag.kind === 'authored') _authoredTemplates.push(gltf.scene);
@@ -170,6 +171,7 @@ function T(role, color, opts = {}) {
 // vertex normals so the silhouette gets a clean dark edge from every angle.
 const _outlineGeoCache = new WeakMap();
 const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x272c33, side: THREE.BackSide });
+OUTLINE_MAT.userData.shared = true;
 function _outlineGeometry(src) {
   let g = _outlineGeoCache.get(src);
   if (g) return g;
@@ -184,6 +186,7 @@ function _outlineGeometry(src) {
     p.setXYZ(i, p.getX(i) + n.getX(i) * t, p.getY(i) + n.getY(i) * t, p.getZ(i) + n.getZ(i) * t);
   }
   _outlineGeoCache.set(src, g);
+  g.userData.shared = true;
   return g;
 }
 
