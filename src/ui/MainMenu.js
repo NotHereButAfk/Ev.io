@@ -1,3 +1,4 @@
+import { mobileIcon } from './MobileIcons.js';
 import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
@@ -51,7 +52,7 @@ const ICON_ACH = {
 };
 
 export class MenuUI {
-  constructor() {
+  constructor({ mobile = false } = {}) {
     // Top-nav elements
     this.topNav      = document.getElementById('top-nav');
     this.mobileNavToggle = document.getElementById('nav-mobile-toggle');
@@ -108,6 +109,8 @@ export class MenuUI {
     this._weaponThumbsRequested = false;
     this._buildModeCards();
     this._buildSettings();
+    this._mobileHome = null;
+    if (mobile) this._buildMobileHome();
     this._wireNav();
     // Apply saved accessibility prefs at boot so the crosshair/HUD/motion
     // settings take effect immediately, not only after opening Settings.
@@ -116,6 +119,41 @@ export class MenuUI {
   }
 
   // ── Nav wiring ──────────────────────────────────────────────────────────────
+
+  _buildMobileHome() {
+    document.body.classList.add('mobile-ui');
+    const home = document.createElement('div');
+    home.id = 'mobile-home';
+    home.className = 'hidden';
+    home.innerHTML = `<div class="mobile-home-content"><div class="mobile-home-icons">
+      <button type="button" data-panel="abilities" aria-label="Abilities">${mobileIcon('abilities')}</button>
+      <button type="button" data-panel="loadout" aria-label="Character and loadout">${mobileIcon('profile')}</button>
+      <button type="button" data-panel="settings" aria-label="Settings">${mobileIcon('settings')}</button>
+      </div><button type="button" id="mobile-play">TAP TO PLAY</button></div>`;
+    document.getElementById('app').appendChild(home);
+    home.querySelector('#mobile-play').addEventListener('click', () => {
+      if (this._mobileResume) this.onResume?.();
+      else this.playBtn.click();
+    });
+    // Keep the rest of the desktop navigation reachable through More.
+    const more = document.querySelector('#panel-more .more-grid');
+    for (const [panel, label] of [['modes', 'GAME MODES'], ['profile', 'PROFILE'], ['shop', 'SHOP'], ['party', 'PARTY'], ['private', 'PRIVATE MATCH']]) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'profile-menu-item';
+      button.dataset.panel = panel; button.textContent = label;
+      if (['profile', 'shop', 'party'].includes(panel)) button.dataset.gated = '1';
+      more?.appendChild(button);
+    }
+    this._mobileHome = home;
+  }
+
+  _showMobileHome(show, resume = false) {
+    if (!this._mobileHome) return;
+    this._mobileResume = resume;
+    this._mobileHome.querySelector('#mobile-play').textContent = resume ? 'TAP TO RESUME' : 'TAP TO PLAY';
+    this._mobileHome.classList.toggle('hidden', !show);
+    document.body.classList.toggle('mobile-home-visible', show);
+  }
 
   _wireNav() {
     const closeMobileNav = () => {
@@ -303,6 +341,7 @@ export class MenuUI {
     }
     this._closeAllPanels();
     this._activePanel = id;
+    this._mobileHome?.classList.add('panel-open');
     document.getElementById('panel-' + id)?.classList.remove('hidden');
     // Light the owning nav control (a dropdown parent or a direct nav item).
     const opener = document.querySelector(`[data-panel="${id}"]`);
@@ -332,6 +371,7 @@ export class MenuUI {
       this._profilePreview?.stop();
     }
     this._activePanel = null;
+    this._mobileHome?.classList.remove('panel-open');
     document.querySelectorAll('.nav-panel').forEach((p) => p.classList.add('hidden'));
     document.querySelectorAll('[data-panel]').forEach((b) => b.classList.remove('active'));
     document.querySelectorAll('.nav-dd-btn').forEach((b) => b.classList.remove('nav-dd-active'));
@@ -710,12 +750,14 @@ export class MenuUI {
   }
 
   showMain() {
+    this._showMobileHome(true, false);
     this.topNav.classList.remove('hidden');
     this.centerPlay.classList.remove('hidden');
     this._chrome(true);
   }
 
   hideMain() {
+    this._showMobileHome(false, false);
     this.topNav.classList.add('hidden');
     this.centerPlay.classList.add('hidden');
     this._chrome(false);
@@ -726,10 +768,12 @@ export class MenuUI {
   // Profile / …) — the same menu as the main screen. No paused box; click any
   // nav item to change loadout, or press Esc again to hide the nav and resume.
   showPause() {
+    this._showMobileHome(true, true);
     this.topNav.classList.remove('hidden');
     this._chrome(true);
   }
   hidePause() {
+    this._showMobileHome(false, false);
     this._chrome(false);
     this.topNav.classList.add('hidden');
     this._closeAllPanels();
