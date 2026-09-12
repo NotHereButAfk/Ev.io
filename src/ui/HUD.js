@@ -83,6 +83,7 @@ export class HUD {
     const scoreboard = document.getElementById('scoreboard-overlay');
     scoreboard?.querySelectorAll('[data-sb-tab]').forEach((tab) => {
       tab.onclick = () => this._selectScoreboardTab(tab.dataset.sbTab);
+      tab.onmousedown = (event) => event.stopPropagation();
     });
     document.addEventListener('keydown', (event) => {
       if (!scoreboard || scoreboard.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight'].includes(event.code)) return;
@@ -568,7 +569,7 @@ export class HUD {
       const kills = Number.isFinite(r.kills) ? r.kills : 0;
       const deaths = Number.isFinite(r.deaths) ? r.deaths : 0;
       for (const value of [(r.score || 0).toLocaleString(), r.assists ?? '—', kills, deaths,
-        deaths ? (kills / deaths).toFixed(1) : String(kills)]) {
+        deaths ? (kills / deaths).toFixed(1) : kills.toFixed(1)]) {
         const cell = document.createElement('td'); cell.textContent = value; tr.appendChild(cell);
       }
       tb.appendChild(tr);

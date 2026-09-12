@@ -703,6 +703,7 @@ export class Game {
 
   _newMatchStats() {
     return {
+      earnedCoins: 0,
       shotsFired: 0,
       hits: 0,
       headshots: 0,
@@ -818,7 +819,7 @@ export class Game {
       this.score += 50 * rewardMult;
       this._pendingCoins += coins;
       if (this._pendingCoins >= 1) {
-        Shop.addCoins(Math.floor(this._pendingCoins));
+        this._creditMatchCoins(Math.floor(this._pendingCoins));
         this._pendingCoins -= Math.floor(this._pendingCoins);
       }
       BattlePass.addXP(10 * rewardMult);
@@ -828,7 +829,7 @@ export class Game {
       const { coins, streak } = this.dmManager.onKill();
       const reward = coins * rewardMult;
       this.score += 100 * rewardMult;
-      Shop.addCoins(Math.round(reward));
+      this._creditMatchCoins(Math.round(reward));
       BattlePass.addXP(25 * rewardMult);
       this._refreshNavCoins();
       if (this._netDriven) this.net.sendKill(); // report to the shared 24/7 roster
@@ -841,11 +842,16 @@ export class Game {
       }
     } else {
       this.score += 100 * rewardMult;
-      Shop.addCoins(10 * rewardMult);
+      this._creditMatchCoins(10 * rewardMult);
       BattlePass.addXP(25 * rewardMult);
       this.hud.showCoinEarn(10 * rewardMult);
       this.hud.addKillFeed(`${this.player.name} eliminated a target  +${100 * rewardMult}  💰+${10 * rewardMult}${hsTag}${knifeTag}`);
     }
+  }
+
+  _creditMatchCoins(amount) {
+    Shop.addCoins(amount);
+    this.matchStats.earnedCoins += amount;
   }
 
   _refreshNavCoins() {
@@ -1338,7 +1344,7 @@ export class Game {
     // AuthNetBridge clears BotManager on welcome, so the results screen must
     // consume the same complete server roster as the live scoreboard.
     const rows = buildLeaderboardRows(finalRows || this._buildScoreboardRows());
-    const earnedCoins = Math.max(0, this.kills) * 10 + 100; // 10/kill + 100 match bonus
+    const earnedCoins = this.matchStats.earnedCoins;
 
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state    = 'leaderboard';
@@ -1384,7 +1390,7 @@ export class Game {
     if (this._statsSaved) return;
     this._statsSaved = true;
     UserAccount.addGameStats(this.currentUsername, this.kills, this.score);
-    Shop.addCoins(100);
+    this._creditMatchCoins(100);
     BattlePass.addXP(100);
   }
 
@@ -2071,7 +2077,7 @@ export class Game {
       this._sbRefreshT -= dt;
       if (!this._sbShown || this._sbRefreshT <= 0) {
         this.hud.showScoreboard(this._buildScoreboardRows(), this._mode?.name || '', {
-          ...this.matchStats, earnedCoins: this._pendingCoins || 0,
+          ...this.matchStats,
         });
         this._sbRefreshT = 0.4;
       }
