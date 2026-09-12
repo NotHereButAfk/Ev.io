@@ -475,6 +475,7 @@ export function buildPreviewCharacter(skin, armorTypeId = 'vanguard', armorSkin 
 }
 
 export function applySkinToCharacter(group, skin, armorSkin = null) {
+  if (group.userData?.isEvCharacter) { group.userData.applyFinish(skin, armorSkin); return; }
   // Low-poly models ship a designed cel palette — leave it intact.
   if (group.userData?.isLowPoly) return;
   // Human soldier: tint the body texture instead of recoloring armor plates.

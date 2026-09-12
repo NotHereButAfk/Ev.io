@@ -37,7 +37,13 @@ npm run assets
 Validation loads the real GLBs, exercises every movement/fire state, checks
 independent skeletons and materials, muzzle direction, finite rotations, original
 rifle markers, loading success/failure order, and first-person clearance across
-12 viewport/FOV combinations. `npm run certify` includes these asset checks.
+12 viewport/FOV combinations. It also checks armor palettes and helmet themes,
+death/respawn at 30/60/144 Hz, weapon-skin material roles and resource ownership.
+`npm run test:ev-game` starts its own temporary Vite server and Chromium browser
+to check the menu, local/remote players, bots, first-person rifle and actual
+armory/thumbnail cleanup. It fails on browser errors or failed requests.
+Install Chromium with `npx playwright install chromium` before the first run.
+`npm run certify` includes both the asset checks and this browser integration gate.
 
 Source attribution: character mesh from
 [ev.io default skin](https://ev.io/sites/default/files/skins/default_2.evskin),

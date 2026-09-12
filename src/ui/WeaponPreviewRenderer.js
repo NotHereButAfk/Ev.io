@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { buildWeaponModel } from '../weapons/WeaponModels.js';
 import { applyWeaponSkin, animateWeaponSkin } from '../weapons/WeaponSkins.js';
 import { applySwordSkin, animateSwordSkin } from '../weapons/SwordSkins.js';
+import { disposeModel } from '../core/ModelResources.js';
 
 // Lightweight dedicated Three.js renderer for the 3D skin-preview panel.
 // Runs in its own RAF loop while the ARMORY tab is open.
@@ -53,7 +54,7 @@ export class WeaponPreviewRenderer {
   loadWeapon(weaponDef) {
     if (this._group) {
       this._scene.remove(this._group);
-      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      disposeModel(this._group);
     }
     const { group } = buildWeaponModel(weaponDef);
     group.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
@@ -114,7 +115,7 @@ export class WeaponPreviewRenderer {
   dispose() {
     this.stop();
     if (this._group) {
-      this._group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+      disposeModel(this._group);
     }
     this._renderer.dispose();
   }

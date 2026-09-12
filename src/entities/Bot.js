@@ -517,6 +517,12 @@ export class Bot {
       this.mesh.rotation.z = eased * (Math.PI / 2) * this._deathSide;
       this.mesh.rotation.x = eased * 0.3;
       this.mesh.position.y = this._deathBaseY - eased * 0.5 - Math.min(0.16, p * 0.28);  // knees sink
+      if (this._isHuman) {
+        const ud = this.mesh.userData;
+        ud.setLocomotion?.(0, true, false);
+        ud.setDeathState?.(eased, this._deathSide);
+        ud.mixer?.update(dt);
+      }
       if (p > 0.58) {
         const fade = 1 - (p - 0.58) / 0.42;
         this.mesh.traverse(o => { if (o.isMesh && o.material && 'opacity' in o.material) {

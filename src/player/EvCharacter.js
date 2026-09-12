@@ -3,6 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { STATURE } from './Proportions.js';
 import { weaponHandPose } from '../weapons/WeaponHandPoses.js';
+import { disposeModel } from '../core/ModelResources.js';
+import { setupEvCosmetics } from './EvCosmetics.js';
+import { createHumanDeathPose, sampleHumanDeathPose } from './HumanActionMotion.js';
 
 // One native skeleton and the thirteen actions exported from the supplied blend.
 // Every instance owns its bones, mixer and materials; geometry stays shared.
@@ -117,7 +120,6 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
     if (o.isBone) bones[o.name] = o;
     if (!o.isMesh) return;
     o.material = o.material.clone();
-    if (armorSkin && /orange/i.test(o.material.name)) o.material.color.set(armorSkin.primary);
     o.castShadow = o.receiveShadow = true;
     o.frustumCulled = false;
     if (o.isSkinnedMesh) o.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1, 0), 3);
@@ -126,6 +128,7 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
   const spine = bones.Bip001_Spine;
   const chest = bones.Bip001_Spine1;
   const rifle = model.getObjectByName('Auto_Rifle_-_root');
+  const cosmetics = setupEvCosmetics(group, model, bones);
   const muzzle = model.getObjectByName('BIND_BULLET');
   rifle.traverse((o) => { o.userData.noHit = true; });
   const flash = new THREE.Mesh(new THREE.OctahedronGeometry(0.10),
@@ -143,6 +146,9 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
   let transition = 0, landing = 0, fireHold = 0, flashTime = 0;
   let pitch = 0, yaw = 0, smoothPitch = 0, smoothYaw = 0, travelYaw = 0;
   let externalWeapon = null, melee = false, shot = 0, actionTime = 0, actionKind = '';
+  let death = 0, deathSide = 1;
+  const deathBase = new Map();
+  const deathPose = createHumanDeathPose();
   const weaponSocket = new THREE.Group();
   rifle.add(weaponSocket);
   const rifleMeshes = [];
@@ -152,6 +158,7 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
     isHuman: true, isEvCharacter: true, armorTypeId: 'vanguard',
     standHeight: STATURE, feetY: 0, centerX: 0, centerZ: 0, headshotY: 1.56,
     bones, animationMixer: native, animationActions: actions, measuredSpeeds: template.speeds,
+    primaryMat: cosmetics.primary, bodyMats: cosmetics.materials, applyFinish: cosmetics.apply,
     setLocomotion(speed, grounded = true, sprint = false, strafe = 0, dirF = 1, dirR = 0) {
       Object.assign(state, { speed: Math.max(0, speed), grounded, sprint, dirF, dirR });
     },
@@ -163,6 +170,10 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
     triggerHit() { actionKind = 'hit'; actionTime = 0.3; },
     triggerJump() { landing = 0.25; },
     triggerTeleport() {
+      death = 0; rifle.visible = true;
+      for (const [bone, pose] of deathBase) {
+        bone.position.copy(pose.position); bone.quaternion.copy(pose.quaternion); bone.scale.copy(pose.scale);
+      }
       fireHold = flashTime = shot = transition = landing = actionTime = 0;
       pitch = yaw = smoothPitch = smoothYaw = travelYaw = 0;
       state.speed = 0; state.sprint = false; state.dirF = 1; state.dirR = 0;
@@ -174,13 +185,16 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
       flash.visible = false;
       tick(0);
     },
-    setDeathState(value) { ud.death = value; },
+    setDeathState(value, side = 1) {
+      if (death > 0 && value <= 0) ud.triggerTeleport();
+      death = clamp(value, 0, 1); deathSide = side;
+    },
     attachWeapon(weapon, isMelee = false) {
-      externalWeapon?.removeFromParent();
+      if (externalWeapon && externalWeapon !== weapon) disposeModel(externalWeapon);
       externalWeapon = null; melee = isMelee;
       const useNative = !weapon || weapon.userData.weaponId === 'm4';
       rifleMeshes.forEach((o) => { o.visible = useNative; });
-      if (useNative) return;
+      if (useNative) { if (weapon) disposeModel(weapon); return; }
       externalWeapon = weapon;
       // Preserve the original rifle's orientation, replacing its geometry at
       // the trigger marker. Other loadout weapons remain visible and animated.
@@ -196,6 +210,29 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
   };
   function tick(dt) {
     dt = clamp(dt, 0, 0.1);
+    if (death > 0) {
+      for (const [bone, pose] of deathBase) {
+        bone.position.copy(pose.position); bone.quaternion.copy(pose.quaternion); bone.scale.copy(pose.scale);
+      }
+      const pose = sampleHumanDeathPose(death, deathSide, deathPose);
+      group.updateWorldMatrix(true, true);
+      const frame = group.getWorldQuaternion(new THREE.Quaternion());
+      const x = X.clone().applyQuaternion(frame), z = new THREE.Vector3(0, 0, 1).applyQuaternion(frame);
+      const parts = [
+        ['Pelvis', 'hips'], ['Spine', 'spine'], ['Spine1', 'chest'], ['Head', 'head'],
+        ['R_UpperArm', 'rArm'], ['L_UpperArm', 'lArm'], ['R_Forearm', 'rFore'], ['L_Forearm', 'lFore'],
+        ['R_Thigh', 'rLeg'], ['L_Thigh', 'lLeg'], ['R_Calf', 'rCalf'], ['L_Calf', 'lCalf'],
+      ];
+      for (const [name, key] of parts) {
+        const bone = bones[`Bip001_${name}`];
+        rotateWorld(bone, Q[0].setFromAxisAngle(x, pose[`${key}X`] || 0));
+        rotateWorld(bone, Q[0].setFromAxisAngle(z, pose[`${key}Z`] || 0));
+      }
+      rifle.visible = death < 0.2; flash.visible = false;
+      fireHold = flashTime = shot = actionTime = 0;
+      ud.activeAnimation = 'Death';
+      return;
+    }
     const crouched = state.crouch > 0.5 || state.slide > 0.5;
     const moving = state.speed > 0.35;
     const firing = !melee && state.reload <= 0 && (state.firing > 0 || fireHold > 0);
@@ -282,5 +319,9 @@ export function buildEvCharacter(skin = null, armorSkin = null) {
   }
   ud.mixer = { update: tick };
   tick(0);
+  for (const bone of Object.values(bones)) deathBase.set(bone, {
+    position: bone.position.clone(), quaternion: bone.quaternion.clone(), scale: bone.scale.clone(),
+  });
+  cosmetics.apply(skin, armorSkin);
   return group;
 }
