@@ -183,6 +183,7 @@ export function chooseSafeSpawn(spawns, occupants = [], seed = 0) {
 
 export class AuthRoom {
   constructor(arena = IMPORTED_ARENAS, {
+    shieldsEnabled = false,
     targetPopulation = 0,
     botDifficulty = 'normal',
     botDifficultyOverrides = null,
@@ -198,6 +199,7 @@ export class AuthRoom {
     this.tick = 0;
     this._lootSeed = Number(lootSeed) | 0;
     this._lootGeneration = 0;
+    this.shieldsEnabled = shieldsEnabled;
     this.lootPads = [];
     this._resetLootPads();
     this.players = new Map();   // id -> player
@@ -262,7 +264,7 @@ export class AuthRoom {
       x: pickup.x, y: pickup.y, z: pickup.z, markerKind: pickup.markerKind,
     }));
     const seed = this._lootSeed + this._lootGeneration++ * 0x51ed270b;
-    this.lootPads = randomLootSpecs(points, seed).map((spec) => ({
+    this.lootPads = randomLootSpecs(points, seed, this.shieldsEnabled).map((spec) => ({
       padId: spec.padId,
       x: spec.position.x, y: spec.position.y, z: spec.position.z,
       lootType: spec.lootType,
@@ -277,7 +279,7 @@ export class AuthRoom {
   _rerollLootPad(pad) {
     const item = rollLootItem(
       this._lootSeed + this.tick * 101 + (++pad.generation) * 0x45d9f3b,
-      pad.padId,
+      pad.padId, this.shieldsEnabled,
     );
     Object.assign(pad, item, { active: true, respawnTick: 0 });
     this.events.push({ e: 'loot-ready', padId: pad.padId, lootType: pad.lootType, gunId: pad.gunId });
@@ -1098,6 +1100,7 @@ export class AuthRoom {
     if (Math.hypot(dx, dz) >= WEAPON_COLLECT_RADIUS || Math.abs(dy) >= WEAPON_COLLECT_HEIGHT) return false;
 
     if (pad.lootType === 'shield') {
+      if (!this.shieldsEnabled) return false;
       if (p.maxShield >= MAX_PICKUP_SHIELD) return false;
       const next = addShieldStack(p.shield, p.maxShield);
       p.shield = next.shield;

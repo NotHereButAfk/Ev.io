@@ -145,11 +145,11 @@ ok('join: arena shipped', !!a.welcome?.arena?.boxes);
 ok('snapshot: both see two players', a.last()?.players.length === 2 && b.last()?.players.length === 2);
 
 // Random pad collection is an explicit authoritative request. Asking from far
-// away cannot grant anything; reaching the exact active pad can grant a shield
+// away cannot grant anything; reaching the exact active pad can grant a weapon
 // and the replicated state hides that pad for every client.
 const pickupPlayer = room.players.get(a.welcome.you);
 const pickupPad = room.lootPads[0];
-Object.assign(pickupPad, { lootType: 'shield', gunId: undefined, active: true });
+Object.assign(pickupPad, { lootType: 'weapon', gunId: 'rpg', active: true });
 const pickupStartShield = a.last().you.shield;
 a.pickup(pickupPad.padId);
 await sleep(120);
@@ -158,7 +158,7 @@ ok('pickup: remote request cannot collect a pad from across the map',
 Object.assign(pickupPlayer.state, { px: pickupPad.x, py: pickupPad.y, pz: pickupPad.z });
 a.pickup(pickupPad.padId);
 await sleep(120);
-ok('pickup: server grants a shield only at the active pad', a.last().you.shield === 30);
+ok('pickup: server grants a weapon only at the active pad', a.last().you.wid === 'rpg');
 ok('pickup: collected pad state is hidden and replicated',
    !pickupPad.active && a.last().lootPads?.find((pad) => pad.padId === pickupPad.padId)?.active === false);
 

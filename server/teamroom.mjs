@@ -1,7 +1,7 @@
 import { AuthRoom } from "./authroom.mjs";
 export class TeamRoom extends AuthRoom {
   constructor(arena, options) {
-    super(arena, options);
+    super(arena, { ...options, shieldsEnabled: true });
     this.mode = "teamslayer";
     this.matchDurationMs = 600000;
     this.matchStart = Date.now();

@@ -7321,3 +7321,25 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 .mobile-ui #e-hud { top: 8px; left: auto; right: 8px; min-width: 160px; font-size: 12px; }
 .mobile-ui .mbtn-timebomb { left: 0; top: 0; width: var(--action-size); height: var(--action-size); }
 .mobile-ui .mbtn-impulse { left: 23%; top: 0; width: var(--action-size); height: var(--action-size); }
+
+/* Shield occupies the health track: damage reveals purple health beneath it. */
+#hud #shield-wrap, .mobile-ui #hud #shield-wrap {
+  left: 20px !important; bottom: 14px !important; width: min(280px,28vw);
+  height: 12px; padding: 0 !important; background: transparent !important;
+  border: 0 !important; z-index: 3; pointer-events: none;
+}
+#hud #shield-wrap .hud-icon, #hud #shield-text, #hud #shield-stacks { display: none !important; }
+#hud #shield-wrap .bar-bg { flex: 1; height: 5px !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; }
+#hud #shield-wrap .bar-bg::after { display: none !important; }
+#hud #shield-bar { background: #8cddff !important; box-shadow: none !important; border-radius: 0 !important; }
+
+.mobile-ui #hud #shield-wrap { left: 3vw !important; bottom: 15px !important; width: min(28vw,235px); }
+
+#hud #health-wrap .bar-bg { position: relative; border: 0 !important; }
+#hud #health-wrap #shield-wrap {
+  position: absolute !important; inset: 0 !important; width: 100% !important;
+  height: 100% !important; margin: 0 !important; padding: 0 !important;
+  display: flex; align-items: stretch !important; z-index: 3;
+}
+#hud #health-wrap #shield-wrap.hidden { display: none !important; }
+#hud #health-wrap #shield-wrap .bar-bg { width: 100% !important; height: 100% !important; margin: 0 !important; }

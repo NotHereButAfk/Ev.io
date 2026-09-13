@@ -9,7 +9,7 @@ import { makeInput } from "../src/sim/MoveSim.js";
 // Authoritative PvE reuses the production collision, weapon and damage simulation.
 export class SurvivalRoom extends AuthRoom {
   constructor(arena, options = {}) {
-    super(arena, { ...options, targetPopulation: 0 });
+    super(arena, { ...options, shieldsEnabled: true, targetPopulation: 0 });
     this.mode = "survival";
     this.botConfig = options.botConfig
       ? survivalBotConfig(options.botConfig)

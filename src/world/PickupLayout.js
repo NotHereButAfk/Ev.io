@@ -23,9 +23,9 @@ function seededUnit(seed) {
   return ((s ^ (s >>> 15)) >>> 0) / 4294967296;
 }
 
-export function rollLootItem(seed, padId = 0) {
+export function rollLootItem(seed, padId = 0, shieldsEnabled = true) {
   const typeRoll = seededUnit((seed | 0) + padId * 0x45d9f3b);
-  if (typeRoll < LOOT_SHIELD_CHANCE) {
+  if (shieldsEnabled && typeRoll < LOOT_SHIELD_CHANCE) {
     return { lootType: 'shield', color: 0x39bfff };
   }
   const weaponRoll = seededUnit((seed | 0) ^ (padId + 1) * 0x27d4eb2d);
@@ -42,13 +42,13 @@ export function rollLootItem(seed, padId = 0) {
 
 // Roll every authored pad at once and make the first generation useful: maps
 // with at least two pads always contain at least one shield and one weapon.
-export function randomLootSpecs(points = [], seed = Date.now()) {
+export function randomLootSpecs(points = [], seed = Date.now(), shieldsEnabled = true) {
   const specs = points.map((position, padId) => ({
     padId,
     position,
-    ...rollLootItem(seed + padId * 101, padId),
+    ...rollLootItem(seed + padId * 101, padId, shieldsEnabled),
   }));
-  if (specs.length > 1 && !specs.some((spec) => spec.lootType === 'shield')) {
+  if (shieldsEnabled && specs.length > 1 && !specs.some((spec) => spec.lootType === 'shield')) {
     Object.assign(specs[0], { lootType: 'shield', gunId: undefined, color: 0x39bfff });
   }
   if (specs.length > 1 && !specs.some((spec) => spec.lootType === 'weapon')) {

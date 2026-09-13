@@ -98,6 +98,14 @@ try {
   ui.dispose();return result;
  });
  assert.deepEqual(economyHud,{guestHidden:true,visible:true,rate:'2x',balance:'4,695.00',keys:['G','U','V','E']});
+ const shieldLayout=await page.evaluate(()=>{
+  const h=window.__game.hud;h.show();
+  const p={health:80,maxHealth:100,shield:25,maxShield:50,stamina:100,maxStamina:100};
+  h.update(p,{name:'Rifle',isMelee:false,magAmmo:50,reserveAmmo:100,slots:[]},0,0);
+  const health=document.querySelector('#health-wrap .bar-bg').getBoundingClientRect(),shield=document.querySelector('#shield-wrap .bar-bg').getBoundingClientRect();
+  return {aligned:Math.abs(health.x-shield.x)<1&&Math.abs(health.y-shield.y)<1&&Math.abs(health.width-shield.width)<1,width:document.getElementById('shield-bar').style.width,popup:!!document.getElementById('e-summary')};
+ });
+ assert.deepEqual(shieldLayout,{aligned:true,width:'50%',popup:false});
  assert.deepEqual(errors,[]);
  console.log('Match UI passed: both map images, responsive scoreboard, real stats, escaped names, portraits and working tabs');
 }finally{await browser?.close();await server.close();}

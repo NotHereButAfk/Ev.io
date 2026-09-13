@@ -1000,7 +1000,7 @@ export class Game {
 
     this.player.name = name;
     this.player.skin = this.selectedSkin;
-    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+    this.player.setMaxShield(modeId === 'deathmatch' ? 0 : (this.selectedArmorSkin?.shield || 0));
     this.player.respawn(this.world.randomSpawnPoint());
     this.weaponSystem.resetState(this.player.baseFov);
     this.grenadeSystem.reset();
@@ -1705,6 +1705,7 @@ export class Game {
   _createPickupSystem() {
     const authClient = this._authNet?.ready ? this._authNet.client : null;
     return new PickupSystem(this.world.scene, this.world.weaponSpawnPoints, {
+      shieldsEnabled: this._mode?.id !== 'deathmatch',
       lootPads: authClient?.lootPads || null,
       onPickupRequest: authClient
         ? (padId) => authClient.sendPickup?.(padId)
@@ -1713,7 +1714,7 @@ export class Game {
   }
 
   _dropLifePickups() {
-    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+    this.player.setMaxShield(this._mode?.id === 'deathmatch' ? 0 : (this.selectedArmorSkin?.shield || 0));
     this._resetLoadoutHud();
   }
 
@@ -1795,7 +1796,7 @@ export class Game {
   _respawnPlayer() {
     if (this.state !== 'playing') return;
     const point = this.world.safeSpawnPoint(this._activeManager?.bots || []);
-    this.player.setMaxShield(this.selectedArmorSkin?.shield || 0);
+    this.player.setMaxShield(this._mode?.id === 'deathmatch' ? 0 : (this.selectedArmorSkin?.shield || 0));
     this.player.respawn(point);
     this.weaponSystem.resetMotionState();
     this._resetLoadoutHud();   // drop any picked-up power weapon

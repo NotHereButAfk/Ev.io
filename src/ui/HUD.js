@@ -28,6 +28,7 @@ export class HUD {
     this.healthBar   = document.getElementById('health-bar');
     this.healthText  = document.getElementById('health-text');
     this.shieldWrap  = document.getElementById('shield-wrap');
+    this.healthBar?.parentElement?.appendChild(this.shieldWrap);
     this.shieldBar   = document.getElementById('shield-bar');
     this.shieldText  = document.getElementById('shield-text');
     this.shieldStacks = document.getElementById('shield-stacks');
@@ -253,9 +254,9 @@ export class HUD {
     setStyle(this.healthBar, 'width', `${hpct}%`);
     setText(this.healthText, Math.ceil(player.health));
 
-    if (player.maxShield > 0) {
+    if (player.shield > 0 && player.maxShield > 0) {
       this.shieldWrap.classList.remove('hidden');
-      const spct = Math.max(0, Math.min(100, (player.shield / MAX_PICKUP_SHIELD) * 100));
+      const spct = Math.max(0, Math.min(100, (player.shield / player.maxShield) * 100));
       setStyle(this.shieldBar, 'width', `${spct}%`);
       setText(this.shieldText, Math.ceil(player.shield));
       setText(this.shieldStacks, `×${Math.ceil(player.maxShield / SHIELD_PER_STACK)}`);

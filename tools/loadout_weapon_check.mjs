@@ -56,7 +56,7 @@ const arena = {
     { type: 'weapon', x: 8, y: 0, z: 0, markerKind: 524288 },
   ],
 };
-const room = new AuthRoom(arena, { lootSeed: 7 });
+const room = new AuthRoom(arena, { lootSeed: 7, shieldsEnabled: true });
 const playerId = room.add(() => {}, 'Loadout Probe');
 const player = room.players.get(playerId);
 
@@ -124,3 +124,20 @@ for (const id of MAIN_WEAPON_IDS) {
 player.wid='rpg';room._weaponState(player,'rpg').mag=0;room._weaponState(player,'rpg').reserve=0;
 assert.equal(room._startReload(player,'rpg'),false,'pickup launchers retain finite reserves');
 console.log('Unlimited main reserves passed: all five guns, repeated reloads, timers, finite pickup weapons.');
+
+const ffa=new AuthRoom(arena,{lootSeed:7});const ffaId=ffa.add(()=>{},'FFA');
+for(let generation=0;generation<50;generation++){
+  assert(ffa.lootPads.every(p=>p.lootType!=='shield'),'FFA initial/rotated drops cannot include shields');
+  for(const pad of ffa.lootPads)ffa._rerollLootPad(pad);
+  assert(ffa.lootPads.every(p=>p.lootType!=='shield'),'FFA respawns cannot include shields');
+  ffa._resetLootPads();
+}
+const fp=ffa.players.get(ffaId),forged=ffa.lootPads[0];Object.assign(fp.state,{px:forged.x,py:forged.y,pz:forged.z});forged.lootType='shield';
+assert.equal(ffa.onPickup(ffaId,{seq:1,padId:forged.padId}),false);assert.equal(fp.shield,0);
+const {SurvivalRoom}=await import('../server/survivalroom.mjs');const survival=new SurvivalRoom(arena,{botConfig:{maximumBots:0},lootSeed:7});
+assert(survival.lootPads.some(p=>p.lootType==='shield'),'Survival retains shield drops');
+const sp=survival.players.get(survival.add(()=>{},'Survivor'));sp.invulnerableUntil=0;sp.shield=50;sp.maxShield=50;
+const enemy=survival.players.get(survival.addBot('Enemy'));enemy.survivalEnemy=true;
+survival._damage(sp,enemy,30,false);assert.equal(sp.shield,20);assert.equal(sp.health,100);
+survival._damage(sp,enemy,40,false);assert.equal(sp.shield,0);assert.equal(sp.health,80);
+console.log('Mode shields passed: no FFA shields across rotations/respawns, forged pickup rejected, Survival shield-first damage.');

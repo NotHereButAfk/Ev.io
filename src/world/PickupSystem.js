@@ -46,10 +46,12 @@ const SPAWN_LAYOUT = [
 
 export class PickupSystem {
   constructor(scene, authoredWeaponSpawns = [], {
+    shieldsEnabled = true,
     lootPads = null,
     onPickupRequest = null,
     seed = Date.now(),
   } = {}) {
+    this.shieldsEnabled = shieldsEnabled;
     this.scene    = scene;
     this._pickups = [];
     this._authoritative = typeof onPickupRequest === 'function';
@@ -74,7 +76,7 @@ export class PickupSystem {
     const positions = authored.length
       ? authored.map((spec) => spec.position)
       : FALLBACK_LOOT_POINTS;
-    return randomLootSpecs(positions, this._lootSeed);
+    return randomLootSpecs(positions, this._lootSeed, this.shieldsEnabled);
   }
 
   _buildMesh(def) {
@@ -320,7 +322,7 @@ export class PickupSystem {
         p.respawnTimer -= dt;
         if (p.respawnTimer <= 0) {
           if (p.type === 'loot') {
-            const next = rollLootItem(++this._lootSeed + p.padId * 101, p.padId);
+            const next = rollLootItem(++this._lootSeed + p.padId * 101, p.padId, this.shieldsEnabled);
             this._replaceLoot(p, { ...next, active: true, position: p.mesh.position.clone() });
           } else {
             p.active = true;
