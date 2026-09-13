@@ -202,7 +202,7 @@ export class Game {
     this._menuOpen      = false; // in-match menu overlay (the match keeps running)
     this.grenadeSystem  = new GrenadeSystem(this.world.scene, this.audio);
     this.pickupSystem = null; // created on first play, cleared on restart
-    this.menu           = new MenuUI();
+    this.menu           = new MenuUI({ mobile: this.input.isMobile });
 
     // The menu background is a first-person spectator POV, not a fixed hero
     // shot. Match the playable camera's wider spatial feel.
