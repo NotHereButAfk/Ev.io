@@ -19,6 +19,8 @@ try {
  assert.equal(await page.locator('#mobile-play').textContent(),'TAP TO PLAY');
  async function shot(name){if(process.env.MOBILE_UI_SHOTS){fs.mkdirSync(process.env.MOBILE_UI_SHOTS,{recursive:true});await page.screenshot({path:`${process.env.MOBILE_UI_SHOTS}/${name}.png`});}}
  await shot('mobile-menu-landscape');
+ const unreachable=await page.evaluate(()=>[...document.querySelectorAll('#top-nav [data-panel]')].map(el=>el.dataset.panel).filter(panel=>!document.querySelector(`#mobile-home [data-panel="${panel}"], #panel-more [data-panel="${panel}"]`)));
+ assert.deepEqual(unreachable,[], 'every desktop panel remains reachable on mobile');
  for(const panel of ['abilities','settings','loadout']) {
   await page.locator(`#mobile-home [data-panel="${panel}"]`).tap();
   assert(await page.locator(`#panel-${panel}`).isVisible());

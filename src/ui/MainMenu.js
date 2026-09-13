@@ -137,11 +137,11 @@ export class MenuUI {
     });
     // Keep the rest of the desktop navigation reachable through More.
     const more = document.querySelector('#panel-more .more-grid');
-    for (const [panel, label] of [['modes', 'GAME MODES'], ['profile', 'PROFILE'], ['shop', 'SHOP'], ['party', 'PARTY'], ['private', 'PRIVATE MATCH']]) {
+    for (const [panel, label] of [['modes', 'GAME MODES'], ['profile', 'PROFILE'], ['shop', 'SHOP'], ['battlepass', 'BATTLE PASS'], ['tournaments', 'TOURNAMENTS'], ['party', 'PARTY'], ['private', 'PRIVATE MATCH']]) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'profile-menu-item';
       button.dataset.panel = panel; button.textContent = label;
-      if (['profile', 'shop', 'party'].includes(panel)) button.dataset.gated = '1';
+      if (['profile', 'shop', 'battlepass', 'party'].includes(panel)) button.dataset.gated = '1';
       more?.appendChild(button);
     }
     this._mobileHome = home;
