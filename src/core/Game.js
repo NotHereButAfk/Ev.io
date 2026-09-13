@@ -2341,7 +2341,7 @@ export class Game {
     // ─── SURVIVAL ───────────────────────────────────────────────────────────────
     if (this._isSurvival && this._authNet?.ready) {
       const s=this._authNet.client.survival;
-      if(s)this.hud.setModeHUD(`WAVE ${s.wave}`,`${s.enemies} ENEMIES ALIVE`);
+      if(s)this.hud.setModeHUD(`WAVE ${s.wave}`,s.state==='ACTIVE'?`${s.enemies} ENEMIES ALIVE`:(s.state||'PRE_WAVE').replaceAll('_',' '));
       return;
     }
     if (this._isSurvival) {

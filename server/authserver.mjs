@@ -196,11 +196,11 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
       if(!selected){res.writeHead(404);res.end();return;}
       const room=selected.room;
       const humans = Array.from(room.players.values()).filter((player) => !player.isBot).length;
-      const capacity = requestedMode==='survival'?5:room.targetPopulation || 8;
+      const capacity = requestedMode==='survival'?room.botConfig.desiredParticipants:room.targetPopulation || 8;
       const remainingMs = Math.max(0, room.matchDurationMs - (Date.now() - room.matchStart));
       const body = JSON.stringify({
         available: humans < capacity, mode:requestedMode,
-        humans, players: room.players.size, capacity,
+        humans, players: requestedMode==='survival'?room.participants().length:room.players.size, capacity,
         mapId: room.arena.id, mapName: room.arena.name,
         matchStart: room.matchStart, matchDurationMs: room.matchDurationMs,
         remainingMs,

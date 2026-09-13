@@ -14,7 +14,7 @@ export function buildMatchRows({
   isSurvival = false,
 } = {}) {
   if (authClient) {
-    return (authClient.roster || []).map((entry) => {
+    return (authClient.roster || []).filter(entry=>!entry.survivalEnemy).map((entry) => {
       const isYou = entry.id === authClient.you;
       const self = isYou ? (authClient.self || {}) : entry;
       return {
@@ -22,6 +22,8 @@ export function buildMatchRows({
         kills: number(self.kills),
         deaths: number(self.deaths),
         score: number(self.score),
+        assists: number(self.assists),
+        survival: isSurvival, damageDealt:number(entry.damageDealt), bossDamage:number(entry.bossDamage),wavesSurvived:number(entry.wavesSurvived),
         isYou,
         isBot: !!entry.isBot,
       };

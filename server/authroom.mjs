@@ -213,6 +213,8 @@ export class AuthRoom {
     this._fillBotSlots();
   }
 
+  weaponDefinition(id) { return WEAPONS[id] || WEAPONS.m4; }
+
   opponents(a,b) { return a.id!==b.id; }
 
   _setSimArena(arena) {
@@ -303,9 +305,10 @@ export class AuthRoom {
     }
     this.previousRound = {
       start: this.matchStart,
-      rows: Array.from(this.players.values(), p => ({
+      rows: Array.from(this.players.values()).filter(p=>!p.survivalEnemy).map(p => ({
         id: p.id, name: p.name, isBot: !!p.isBot,
         kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
+        survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
       })),
     };
     // Keep the clock on its global cadence even if the process sleeps or a
@@ -366,6 +369,7 @@ export class AuthRoom {
       };
       player.abilityCD = 0;
       if (player.isBot) this._resetBotAI(player);
+      if(player.survivalAlly)this.allyAI?.reset(player);
     }
     this.events.push({ e: 'map', id: this.arena.id, name: this.arena.name });
     return true;
@@ -1209,7 +1213,7 @@ export class AuthRoom {
       shooter.kills++;
       const boss=target.bossInstance?this.economy?.match.bosses[target.bossInstance]:null;
       const kind=target.survivalEnemy?(boss?'boss':'survival_kill'):(head?'headshot':'kill');
-      const reward=this.economy?.ready?this.economy.award(shooter.id,kind,{victim:target.id,victimIsBot:target.isBot,...(boss?{score:boss.scoreReward}:{})}):null;
+      const reward=this.economy?.ready?this.economy.award(shooter.id,kind,{victim:target.id,victimIsBot:target.isBot,earnsE:this.mode!=='survival'||!!target.survivalEnemy,...(boss?{score:boss.scoreReward}:{})}):null;
       awardedScore=reward?.score ?? (head ? 150 : 100);
       shooter.score += awardedScore;
       if(reward && reward.e !== '0.0000')shooter.send({t:'earning',kind:'kill',amount:reward.e});
@@ -1218,7 +1222,7 @@ export class AuthRoom {
     for(const [id,tick] of target.damageContributors){
       if(id===shooter?.id || id===target.id || this.tick-tick>assistWindow)continue;
       const helper=this.players.get(id);if(!helper)continue;
-      const reward=this.economy?.ready?this.economy.award(id,'assist',{victim:target.id,victimIsBot:target.isBot}):null;
+      const reward=this.economy?.ready?this.economy.award(id,'assist',{victim:target.id,victimIsBot:target.isBot,earnsE:this.mode!=='survival'||!!target.survivalEnemy}):null;
       helper.assists++;helper.score+=reward?.score??10;
       helper.send({t:'earning',kind:'assist',amount:reward?.e||'0.0000',score:reward?.score??10});
     }
@@ -1372,6 +1376,7 @@ export class AuthRoom {
           p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
           if (p.isBot) this._resetBotAI(p);
+          if(p.survivalAlly)this.allyAI?.reset(p);
           this.events.push({ e: 'respawn', id: p.id, x: s[0], y: s[1], z: s[2] });
         }
         this._record(p);
@@ -1402,11 +1407,11 @@ export class AuthRoom {
       // Bot stamina is not a tactical limiter. Refresh it around the shared
       // movement step so bots can run for an entire match, while human players
       // continue using the normal authoritative stamina contract.
-      if (p.isBot) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
+      if (p.isBot && !p.survivalAlly) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
       const previousState = p.state;
       const sprinting = isSprinting(previousState, cmd.inp);
       p.state = step(previousState, cmd.inp, this.simWorld);
-      if (p.isBot) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
+      if (p.isBot && !p.survivalAlly) { p.state.stamina = STAMINA_MAX; p.state.stamDelay = 0; }
       if (p.isBot && cmd.botDash) p.state = this._advanceBotDash(p, p.state);
       if (this.arena.resolveState) p.state = this.arena.resolveState(previousState, p.state);
       p.ackTick = cmd.seq;
@@ -1526,7 +1531,9 @@ export class AuthRoom {
         swing: p._swingUntil > now ? clamp((now - p._swingStart) / swingDuration, 0, 1) : 1,
         health: p.health, shield: p.shield, maxShield: p.maxShield,
         kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
-        botState: p.isBot ? p._botState : undefined,
+        survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
+        botState: p.isBot && (this.mode!=='survival'||this.botConfig?.debug) ? p._botState : undefined,
+        botDebug: this.botConfig?.debug && p.survivalAI ? {state:p.survivalAI.state,target:p.survivalAI.target,threat:p.survivalAI.threat,path:p.survivalAI.path,detectionRange:this.botConfig.detectionRange} : undefined,
       });
     }
     const smokeList = this.smokes.map((s) => ({ x: s.x, y: s.y, z: s.z, r: s.r }));
@@ -1535,7 +1542,7 @@ export class AuthRoom {
       p.mag = ammo.mag;
       p.send({
         t: 'snapshot', tick: now, ack: p.ackTick,
-        survival: this.mode==='survival'?{wave:this.wave,enemies:[...this.players.values()].filter(p=>p.isBot&&p.alive).length}:null,
+        survival: this.mode==='survival'?{wave:this.wave,state:this.waveState,capacity:this.botConfig.desiredParticipants,participants:this.participants().length,enemies:this.enemies().filter(p=>p.alive).length}:null,
         economy: this.economy?.ready ? this.economy.preview(p.id) : null,
         mapId: this.arena.id,
         mapName: this.arena.name,
@@ -1566,6 +1573,7 @@ export class AuthRoom {
                reloadDuration: Math.ceil((WEAPONS[p.wid]?.reload || 0) * TICK_HZ),
                spawnProtected: now < (p.invulnerableUntil || 0),
                kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
+        survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),
                abilities: p.abilities, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,
@@ -1593,6 +1601,7 @@ export class AuthRoom {
   _roster() {
     return Array.from(this.players.values()).map((p) => ({
       id: p.id, name: p.name, isBot: p.isBot, kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
+        survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
     }));
   }
 

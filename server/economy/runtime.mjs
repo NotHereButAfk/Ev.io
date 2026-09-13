@@ -197,12 +197,12 @@ export class EconomyRuntime {
   award(
     id,
     kind,
-    { score, wave = this.match?.wave || 1, victim = null, victimIsBot = false } = {},
+    { score, wave = this.match?.wave || 1, victim = null, victimIsBot = false, earnsE = true } = {},
   ) {
     const p = this.participant(id),
       c = this.match?.config || this.config,
       rule = c.actions[kind];
-    if (!p || !rule) return { score: rule?.score || 0, e: "0.0000" };
+    if (!p || !rule) return { score: score ?? rule?.score ?? 0, e: "0.0000" };
     const normalScore = score ?? rule.score;
     if (
       !Number.isSafeInteger(normalScore) ||
@@ -211,7 +211,7 @@ export class EconomyRuntime {
     )
       throw new Error("Invalid server score");
     p.score += normalScore;
-    let allowed = this.allowed(p),
+    let allowed = earnsE && this.allowed(p),
       factor = "1";
     const now = this.clock();
     if (victimIsBot && !c.botEarning && this.mode !== "survival")

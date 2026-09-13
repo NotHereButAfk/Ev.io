@@ -115,7 +115,7 @@ export class AuthClient {
       case 'welcome':
         this.you = m.you;
         this.roster = (m.players || []).map((pl) => ({
-          id: pl.id, name: pl.name, isBot: !!pl.isBot,
+          id: pl.id, name: pl.name, isBot: !!pl.isBot, survivalEnemy: !!pl.survivalEnemy, survivalAlly: !!pl.survivalAlly, damageDealt:pl.damageDealt||0,bossDamage:pl.bossDamage||0,wavesSurvived:pl.wavesSurvived||0,
           kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0, assists: pl.assists || 0,
         }));
         this.arena = m.arena;
@@ -215,7 +215,7 @@ export class AuthClient {
     this.smokes = snap.smokes ?? [];
     this.lootPads = snap.lootPads ?? snap.arena?.lootPads ?? this.lootPads;
     this.roster = snap.players.map((pl) => ({
-      id: pl.id, name: pl.name, isBot: !!pl.isBot,
+      id: pl.id, name: pl.name, isBot: !!pl.isBot, survivalEnemy: !!pl.survivalEnemy, survivalAlly: !!pl.survivalAlly, damageDealt:pl.damageDealt||0,bossDamage:pl.bossDamage||0,wavesSurvived:pl.wavesSurvived||0,
       kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0, assists: pl.assists || 0,
     }));
     // snap predicted state to server truth

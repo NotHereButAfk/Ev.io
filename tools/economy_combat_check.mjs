@@ -29,7 +29,7 @@ room.tick += 101;
 room._damage(victim, b, 200, false);
 assert.equal(a.assists, 1);
 // Server Survival spawns waves, validates melee damage, and suppresses friendly fire.
-const survival = new SurvivalRoom();
+const survival = new SurvivalRoom(undefined,{botConfig:{maximumBots:0}});
 const human = survival.players.get(survival.add(() => {}, "survivor"));
 human.invulnerableUntil = 0;
 survival.nextWaveTick = 0;

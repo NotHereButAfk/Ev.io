@@ -485,6 +485,7 @@ export class HUD {
       const nameTd = document.createElement('td');
       nameTd.className = 'lb-name-cell';
       nameTd.textContent = row.name;
+      if(row.survival){const detail=document.createElement('small');detail.className='sb-survival-stats';detail.textContent=`Damage ${Math.round(row.damageDealt||0)} · Boss ${Math.round(row.bossDamage||0)} · Waves ${row.wavesSurvived||0}`;nameTd.appendChild(detail);}
       if (row.isYou) {
         const badge = document.createElement('span');
         badge.className = 'lb-you-badge';
@@ -571,6 +572,11 @@ export class HUD {
       for (const value of [(r.score || 0).toLocaleString(), r.assists ?? '—', kills, deaths,
         deaths ? (kills / deaths).toFixed(1) : kills.toFixed(1)]) {
         const cell = document.createElement('td'); cell.textContent = value; tr.appendChild(cell);
+      }
+      if(r.survival){
+        const detail=document.createElement('small');detail.className='sb-survival-stats';
+        detail.textContent=`Damage ${Math.round(r.damageDealt||0).toLocaleString()} · Boss ${Math.round(r.bossDamage||0).toLocaleString()} · Waves ${r.wavesSurvived||0}`;
+        nameTd.appendChild(detail);
       }
       tb.appendChild(tr);
     });

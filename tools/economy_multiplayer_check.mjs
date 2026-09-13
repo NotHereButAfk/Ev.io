@@ -25,6 +25,6 @@ try{
  app.room.matchStart=Date.now()-app.room.matchDurationMs;app.room._rotateMatch();await runtime.queue;
  const balance=(await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance;assert.equal(balance,'1.0000');
  await runtime.store.finalize({id:matchId},1);assert.equal((await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance,'1.0000');
- const discovery=await(await fetch(`http://127.0.0.1:${port}/api/matchmake?mode=survival`)).json();assert.equal(discovery.mode,'survival');assert.equal(discovery.capacity,5);
+ const discovery=await(await fetch(`http://127.0.0.1:${port}/api/matchmake?mode=survival`)).json();assert.equal(discovery.mode,'survival');assert.equal(discovery.capacity,10);
  console.log('E multiplayer integration passed: authenticated socket identity, ignored fake kills/currency, real damage reward, leave preservation, round finalization and replay protection');
 }finally{for(const ws of sockets)ws.terminate();await app.close();await db.close();}

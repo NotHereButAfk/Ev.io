@@ -7235,3 +7235,12 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 #e-summary a { color:#a5e9df; }
 .mobile-ui #e-hud { top:max(18vh,60px); left:3vw; right:auto; font-size:11px; padding:4px 8px; }
 .mobile-ui #e-hud small { max-width:160px; }
+
+.sb-survival-stats{display:block;font-size:10px;color:#c8e4ea;white-space:normal;line-height:1.2}
+
+#survival-bot-debug{position:fixed;left:12px;top:80px;max-width:65vw;max-height:45vh;overflow:auto;background:#000c;color:#b8f6d5;padding:10px;font:11px monospace;z-index:9000;pointer-events:none;white-space:pre-wrap}
+
+.sb-panel{max-height:calc(100dvh - 24px);display:flex;flex-direction:column}
+.sb-tabs{flex-shrink:0}
+#sb-leaderboard-view{min-height:0;overflow:auto;pointer-events:auto;overscroll-behavior:contain;touch-action:pan-y}
+.sb-table thead{position:sticky;top:0;z-index:2}

@@ -138,7 +138,7 @@ export class AuthNetBridge {
       game.zombieManager?.clear?.();
       game.serverSim?.stop?.();
       game._netDriven = true;
-      game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
+      game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster.filter(p=>!p.survivalEnemy)), this.client.survival?.capacity||8);
       this._mapReady = Promise.resolve(game._onAuthoritativeMap?.(arena?.id, match, true));
     };
     this.earnings = new EarningsUI(()=>{game.input.mouseDown=false;game.input.rightMouseDown=false;game.mobileControls?.hide();document.exitPointerLock?.();game._openMenu?.();});
@@ -146,6 +146,13 @@ export class AuthNetBridge {
     this.client.onSnapshot = (snapshot) => {
       this.earnings.update(snapshot.economy);
       this.client.survival=snapshot.survival;
+      if(import.meta.env.DEV && snapshot.players?.some(p=>p.botDebug)){
+        this._botDebug ||= Object.assign(document.createElement('pre'),{id:'survival-bot-debug'});
+        if(!this._botDebug.isConnected)document.body.appendChild(this._botDebug);
+        if(!this._debugAt||performance.now()>this._debugAt){this._debugAt=performance.now()+250;
+          this._botDebug.textContent=snapshot.players.filter(p=>p.botDebug).map(p=>`${p.name}: ${p.botDebug.state} | Target ${p.botDebug.target??'none'} | Threat ${Math.round(p.botDebug.threat)} | Range ${p.botDebug.detectionRange}m | Path ${JSON.stringify(p.botDebug.path)}`).join('\n');
+        }
+      }else this._botDebug?.remove();
       if (!this._welcomed || this.ready || this._starting) return;
       this._starting = true;
       this._mapReady.then(async () => {
@@ -369,7 +376,7 @@ export class AuthNetBridge {
     // Count the authoritative roster, not only currently interpolated remote
     // meshes. Bots are full match participants and remain counted while dead,
     // respawning, or waiting for their first render buffer.
-    this.game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
+    this.game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster.filter(p=>!p.survivalEnemy)), this.client.survival?.capacity||8);
     this._drainEvents();
   }
 
@@ -555,6 +562,7 @@ export class AuthNetBridge {
   }
 
   disconnect() {
+    this._botDebug?.remove();
     this.earnings?.dispose();
     this.client.disconnect();
     for (const [, a] of this.remotes) { a.avatar.dispose(); a.nameEl.remove(); }

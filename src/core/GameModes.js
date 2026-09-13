@@ -64,7 +64,7 @@ export const GAME_MODES = [
     name:      'FIREFIGHT',
     icon:      '🧟',
     tag:       'CO-OP',
-    desc:      'PvE co-op defense. Up to 5 Spartans. Survive escalating waves — revive fallen teammates.',
+    desc:      'PvE co-op defense. Fight escalating waves with real players and allied bots filling open seats. Stay alive to keep the squad in the fight.',
     color:     '#44cc22',
     botCount:  0,
     noRespawn: true,
