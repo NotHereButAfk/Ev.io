@@ -1,3 +1,4 @@
+import { WALK_SPEED, SPRINT_MULT, SLIDE_LAUNCH_SPEED } from './MovementConfig.js';
 // ─────────────────────────────────────────────────────────────────────────────
 // MoveSim — deterministic fixed-20 Hz movement/collision core (Phase 3).
 //
@@ -32,8 +33,7 @@ export const TICK_RATE = 20;
 export const DT = 1 / TICK_RATE;
 
 // Movement constants — kept identical to the legacy controller.
-const WALK_SPEED = 9.24;
-const SPRINT_MULT = 2.0;
+
 const JUMP_SPEED = 13.8;
 const GRAVITY = -20;
 const RADIUS = 0.45;
@@ -42,7 +42,7 @@ const CROUCH_H = 1.0;
 const CROUCH_SPEED = 0.55;
 const SLIDE_DURATION = 0.72;
 const SLIDE_MIN_SPEED = WALK_SPEED * 1.25;
-const SLIDE_BOOST = WALK_SPEED * SPRINT_MULT * 1.65;
+const SLIDE_BOOST = SLIDE_LAUNCH_SPEED;
 const COYOTE_TIME = 0.14;
 const STEP_UP = 0.55, GRACE = 0.06;      // platform support (matches World)
 const SNAP_DOWN = 0.12;                  // grounded hysteresis (defect fix)

@@ -23,7 +23,7 @@ redemption, wallet, or payment flow is connected to E.
   legacy local data, not a source of permanent E or earning item entitlement.
 - Authenticated WebSocket identities come from the existing HttpOnly session
   cookie. Neither a display name nor local login state proves E eligibility.
-  Guest temporary earnings are configurable but never enter the permanent ledger.
+  Guests cannot earn E, including with legacy guest-enabled configuration. Signing out stops further earnings immediately; legitimate pending earnings from before sign-out remain eligible for match finalization.
 
 ## Gameplay
 

@@ -76,6 +76,13 @@ const templates = {
   },
 };
 function field(parent, key, value, change) {
+  if (key === "guestEarning") {
+    change(false);
+    const note = document.createElement("p");
+    note.textContent = "E earning requires a registered login. Guests cannot earn E.";
+    parent.appendChild(note);
+    return;
+  }
   if (Array.isArray(value)) {
     const box = document.createElement("fieldset");
     box.appendChild(

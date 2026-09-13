@@ -98,12 +98,13 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
     const token = cookie(req, 'kyx_session');
     if (!token) return null;
     const result = await pool.query(`
-      SELECT u.id, u.username, u.email, u.kills, u.deaths, u.score, u.games, s.token_hash AS "sessionId"
+      SELECT u.id, u.username, u.email, u.kills, u.deaths, u.score, u.games, s.token_hash AS "sessionId", s.expires_at AS "sessionExpiresAt"
       FROM account_sessions s JOIN users u ON u.id=s.user_id
       WHERE s.token_hash=$1 AND s.expires_at > NOW()
     `, [tokenHash(token)]);
     const user = result.rows[0] || null;
     if (user) {
+      const expiry=user.sessionExpiresAt;delete user.sessionExpiresAt;Object.defineProperty(user,'sessionExpiresAt',{value:new Date(expiry).getTime(),enumerable:false});
       const sessionId=user.sessionId;delete user.sessionId;Object.defineProperty(user,'sessionId',{value:sessionId,enumerable:false});
       const owned = await pool.query('SELECT skin_id,skin_kind FROM user_skins WHERE user_id=$1 ORDER BY granted_at', [user.id]);
       user.ownedSkins = owned.rows.map((row) => ({ id: row.skin_id, kind: row.skin_kind }));
@@ -176,7 +177,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
       }
       if (req.method === 'POST' && pathname === '/api/account/logout') {
         const token = cookie(req, 'kyx_session');
-        if (token) await pool.query('DELETE FROM account_sessions WHERE token_hash=$1', [tokenHash(token)]);
+        if (token) { await pool.query('DELETE FROM account_sessions WHERE token_hash=$1', [tokenHash(token)]); handler.onLogout?.(tokenHash(token)); }
         json(res, 200, { ok: true }, { 'Set-Cookie': 'kyx_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0' });
         return true;
       }

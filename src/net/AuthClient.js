@@ -149,7 +149,8 @@ export class AuthClient {
 
   _reconcile(snap) {
     if (!this.sim) return;
-    const before = { x: this.sim.px, y: this.sim.py, z: this.sim.pz };
+    const before = this.localPos(this._presentationAhead || 0);
+    const wasAlive = this.self.alive;
     if (Number.isFinite(snap.tick)) this.lastServerTick = snap.tick;
     const previousMapId = this.mapId;
     const previousMatchStart = this.matchStart;
@@ -160,6 +161,7 @@ export class AuthClient {
     // Keep the round identity too: consuming it before the arena arrives
     // would lose the round-end event on the next complete snapshot.
     if (!canAdoptMap) return;
+    this._previousSim = this.sim;
     this.mapId = requestedMapId;
     this.matchStart = snap.matchStart ?? this.matchStart;
     this.matchDurationMs = snap.matchDurationMs ?? this.matchDurationMs;
@@ -244,16 +246,18 @@ export class AuthClient {
     this.pending = mapChanged ? [] : this.pending.filter((c) => c.seq > snap.ack);
     for (const c of this.pending) this._predict(c.inp);
 
-    const correctionX = before.x - this.sim.px;
-    const correctionY = before.y - this.sim.py;
-    const correctionZ = before.z - this.sim.pz;
+    const rendered = this._interpolatedPosition(this._presentationAhead || 0);
+    const correctionX = before.x - rendered.x;
+    const correctionY = before.y - rendered.y;
+    const correctionZ = before.z - rendered.z;
     const correctionSq = correctionX ** 2 + correctionY ** 2 + correctionZ ** 2;
-    if (mapChanged || correctionSq > TELEPORT_DISTANCE_SQ) {
+    if (mapChanged || wasAlive !== this.self.alive || correctionSq > TELEPORT_DISTANCE_SQ) {
+      this._previousSim = this.sim;
       this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
     } else {
-      this._visualOffset.x += correctionX;
-      this._visualOffset.y += correctionY;
-      this._visualOffset.z += correctionZ;
+      this._visualOffset.x = correctionX;
+      this._visualOffset.y = correctionY;
+      this._visualOffset.z = correctionZ;
       const length = Math.hypot(this._visualOffset.x, this._visualOffset.y, this._visualOffset.z);
       if (length > 1.5) {
         const scale = 1.5 / length;
@@ -306,11 +310,13 @@ export class AuthClient {
 
   _predict(inp) {
     const before = this.sim;
+    this._previousSim = before;
     const active = isSprinting(before, inp);
     const next = step(before, inp, this.simWorld);
     const distance = Math.hypot(next.px - before.px, next.pz - before.pz);
     this.sprinting = active && !inp.teleJust && distance / DT > 6.5 && distance < 2;
     this.sim = this.postStep ? this.postStep(next, before) : next;
+    if(inp.teleJust || Math.hypot(this.sim.px-before.px,this.sim.py-before.py,this.sim.pz-before.pz)>4)this.resetPresentation();
   }
 
   // Feed one client input; predicts locally + ships to the server.
@@ -369,19 +375,22 @@ export class AuthClient {
   }
 
   resetPresentation() {
+    this._previousSim = this.sim;
     this._visualOffset.x = this._visualOffset.y = this._visualOffset.z = 0;
   }
 
+  _interpolatedPosition(ahead = 0) {
+    const current=this.sim, previous=this._previousSim || current;
+    const t=Math.max(0,Math.min(1,ahead/DT));
+    return {x:lerp(previous.px,current.px,t),y:lerp(previous.py,current.py,t),z:lerp(previous.pz,current.pz,t)};
+  }
   localPos(presentationAhead = 0) {
-    const ahead = Math.max(0, Math.min(DT, presentationAhead));
-    return this.sim ? {
-      // Prediction is authoritative at 20 Hz. Fill the render-time gap with a
-      // bounded velocity projection so the camera moves every frame instead
-      // of holding for 50 ms and stepping forward in visible chunks.
-      x: this.sim.px + (this.sim.vx || 0) * ahead + this._visualOffset.x,
-      y: this.sim.py + (this.sim.vy || 0) * ahead + this._visualOffset.y,
-      z: this.sim.pz + (this.sim.vz || 0) * ahead + this._visualOffset.z,
-    } : null;
+    if(!this.sim)return null;
+    this._presentationAhead=presentationAhead;
+    // Render only between collision-checked states. Velocity projection could
+    // overshoot a stop/wall then visibly pull the camera back on the next tick.
+    const p=this._interpolatedPosition(presentationAhead);
+    return {x:p.x+this._visualOffset.x,y:p.y+this._visualOffset.y,z:p.z+this._visualOffset.z};
   }
 
   // Interpolated remote players at render time.

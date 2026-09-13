@@ -320,6 +320,7 @@ assert.equal(
   calculateEarnings(match, { ...player, boosters }, eventConfig).finalE,
   "10.0000",
 );
+assert.equal(calculateEarnings(match,{...player,userId:null},{...config,guestEarning:true}).finalE,"0.0000","legacy config cannot enable guest E");
 await db.close();
 console.log(
   "E economy passed: exact decimals, eligibility, items, waves, caps, guests/private, real SQL migration/idempotency/rollback, ledger purchases/refunds, reconnect and farming tiers",

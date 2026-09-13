@@ -189,7 +189,7 @@ export class EconomyRuntime {
       c.enabled &&
       !!c.modes[this.mode]?.earningEnabled &&
       (!this.privateMatch || c.privateEarning) &&
-      (!!p.userId || c.guestEarning) &&
+      (!!p.userId) &&
       this.clock() - p.lastActivity <= c.afkSeconds * 1000 &&
       this.activePlayers() >= c.modes[this.mode].minimumPlayers
     );
@@ -386,23 +386,6 @@ export class EconomyRuntime {
           this.results.set(key, summary);
           if (this.results.size > 1000)
             this.results.delete(this.results.keys().next().value);
-        } else if (c.guestEarning) {
-          const summary = {
-            ...calculateEarnings(closed, p, c, { final: true }),
-            finalized: true,
-            guest: true,
-            matchId: closed.id,
-          };
-          this.results.set(key, summary);
-          const previous = this.profiles.get(key) || {
-            balance: "0.0000",
-            dailyE: "0.0000",
-            sessionE: "0.0000",
-          };
-          this.profiles.set(key, {
-            ...previous,
-            sessionE: d(u(previous.sessionE) + u(summary.finalE)),
-          });
         }
       }
     });

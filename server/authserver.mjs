@@ -240,8 +240,9 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
       ws.send(JSON.stringify(obj));
     };
 
-    const identityReady = accounts ? Promise.resolve(accounts.ready).then(() => accounts.session(req)).catch(() => null) : Promise.resolve(null);
+    const readIdentity = () => accounts ? Promise.resolve(accounts.ready).then(() => accounts.session(req)).catch(() => null) : Promise.resolve(null);
     ws.on('message', async (raw) => {
+      if (!conn.alive) return;
       conn.lastSeen = Date.now();
       if (raw.length > MAX_MSG_BYTES) { ws.close(1009, 'too big'); return; }
 
@@ -261,10 +262,10 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
         case 'hello':
           if (conn.id != null || conn.joining) return;
           conn.joining = true;
-          const identity = await identityReady;
+          const identity = await readIdentity();
           if (!conn.alive || ws.readyState !== ws.OPEN) return;
           if (identity && [...wss.clients].some(other => other !== ws && other._conn?.userId === identity.id)) { ws.close(1008, 'account already playing'); return; }
-          conn.userId = identity?.id || null;
+          conn.userId = identity?.id || null; conn.sessionId=identity?.sessionId || null; conn.sessionExpiresAt=identity?.sessionExpiresAt || Infinity;
           conn.id = room.add(send, sanitizeName(
             identity?.username || msg.name,
             new Set(Array.from(room.players.values()).map((player) => player.name)),
@@ -314,8 +315,16 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
     ws._send = send;
   });
 
+  if(accounts)accounts.onLogout=sessionId=>{
+    for(const {economy} of rooms.values())for(const [id,c] of economy?.runtime.connections||[])
+      if(c.identity?.sessionId===sessionId)economy.runtime.leave(id);
+    for(const ws of wss.clients)if(ws._conn?.sessionId===sessionId){ws._conn.alive=false;ws.close(1008,'signed out');}
+  };
+
   // fixed-20Hz authoritative loop
-  const loop = setInterval(() => { for(const [kind,{room,economy}]of rooms){if(kind===mode||[...room.players.values()].some(p=>!p.isBot))room.update();economy?.runtime.tick();} }, TICK_MS);
+  const loop = setInterval(() => {
+    for(const ws of wss.clients)if(ws._conn?.alive && ws._conn.sessionExpiresAt <= Date.now())accounts?.onLogout(ws._conn.sessionId);
+    for(const [kind,{room,economy}]of rooms){if(kind===mode||[...room.players.values()].some(p=>!p.isBot))room.update();economy?.runtime.tick();} }, TICK_MS);
 
   // heartbeat / dead-socket reaping
   const hb = setInterval(() => {

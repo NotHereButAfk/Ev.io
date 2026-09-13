@@ -4,6 +4,7 @@
 // runner (tools/movesim_fixtures.mjs) and the browser movement lab.
 
 import { makeInput } from './MoveSim.js';
+import { WALK_SPEED, SPRINT_MULT } from './MovementConfig.js';
 
 const flat = { half: 60, killY: -25, platforms: [], boxes: [], gravLifts: [], teleporters: [] };
 const box = (x0, y0, z0, x1, y1, z1) => ({ min: [x0, y0, z0], max: [x1, y1, z1] });
@@ -197,7 +198,7 @@ export const FIXTURES = [
   },
   {
     id: 'mobility',
-    title: 'Mobility — sprint reaches 18 m/s and jump rises above 4 metres',
+    title: 'Mobility — sprint reaches 12.936 m/s and jump rises above 4 metres',
     world: W({}),
     spawn: [0, 0, 0],
     tape: [
@@ -213,7 +214,7 @@ export const FIXTURES = [
         topSpeed = Math.max(topSpeed, Math.hypot(s.vx, s.vz));
       }
       if (peak < 4) return `jump peak too low (${peak})`;
-      if (topSpeed < 18) return `sprint speed too low (${topSpeed})`;
+      if (Math.abs(topSpeed - WALK_SPEED * SPRINT_MULT) > 1e-6) return `sprint speed too low (${topSpeed})`;
       const last = states[states.length - 1];
       if (!last.onGround || last.py !== 0) return 'did not land after mobility check';
       return null;

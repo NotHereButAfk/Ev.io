@@ -38,11 +38,32 @@ ok('local correction smoothing is frame-rate independent',
 smoothClient.sim.vx = 8;
 smoothClient.sim.vy = 0;
 smoothClient.sim.vz = -4;
+smoothClient._previousSim={px:9.6,py:2,pz:-3.8};
 const betweenTicks = smoothClient.localPos(0.025);
 ok('local camera fills the render gap between 20Hz prediction ticks',
-  Math.abs(betweenTicks.x - (smoothClient.sim.px + 0.2 + smoothClient._visualOffset.x)) < 1e-9
-  && Math.abs(betweenTicks.z - (smoothClient.sim.pz - 0.1 + smoothClient._visualOffset.z)) < 1e-9);
+  Math.abs(betweenTicks.x - (smoothClient.sim.px - 0.2 + smoothClient._visualOffset.x)) < 1e-9
+  && Math.abs(betweenTicks.z - (smoothClient.sim.pz + 0.1 + smoothClient._visualOffset.z)) < 1e-9);
 
+smoothClient.resetPresentation();
+const stopped=smoothClient.localPos(0.049);
+ok('stopped camera never extrapolates beyond the collision-checked position',stopped.x===smoothClient.sim.px&&stopped.z===smoothClient.sim.pz);
+// Render a moving/stopping sequence at 120 Hz. Reaching a wall must never
+// overshoot and pull the camera backwards at the next prediction boundary.
+let lastCamera = -Infinity;
+let monotonic = true;
+smoothClient._visualOffset = { x: 0, y: 0, z: 0 };
+for (let tick=0; tick<8; tick++) {
+  const previous = Math.min(tick * 0.4, 1.2);
+  const current = Math.min((tick+1) * 0.4, 1.2);
+  smoothClient._previousSim = {px:previous,py:0,pz:0};
+  smoothClient.sim = {...smoothClient.sim,px:current,py:0,pz:0,vx:8};
+  for (let frame=0; frame<6; frame++) {
+    const x=smoothClient.localPos(frame/120).x;
+    monotonic &&= x >= lastCamera - 1e-9 && x <= 1.2 + 1e-9;
+    lastCamera=x;
+  }
+}
+ok('camera advances monotonically and settles at a wall without overshoot',monotonic);
 const safe = chooseSafeSpawn([[0, 0, 0], [12, 0, 0], [48, 0, 0]], [[1, 0, 0]], 0);
 ok('spawn selection avoids occupied combat space', safe[0] === 48);
 const authoredSpawns = [

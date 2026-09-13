@@ -199,18 +199,18 @@ assert.throws(() => survivalBotConfig({ accuracy: 1 }));
 // Only real connections enter the E journal; optional friendly fire cannot generate E.
 let clock = Date.now();
 const e = new EconomyRuntime(
-  { checkpoint: async () => {}, flag: async () => {} },
+  { checkpoint: async () => {}, flag: async () => {},earningItems:async()=>[],reserveBoosters:async()=>[],profile:async()=>({balance:"0",sessionE:"0",dailyE:"0"}) },
   { mode: "survival", clock: () => clock },
 );
 e.config = structuredClone(DEFAULT_ECONOMY);
-e.config.guestEarning = true;
+
 e.config.modes.survival.minimumPlayers = 1;
 e.ready = true;
 e.begin();
 const er = room({ desiredParticipants: 2, survivalFriendlyBots: false }),
   eh = er.players.get(er.add(() => {}, "real"));
 er.economy = e;
-await e.join(eh.id, null, () => {});
+await e.join(eh.id, {id: "1", sessionId: "test"}, () => {});
 clock += 60000;
 e.activity(eh.id, true, 1000);
 const eb = er.participants().find((p) => p.isBot);

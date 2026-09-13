@@ -82,7 +82,7 @@ export function calculateEarnings(
     (match.private && !config.privateEarning)
   )
     return { ...result, reason: "Earning disabled in this match" };
-  if (!player.userId && !config.guestEarning)
+  if (!player.userId)
     return { ...result, reason: "Sign in to earn E" };
   let eligible = 0n,
     base = 0n,

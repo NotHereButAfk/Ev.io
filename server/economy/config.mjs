@@ -229,5 +229,6 @@ export function validateConfig(c) {
     if (!Array.isArray(b.modes) || b.modes.some((m) => !c.modes[m]))
       throw new Error("Invalid boss modes");
   }
+  if(c.guestEarning) throw new Error("E earning requires a registered login; guest earning cannot be enabled");
   return structuredClone(c);
 }

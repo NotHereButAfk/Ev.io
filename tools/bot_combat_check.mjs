@@ -239,6 +239,9 @@ human.invulnerableUntil = bot.invulnerableUntil = rival.invulnerableUntil = 0;
 for (let i = 0; i < TICK_HZ * 2; i++) aiRoom.update();
 assert.equal(human.health, 100, 'authoritative bot attacked a neutral player');
 assert.equal(bot._botState, BOT_STATES.ROAM);
+// Test visible retaliation independently of how far the patrol moved.
+Object.assign(bot.state, { px: 0, py: 0, pz: 0 });
+bot._botAimYaw = 0;
 aiRoom._damage(bot, human, 1, false);
 assert.equal(bot._botTargetId, human.id, 'damage did not immediately select the attacker');
 assert.equal(bot._botState, BOT_STATES.REACT);

@@ -10,3 +10,8 @@ export const PLAYER_SPRINT_SECONDS = ((STAMINA_MAX - 2) / 28) + 7;
 export const STAMINA_DRAIN = ((STAMINA_MAX - 2) / PLAYER_SPRINT_SECONDS) + 1e-4;
 export const STAMINA_REGEN = 14;
 export const STAMINA_REGEN_DELAY = 1.2;
+
+// Sprint reduced by 30%; shared by offline control, prediction and authority.
+export const WALK_SPEED = 9.24;
+export const SPRINT_MULT = 1.4;
+export const SLIDE_LAUNCH_SPEED = 9.24 * 2 * 1.65;
