@@ -1503,7 +1503,7 @@ export class Game {
     const TIPS = [
       'TIP: press Q to blink-teleport forward',
       'TIP: hold TAB to check the scoreboard mid-match',
-      'TIP: G throws a frag grenade, F throws smoke',
+      'TIP: G smoke, U frag, V plant bomb, E knockback blast',
       'TIP: headshots deal bonus damage — aim high',
       'TIP: grav-lifts by the plaza launch you onto the rooftops',
       'TIP: rarer skins earn more coins per kill',
@@ -1802,7 +1802,7 @@ export class Game {
     // Match the authoritative room's clean-life ability contract without
     // deleting smoke/explosion presentation that is still active in the map.
     this.grenadeSystem.refillInventory?.();
-    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns);
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns, this._authNet?.client?.self?.abilities);
     this._respawnRemaining = 0;
     this._respawnDeadline = 0;
     this._resetDeathAnimation();
@@ -2048,7 +2048,11 @@ export class Game {
       const auth = this._authNet?.ready ? this._authNet.client : null;
       const serverCharges = auth?.self?.abilities?.[throwable];
       const canThrow = !auth || ((serverCharges ?? 0) > 0 && (auth.self.abilityCooldowns?.[throwable] ?? 0) <= 0);
-      if (canThrow) {
+      if (canThrow && ['timebomb','impulse'].includes(throwable)) {
+        if (auth) {
+          if(throwable !== 'timebomb' || this.player.onGround){auth.sendAbility(throwable,this.player.yaw,this.player.pitch);this._throwAnim();}
+        } else this.hud.addKillFeed('Bomb and blast require a multiplayer match');
+      } else if (canThrow) {
         const field = throwable === 'frag' ? 'frags' : 'smokes';
         const had = this.grenadeSystem[field];
         if (throwable === 'frag') this.grenadeSystem.throwFrag(this.player.camera);
@@ -2062,7 +2066,7 @@ export class Game {
     this.grenadeSystem.update(dt, this.player, this.world);
 
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
-    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns);
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns, this._authNet?.client?.self?.abilities);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
 
     // Enemy nameplates (name + health bar) over living opponents.

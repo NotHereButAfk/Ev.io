@@ -123,6 +123,7 @@ const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 //   smoke:   a vision volume that blocks hitscan for its lifetime
 //   impulse: radial knockback velocity (clamped so it can't launch to infinity)
 const ABILITIES = {
+  timebomb: { cd: 15, charges: 1, throwRange: 0, radius: 6.5, damage: 80, fuseSec: 3 },
   frag:    { cd: 15.0, charges: 2, throwRange: 24, radius: 6.5, damage: 80, fuseSec: 2.5 },
   flash:   { cd: 15.0, charges: 2, throwRange: 24, radius: 8,  blindSec: 2.2 },
   smoke:   { cd: 15.0, charges: 2, throwRange: 22, radius: 5,  lifeSec: 8 },
@@ -366,7 +367,7 @@ export class AuthRoom {
       player.abilities = {
         frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges,
         smoke: ABILITIES.smoke.charges,
-        impulse: ABILITIES.impulse.charges,
+        timebomb: ABILITIES.timebomb.charges, impulse: ABILITIES.impulse.charges,
       };
       player.abilityCD = 0; player.abilityCooldowns = {};
       if (player.isBot) this._resetBotAI(player);
@@ -439,7 +440,7 @@ export class AuthRoom {
       history: [],               // [{tick, x,y,z,eye,crouch,slide}]
       lastFireSeq: 0, lastFireRequestTick: -Infinity, lastPickupSeq: 0,
       abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
-                   impulse: ABILITIES.impulse.charges },
+                   timebomb: ABILITIES.timebomb.charges, impulse: ABILITIES.impulse.charges },
       abilityCooldowns: {}, abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
     };
     this.players.set(id, p);
@@ -1264,10 +1265,12 @@ export class AuthRoom {
     const dx = -Math.sin(yaw) * cp, dy = sp, dz = -Math.cos(yaw) * cp;
     const hitT = rayVsBoxes(this.simWorld, ox, oy, oz, dx, dy, dz, A.throwRange);
     const dist = Math.min(hitT, A.throwRange);
-    const bx = ox + dx * dist, by = Math.max(0, oy + dy * dist), bz = oz + dz * dist;
+    let bx = ox + dx * dist, by = Math.max(0, oy + dy * dist), bz = oz + dz * dist;
+    if (kind === 'impulse') { bx=ox; by=p.state.py+.9; bz=oz; }
+    if (kind === 'timebomb') { bx=ox; by=p.state.py+.08; bz=oz; }
 
-    if (kind === 'frag') {
-      this.frags.push({ by: p.id, x: bx, y: by, z: bz,
+    if (kind === 'frag' || kind === 'timebomb') {
+      this.frags.push({ kind, id: `${p.id}:${this.tick}`, by: p.id, x: bx, y: by, z: bz,
                         until: this.tick + Math.round(A.fuseSec * TICK_HZ) });
     } else if (kind === 'smoke') {
       this.smokes.push({ x: bx, y: by, z: bz, r: A.radius, until: this.tick + Math.round(A.lifeSec * TICK_HZ) });
@@ -1286,10 +1289,11 @@ export class AuthRoom {
       }
     } else if (kind === 'impulse') {
       for (const t of this.players.values()) {
-        if (!t.alive) continue;
+        if (!t.alive || t === p) continue;
         const tx = t.state.px - bx, ty = (t.state.py + 0.9) - by, tz = t.state.pz - bz;
         const d = Math.hypot(tx, ty, tz);
         if (d > A.radius) continue;
+        if (d > 0 && rayVsBoxes(this.simWorld,bx,by,bz,tx/d,ty/d,tz/d,d) < d-.1) continue;
         const f = A.power * (1 - d / A.radius) / (d || 1e-6);
         // clamp every component so knockback can never launch to infinity
         t.state.vx = clamp(t.state.vx + tx * f, -IMPULSE_MAX, IMPULSE_MAX);
@@ -1304,7 +1308,7 @@ export class AuthRoom {
   _explodeFrag(frag) {
     const shooter = this.players.get(frag.by);
     if (!shooter) return;
-    const A = ABILITIES.frag;
+    const A = ABILITIES[frag.kind || 'frag'];
     for (const target of this.players.values()) {
       if (!target.alive) continue;
       const tx = target.state.px - frag.x;
@@ -1321,7 +1325,7 @@ export class AuthRoom {
       const falloff = 1 - 0.9 * clamp(distance / A.radius, 0, 1);
       this._damage(target, shooter, A.damage * falloff, false);
     }
-    this.events.push({ e: 'explosion', kind: 'frag', by: shooter.id,
+    this.events.push({ e: 'explosion', kind: frag.kind || 'frag', by: shooter.id,
                        x: frag.x, y: frag.y, z: frag.z, r: A.radius });
   }
 
@@ -1380,7 +1384,7 @@ export class AuthRoom {
           p.gunBloom = 0;
           p.blindUntil = 0; p.abilityCooldowns = {}; p.abilityCD = 0;
           p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
-                          impulse: ABILITIES.impulse.charges };
+                          timebomb: ABILITIES.timebomb.charges, impulse: ABILITIES.impulse.charges };
           if (p.isBot) this._resetBotAI(p);
           if(p.survivalAlly)this.allyAI?.reset(p);
           this.events.push({ e: 'respawn', id: p.id, x: s[0], y: s[1], z: s[2] });
@@ -1504,6 +1508,7 @@ export class AuthRoom {
       if (!p.abilityReq || !p.alive) { p.abilityReq = null; continue; }
       const req = p.abilityReq; p.abilityReq = null;
       const A = ABILITIES[req.kind];
+      if(req.kind === 'timebomb' && !p.state.onGround) continue;
       if (!A || (p.abilityCooldowns?.[req.kind] || 0) > 0 || p.abilities[req.kind] <= 0) continue;   // authority: cd + charges
       p.abilities[req.kind]--;
       p.abilityCD = A.cd;
@@ -1584,6 +1589,7 @@ export class AuthRoom {
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),
                abilities: p.abilities, abilityCooldowns: p.abilityCooldowns, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,
+        bombs: this.frags.filter(f=>f.kind==='timebomb').map(f=>({id:f.id,x:f.x,y:f.y,z:f.z,remaining:Math.max(0,(f.until-this.tick)/TICK_HZ)})),
         smokes: smokeList,
         lootPads: this._lootPadPayload(),
         events: this.events,

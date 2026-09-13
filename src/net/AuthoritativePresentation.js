@@ -7,7 +7,7 @@ export function applyAuthoritativeResources(player, client, grenades) {
   player.teleportCooldown = client.sim?.teleCD ?? player.teleportCooldown;
   player.stamina = client.sim?.stamina ?? player.stamina;
   if (grenades && client.self.abilities) {
-    grenades.cooldowns = {frag: client.self.abilityCooldowns?.frag || 0, smoke: client.self.abilityCooldowns?.smoke || 0};
+    grenades.cooldowns = {timebomb: client.self.abilityCooldowns?.timebomb || 0, impulse: client.self.abilityCooldowns?.impulse || 0, frag: client.self.abilityCooldowns?.frag || 0, smoke: client.self.abilityCooldowns?.smoke || 0};
     grenades.frags = client.self.abilities.frag ?? grenades.frags;
     grenades.smokes = client.self.abilities.smoke ?? grenades.smokes;
   }

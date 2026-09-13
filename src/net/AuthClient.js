@@ -215,6 +215,7 @@ export class AuthClient {
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
                   abilities: y.abilities ?? this.self.abilities, abilityCooldowns: y.abilityCooldowns ?? {}, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
+    this.bombs = snap.bombs ?? [];
     this.lootPads = snap.lootPads ?? snap.arena?.lootPads ?? this.lootPads;
     this.roster = snap.players.map((pl) => ({
       id: pl.id, name: pl.name, isBot: !!pl.isBot, survivalEnemy: !!pl.survivalEnemy, survivalAlly: !!pl.survivalAlly, damageDealt:pl.damageDealt||0,bossDamage:pl.bossDamage||0,wavesSurvived:pl.wavesSurvived||0,

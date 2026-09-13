@@ -17,6 +17,8 @@ export class GrenadeSystem {
     this.cooldowns = {frag: 0, smoke: 0};
     this.frags       = 2;
     this.smokes      = 2;
+    this.bombMeshes = new Map();
+    this.impulseWaves = [];
     this.throwables  = [];
     this.smokeClouds = [];
     this.explosions  = [];
@@ -106,6 +108,11 @@ export class GrenadeSystem {
   }
 
   update(dt, player, world = null) {
+    for(let i=this.impulseWaves.length-1;i>=0;i--){
+      const wave=this.impulseWaves[i];wave.age+=dt;wave.mesh.scale.setScalar(.1+wave.age*12);
+      wave.mesh.material.opacity=Math.max(0,1-wave.age/.5);
+      if(wave.age>=.5){this.scene.remove(wave.mesh);wave.mesh.geometry.dispose();wave.mesh.material.dispose();this.impulseWaves.splice(i,1);}
+    }
     for (const kind of ['frag','smoke']) {
       const before=this.cooldowns[kind];
       this.cooldowns[kind]=Math.max(0,before-dt);
@@ -249,6 +256,19 @@ export class GrenadeSystem {
     this._smokeExplode(point);
   }
 
+  syncBombs(bombs) {
+    const ids=new Set(bombs.map(b=>b.id));
+    for(const [id,mesh] of this.bombMeshes)if(!ids.has(id)){this.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();this.bombMeshes.delete(id);}
+    for(const bomb of bombs){
+      let mesh=this.bombMeshes.get(bomb.id);
+      if(!mesh){mesh=new THREE.Mesh(new THREE.CylinderGeometry(.24,.28,.10,16),new THREE.MeshStandardMaterial({color:0x173847,emissive:0x00bbee,emissiveIntensity:1}));this.bombMeshes.set(bomb.id,mesh);this.scene.add(mesh);}
+      mesh.position.set(bomb.x,bomb.y,bomb.z);mesh.material.emissiveIntensity=.6+(Math.sin(bomb.remaining*18)+1)*1.1;
+    }
+  }
+  showImpulse(point) {
+    const mesh=new THREE.Mesh(new THREE.RingGeometry(.85,1,48),new THREE.MeshBasicMaterial({color:0x00ddff,transparent:true,opacity:1,side:THREE.DoubleSide,depthWrite:false}));
+    mesh.rotation.x=-Math.PI/2;mesh.position.copy(point);this.scene.add(mesh);this.impulseWaves.push({mesh,age:0});
+  }
   getHudInfo() {
     return { frags: this.frags, smokes: this.smokes };
   }
@@ -260,6 +280,8 @@ export class GrenadeSystem {
   }
 
   reset() {
+    this.syncBombs([]);
+    for(const w of this.impulseWaves){this.scene.remove(w.mesh);w.mesh.geometry.dispose();w.mesh.material.dispose();}this.impulseWaves=[];
     for (const t of this.throwables) {
       this.scene.remove(t.mesh);
       t.mesh.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });

@@ -295,6 +295,7 @@ export class AuthNetBridge {
     // Movement prediction and the HUD now consume the same authoritative
     // stamina/inventory snapshot, so sprint drain and grenade counts agree.
     applyAuthoritativeResources(p, c, this.game.grenadeSystem);
+    this.game.grenadeSystem?.syncBombs(c.bombs || []);
     this.game.kills = c.self.kills ?? this.game.kills;
     this.game.deaths = c.self.deaths ?? this.game.deaths;
     this.game.score = c.self.score ?? this.game.score;
@@ -537,7 +538,10 @@ export class AuthNetBridge {
       else if (e.e === 'ability' && e.kind === 'smoke') {
         this.game.grenadeSystem?.showAuthoritativeSmoke?.(new THREE.Vector3(e.x, e.y, e.z));
       }
-      else if (e.e === 'explosion' && e.kind === 'frag') {
+      else if (e.e === 'ability' && e.kind === 'impulse') {
+        this.game.grenadeSystem?.showImpulse(new THREE.Vector3(e.x,e.y,e.z));
+      }
+      else if (e.e === 'explosion' && ['frag','timebomb'].includes(e.kind)) {
         this.game.grenadeSystem?.showAuthoritativeExplosion?.(new THREE.Vector3(e.x, e.y, e.z));
       }
       else if (e.e === 'shot' && e.by !== me) {

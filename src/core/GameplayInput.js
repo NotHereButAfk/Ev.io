@@ -6,9 +6,12 @@ export function sprintRequested(input, forwardAmount) {
     || (input.isMobile && forwardAmount > 0);
 }
 
-// HUD and gameplay share one throwable contract: G is frag, F is smoke.
+// Five-slot reference layout: Q blink, G smoke, U frag, V planted bomb, E blast.
 export function consumeThrowable(input) {
-  if (input.consumeJustPressed('KeyG')) return 'frag';
+  if (input.consumeJustPressed('KeyU')) return 'frag';
+  if (input.consumeJustPressed('KeyV')) return 'timebomb';
+  if (input.consumeJustPressed('KeyE')) return 'impulse';
+  if (input.consumeJustPressed('KeyG')) return 'smoke';
   if (input.consumeJustPressed('KeyF')) return 'smoke';
   return null;
 }

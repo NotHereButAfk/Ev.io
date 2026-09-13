@@ -90,6 +90,14 @@ try {
   return {same,oldHidden:document.getElementById('leaderboard-overlay').classList.contains('hidden'),blink:document.getElementById('ability-q').style.getPropertyValue('--ready'),frag:document.getElementById('frag-count').closest('.grenade-slot').style.getPropertyValue('--ready'),smoke:document.getElementById('smoke-count').closest('.grenade-slot').style.getPropertyValue('--ready')};
  });
  assert.deepEqual(unified,{same:true,oldHidden:true,blink:'50%',frag:'50%',smoke:'0%'});
+ const economyHud=await page.evaluate(async()=>{
+  const {EarningsUI}=await import('/src/ui/EarningsUI.js');const ui=new EarningsUI();
+  ui.update({guest:true});const guestHidden=ui.el.classList.contains('hidden');
+  ui.update({guest:false,balance:'4695.0000',finalE:'3.0000',sessionE:'0',dailyE:'3',dailyCap:null,itemMultiplier:'1',modeMultiplier:'2',eventMultiplier:'1',survivalMultiplier:'1'});
+  const result={guestHidden,visible:!ui.el.classList.contains('hidden'),rate:ui.el.querySelector('[data-e="rate"]').textContent,balance:ui.el.querySelector('[data-e="balance"]').textContent,keys:[...document.querySelectorAll('#grenade-wrap .grenade-label')].map(e=>e.textContent)};
+  ui.dispose();return result;
+ });
+ assert.deepEqual(economyHud,{guestHidden:true,visible:true,rate:'2x',balance:'4,695.00',keys:['G','U','V','E']});
  assert.deepEqual(errors,[]);
  console.log('Match UI passed: both map images, responsive scoreboard, real stats, escaped names, portraits and working tabs');
 }finally{await browser?.close();await server.close();}

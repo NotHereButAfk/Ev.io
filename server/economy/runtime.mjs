@@ -318,6 +318,7 @@ export class EconomyRuntime {
       matchId: this.match.id,
       pending: true,
       guest: !p.userId,
+      ePer100Score: this.match.config.E_PER_100_SCORE,
       ...(this.failed ? { reason: "E temporarily unavailable" } : {}),
       lastSummary: this.results.get(c.key) || null,
     };

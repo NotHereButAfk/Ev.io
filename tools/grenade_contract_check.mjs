@@ -10,9 +10,9 @@ import { getWeapon } from '../src/weapons/weaponDefs.js';
 const inputFor = (pressed) => ({
   consumeJustPressed(code) { return code === pressed; },
 });
-assert.equal(consumeThrowable(inputFor('KeyG')), 'frag', 'G is not wired to frag');
+assert.equal(consumeThrowable(inputFor('KeyU')), 'frag', 'U is not wired to frag');
 assert.equal(consumeThrowable(inputFor('KeyF')), 'smoke', 'F is not wired to smoke');
-assert.equal(consumeThrowable(inputFor('KeyE')), null, 'stale E smoke binding survived');
+assert.equal(consumeThrowable(inputFor('KeyE')), 'impulse', 'E must trigger knockback');
 
 const system = new GrenadeSystem(new THREE.Scene());
 let routedDamage = 0;
@@ -68,5 +68,5 @@ applyAuthoritativeResources(presentationPlayer, {
   self: { shield: 19, abilityCooldowns: {frag: 7.5, smoke: 0}, abilities: { frag: 1, smoke: 2 } },
 }, inventory);
 assert.deepEqual(presentationPlayer, { shield: 19, stamina: 37, teleportCooldown: 8 }, 'authoritative stamina did not reach HUD player');
-assert.deepEqual(inventory, { frags: 1, smokes: 2, cooldowns: {frag: 7.5, smoke: 0} }, 'authoritative grenade inventory did not reach HUD');
+assert.deepEqual(inventory, { frags: 1, smokes: 2, cooldowns: {timebomb: 0, impulse: 0, frag: 7.5, smoke: 0} }, 'authoritative grenade inventory did not reach HUD');
 console.log('grenade contract passed: swept map collision, larger layered blasts, damage flow, stamina and inventory all replicate');

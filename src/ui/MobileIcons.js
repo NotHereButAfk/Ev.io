@@ -1,5 +1,7 @@
 // Inline pictograms stay sharp on high-density phones and require no image fetch.
 const paths = {
+  timebomb: '<circle cx="32" cy="36" r="19"/><path d="M25 17V8h14v9M32 23v14l9 5"/>',
+  impulse: '<circle cx="32" cy="32" r="10"/><path d="M32 2v14M32 48v14M2 32h14M48 32h14M10 10l10 10M44 44l10 10M10 54l10-10M44 20l10-10"/>',
   abilities: '<circle cx="32" cy="32" r="24" stroke-width="7"/><path d="M32 54V25m-12 11 12-13 12 13" stroke-width="8"/>',
   profile: '<circle cx="32" cy="32" r="27"/><circle cx="32" cy="24" r="11"/><path d="M11 50c2-20 40-20 42 0"/>',
   settings: '<path d="m26 5 12 0 2 9 7 4 9-2 6 10-7 6v8l7 6-6 10-9-2-7 4-2 9H26l-2-9-7-4-9 2-6-10 7-6v-8l-7-6 6-10 9 2 7-4z" transform="translate(4 -2) scale(.88)" fill="currentColor"/><circle cx="32" cy="30" r="12" fill="#080808" stroke="#080808"/>',

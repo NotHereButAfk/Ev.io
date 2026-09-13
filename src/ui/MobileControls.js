@@ -15,7 +15,7 @@ export class MobileControls {
       ${button('reload', 'Reload')}${button('aim', 'Aim down sights')}
       ${button('grenade', 'Throw frag grenade')}${button('fire', 'Fire')}
       ${button('swap', 'Switch weapon')}${button('slide', 'Crouch or slide')}
-      ${button('jump', 'Jump')}${button('ability', 'Use ability')}</div>`;
+      ${button('timebomb', 'Plant time bomb (V)')}${button('impulse', 'Knockback blast (E)')}${button('jump', 'Jump')}${button('ability', 'Use ability')}</div>`;
     document.body.appendChild(this._el);
     this._joyInner = this._el.querySelector('#joy-inner');
     for (const [event, handler] of [['touchstart', '_onStart'], ['touchmove', '_onMove'], ['touchend', '_onEnd'], ['touchcancel', '_onEnd']]) {
@@ -58,7 +58,9 @@ export class MobileControls {
         case 'jump': inp.justPressed.add('Space'); break;
         case 'swap': inp.wheelDelta += 1; break;
         case 'reload': inp.justPressed.add('KeyR'); break;
-        case 'grenade': inp.justPressed.add('KeyG'); break;
+        case 'grenade': inp.justPressed.add('KeyU'); break;
+        case 'timebomb': inp.justPressed.add('KeyV'); break;
+        case 'impulse': inp.justPressed.add('KeyE'); break;
         case 'ability': inp.justPressed.add('KeyQ'); break;
         case 'menu': this.onMenu?.(); break;
       }

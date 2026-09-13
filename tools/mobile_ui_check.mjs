@@ -56,7 +56,7 @@ try {
  await page.waitForFunction(()=>!touchProbe.input.keys.has('KeyW')&&touchProbe.input.keys.has('KeyC')&&touchProbe.input.mouseDown);
  await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});points.clear();
  assert(await page.evaluate(()=>!touchProbe.input.keys.size&&!touchProbe.input.mouseDown&&!touchProbe.input.rightMouseDown));
- for(const [role,key]of [['grenade','KeyG'],['reload','KeyR'],['jump','Space'],['ability','KeyQ']]){
+ for(const [role,key]of [['grenade','KeyU'],['timebomb','KeyV'],['impulse','KeyE'],['reload','KeyR'],['jump','Space'],['ability','KeyQ']]){
   await page.locator(`.mbtn-${role}`).tap();assert(await page.evaluate(k=>touchProbe.input.justPressed.has(k),key));
  }
  for(const viewport of [{width:390,height:844},{width:844,height:390},{width:667,height:375}]){

@@ -7304,3 +7304,20 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 #hud .grenade-icon { position: absolute; left: 7px; top: 2px; }
 
 #sb-next-match { padding: 8px 12px; background: #17212ac9; color: white; font-size: 13px; text-align: center; }
+
+/* Logged-in reference HUD. Detailed earnings remain in the account page. */
+#e-hud { top: 8px; right: 8px; min-width: 210px; padding: 10px 12px; background: #100913bf; font-size: 16px; }
+#e-hud .e-rate-row, #e-hud .e-balance-row { display: flex; gap: 8px; align-items: center; }
+#e-hud [data-e="rate"], #e-hud [data-e="balance"] { margin-left: auto; }
+#e-hud [data-e="rate"] { color: #fff6a0; }
+#e-hud .e-match-gain { color: #85ff00; font-size: 12px; }
+#e-hud .e-details { display: none; }
+#e-hud [data-e="status"]:not([hidden]) { display: block; color: #fff6a0; font-size: 11px; }
+#e-hud:has([data-e="status"]:not(:empty)) { border: 0; }
+#hud #score-wrap { display: none !important; }
+#hud #grenade-wrap .grenade-slot { border-bottom-color: #00c9ed; }
+#hud #grenade-wrap .grenade-slot:has(.frag-icon) { border-bottom-color: #78df11; }
+#hud #timebomb-count, #hud #impulse-count { position: absolute; top: 0; left: 3px; font-size: 12px; }
+.mobile-ui #e-hud { top: 8px; left: auto; right: 8px; min-width: 160px; font-size: 12px; }
+.mobile-ui .mbtn-timebomb { left: 0; top: 0; width: var(--action-size); height: var(--action-size); }
+.mobile-ui .mbtn-impulse { left: 23%; top: 0; width: var(--action-size); height: var(--action-size); }

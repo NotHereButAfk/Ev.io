@@ -306,8 +306,9 @@ export class HUD {
     setText(this.scoreCount, score);
   }
 
-  updateGrenades(frags, smokes, cooldowns = {}) {
-    for(const [counter,kind] of [[this.fragCount,'frag'],[this.smokeCount,'smoke']]) {
+  updateGrenades(frags, smokes, cooldowns = {}, charges = {}) {
+    for(const [counter,kind] of [[this.fragCount,'frag'],[this.smokeCount,'smoke'],[document.getElementById('timebomb-count'),'timebomb'],[document.getElementById('impulse-count'),'impulse']]) {
+      if(counter && ['timebomb','impulse'].includes(kind))setText(counter,charges?.[kind] ?? 1);
       const tile=counter?.closest('.grenade-slot');
       if(tile)tile.style.setProperty('--ready', `${Math.max(0,Math.min(1,1-(cooldowns[kind]||0)/15))*100}%`);
     }
