@@ -98,12 +98,13 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
     const token = cookie(req, 'kyx_session');
     if (!token) return null;
     const result = await pool.query(`
-      SELECT u.id, u.username, u.email, u.kills, u.deaths, u.score, u.games
+      SELECT u.id, u.username, u.email, u.kills, u.deaths, u.score, u.games, s.token_hash AS "sessionId"
       FROM account_sessions s JOIN users u ON u.id=s.user_id
       WHERE s.token_hash=$1 AND s.expires_at > NOW()
     `, [tokenHash(token)]);
     const user = result.rows[0] || null;
     if (user) {
+      const sessionId=user.sessionId;delete user.sessionId;Object.defineProperty(user,'sessionId',{value:sessionId,enumerable:false});
       const owned = await pool.query('SELECT skin_id,skin_kind FROM user_skins WHERE user_id=$1 ORDER BY granted_at', [user.id]);
       user.ownedSkins = owned.rows.map((row) => ({ id: row.skin_id, kind: row.skin_kind }));
     }
@@ -187,6 +188,7 @@ export function createAccountService(databaseUrl = process.env.ACCOUNT_DATABASE_
       return true;
     }
   };
+  handler.ready = initialized;
   handler.pool = pool;
   handler.session = session;
   return handler;

@@ -574,7 +574,7 @@ export class HUD {
       }
       tb.appendChild(tr);
     });
-    setText(document.getElementById('sb-earned'), Math.floor(stats.earnedCoins || 0).toLocaleString());
+    setText(document.getElementById('sb-earned'), Number(stats.earnedCoins || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
     setText(document.getElementById('sb-spectators'), `Spectators: ${stats.spectators?.join(', ') || '—'}`);
     const performance = document.getElementById('sb-performance');
     if (performance) {

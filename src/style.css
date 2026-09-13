@@ -7225,3 +7225,13 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 .mobile-ui #hud #stamina-text { font-size: 11px !important; }
 .mobile-ui #hud #weapon-wrap { right: max(3vw, env(safe-area-inset-right)) !important; bottom: 4px !important; }
 .mobile-ui #hud #ammo-text { font-size: 20px !important; line-height: 22px; }
+#e-hud { position: fixed; top: 72px; right: 18px; z-index: 70; padding: 10px 14px; background: #10151ccc; color: white; font: 16px 'Match Rajdhani',sans-serif; pointer-events: none; }
+#e-hud small { display:block; max-width:220px; color:#ccd1d9; }
+#e-toast { color:#d6ff83; font-size:22px; }
+#e-summary { width: min(470px,90vw); border:1px solid #526470; padding:24px; background:#10151cf5; color:white; font-family:'Match Rajdhani',sans-serif; }
+#e-summary::backdrop { background:#0008; }
+.e-summary-rows>div { display:flex; justify-content:space-between; gap:24px; padding:6px 0; }
+#e-summary button { margin:20px 20px 0 0; padding:10px 24px; background:#08bd99; border:0; color:white; }
+#e-summary a { color:#a5e9df; }
+.mobile-ui #e-hud { top:max(18vh,60px); left:3vw; right:auto; font-size:11px; padding:4px 8px; }
+.mobile-ui #e-hud small { max-width:160px; }

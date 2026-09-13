@@ -4,7 +4,9 @@ export function matchmakingUrlFor(wsUrl, baseUrl = globalThis.location?.href) {
   const url = new URL(wsUrl, baseUrl);
   url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
   url.pathname = '/api/matchmake';
+  const mode=url.searchParams.get('mode');
   url.search = '';
+  if(mode)url.searchParams.set('mode',mode);
   url.hash = '';
   return url.href;
 }

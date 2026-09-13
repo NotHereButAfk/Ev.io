@@ -1,3 +1,7 @@
+import { TeamRoom } from './teamroom.mjs';
+import { SurvivalRoom } from './survivalroom.mjs';
+import { createEconomyService } from './economy/service.mjs';
+import { createHash } from 'node:crypto';
 // Authoritative game server host (Phase 4) — wraps AuthRoom with the
 // connection-level protections the room itself doesn't handle:
 //   • origin allow-list          (ALLOWED_ORIGINS env; loopback-only by default)
@@ -44,7 +48,8 @@ const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.svg', '.gltf', 
 const CLEAN_HTML_ROUTES = new Map([
   ['/login', '/login.html'],
   ['/register', '/register.html'],
-  ['/withdrawal', '/withdrawal.html'],
+  ['/earnings', '/earnings.html'],
+  ['/economy-admin', '/economy-admin.html'],
   ['/privacy', '/privacy.html'],
   ['/terms', '/terms.html'],
 ]);
@@ -155,24 +160,46 @@ function sanitizeName(n, usedNames = new Set()) {
   return c;
 }
 
-export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 } = {}) {
-  const room = new AuthRoom(undefined, { targetPopulation });
+export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0, mode = process.env.GAME_MODE || 'deathmatch', accountService = undefined } = {}) {
+  if(!['deathmatch','survival','teamslayer'].includes(mode))throw new Error('No authoritative implementation for this mode');
+  const Room=mode==='survival'?SurvivalRoom:mode==='teamslayer'?TeamRoom:AuthRoom;
+  const room = new Room(undefined, { targetPopulation });
+  room.mode=mode;
   const staticFallback = staticRoot
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
-  const accounts = createAccountService();
+  const accounts = accountService === undefined ? createAccountService() : accountService;
   const payments = createPaymentService(accounts);
+  const economy = createEconomyService(accounts, {serverId:process.env.E_SERVER_ID || 'public-1',mode,privateMatch:process.env.PRIVATE_MATCH==='1'});
+  room.economy = economy?.runtime || null;
+  const rooms=new Map([[mode,{room,economy}]]);
+  if(mode==='deathmatch'){
+    let previousReady=economy?.ready || Promise.resolve();
+    for(const [kind,RoomType] of [['survival',SurvivalRoom],['teamslayer',TeamRoom]]){
+      const other=new RoomType(undefined,{targetPopulation:kind==='teamslayer'?targetPopulation:0});
+      const facade=accounts?{pool:accounts.pool,session:accounts.session,ready:previousReady}:null;
+      const service=createEconomyService(facade,{serverId:`${process.env.E_SERVER_ID||'public-1'}:${kind}`,mode:kind,privateMatch:process.env.PRIVATE_MATCH==='1'});
+      other.economy=service?.runtime||null;rooms.set(kind,{room:other,economy:service});previousReady=service?.ready||previousReady;
+    }
+  }
   const handler = async (req, res) => {
     let pathname = '';
     try { pathname = new URL(req.url || '/', 'http://localhost').pathname; } catch {}
+    if(!economy && pathname.startsWith('/api/e/')){res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'E database unavailable'}));return;}
+    if(pathname==='/withdrawal' || pathname==='/withdrawal.html'){res.writeHead(302,{Location:'/earnings','Cache-Control':'no-store'});res.end();return;}
+    if (economy && await economy.handler(req, res, pathname)) return;
     if (payments && await payments(req, res, pathname)) return;
     if (accounts && await accounts(req, res, pathname)) return;
     if (req.method === 'GET' && pathname === '/api/matchmake') {
+      const requestedMode=new URL(req.url,'http://localhost').searchParams.get('mode')||mode;
+      const selected=rooms.get(requestedMode);
+      if(!selected){res.writeHead(404);res.end();return;}
+      const room=selected.room;
       const humans = Array.from(room.players.values()).filter((player) => !player.isBot).length;
-      const capacity = room.targetPopulation || 8;
+      const capacity = requestedMode==='survival'?5:room.targetPopulation || 8;
       const remainingMs = Math.max(0, room.matchDurationMs - (Date.now() - room.matchStart));
       const body = JSON.stringify({
-        available: humans < capacity,
+        available: humans < capacity, mode:requestedMode,
         humans, players: room.players.size, capacity,
         mapId: room.arena.id, mapName: room.arena.name,
         matchStart: room.matchStart, matchDurationMs: room.matchDurationMs,
@@ -197,6 +224,9 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MSG_BYTES });
 
   wss.on('connection', (ws, req) => {
+    const requested=new URL(req.url,'http://localhost').searchParams.get('mode')||mode;
+    const selected=rooms.get(requested);if(!selected){ws.close(1008,'unsupported mode');return;}
+    const {room,economy}=selected;
     if (!originOk(req.headers.origin)) { ws.close(1008, 'origin'); return; }
 
     const conn = {
@@ -210,7 +240,8 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
       ws.send(JSON.stringify(obj));
     };
 
-    ws.on('message', (raw) => {
+    const identityReady = accounts ? Promise.resolve(accounts.ready).then(() => accounts.session(req)).catch(() => null) : Promise.resolve(null);
+    ws.on('message', async (raw) => {
       conn.lastSeen = Date.now();
       if (raw.length > MAX_MSG_BYTES) { ws.close(1009, 'too big'); return; }
 
@@ -228,12 +259,31 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
 
       switch (msg.t) {
         case 'hello':
-          if (conn.id != null) return;                   // duplicate session on live socket
+          if (conn.id != null || conn.joining) return;
+          conn.joining = true;
+          const identity = await identityReady;
+          if (!conn.alive || ws.readyState !== ws.OPEN) return;
+          if (identity && [...wss.clients].some(other => other !== ws && other._conn?.userId === identity.id)) { ws.close(1008, 'account already playing'); return; }
+          conn.userId = identity?.id || null;
           conn.id = room.add(send, sanitizeName(
-            msg.name,
+            identity?.username || msg.name,
             new Set(Array.from(room.players.values()).map((player) => player.name)),
           ));
           if (conn.id == null) ws.close(1013, 'match full');
+          else if (economy) {
+            try {
+              await economy.ready;
+              const peer=String(req.socket.remoteAddress||'');
+              const ip=process.env.E_TRUST_PROXY==='1'?String(req.headers['x-forwarded-for']||peer).split(',')[0].trim():peer;
+              const network=(!ip||(['127.0.0.1','::1','::ffff:127.0.0.1'].includes(ip)&&process.env.E_TRUST_PROXY!=='1'))?null:createHash('sha256').update(`${process.env.E_NETWORK_SALT||economy.runtime.serverId}:${ip}`).digest('hex');
+              if (conn.alive) {
+                await economy.runtime.join(conn.id, identity ? {...identity,sessionId:identity.sessionId,network} : null, send);
+                const p=room.players.get(conn.id), earning=economy.runtime.participant(conn.id);
+                if(p && earning){p.score=earning.score;p.kills=earning.kills;p.deaths=earning.deaths;p.assists=earning.assists;}
+                if(!conn.alive)economy.runtime.leave(conn.id);
+              }
+            } catch(e) { console.error('[economy join]',e.message); }
+          }
           break;
         case 'input':
           if (conn.id != null) room.onInput(conn.id, msg);
@@ -257,7 +307,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
       }
     });
 
-    ws.on('close', () => { if (conn.id != null) room.remove(conn.id); conn.alive = false; });
+    ws.on('close', () => { if (conn.id != null) { economy?.runtime.leave(conn.id); room.remove(conn.id); } conn.alive = false; });
     ws.on('error', () => { try { ws.close(); } catch {} });
 
     ws._conn = conn;
@@ -265,7 +315,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
   });
 
   // fixed-20Hz authoritative loop
-  const loop = setInterval(() => room.update(), TICK_MS);
+  const loop = setInterval(() => { for(const [kind,{room,economy}]of rooms){if(kind===mode||[...room.players.values()].some(p=>!p.isBot))room.update();economy?.runtime.tick();} }, TICK_MS);
 
   // heartbeat / dead-socket reaping
   const hb = setInterval(() => {
@@ -281,11 +331,11 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0 
   const close = () => new Promise((resolveClose) => {
     clearInterval(loop); clearInterval(hb);
     for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
-    wss.close(() => http.close(() => resolveClose()));
+    wss.close(() => http.close(async () => { try { for(const {economy}of rooms.values())await economy?.runtime.close(); } catch(e){console.error('[economy close]',e.message);} resolveClose(); }));
   });
 
   if (port) http.listen(port, () => console.log(`[auth] listening on :${port} (tick ${TICK_MS.toFixed(1)}ms)`));
-  return { wss, room, http, close };
+  return { wss, room, rooms, http, close };
 }
 
 // standalone entry
@@ -293,5 +343,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const here = fileURLToPath(new URL('.', import.meta.url));
   const staticRoot = process.env.STATIC_ROOT || resolve(here, '../dist');
   const targetPopulation = Number.parseInt(process.env.MATCH_PLAYERS || '8', 10);
-  makeAuthServer({ port: process.env.PORT || 8788, staticRoot, targetPopulation });
+  const app=makeAuthServer({ port: process.env.PORT || 8788, staticRoot, targetPopulation });
+  let closing=false;
+  for(const signal of ['SIGTERM','SIGINT'])process.on(signal,async()=>{if(closing)return;closing=true;await app.close();process.exit(0);});
 }
