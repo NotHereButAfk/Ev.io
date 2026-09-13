@@ -201,7 +201,7 @@ export class HUD {
       }
       const ammo = document.createElement('span');
       ammo.className = 'ws-ammo';
-      ammo.textContent = slot.isMelee ? '∞' : `${slot.magAmmo ?? 0} / ${slot.reserveAmmo ?? 0}`;
+      ammo.textContent = slot.isMelee ? '∞' : `${slot.magAmmo ?? 0} / ${slot.infiniteReserve ? '∞' : (slot.reserveAmmo ?? 0)}`;
       el.appendChild(ammo);
       const k = document.createElement('span');
       k.className = 'ws-key';
@@ -271,12 +271,12 @@ export class HUD {
     setText(this.weaponName, weaponInfo.name.toUpperCase());
     setText(this.ammoText, weaponInfo.isMelee
       ? '∞'
-      : `${weaponInfo.magAmmo} / ${weaponInfo.reserveAmmo}`);
+      : `${weaponInfo.magAmmo} / ${weaponInfo.infiniteReserve ? '∞' : weaponInfo.reserveAmmo}`);
     toggleClass(this.weaponWrap, 'melee-active', weaponInfo.isMelee);
     this._slotAmmoEls.forEach((ammo, i) => {
       const slot = weaponInfo.slots?.[i];
       if (!slot || !ammo) return;
-      setText(ammo, slot.isMelee ? '∞' : `${slot.magAmmo} / ${slot.reserveAmmo}`);
+      setText(ammo, slot.isMelee ? '∞' : `${slot.magAmmo} / ${slot.infiniteReserve ? '∞' : slot.reserveAmmo}`);
     });
     toggleClass(this.reloadText, 'hidden', !weaponInfo.isReloading);
     if (this.crosshair) {

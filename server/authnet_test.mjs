@@ -270,7 +270,7 @@ ok('ability: impulse knockback velocity clamped (no infinite launch)', speed < 4
 
 // ═══ Phase 11 — clearly-labelled bots (no fake-human surfaces) ═══
 room.addBot('TrainingDummy');
-await sleep(150);
+for(let attempt=0;attempt<60&&!b.last()?.players?.some(p=>p.name==='TrainingDummy');attempt++)await sleep(50);
 const roster = b.last().players;
 const humanEntry = roster.find((p) => p.id === b.welcome.you);
 const botEntry = roster.find((p) => p.name === 'TrainingDummy');
@@ -417,8 +417,8 @@ reloadPlayer.mag = 3;
 reloadRoom.onReload(reloadId, { wid: 'm4' });
 const reloadStarted = reloadPlayer.reloadUntil > reloadRoom.tick;
 for (let i = 0; i < Math.ceil(1.8 * 20); i++) reloadRoom.update();
-ok('reload: server owns timing and transfers reserve into the magazine',
-   reloadStarted && reloadPlayer.mag === 13 && reloadPlayer.ammo.m4.reserve === 0,
+ok('reload: server owns timing and refills main magazines without consuming reserve',
+   reloadStarted && reloadPlayer.mag === 50 && reloadPlayer.ammo.m4.reserve === 10,
    `mag=${reloadPlayer.mag}, reserve=${reloadPlayer.ammo.m4.reserve}`);
 
 const protectedRoom = new AuthRoom(duelArena);

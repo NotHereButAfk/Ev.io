@@ -107,6 +107,7 @@ const WEAPONS = Object.fromEntries(CLIENT_WEAPONS.map((weapon) => [weapon.id, {
   reload: weapon.reloadTime || 0,
   mag: weapon.magSize || 0,
   reserve: weapon.reserveMax || 0,
+  infiniteReserve: !!weapon.infiniteReserve,
   arc: weapon.arc || 0,
 }]));
 const BASE_WEAPONS = new Set([...MAIN_WEAPON_IDS, 'sword']);
@@ -1001,7 +1002,7 @@ export class AuthRoom {
     const weapon = WEAPONS[wid];
     if (!weapon || weapon.kind === 'melee' || weapon.mag <= 0) return false;
     const ammo = this._weaponState(p, wid);
-    if (p.reloadUntil > this.tick || ammo.mag >= weapon.mag || ammo.reserve <= 0) return false;
+    if (p.reloadUntil > this.tick || ammo.mag >= weapon.mag || (!weapon.infiniteReserve && ammo.reserve <= 0)) return false;
     p.reloadWid = wid;
     p.reloadUntil = this.tick + Math.max(1, Math.ceil(weapon.reload * TICK_HZ));
     return true;
@@ -1012,9 +1013,9 @@ export class AuthRoom {
     const wid = p.reloadWid;
     const weapon = WEAPONS[wid];
     const ammo = this._weaponState(p, wid);
-    const amount = Math.min(weapon.mag - ammo.mag, ammo.reserve);
+    const amount = weapon.infiniteReserve ? weapon.mag - ammo.mag : Math.min(weapon.mag - ammo.mag, ammo.reserve);
     ammo.mag += amount;
-    ammo.reserve -= amount;
+    if (!weapon.infiniteReserve) ammo.reserve -= amount;
     p.reloadWid = null;
     p.reloadUntil = 0;
     if (p.wid === wid) p.mag = ammo.mag;

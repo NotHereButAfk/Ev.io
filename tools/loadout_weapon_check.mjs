@@ -104,3 +104,23 @@ assert.equal(player.shield, 0, 'respawn must clear stacked shield pickups');
 assert.equal(player.maxShield, 0, 'respawn must clear shield capacity from the previous life');
 
 console.log(`ok  loot/loadout: ${MAIN_WEAPON_IDS.length} main guns; ${MATCH_PICKUP_WEAPON_IDS.length} random pickup guns; ${MAX_PICKUP_SHIELD} max shield`);
+
+// Unlimited reserves never bypass magazines or timed reloads.
+for (const id of MAIN_WEAPON_IDS) {
+  player.wid=id;
+  const ammo=room._weaponState(player,id);
+  ammo.mag=0;ammo.reserve=0;
+  for(let cycle=0;cycle<3;cycle++) {
+    assert.equal(room._startReload(player,id),true);
+    room._finishReload(player);
+    assert.equal(ammo.mag,0,'reload cannot finish before its timer');
+    room.tick=player.reloadUntil;
+    room._finishReload(player);
+    assert(ammo.mag>0,'main gun reloads with an empty reserve');
+    assert.equal(ammo.reserve,0);
+    ammo.mag=0;
+  }
+}
+player.wid='rpg';room._weaponState(player,'rpg').mag=0;room._weaponState(player,'rpg').reserve=0;
+assert.equal(room._startReload(player,'rpg'),false,'pickup launchers retain finite reserves');
+console.log('Unlimited main reserves passed: all five guns, repeated reloads, timers, finite pickup weapons.');

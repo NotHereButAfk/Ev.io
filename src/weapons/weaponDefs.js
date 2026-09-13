@@ -413,6 +413,7 @@ export const WEAPONS = [
 export const MAIN_WEAPON_IDS = ['m4', 'magnum', 'battlerifle', 'energyshotgun', 'plasmarifle'];
 const _MAIN = new Set(MAIN_WEAPON_IDS);
 for (const w of WEAPONS) {
+  w.infiniteReserve = _MAIN.has(w.id);
   w.category = w.kind === 'melee' ? 'melee' : (_MAIN.has(w.id) ? 'main' : 'extra');
 }
 

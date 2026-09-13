@@ -85,8 +85,8 @@ const VIEWMODEL_Z = -0.98;
 // The lower mount crops the buttstock at the bottom/right while retaining the
 // full-size receiver and both grip contacts. These are our presentation
 // settings, not measured constants from the reference game.
-const VIEWMODEL_X = 0.36;
-const VIEWMODEL_Y = -0.50;
+const VIEWMODEL_X = 0.40;
+const VIEWMODEL_Y = -0.53;
 // Keep the gun and the matching first-person arms large and readable like the
 // reference while world/player weapons retain their physical third-person scale.
 const VIEWMODEL_SCALE = 1.80;
@@ -1246,7 +1246,7 @@ export class WeaponSystem {
     const def = this.currentDef;
     const st = this.currentState;
     if (def.kind === 'melee' || st.isReloading) return;
-    if (st.magAmmo >= def.magSize || st.reserveAmmo <= 0) return;
+    if (st.magAmmo >= def.magSize || (!def.infiniteReserve && st.reserveAmmo <= 0)) return;
     st.isReloading = true;
     st.reloadTimer = def.reloadTime;
     // Two-phase reload: mag drop immediately, rack/bolt halfway through
@@ -1259,9 +1259,9 @@ export class WeaponSystem {
     const def = this.currentDef;
     const st = this.currentState;
     const needed = def.magSize - st.magAmmo;
-    const transfer = Math.min(needed, st.reserveAmmo);
+    const transfer = def.infiniteReserve ? needed : Math.min(needed, st.reserveAmmo);
     st.magAmmo += transfer;
-    st.reserveAmmo -= transfer;
+    if (!def.infiniteReserve) st.reserveAmmo -= transfer;
     st.isReloading = false;
   }
 
@@ -1920,7 +1920,7 @@ export class WeaponSystem {
 
     if (this.onShoot) this.onShoot(def);
 
-    if (st.magAmmo <= 0 && st.reserveAmmo > 0) {
+    if (st.magAmmo <= 0 && (def.infiniteReserve || st.reserveAmmo > 0)) {
       this.startReload();
     }
   }
@@ -2340,6 +2340,7 @@ export class WeaponSystem {
         id: w.id,
         name: w.name,
         isMelee: w.kind === 'melee',
+        infiniteReserve: !!w.infiniteReserve,
       }));
     }
     this._hudSlots.forEach((slot) => {
@@ -2347,6 +2348,7 @@ export class WeaponSystem {
       slot.magAmmo = slotState?.magAmmo ?? 0;
       slot.reserveAmmo = slotState?.reserveAmmo ?? 0;
     });
+    info.infiniteReserve = !!def.infiniteReserve;
     info.name = def.name;
     info.isMelee = def.kind === 'melee';
     info.magAmmo = st.magAmmo;
