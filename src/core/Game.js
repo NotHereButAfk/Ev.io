@@ -1802,7 +1802,7 @@ export class Game {
     // Match the authoritative room's clean-life ability contract without
     // deleting smoke/explosion presentation that is still active in the map.
     this.grenadeSystem.refillInventory?.();
-    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns);
     this._respawnRemaining = 0;
     this._respawnDeadline = 0;
     this._resetDeathAnimation();
@@ -2047,7 +2047,7 @@ export class Game {
     if (throwable) {
       const auth = this._authNet?.ready ? this._authNet.client : null;
       const serverCharges = auth?.self?.abilities?.[throwable];
-      const canThrow = !auth || ((serverCharges ?? 0) > 0 && (auth.self.abilityCD ?? 0) <= 0);
+      const canThrow = !auth || ((serverCharges ?? 0) > 0 && (auth.self.abilityCooldowns?.[throwable] ?? 0) <= 0);
       if (canThrow) {
         const field = throwable === 'frag' ? 'frags' : 'smokes';
         const had = this.grenadeSystem[field];
@@ -2062,7 +2062,7 @@ export class Game {
     this.grenadeSystem.update(dt, this.player, this.world);
 
     this.hud.update(this.player, this.weaponSystem.getHudInfo(), this.kills, this.score);
-    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes);
+    this.hud.updateGrenades(this.grenadeSystem.frags, this.grenadeSystem.smokes, this.grenadeSystem.cooldowns);
     this.hud.setActiveSlot(this.weaponSystem.currentIndex);
 
     // Enemy nameplates (name + health bar) over living opponents.

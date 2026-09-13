@@ -14,6 +14,7 @@ export class GrenadeSystem {
   constructor(scene, audio = null) {
     this.scene       = scene;
     this.audio       = audio;
+    this.cooldowns = {frag: 0, smoke: 0};
     this.frags       = 2;
     this.smokes      = 2;
     this.throwables  = [];
@@ -30,13 +31,15 @@ export class GrenadeSystem {
   }
 
   throwFrag(camera) {
-    if (this.frags <= 0) return;
+    if (this.frags <= 0 || this.cooldowns.frag > 0) return;
+    this.cooldowns.frag = 15;
     this.frags--;
     this._spawn(camera, 'frag');
   }
 
   throwSmoke(camera) {
-    if (this.smokes <= 0) return;
+    if (this.smokes <= 0 || this.cooldowns.smoke > 0) return;
+    this.cooldowns.smoke = 15;
     this.smokes--;
     this._spawn(camera, 'smoke');
   }
@@ -103,6 +106,11 @@ export class GrenadeSystem {
   }
 
   update(dt, player, world = null) {
+    for (const kind of ['frag','smoke']) {
+      const before=this.cooldowns[kind];
+      this.cooldowns[kind]=Math.max(0,before-dt);
+      if(before>0 && this.cooldowns[kind]===0)this[kind==='frag'?'frags':'smokes']=2;
+    }
     // in-flight throwables
     for (let i = this.throwables.length - 1; i >= 0; i--) {
       const t = this.throwables[i];
@@ -246,6 +254,7 @@ export class GrenadeSystem {
   }
 
   refillInventory() {
+    this.cooldowns = {frag: 0, smoke: 0};
     this.frags = 2;
     this.smokes = 2;
   }

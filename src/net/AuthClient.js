@@ -213,7 +213,7 @@ export class AuthClient {
                   spawnProtected: !!y.spawnProtected,
                   kills: y.kills, deaths: y.deaths, score: y.score, assists: y.assists || 0,
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
-                  abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
+                  abilities: y.abilities ?? this.self.abilities, abilityCooldowns: y.abilityCooldowns ?? {}, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
     this.lootPads = snap.lootPads ?? snap.arena?.lootPads ?? this.lootPads;
     this.roster = snap.players.map((pl) => ({

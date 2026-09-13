@@ -7283,3 +7283,24 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 #hud .grenade-icon::after { display: none !important; }
 #hud .grenade-icon svg { width: 42px; height: 42px; color: #00c9ed; }
 #hud .frag-icon svg { color: #78df11; }
+
+/* Compact ability HUD with a left-to-right readiness reveal. */
+#hud #health-wrap, #hud #stamina-wrap { width: min(280px,28vw); left: 20px !important; }
+#hud #stamina-wrap .bar-bg { height: 8px !important; }
+#hud #health-wrap .bar-bg { height: 5px !important; }
+#hud #stamina-wrap { bottom: 30px !important; }
+#hud #health-wrap { bottom: 14px !important; }
+#hud #grenade-wrap { left: 72px !important; bottom: 54px !important; height: 48px; gap: 5px !important; }
+#hud .grenade-slot { width: 46px; min-width: 46px; height: 48px; border-bottom-width: 3px; }
+#hud .ability-indicator { left: 20px !important; bottom: 54px !important; width: 46px !important; height: 48px !important; border-bottom-width: 3px !important; }
+#hud .ability-art { width: 34px; height: 34px; left: 6px; top: 1px; }
+#hud .grenade-icon, #hud .grenade-icon svg { width: 32px; height: 32px; }
+#hud .grenade-label, #hud .ability-key { font-size: 12px !important; font-weight: 700; bottom: 0; left: 3px; z-index: 4; color: white !important; }
+#hud .grenade-slot, #hud .ability-indicator { --ready: 100%; overflow: hidden; }
+#hud .cooldown-gray { filter: grayscale(1) brightness(.65); }
+#hud .cooldown-color { clip-path: inset(0 calc(100% - var(--ready)) 0 0); }
+#hud .ability-indicator::after, #hud .grenade-slot::after { content: ''; position: absolute; left: 0; bottom: 0; width: var(--ready); height: 3px; background: #16c8ed; z-index: 3; }
+#hud .ability-indicator::after { background: #ff9500; }
+#hud .grenade-icon { position: absolute; left: 7px; top: 2px; }
+
+#sb-next-match { padding: 8px 12px; background: #17212ac9; color: white; font-size: 13px; text-align: center; }

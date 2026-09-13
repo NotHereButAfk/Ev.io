@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {AuthRoom} from '../server/authroom.mjs';
+const room=new AuthRoom();const id=room.add(()=>{},'Cooldown');const p=room.players.get(id);p.invulnerableUntil=100000;
+const use=kind=>{p.abilityReq={kind,yaw:0,pitch:0};room.update();};
+use('smoke');assert.equal(p.abilityCooldowns.smoke,15);assert.equal(p.abilities.smoke,1);
+use('smoke');assert.equal(p.abilities.smoke,1,'cannot use same ability during cooldown');
+use('flash');assert.equal(p.abilities.flash,1,'abilities cool down independently');
+for(let i=0;i<295;i++)room.update();
+assert(p.abilityCooldowns.smoke>0);use('smoke');assert.equal(p.abilities.smoke,1);
+for(let i=0;i<4;i++)room.update();
+assert.equal(p.abilityCooldowns.smoke,0);assert.equal(p.abilities.smoke,2,'charges return when ready');
+use('smoke');assert.equal(p.abilityCooldowns.smoke,15);
+console.log('Ability cooldown passed: 15 seconds, early reuse rejected, independent abilities, recharge.');

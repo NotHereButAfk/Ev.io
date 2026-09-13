@@ -306,7 +306,11 @@ export class HUD {
     setText(this.scoreCount, score);
   }
 
-  updateGrenades(frags, smokes) {
+  updateGrenades(frags, smokes, cooldowns = {}) {
+    for(const [counter,kind] of [[this.fragCount,'frag'],[this.smokeCount,'smoke']]) {
+      const tile=counter?.closest('.grenade-slot');
+      if(tile)tile.style.setProperty('--ready', `${Math.max(0,Math.min(1,1-(cooldowns[kind]||0)/15))*100}%`);
+    }
     setText(this.fragCount, frags);
     setText(this.smokeCount, smokes);
     toggleClass(this.fragCount, 'grenade-empty', frags === 0);
@@ -361,6 +365,7 @@ export class HUD {
   updateTeleport(ratio) {
     if (!this._abilityQ) return;
     setCustomStyle(this._abilityQ, '--ratio', String(Math.max(0, Math.min(1, ratio))));
+    setCustomStyle(this._abilityQ, '--ready', `${Math.max(0,Math.min(1,ratio))*100}%`);
     toggleClass(this._abilityQ, 'ready', ratio >= 1);
   }
 
@@ -434,91 +439,17 @@ export class HUD {
 
   // Post-match leaderboard (outside #hud, so hud.hide() won't touch it).
   showLeaderboard(rows, playerName, earnedCoins = 0, stats = {}) {
-    const overlay = document.getElementById('leaderboard-overlay');
-    const tbody   = document.getElementById('lb-rows');
-    if (!overlay || !tbody) return;
-    tbody.innerHTML = '';
-
-    // Winner banner + earned coins
-    const winner = rows[0];
-    const winEl  = document.getElementById('lb-winner-name');
-    if (winEl && winner) winEl.textContent = winner.name;
-    const earnedEl = document.getElementById('lb-earned-val');
-    if (earnedEl) earnedEl.textContent = earnedCoins.toLocaleString();
-
-    const setText = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    };
-    const mins = Math.floor((stats.playTime || 0) / 60);
-    const secs = Math.floor(stats.playTime || 0) % 60;
-    setText('lb-stat-accuracy', `${(stats.accuracy || 0).toFixed(1)}%`);
-    setText('lb-stat-damage', Math.round(stats.damageDealt || 0).toLocaleString());
-    setText('lb-stat-shots', `${stats.shotsFired || 0} / ${stats.hits || 0}`);
-    setText('lb-stat-headshots', stats.headshots || 0);
-    setText('lb-stat-streak', stats.bestStreak || 0);
-    setText('lb-stat-time', `${mins}:${String(secs).padStart(2, '0')}`);
-
-    const views = {
-      leaderboard: document.getElementById('lb-leaderboard-view'),
-      earn: document.getElementById('lb-earn-view'),
-      performance: document.getElementById('lb-performance-view'),
-    };
-    const tabs = overlay.querySelectorAll('[data-lb-tab]');
-    const selectTab = (name) => {
-      Object.entries(views).forEach(([key, view]) => view?.classList.toggle('hidden', key !== name));
-      tabs.forEach((tab) => {
-        const active = tab.dataset.lbTab === name;
-        tab.classList.toggle('active', active);
-        tab.setAttribute('aria-selected', String(active));
-      });
-    };
-    tabs.forEach((tab) => { tab.onclick = () => selectTab(tab.dataset.lbTab); });
-    selectTab('leaderboard');
-
-    rows.forEach((row, i) => {
-      const rank   = i + 1;
-      const rankCls = rank <= 3 ? `lb-rank lb-rank-${rank}` : 'lb-rank';
-      const tr = document.createElement('tr');
-      tr.className = row.isYou ? 'lb-row-you' : '';
-
-      const nameTd = document.createElement('td');
-      nameTd.className = 'lb-name-cell';
-      nameTd.textContent = row.name;
-      if(row.survival){const detail=document.createElement('small');detail.className='sb-survival-stats';detail.textContent=`Damage ${Math.round(row.damageDealt||0)} · Boss ${Math.round(row.bossDamage||0)} · Waves ${row.wavesSurvived||0}`;nameTd.appendChild(detail);}
-      if (row.isYou) {
-        const badge = document.createElement('span');
-        badge.className = 'lb-you-badge';
-        badge.textContent = 'YOU';
-        nameTd.appendChild(badge);
-      } else if (row.isBot) {
-        const badge = document.createElement('span');
-        badge.className = 'lb-bot-badge';
-        badge.textContent = 'BOT';
-        nameTd.appendChild(badge);
-      }
-
-      tr.innerHTML = `<td><span class="${rankCls}">${rank}</span></td>`;
-      tr.appendChild(nameTd);
-
-      const cell = (val, cls) => {
-        const td = document.createElement('td');
-        if (cls) td.className = cls;
-        td.textContent = val;
-        tr.appendChild(td);
-      };
-      cell(row.score.toLocaleString(), 'lb-score-cell');
-      cell(row.assists ?? 0, 'lb-dim-cell');
-      cell(row.kills, 'lb-kills');
-      cell(row.deaths ?? 0, 'lb-dim-cell');
-      cell(row.kd ?? '0.0', 'lb-kd-cell');
-
-      tbody.appendChild(tr);
-    });
-    overlay.classList.remove('hidden');
+    document.getElementById('leaderboard-overlay')?.classList.add('hidden');
+    this.showScoreboard(rows, 'Match complete', {...stats, earnedCoins});
+    const panel=document.querySelector('#scoreboard-overlay .sb-panel');
+    let countdown=document.getElementById('sb-next-match');
+    if(!countdown && panel){countdown=document.createElement('div');countdown.id='sb-next-match';panel.appendChild(countdown);}
+    if(countdown)countdown.hidden=false;
   }
 
   hideLeaderboard() {
+    this.hideScoreboard();
+    const countdown=document.getElementById('sb-next-match');if(countdown)countdown.hidden=true;
     document.getElementById('leaderboard-overlay')?.classList.add('hidden');
   }
 
@@ -573,11 +504,6 @@ export class HUD {
         deaths ? (kills / deaths).toFixed(1) : kills.toFixed(1)]) {
         const cell = document.createElement('td'); cell.textContent = value; tr.appendChild(cell);
       }
-      if(r.survival){
-        const detail=document.createElement('small');detail.className='sb-survival-stats';
-        detail.textContent=`Damage ${Math.round(r.damageDealt||0).toLocaleString()} · Boss ${Math.round(r.bossDamage||0).toLocaleString()} · Waves ${r.wavesSurvived||0}`;
-        nameTd.appendChild(detail);
-      }
       tb.appendChild(tr);
     });
     setText(document.getElementById('sb-earned'), Number(stats.earnedCoins || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
@@ -604,6 +530,7 @@ export class HUD {
   }
 
   updateLeaderboardCountdown(secsLeft, total) {
+    const next=document.getElementById('sb-next-match');if(next)next.textContent=`Next match in ${secsLeft}s`;
     const el = document.getElementById('lb-countdown');
     if (el) el.textContent = secsLeft;
     const bar = document.getElementById('lb-bar');

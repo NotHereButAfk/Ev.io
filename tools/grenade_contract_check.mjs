@@ -64,9 +64,9 @@ assert.ok(collisionSystem.throwables[0].vel.y > 0,
 const presentationPlayer = { shield: 0, stamina: 100 };
 const inventory = { frags: 0, smokes: 0 };
 applyAuthoritativeResources(presentationPlayer, {
-  sim: { stamina: 37 },
-  self: { shield: 19, abilities: { frag: 1, smoke: 2 } },
+  sim: { stamina: 37, teleCD: 8 },
+  self: { shield: 19, abilityCooldowns: {frag: 7.5, smoke: 0}, abilities: { frag: 1, smoke: 2 } },
 }, inventory);
-assert.deepEqual(presentationPlayer, { shield: 19, stamina: 37 }, 'authoritative stamina did not reach HUD player');
-assert.deepEqual(inventory, { frags: 1, smokes: 2 }, 'authoritative grenade inventory did not reach HUD');
+assert.deepEqual(presentationPlayer, { shield: 19, stamina: 37, teleportCooldown: 8 }, 'authoritative stamina did not reach HUD player');
+assert.deepEqual(inventory, { frags: 1, smokes: 2, cooldowns: {frag: 7.5, smoke: 0} }, 'authoritative grenade inventory did not reach HUD');
 console.log('grenade contract passed: swept map collision, larger layered blasts, damage flow, stamina and inventory all replicate');

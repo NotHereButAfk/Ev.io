@@ -81,6 +81,15 @@ try {
  const bounds=await page.locator('.sb-panel').boundingBox();assert(bounds.x>=0&&bounds.x+bounds.width<=391);
  if(process.env.MATCH_UI_SHOTS)await page.screenshot({path:`${process.env.MATCH_UI_SHOTS}/scoreboard-mobile.png`});
  await page.evaluate(()=>window.__game.hud.hideScoreboard());assert(!await page.locator('#scoreboard-overlay').isVisible());
+ const unified=await page.evaluate(()=>{
+  const h=window.__game.hud,rows=[{name:'Same player',score:120,kills:2,deaths:1,assists:1,isYou:true}];
+  h.showScoreboard(rows);const before=document.getElementById('sb-rows').innerHTML;
+  h.showLeaderboard(rows,'Same player',3);h.updateLeaderboardCountdown(9,10);
+  const same=before===document.getElementById('sb-rows').innerHTML;
+  h.updateTeleport(.5);h.updateGrenades(1,1,{frag:7.5,smoke:15});
+  return {same,oldHidden:document.getElementById('leaderboard-overlay').classList.contains('hidden'),blink:document.getElementById('ability-q').style.getPropertyValue('--ready'),frag:document.getElementById('frag-count').closest('.grenade-slot').style.getPropertyValue('--ready'),smoke:document.getElementById('smoke-count').closest('.grenade-slot').style.getPropertyValue('--ready')};
+ });
+ assert.deepEqual(unified,{same:true,oldHidden:true,blink:'50%',frag:'50%',smoke:'0%'});
  assert.deepEqual(errors,[]);
  console.log('Match UI passed: both map images, responsive scoreboard, real stats, escaped names, portraits and working tabs');
 }finally{await browser?.close();await server.close();}

@@ -37,7 +37,7 @@
     "test:gameplay-smoke": "node tools/gameplay_smoke.mjs",
     "test:player-respawn": "node tools/player_respawn_check.mjs",
     "test:player-death": "node tools/player_death_check.mjs",
-    "test:grenades": "node tools/grenade_contract_check.mjs",
+    "test:grenades": "node tools/grenade_contract_check.mjs && node tools/ability_cooldown_check.mjs",
     "test:zombie-death": "node tools/zombie_death_check.mjs",
     "test:viewmodel": "node tools/viewmodel_arm_continuity_check.mjs && node tools/viewmodel_check.mjs && node tools/viewmodel_check.mjs --authored-arms",
     "test:ads-visual": "node tools/ads_visual_check.mjs",

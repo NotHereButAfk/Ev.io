@@ -71,7 +71,7 @@ assert.equal(finalRows.filter((row) => row.isBot).length, 3,
 assert.equal(finalRows.find((row) => row.isYou)?.deaths, 1,
   'post-match results must use authoritative deaths and K/D');
 const hudSource = readFileSync(new URL('../src/ui/HUD.js', import.meta.url), 'utf8');
-assert.match(hudSource, /row\.isBot[\s\S]*lb-bot-badge/,
+assert.match(hudSource, /r\.isBot[\s\S]*sb-bot-badge/,
   'post-match bot rows must be visibly labelled as bots');
 assert.match(hudSource, /r\.isBot[\s\S]*sb-bot-badge/,
   'live scoreboard bot rows must be visibly labelled as bots');

@@ -123,10 +123,10 @@ const HEAD_Y = 1.55, BODY_R = 0.5, HEAD_R = 0.28;
 //   smoke:   a vision volume that blocks hitscan for its lifetime
 //   impulse: radial knockback velocity (clamped so it can't launch to infinity)
 const ABILITIES = {
-  frag:    { cd: 1.5, charges: 2, throwRange: 24, radius: 6.5, damage: 80, fuseSec: 2.5 },
-  flash:   { cd: 1.5, charges: 2, throwRange: 24, radius: 8,  blindSec: 2.2 },
-  smoke:   { cd: 1.5, charges: 2, throwRange: 22, radius: 5,  lifeSec: 8 },
-  impulse: { cd: 2.0, charges: 2, throwRange: 18, radius: 6,  power: 11 },
+  frag:    { cd: 15.0, charges: 2, throwRange: 24, radius: 6.5, damage: 80, fuseSec: 2.5 },
+  flash:   { cd: 15.0, charges: 2, throwRange: 24, radius: 8,  blindSec: 2.2 },
+  smoke:   { cd: 15.0, charges: 2, throwRange: 22, radius: 5,  lifeSec: 8 },
+  impulse: { cd: 15.0, charges: 2, throwRange: 18, radius: 6,  power: 11 },
 };
 const IMPULSE_MAX = 18;   // hard clamp on any single knockback component
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -368,7 +368,7 @@ export class AuthRoom {
         smoke: ABILITIES.smoke.charges,
         impulse: ABILITIES.impulse.charges,
       };
-      player.abilityCD = 0;
+      player.abilityCD = 0; player.abilityCooldowns = {};
       if (player.isBot) this._resetBotAI(player);
       if(player.survivalAlly)this.allyAI?.reset(player);
     }
@@ -440,7 +440,7 @@ export class AuthRoom {
       lastFireSeq: 0, lastFireRequestTick: -Infinity, lastPickupSeq: 0,
       abilities: { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                    impulse: ABILITIES.impulse.charges },
-      abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
+      abilityCooldowns: {}, abilityCD: 0, blindUntil: 0, lastAbilitySeq: 0, abilityReq: null,
     };
     this.players.set(id, p);
     if (p.isBot) this._resetBotAI(p);
@@ -1354,7 +1354,12 @@ export class AuthRoom {
         equipped.spreadMin || 0,
         (p.gunBloom || 0) - (equipped.bloomRecovery || 0) / TICK_HZ,
       );
-      p.abilityCD = Math.max(0, p.abilityCD - 1 / TICK_HZ);
+      p.abilityCooldowns ||= {};
+      for (const [kind, remaining] of Object.entries(p.abilityCooldowns)) {
+        p.abilityCooldowns[kind] = Math.max(0, remaining - 1 / TICK_HZ);
+        if (remaining > 0 && p.abilityCooldowns[kind] <= 0) p.abilities[kind] = ABILITIES[kind].charges;
+      }
+      p.abilityCD = Math.max(0, ...Object.values(p.abilityCooldowns));
 
       if (!p.alive) {
         if (this.tick >= p.deadUntil) {
@@ -1373,7 +1378,7 @@ export class AuthRoom {
           p._swingStart = p._swingUntil = 0;
           p._botReloadUntil = 0;
           p.gunBloom = 0;
-          p.blindUntil = 0;
+          p.blindUntil = 0; p.abilityCooldowns = {}; p.abilityCD = 0;
           p.abilities = { frag: ABILITIES.frag.charges, flash: ABILITIES.flash.charges, smoke: ABILITIES.smoke.charges,
                           impulse: ABILITIES.impulse.charges };
           if (p.isBot) this._resetBotAI(p);
@@ -1499,9 +1504,10 @@ export class AuthRoom {
       if (!p.abilityReq || !p.alive) { p.abilityReq = null; continue; }
       const req = p.abilityReq; p.abilityReq = null;
       const A = ABILITIES[req.kind];
-      if (!A || p.abilityCD > 0 || p.abilities[req.kind] <= 0) continue;   // authority: cd + charges
+      if (!A || (p.abilityCooldowns?.[req.kind] || 0) > 0 || p.abilities[req.kind] <= 0) continue;   // authority: cd + charges
       p.abilities[req.kind]--;
       p.abilityCD = A.cd;
+      p.abilityCooldowns ||= {}; p.abilityCooldowns[req.kind] = A.cd;
       this._resolveAbility(p, req.kind, A, req.yaw, req.pitch);
     }
 
@@ -1576,7 +1582,7 @@ export class AuthRoom {
                kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
         survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),
-               abilities: p.abilities, abilityCD: +p.abilityCD.toFixed(2) },
+               abilities: p.abilities, abilityCooldowns: p.abilityCooldowns, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,
         smokes: smokeList,
         lootPads: this._lootPadPayload(),

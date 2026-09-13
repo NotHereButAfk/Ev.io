@@ -46,7 +46,7 @@ const SLIDE_BOOST = SLIDE_LAUNCH_SPEED;
 const COYOTE_TIME = 0.14;
 const STEP_UP = 0.55, GRACE = 0.06;      // platform support (matches World)
 const SNAP_DOWN = 0.12;                  // grounded hysteresis (defect fix)
-const TELEPORT_RANGE = 22, TELEPORT_COOLDOWN = 5.0;
+const TELEPORT_RANGE = 22, TELEPORT_COOLDOWN = 15.0;
 const SAFE_TICKS = 3;                    // grounded ticks before a spot is "safe"
 
 const Q = 1e6;

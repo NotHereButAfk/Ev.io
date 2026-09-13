@@ -64,7 +64,7 @@ export function buildLeaderboardRows(rows) {
       kills,
       deaths,
       score: number(row.score),
-      assists: number(row.assists ?? Math.floor(kills * 0.4)),
+      assists: row.assists,
       kd: deaths > 0 ? (kills / deaths).toFixed(1) : kills.toFixed(1),
     };
   });
