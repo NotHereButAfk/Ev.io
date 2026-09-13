@@ -1,7 +1,7 @@
 {
   "name": "kyx.io",
   "version": "1.0.0",
-  "description": "Browser-based low-poly arena FPS \u2014 deathmatch and zombie survival.",
+  "description": "Browser-based low-poly arena FPS — deathmatch and zombie survival.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
     "test:move": "node tools/movesim_fixtures.mjs",
     "test:ev-character": "node tools/ev_character_check.mjs && node tools/ev_auto_rifle_check.mjs && node tools/ev_review_check.mjs",
     "test:ev-game": "node tools/ev_game_check.mjs",
+    "test:economy": "node tools/economy_check.mjs && node tools/economy_combat_check.mjs && node tools/economy_api_check.mjs && node tools/economy_multiplayer_check.mjs",
     "test:mobile-ui": "node tools/mobile_ui_check.mjs",
     "test:match-ui": "node tools/match_ui_check.mjs",
     "test:stairs": "node tools/stair_movement_check.mjs",
@@ -77,6 +78,7 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "nanoid": "^3.3.17",
     "playwright": "^1.61.0",
     "vite": "^8.0.16"

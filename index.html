@@ -119,9 +119,9 @@
               <span class="pm-icon">&#127903;</span>
               <div class="pm-body"><div class="pm-name">BATTLE PASS</div><div class="pm-sub">Season 1 rewards track</div></div>
             </button>
-            <a class="profile-menu-item" href="/withdrawal">
+            <a class="profile-menu-item" href="/earnings">
               <span class="pm-icon">$</span>
-              <div class="pm-body"><div class="pm-name">WITHDRAWAL</div><div class="pm-sub">USDC redemption status</div></div>
+              <div class="pm-body"><div class="pm-name">E EARNINGS</div><div class="pm-sub">Balance, items and reward history</div></div>
             </a>
           </div>
         </div>
@@ -160,7 +160,7 @@
       <a id="nav-register-link" class="side-register" href="/register">register</a>
       <div id="nav-account" class="side-account hidden">
         <span id="nav-username" class="side-user"></span>
-        <span id="nav-coins" class="side-coins">&#128176; 500</span>
+        <span id="nav-coins" class="side-coins">0.00 E</span>
         <button id="nav-logout-btn" class="side-link side-logout">logout</button>
       </div>
       <button class="side-link" data-panel="rankings">rankings</button>
@@ -440,7 +440,7 @@
           <div class="prof-stat"><div class="prof-stat-label">TOTAL GAMES</div><div class="prof-stat-val" id="ps-games">0</div></div>
           <div class="prof-stat"><div class="prof-stat-label">BEST SURVIVAL</div><div class="prof-stat-val" id="ps-survival">00:00:00</div></div>
           <div class="prof-stat"><div class="prof-stat-label">RANK</div><div class="prof-stat-val" id="ps-rank">RECRUIT</div></div>
-          <div class="prof-stat"><div class="prof-stat-label">BALANCE</div><div class="prof-stat-val" id="ps-balance">0e</div></div>
+          <div class="prof-stat"><div class="prof-stat-label">BALANCE</div><div class="prof-stat-val" id="ps-balance">0.00 E</div></div>
         </div>
       </div>
       <button id="profile-logout-btn" class="ghost-btn" style="margin-top:16px;display:none">LOGOUT</button>
@@ -502,7 +502,7 @@
         <div class="stp-currency">
           <span class="stp-coin-icon">&#9670;</span>
           <span id="shop-coin-balance">0</span>
-          <span class="stp-coin-name">E-COINS</span>
+          <span class="stp-coin-name">LEGACY CREDITS</span>
         </div>
       </div>
 
@@ -521,7 +521,7 @@
           <div class="nm-timer" id="nm-timer">Refreshes in 00:00:00</div>
         </div>
         <div id="shop-grid-root"></div>
-        <div class="shop-earn-tip">Earn E-Coins in-game &middot; 10 per kill &middot; 100 match bonus &middot; Daily challenges</div>
+        <div class="shop-earn-tip">Earn E from eligible server-validated play &middot; <a href="/earnings">Balance, E items and history</a></div>
       </div>
     </div>
 
@@ -594,7 +594,7 @@
         </div>
         <div class="bp-premium-box" id="bp-premium-box">
           <div class="bp-prem-label">PREMIUM PASS</div>
-          <div class="bp-prem-desc">Unlock 14 extra skins + bonus coins</div>
+          <div class="bp-prem-desc">Unlock 14 extra skins + legacy credits</div>
           <button id="bp-unlock-btn" class="bp-unlock-btn">UNLOCK — &#128176; 1000</button>
         </div>
       </div>
@@ -795,7 +795,7 @@
           <div class="lb-earn-card">
             <span class="lb-earn-label">MATCH REWARD</span>
             <span class="lb-earn-total"><span class="lb-earned-coin">&#9670;</span> <span id="lb-earned-val">0</span></span>
-            <span class="lb-earn-detail">100 completion bonus + 10 per elimination</span>
+            <span class="lb-earn-detail">Server-validated E · caps and participation rules apply</span>
           </div>
         </div>
         <div id="lb-performance-view" class="lb-view hidden">
@@ -840,7 +840,7 @@
         <div class="sb-spectators" id="sb-spectators">Spectators: —</div>
         </div>
         <div id="sb-earn-view" class="sb-detail hidden" role="tabpanel" aria-labelledby="sb-tab-earn">
-          <span class="sb-detail-label">COINS EARNED THIS MATCH</span><strong id="sb-earned">0</strong>
+          <span class="sb-detail-label">E THIS MATCH · PENDING VALIDATION</span><strong id="sb-earned">0</strong>
           <p>Coins awarded during this match.</p>
         </div>
         <div id="sb-performance-view" class="sb-detail hidden" role="tabpanel" aria-labelledby="sb-tab-performance">

@@ -25,6 +25,8 @@ const tail = (s, n = 1) => s.trim().split('\n').slice(-n).join(' ').slice(0, 90)
 
 // Automated gates — each returns {ok, detail}
 const AUTO = [
+  { id: 'G-E-ECONOMY', phase: 'economy', name: 'E decimals, ledger, authority, caps and replay protection',
+    fn: () => { const r = run('npm run test:economy'); return {ok:r.ok,detail:tail(r.out)}; } },
   { id: 'G-EV-BROWSER', phase: 'art', name: 'Browser loads EV players, bots and rifle; preview cleanup retains live geometry',
     fn: () => { const r = run('npm run test:ev-game'); return { ok: r.ok, detail: tail(r.out) }; } },
   { id: 'G-EV-DEFAULT', phase: 'art', name: 'EV default character animations and Auto Rifle load and fit',
@@ -108,8 +110,6 @@ const BLOCKED = [
     why: 'needs authored 3D art assets — cannot be generated here' },
   { id: 'G5-play',   phase: 'Phase 6',   name: 'Human playtest lock (2/4/8p feel, sightlines)',
     why: 'needs human playtesters — bot load/topology proven, human feel is not' },
-  { id: 'G-econ',    phase: 'Phase 11',  name: 'Authoritative progression / economy',
-    why: 'gated by roadmap on product + identity + persistence + legal approval' },
   { id: 'G-legal',   phase: 'Phase 12',  name: 'Security / privacy / provenance / legal / credits review',
     why: 'needs human security + legal review' },
   { id: 'G-deploy',  phase: 'Phase 12',  name: 'Staging deploy + rollback drill + production deploy',

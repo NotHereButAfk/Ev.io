@@ -1,3 +1,4 @@
+import { EarningsUI } from '../ui/EarningsUI.js';
 // AuthNetBridge — folds the proven authoritative netcode (AuthClient) into the
 // LIVE game. When enabled it replaces the local ServerSim path: the server owns
 // movement + combat, the local player is client-predicted, and other players
@@ -72,7 +73,13 @@ export function nearestSpawnYaw(spawns, x, y, z, fallback = Math.PI, maxDistance
   return bestYaw;
 }
 
-export function authNetTargets() {
+export function authNetTargets(mode = 'deathmatch') {
+  if(['survival','teamslayer'].includes(mode)){
+    const explicit=mode==='survival'?import.meta.env.VITE_AUTH_SURVIVAL_WS_URLS:import.meta.env.VITE_AUTH_TEAM_WS_URLS;
+    if(explicit)return String(explicit).split(',').map(s=>s.trim()).filter(Boolean);
+    return authNetTargets().map(target=>{const url=new URL(target,location.href);url.searchParams.set('mode',mode);return url.href;});
+  }
+  if(mode!=='deathmatch')return [];
   try {
     const q = new URLSearchParams(location.search).get('authnet');
     if (q) return q === '1' ? [`ws://${location.hostname}:8788`] : q.split(',').map((s) => s.trim()).filter(Boolean);
@@ -128,12 +135,17 @@ export class AuthNetBridge {
       // keep fighting underneath the real server snapshots, causing phantom
       // damage, fake population counts, and two incompatible scoreboards.
       game.botManager?.clear?.();
+      game.zombieManager?.clear?.();
       game.serverSim?.stop?.();
       game._netDriven = true;
       game.hud?.setServerPop?.(countAuthoritativePlayers(this.client.roster), 8);
       this._mapReady = Promise.resolve(game._onAuthoritativeMap?.(arena?.id, match, true));
     };
-    this.client.onSnapshot = () => {
+    this.earnings = new EarningsUI(()=>{game.input.mouseDown=false;game.input.rightMouseDown=false;game.mobileControls?.hide();document.exitPointerLock?.();game._openMenu?.();});
+    this.client.onEarning = m => {if(m.kind==='boss_spawn')game.hud?.addKillFeed?.(m.description);else this.earnings.notify(m.amount,m.kind);};
+    this.client.onSnapshot = (snapshot) => {
+      this.earnings.update(snapshot.economy);
+      this.client.survival=snapshot.survival;
       if (!this._welcomed || this.ready || this._starting) return;
       this._starting = true;
       this._mapReady.then(async () => {
@@ -509,7 +521,7 @@ export class AuthNetBridge {
       else if (e.e === 'kill') {
         if (e.by === me) {
           this.game.hud?.flashHitmarker?.(e.head);
-          this.game.hud?.showKillConfirm?.(e.head, 100);
+          this.game.hud?.showKillConfirm?.(e.head, e.score ?? 100);
           if (e.head) this.game.hud?.showHeadshotFlair?.();
         }
         const tag = e.head ? ' 🎯' : '';
@@ -543,6 +555,7 @@ export class AuthNetBridge {
   }
 
   disconnect() {
+    this.earnings?.dispose();
     this.client.disconnect();
     for (const [, a] of this.remotes) { a.avatar.dispose(); a.nameEl.remove(); }
     this.remotes.clear();

@@ -48,12 +48,16 @@ try {
     compressedMap.status === 200 && compressedMap.headers.get('content-encoding') === 'gzip'
       && decodedMap.byteLength > 1_000_000);
 
-  for (const route of ['/login', '/register', '/privacy', '/terms', '/withdrawal']) {
+  for (const route of ['/login', '/register', '/privacy', '/terms', '/earnings', '/economy-admin']) {
     const page = await fetch(`http://127.0.0.1:${PORT}${route}`);
     const pageHtml = await page.text();
     await check(`serves clean HTML route ${route}`, page.status === 200 && /<!doctype html>/i.test(pageHtml));
   }
 
+  for (const route of ['/withdrawal', '/withdrawal.html']) {
+    const legacy = await fetch(`http://127.0.0.1:${PORT}${route}`, { redirect: 'manual' });
+    await check(`redirects obsolete route ${route} to internal earnings`, legacy.status === 302 && legacy.headers.get('location') === '/earnings');
+  }
   const missing = await fetch(`http://127.0.0.1:${PORT}/not-a-real-file`);
   await check('returns 404 for missing files', missing.status === 404);
 

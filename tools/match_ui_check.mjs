@@ -62,7 +62,7 @@ try {
   });
   await page.screenshot({path:`${process.env.MATCH_UI_SHOTS}/scoreboard-desktop.png`});
  }
- await page.keyboard.press('ArrowRight');assert(await page.locator('#sb-earn-view').isVisible());assert.equal(await page.locator('#sb-earned').textContent(),'60');
+ await page.keyboard.press('ArrowRight');assert(await page.locator('#sb-earn-view').isVisible());assert.equal(await page.locator('#sb-earned').textContent(),'60.00');
  await page.keyboard.press('ArrowRight');assert(await page.locator('#sb-performance-view').isVisible());assert((await page.locator('#sb-performance').textContent()).includes('25.0%'));
  await page.evaluate(()=>window.__game.hud.showScoreboard(window.__game._buildScoreboardRows()));
  assert(await page.locator('#sb-performance-view').isVisible(),'refresh preserves selected tab');

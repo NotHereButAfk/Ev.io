@@ -213,6 +213,8 @@ export class AuthRoom {
     this._fillBotSlots();
   }
 
+  opponents(a,b) { return a.id!==b.id; }
+
   _setSimArena(arena) {
     this.arena = arena;
     this.simWorld = {
@@ -293,11 +295,17 @@ export class AuthRoom {
 
   _rotateMatch(now = Date.now()) {
     if (now - this.matchStart < this.matchDurationMs) return false;
+    if (this.economy?.ready) {
+      const humans=[...this.players.values()].filter(p=>!p.isBot);
+      const high=Math.max(0,...[...this.players.values()].map(p=>p.score));
+      const leaders=humans.filter(p=>p.score===high && high>0);
+      this.economy.finish(this.winnerIds?this.winnerIds():(this.mode!=='survival'&&leaders.length===1?[leaders[0].id]:[])).catch(e=>console.error('[economy round]',e.message));
+    }
     this.previousRound = {
       start: this.matchStart,
       rows: Array.from(this.players.values(), p => ({
         id: p.id, name: p.name, isBot: !!p.isBot,
-        kills: p.kills, deaths: p.deaths, score: p.score,
+        kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
       })),
     };
     // Keep the clock on its global cadence even if the process sleeps or a
@@ -338,6 +346,8 @@ export class AuthRoom {
       player.kills = 0;
       player.deaths = 0;
       player.score = 0;
+      player.assists = 0;
+      player.damageContributors = new Map();
       player.reloadUntil = 0;
       player.reloadWid = null;
       player.invulnerableUntil = this.tick + SPAWN_PROTECTION_TICKS;
@@ -406,7 +416,7 @@ export class AuthRoom {
     const id = _pid++;
     const spawn = this._spawn(id, id, true);
     const p = {
-      id, send, name, isBot: !!isBot,
+      id, send, name, isBot: !!isBot, assists: 0, damageContributors: new Map(),
       state: createState(spawn[0], spawn[1], spawn[2]),
       lastInputSeq: 0, ackTick: 0,
       queue: [],
@@ -600,7 +610,7 @@ export class AuthRoom {
         const isArenaOpponent = candidate.isBot;
         if (!isArenaOpponent && !p._botHostility.has(id)) continue;
         if (p._botIgnoredUntil.has(id)) continue;
-        if (!candidate?.alive || candidate === p) continue;
+        if (!candidate?.alive || !this.opponents(p,candidate)) continue;
         const dx = candidate.state.px - p.state.px;
         const dz = candidate.state.pz - p.state.pz;
         const distance = Math.hypot(dx, dz);
@@ -1172,6 +1182,7 @@ export class AuthRoom {
   _damage(target, shooter, dmg, head) {
     if (!target.alive || this.tick < (target.invulnerableUntil || 0)) return;
     if (target.isBot && shooter && shooter !== target) this._provokeBot(target, shooter, true);
+    if(shooter && shooter !== target){target.damageContributors.set(shooter.id,this.tick);this.economy?.activity(shooter.id,true,50);}
     const absorbed = Math.min(target.shield, dmg);
     target.shield -= absorbed;
     target.health -= (dmg - absorbed);
@@ -1193,14 +1204,30 @@ export class AuthRoom {
     target.deadUntil = this.tick + RESPAWN_TICKS;
     if (target.isBot) target._botState = BOT_STATES.DEAD;
     target.deaths++;
+    let awardedScore=0;
     if (shooter && target !== shooter) {
       shooter.kills++;
-      shooter.score += head ? 150 : 100;
+      const boss=target.bossInstance?this.economy?.match.bosses[target.bossInstance]:null;
+      const kind=target.survivalEnemy?(boss?'boss':'survival_kill'):(head?'headshot':'kill');
+      const reward=this.economy?.ready?this.economy.award(shooter.id,kind,{victim:target.id,victimIsBot:target.isBot,...(boss?{score:boss.scoreReward}:{})}):null;
+      awardedScore=reward?.score ?? (head ? 150 : 100);
+      shooter.score += awardedScore;
+      if(reward && reward.e !== '0.0000')shooter.send({t:'earning',kind:'kill',amount:reward.e});
     }
+    const assistWindow=(this.economy?.match?.config.assistWindowSeconds ?? 5)*TICK_HZ;
+    for(const [id,tick] of target.damageContributors){
+      if(id===shooter?.id || id===target.id || this.tick-tick>assistWindow)continue;
+      const helper=this.players.get(id);if(!helper)continue;
+      const reward=this.economy?.ready?this.economy.award(id,'assist',{victim:target.id,victimIsBot:target.isBot}):null;
+      helper.assists++;helper.score+=reward?.score??10;
+      helper.send({t:'earning',kind:'assist',amount:reward?.e||'0.0000',score:reward?.score??10});
+    }
+    target.damageContributors.clear();
+    const earningTarget=this.economy?.participant(target.id);if(earningTarget)earningTarget.deaths++;
     this.events.push({
       e: 'kill', id: target.id, by: shooter?.id ?? null,
       byName: shooter?.name ?? 'THE VOID', victimName: target.name,
-      head, wid: wid ?? shooter?.wid ?? 'void',
+      score:awardedScore, head, wid: wid ?? shooter?.wid ?? 'void',
     });
     return true;
   }
@@ -1472,6 +1499,10 @@ export class AuthRoom {
       this._resolveAbility(p, req.kind, A, req.yaw, req.pitch);
     }
 
+    for(const p of this.players.values()) {
+      const moving=Math.hypot(p._animVX||0,p._animVZ||0)>.2;
+      if(!p.isBot)this.economy?.activity(p.id,moving || (p._firingTicks||0)>0,TICK_MS);
+    }
     // send per-player snapshots (each gets its own ack + authoritative you-state)
     const now = this.tick;
     const publicList = [];
@@ -1494,7 +1525,7 @@ export class AuthRoom {
         reload: reloadTicks > 0 ? 1 - reloadTicks / reloadDuration : 0,
         swing: p._swingUntil > now ? clamp((now - p._swingStart) / swingDuration, 0, 1) : 1,
         health: p.health, shield: p.shield, maxShield: p.maxShield,
-        kills: p.kills, deaths: p.deaths, score: p.score,
+        kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
         botState: p.isBot ? p._botState : undefined,
       });
     }
@@ -1504,6 +1535,8 @@ export class AuthRoom {
       p.mag = ammo.mag;
       p.send({
         t: 'snapshot', tick: now, ack: p.ackTick,
+        survival: this.mode==='survival'?{wave:this.wave,enemies:[...this.players.values()].filter(p=>p.isBot&&p.alive).length}:null,
+        economy: this.economy?.ready ? this.economy.preview(p.id) : null,
         mapId: this.arena.id,
         mapName: this.arena.name,
         matchStart: this.matchStart,
@@ -1532,7 +1565,7 @@ export class AuthRoom {
                reloadTicks: p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0,
                reloadDuration: Math.ceil((WEAPONS[p.wid]?.reload || 0) * TICK_HZ),
                spawnProtected: now < (p.invulnerableUntil || 0),
-               kills: p.kills, deaths: p.deaths, score: p.score,
+               kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
                blind: p.blindUntil > now, blindTicks: Math.max(0, p.blindUntil - now),
                abilities: p.abilities, abilityCD: +p.abilityCD.toFixed(2) },
         players: publicList,
@@ -1559,7 +1592,7 @@ export class AuthRoom {
 
   _roster() {
     return Array.from(this.players.values()).map((p) => ({
-      id: p.id, name: p.name, isBot: p.isBot, kills: p.kills, deaths: p.deaths, score: p.score,
+      id: p.id, name: p.name, isBot: p.isBot, kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
     }));
   }
 

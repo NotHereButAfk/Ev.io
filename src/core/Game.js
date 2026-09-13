@@ -1,3 +1,4 @@
+import { EAccount } from './EAccount.js';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -856,7 +857,7 @@ export class Game {
 
   _refreshNavCoins() {
     const el = document.getElementById('nav-coins');
-    if (el) el.textContent = `💰 ${Shop.getCoins()}`;
+    EAccount.render();
   }
 
   _wireMenu() {
@@ -882,8 +883,8 @@ export class Game {
           this._onAuth('__guest__');
           name = UserAccount.getDisplayName('__guest__');
         }
-        const publicMode = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
-        if (publicMode && authNetTargets().length) {
+        const publicMode = authNetTargets(modeId).length>0;
+        if (publicMode) {
           await this._prepareAuthoritativeMatch(name, modeId);
         } else if (!publicMode && this._authNet) {
           // Leaving the prepared public lobby for survival must not keep its
@@ -1022,7 +1023,7 @@ export class Game {
     this._isDM       = ['deathmatch', 'teamslayer', 'ctf', 'koth'].includes(modeId);
     this._isSurvival = modeId === 'survival';
     this.botManager.setEnabled(!this._isSurvival);
-    const expectsAuth = this._isDM && !!(this._selectedAuthNetUrl || authNetTarget());
+    const expectsAuth = authNetTargets(modeId).length>0 && !!this._selectedAuthNetUrl;
 
     this.hud.hideDMTimer();
     this.hud.hideDowned();
@@ -1082,7 +1083,7 @@ export class Game {
       this._modeTimer = 0;
       this.serverSim.stop();
       this.hud.showServerPop(false);
-      this._wireSurvivalCallbacks();
+      if(!expectsAuth)this._wireSurvivalCallbacks();
       this.hud.setModeHUD('GRACE PERIOD', '1:00 REMAINING');
     } else {
       // Legacy modes (kept for compatibility)
@@ -1344,7 +1345,7 @@ export class Game {
     // AuthNetBridge clears BotManager on welcome, so the results screen must
     // consume the same complete server roster as the live scoreboard.
     const rows = buildLeaderboardRows(finalRows || this._buildScoreboardRows());
-    const earnedCoins = this.matchStats.earnedCoins;
+    const earnedCoins = Number(this._authNet?.earnings?.data?.finalE || 0);
 
     if (this.weaponSystem.weaponMount) this.weaponSystem.weaponMount.visible = false;
     this.state    = 'leaderboard';
@@ -1456,7 +1457,8 @@ export class Game {
         && this._joiningModeId === modeId && this.player.name === name) return;
     this._joiningModeId = modeId;
     if (!continueLoading) this._showServerJoining(modeId);
-    const match = await findAvailableMatch(authNetTargets());
+    const match = await findAvailableMatch(authNetTargets(modeId));
+    if(match?.mode && match.mode!==modeId)throw new Error('Server mode mismatch');
     if (!match?.url) throw new Error('No public server is available');
     this._selectedAuthNetUrl = match.url;
     this._selectedMatch = match;
@@ -1956,7 +1958,7 @@ export class Game {
     // movement + combat — the local player is client-predicted and other
     // players are real remotes. Falls back cleanly if the socket isn't up.
     if (this._authNet === undefined) {
-      const url = this._selectedAuthNetUrl || authNetTarget();
+      const url = authNetTargets(this.menu.selectedModeId).length?(this._selectedAuthNetUrl || authNetTargets(this.menu.selectedModeId)[0]):null;
       this._authNet = url ? new AuthNetBridge(this, url) : null;
     }
     // Dead players are frozen where they fell until the respawn timer fires —
@@ -2078,6 +2080,7 @@ export class Game {
       if (!this._sbShown || this._sbRefreshT <= 0) {
         this.hud.showScoreboard(this._buildScoreboardRows(), this._mode?.name || '', {
           ...this.matchStats,
+          earnedCoins: Number(this._authNet?.earnings?.data?.finalE || 0),
         });
         this._sbRefreshT = 0.4;
       }
@@ -2336,6 +2339,11 @@ export class Game {
     }
 
     // ─── SURVIVAL ───────────────────────────────────────────────────────────────
+    if (this._isSurvival && this._authNet?.ready) {
+      const s=this._authNet.client.survival;
+      if(s)this.hud.setModeHUD(`WAVE ${s.wave}`,`${s.enemies} ENEMIES ALIVE`);
+      return;
+    }
     if (this._isSurvival) {
       const sm = this.survivalManager;
       sm.update(dt, this.zombieManager.allDead());

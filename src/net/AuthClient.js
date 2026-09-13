@@ -116,7 +116,7 @@ export class AuthClient {
         this.you = m.you;
         this.roster = (m.players || []).map((pl) => ({
           id: pl.id, name: pl.name, isBot: !!pl.isBot,
-          kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
+          kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0, assists: pl.assists || 0,
         }));
         this.arena = m.arena;
         this.lootPads = m.arena?.lootPads || [];
@@ -137,6 +137,9 @@ export class AuthClient {
         break;
       case 'ping':
         this.ws?.send(JSON.stringify({ t: 'pong', id: m.id }));
+        break;
+      case 'earning':
+        this.onEarning?.(m);
         break;
       case 'snapshot':
         this._reconcile(m);
@@ -206,14 +209,14 @@ export class AuthClient {
                   reloading: !!y.reloading, reloadTicks: y.reloadTicks ?? 0,
                   reloadDuration: y.reloadDuration ?? 0,
                   spawnProtected: !!y.spawnProtected,
-                  kills: y.kills, deaths: y.deaths, score: y.score,
+                  kills: y.kills, deaths: y.deaths, score: y.score, assists: y.assists || 0,
                   blind: !!y.blind, blindTicks: y.blindTicks ?? 0,
                   abilities: y.abilities ?? this.self.abilities, abilityCD: y.abilityCD ?? 0 };
     this.smokes = snap.smokes ?? [];
     this.lootPads = snap.lootPads ?? snap.arena?.lootPads ?? this.lootPads;
     this.roster = snap.players.map((pl) => ({
       id: pl.id, name: pl.name, isBot: !!pl.isBot,
-      kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0,
+      kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0, assists: pl.assists || 0,
     }));
     // snap predicted state to server truth
     this.sim = { ...this.sim,
@@ -290,7 +293,7 @@ export class AuthClient {
                    firing: !!pl.firing,
                    reload: pl.reload || 0, swing: pl.swing == null ? 1 : pl.swing,
                    alive: pl.alive, health: pl.health,
-                   kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0 });
+                   kills: pl.kills || 0, deaths: pl.deaths || 0, score: pl.score || 0, assists: pl.assists || 0 });
       if (r.buf.length > 30) r.buf.shift();
     }
     // reap gone players

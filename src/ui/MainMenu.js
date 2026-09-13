@@ -1,3 +1,4 @@
+import { EAccount } from '../core/EAccount.js';
 import { mobileIcon } from './MobileIcons.js';
 import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
@@ -144,6 +145,7 @@ export class MenuUI {
       if (['profile', 'shop', 'battlepass', 'party'].includes(panel)) button.dataset.gated = '1';
       more?.appendChild(button);
     }
+    const earningsLink=document.createElement('a');earningsLink.className='profile-menu-item';earningsLink.href='/earnings';earningsLink.textContent='E EARNINGS';more?.appendChild(earningsLink);
     this._mobileHome = home;
   }
 
@@ -587,7 +589,8 @@ export class MenuUI {
 
   _refreshCoins() {
     const el = document.getElementById('nav-coins');
-    if (el) el.textContent = `\u{1F4B0} ${Shop.getCoins().toLocaleString()}`;
+    EAccount.render();
+    EAccount.refresh();
   }
 
   _renderProfile() {
@@ -612,7 +615,7 @@ export class MenuUI {
     set('ps-games', games);
     set('ps-survival', '00:00:00');
     set('ps-rank', _rank(kills));
-    set('ps-balance', Shop.getCoins().toLocaleString() + 'e');
+    set('ps-balance', EAccount.loaded ? Number(EAccount.balance).toFixed(2)+' E' : 'Sign in to earn E');
 
     const logout = document.getElementById('profile-logout-btn');
     if (logout) logout.style.display = isGuest ? 'none' : 'block';
