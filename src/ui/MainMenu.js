@@ -871,7 +871,6 @@ export class MenuUI {
       warmWeaponThumbs(() => { if (this._activePanel === 'shop') this._renderShop(); });
     }
 
-    this._startNightMarketTimer();
     this._renderShopGrid(root);
   }
 
@@ -1022,12 +1021,7 @@ export class MenuUI {
       return card;
     };
 
-    // Night Market: 5 daily items seeded by today's date. Unowned skins get
-    // priority so the rotation stays worth checking; owned ones only pad out
-    // the row when the collection is nearly complete.
-    // Stock = player finishes + shared weapon finishes. A purchased weapon
-    // finish can be equipped independently on its authored main gun and on the
-    // sword; the inventory owns those two equipped slots.
+    // Full catalog: character finishes and five exclusive finishes per main gun.
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
     const weaponItems    = WEAPON_SKINS.filter((s) => getWeaponIdForSkin(s.id))
       .map(s => ({ ...s, _kind: 'weapon' }));
@@ -1038,29 +1032,14 @@ export class MenuUI {
     characterGrid.className = 'shop-skin-grid';
     characterItems.forEach(s => characterGrid.appendChild(makeCard(s, 'character')));
     root.appendChild(characterGrid);
-    const allItems = weaponItems;
-    const isOwnedItem = (s) => s._kind === 'character' ? Shop.isOwned(s.id) : Armory.ownsSkin(s.id);
-    const unowned = allItems.filter(s => !isOwnedItem(s));
-
-    if (allItems.length && unowned.length === 0) {
-      // Collection complete — the market bows to a completionist.
-      const done = document.createElement('div');
-      done.className = 'nm-complete';
-      done.innerHTML = `
-        <div class="nm-complete-crown">👑</div>
-        <div class="nm-complete-title">COLLECTION COMPLETE</div>
-        <div class="nm-complete-sub">You own every finish in the armory. The Night Market has
-        nothing left to sell you, legend — new drops will land here first.</div>`;
-      root.appendChild(done);
-    } else {
-      const picks = this._nightMarketPick(unowned, 5);
-      if (picks.length < 5) {
-        const owned = allItems.filter(isOwnedItem);
-        picks.push(...this._nightMarketPick(owned, 5 - picks.length));
-      }
+    for (const weaponId of [...new Set(weaponItems.map(s => getWeaponIdForSkin(s.id)))]) {
+      const title = document.createElement('h3');
+      title.textContent = WEAPONS.find(w => w.id === weaponId)?.name || weaponId;
+      root.appendChild(title);
       const grid = document.createElement('div');
-      grid.className = 'shop-skin-grid nm-grid';
-      picks.forEach(s => grid.appendChild(makeCard(s, s._kind)));
+      grid.className = 'shop-skin-grid';
+      weaponItems.filter(s => getWeaponIdForSkin(s.id) === weaponId)
+        .forEach(s => grid.appendChild(makeCard(s, 'weapon')));
       root.appendChild(grid);
     }
 

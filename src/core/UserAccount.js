@@ -17,7 +17,7 @@ function _storeServerProfile(user) {
   const shop = JSON.parse(localStorage.getItem('sio_shop') || '{"coins":500,"owned":[]}');
   const armory = JSON.parse(localStorage.getItem('sio_armory') || '{}');
   shop.owned = []; // Replace the previous account's character entitlements.
-  if (!Array.isArray(armory.__owned)) armory.__owned = [];
+  armory.__owned = []; // Account entitlements replace prior local ownership.
   for (const item of entitlements) {
     const target = item.kind === 'character' ? shop.owned : armory.__owned;
     if (!target.includes(item.id)) target.push(item.id);

@@ -1,14 +1,5 @@
-// Per-weapon cosmetic skin storage, backed by localStorage.
-// Each weapon has an independently equipped skin.
-// Skins are for the ALWAYS-EQUIPPED loadout items only: the 5 main guns and
-// the Arc Blade sword (the player always carries a gun + the sword). They all
-// share ONE skin catalog (WEAPON_SKINS — the authored sword uses the same
-// material roles as the guns), so every skinnable item has the same skins.
-// Everything else (extras, knife, hammer) always shows its default look.
-// Enforced here centrally so the UI, viewmodel and thumbnails all agree.
-
+// Per-main-gun cosmetics. Retired and incompatible finishes fall back to Default.
 import { getWeaponSkin, isSkinForWeapon } from '../weapons/WeaponSkins.js';
-import { getSwordSkin } from '../weapons/SwordSkins.js';
 import { getWeapon } from '../weapons/weaponDefs.js';
 
 const _KEY = 'sio_armory';
@@ -20,9 +11,9 @@ function _load() {
 function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 
 export const Armory = {
-  // The main-category guns + the always-equipped sword can wear skins.
+  // Only the five main guns have purchasable finishes.
   canSkin(weaponId) {
-    return weaponId === 'sword' || getWeapon(weaponId)?.category === 'main';
+    return getWeapon(weaponId)?.category === 'main';
   },
 
   getSkinId(weaponId, isSword = false) {
@@ -30,7 +21,7 @@ export const Armory = {
     if (!this.canSkin(weaponId)) return null;
     const skinId = _load()[weaponId] || null;
     if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return null;
-    return skinId;
+    return this.ownsSkin(skinId) ? skinId : null;
   },
 
   // True only if the player has explicitly equipped a skin for this weapon
@@ -45,14 +36,10 @@ export const Armory = {
   // through the shop, battle pass, drops, etc.
   ownedSkins() {
     const d = _load();
-    return Array.isArray(d.__owned) ? d.__owned : [];
+    return Array.isArray(d.__owned) ? d.__owned.filter(id => getWeaponSkin(id)) : [];
   },
   ownsSkin(skinId) {
-    if (this.ownedSkins().includes(skinId)) return true;
-    // Common finishes are free; epic/legendary/mythic are bought in the
-    // Night Market (Shop.buy -> grantSkin).
-    const s = getWeaponSkin(skinId) || getSwordSkin(skinId);
-    return s?.rarity === 'common';
+    return !!getWeaponSkin(skinId) && this.ownedSkins().includes(skinId);
   },
   grantSkin(skinId) {
     const d = _load();
@@ -61,7 +48,7 @@ export const Armory = {
   },
 
   equipSkin(weaponId, skinId) {
-    if (!this.canSkin(weaponId)) return;   // extras/melee stay default
+    if (!this.canSkin(weaponId) || !this.ownsSkin(skinId)) return;   // extras/melee stay default
     if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return;
     const d = _load();
     d[weaponId] = skinId;
@@ -76,14 +63,10 @@ export const Armory = {
   },
 
   // Returns Map<weaponId, { skin, isSword }>  for all weapons in loadout.
-  // Every skinnable item (main guns + sword) uses the shared WEAPON_SKINS
-  // catalog, so isSword is always false — the legacy sword-catalog path only
-  // survives inside ownsSkin for old saves.
   buildSkinMap(weapons) {
-    const d = _load();
     const map = new Map();
     for (const w of weapons) {
-      const saved = this.canSkin(w.id) ? (d[w.id] || null) : null;
+      const saved = this.getSkinId(w.id);
       const skinId = w.category === 'main' && !isSkinForWeapon(w.id, saved) ? null : saved;
       map.set(w.id, { skin: skinId ? getWeaponSkin(skinId) : null, isSword: false });
     }
