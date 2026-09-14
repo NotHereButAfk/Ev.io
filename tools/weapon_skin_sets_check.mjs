@@ -24,14 +24,15 @@ assert(Object.keys(MAIN_GUN_SKIN_SETS).length === 5, 'expected five main-gun ski
 const assigned = [];
 for (const weaponId of MAIN_WEAPON_IDS) {
   const skins = getWeaponSkinsFor(weaponId);
-  assert(skins.length === 5, `${weaponId} has ${skins.length} skins instead of 5`);
+  assert(skins.length === 10, `${weaponId} has ${skins.length} skins instead of 10`);
+  assert(skins.filter(s=>s.rarity==='rare').length===5 && skins.filter(s=>s.rarity==='common').length===5, 'five of each rarity required');
   for (const skin of skins) {
     assert(isSkinForWeapon(weaponId, skin.id), `${skin.id} is not assigned to ${weaponId}`);
     assert(getWeaponIdForSkin(skin.id) === weaponId, `${skin.id} reverse assignment is wrong`);
     assigned.push(skin.id);
   }
 }
-assert(new Set(assigned).size === 25, 'main-gun skin assignments must be 25 unique finishes');
+assert(new Set(assigned).size === 50, 'main-gun skin assignments must be 50 unique finishes');
 assert(assigned.every((id) => WEAPON_SKINS.some((skin) => skin.id === id)), 'assigned skin is missing');
 
 // Applying every assigned finish must leave the model hierarchy, transforms,
@@ -47,6 +48,11 @@ for (const skinId of assigned) {
   const positions = [...geometry.attributes.position.array];
   const childCount = group.children.length;
   applyWeaponSkin(group, skin);
+  if(skin.rarity==='rare') {
+    assert(material.map?.isTexture, `${skinId} is missing its patterned wrap`);
+    applyWeaponSkin(group, WEAPON_SKINS.find(s=>s.rarity==='common'));
+    assert(material.map===null, 'switching back to Common must clear the Rare wrap');
+  }
   assert(group.children.length === childCount, `${skinId} changed the model hierarchy`);
   assert(geometry.attributes.position.array.every((value, i) => value === positions[i]), `${skinId} changed gun geometry`);
   assert(mesh.position.length() === 0
@@ -54,4 +60,4 @@ for (const skinId of assigned) {
   `${skinId} changed gun transforms`);
 }
 
-console.log('weapon skins passed: 5 unique material-only finishes for each of 5 main guns (25 total)');
+console.log('weapon skins passed: 10 material-only finishes per main gun: five Common and five Rare (50 total)');

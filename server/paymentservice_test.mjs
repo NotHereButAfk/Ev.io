@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createPaymentService } from './paymentservice.mjs';
 
+const testSkin = process.argv.includes('--common') ? 'm4_white_signal' : 'm4_azure_mainframe';
+const testPrice = process.argv.includes('--common') ? '20.00' : '30.00';
+
 class FakePool {
   constructor() {
     this.orders = [];
@@ -89,7 +92,7 @@ const fetchImpl = async (url, options = {}) => {
   if (url.endsWith('/v2/checkout/orders/PAYPALORDER1/capture')) {
     return response({
       status: 'COMPLETED',
-      purchase_units: [{ payments: { captures: [{ id: 'CAPTURE1', status: 'COMPLETED', amount: { currency_code: 'USD', value: '20.00' } }] } }],
+      purchase_units: [{ payments: { captures: [{ id: 'CAPTURE1', status: 'COMPLETED', amount: { currency_code: 'USD', value: testPrice } }] } }],
     });
   }
   throw new Error(`Unexpected PayPal request: ${url}`);
@@ -107,6 +110,7 @@ let result = await invoke(service, 'GET', '/api/store/config');
 assert.equal(result.status, 200);
 assert.equal(result.json.configured, true);
 assert.equal(result.json.prices.common, '20.00');
+assert.equal(result.json.prices.rare, '30.00');
 
 result = await invoke(service, 'POST', '/api/store/client-token', undefined, { authorization: 'guest' });
 assert.equal(result.status, 401);
@@ -118,21 +122,21 @@ result = await invoke(service, 'POST', '/api/store/client-token');
 assert.equal(result.status, 200);
 assert.equal(result.json.clientToken, 'CLIENT_TOKEN');
 
-result = await invoke(service, 'POST', '/api/store/orders', { skinId: 'ember', termsAccepted: false, termsVersion: '2026-08-31' });
+result = await invoke(service, 'POST', '/api/store/orders', { skinId: testSkin, termsAccepted: false, termsVersion: '2026-08-31' });
 assert.equal(result.status, 400);
 
 result = await invoke(service, 'POST', '/api/store/orders', { skinId: 'not-for-sale', termsAccepted: true, termsVersion: '2026-08-31' });
 assert.equal(result.status, 400);
 
-result = await invoke(service, 'POST', '/api/store/orders', { skinId: 'ember', termsAccepted: true, termsVersion: '2026-08-31' });
+result = await invoke(service, 'POST', '/api/store/orders', { skinId: testSkin, price: '0.01', amount: '0.01', termsAccepted: true, termsVersion: '2026-08-31' });
 assert.equal(result.status, 201);
 assert.equal(result.json.orderId, 'PAYPALORDER1');
 const createCall = calls.find((call) => call.url.endsWith('/v2/checkout/orders'));
-assert.equal(JSON.parse(createCall.options.body).purchase_units[0].amount.value, '20.00');
+assert.equal(JSON.parse(createCall.options.body).purchase_units[0].amount.value, testPrice);
 
 result = await invoke(service, 'POST', '/api/store/orders/PAYPALORDER1/capture');
 assert.equal(result.status, 200);
-assert.deepEqual(result.json, { ok: true, skinId: 'ember', kind: 'weapon' });
+assert.deepEqual(result.json, { ok: true, skinId: testSkin, kind: 'weapon' });
 assert.equal(pool.skins.length, 1);
 
 const captureCount = () => calls.filter((call) => call.url.endsWith('/capture')).length;

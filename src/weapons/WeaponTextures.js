@@ -1268,7 +1268,34 @@ function camoUrbanDecal() {
   return c;
 }
 
+// Neutral patterned wraps multiply against each skin's authored palette.
+function rarePattern(kind) {
+  const c = makeCanvas(256), ctx = c.getContext('2d');
+  ctx.fillStyle = '#cbd0d6'; ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#4e5763'; ctx.fillStyle = '#66707c'; ctx.lineWidth = 9;
+  for (let y = -128; y < 384; y += 64) {
+    for (let x = -128; x < 384; x += 64) {
+      ctx.beginPath();
+      if (kind === 'circuit') {
+        ctx.moveTo(x, y+12); ctx.lineTo(x+34, y+12); ctx.lineTo(x+34, y+44); ctx.lineTo(x+64, y+44); ctx.stroke();
+        ctx.fillRect(x+27,y+5,14,14);
+      } else if (kind === 'orbit') {
+        ctx.arc(x+32,y+32,23,0,Math.PI*1.6); ctx.stroke();
+        ctx.fillRect(x+12,y+9,11,11);
+      } else if (kind === 'shards') {
+        ctx.moveTo(x,y);ctx.lineTo(x+51,y+13);ctx.lineTo(x+14,y+56);ctx.closePath();ctx.fill();
+      } else if (kind === 'weave') {
+        ctx.fillRect(x,y+10,46,13);ctx.fillRect(x+10,y+32,13,32);
+      } else {
+        ctx.moveTo(x,y+8);ctx.lineTo(x+32,y+36);ctx.lineTo(x+64,y+8);ctx.stroke();
+      }
+    }
+  }
+  return c;
+}
+
 const DECALS = {
+  ...Object.fromEntries(['circuit','orbit','shards','weave','chevron'].map(k => ['rare_'+k, () => rarePattern(k)])),
   fire:        fireDecal,
   anime:       animeDecal,
   animegirl:   animeGirlDecal,
@@ -1302,7 +1329,7 @@ export function decalTexture(type) {
   return cached('decal_' + type, () => {
     const make = DECALS[type];
     if (!make) return null;
-    const repeat = type === 'animegirl' ? 1 : 2;
+    const repeat = type === 'animegirl' || type.startsWith('rare_') ? 1 : 2;
     return finalize(make(), { color: true, repeat });
   });
 }

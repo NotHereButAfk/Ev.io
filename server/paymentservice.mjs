@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { STORE_ITEMS } from './storecatalog.mjs';
 
-const PRICE = { common: '20.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
+const PRICE = { common: '20.00', rare: '30.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
 const TERMS_VERSION = '2026-08-31';
 const items = new Map(STORE_ITEMS.map((skin) => [skin.id, { ...skin, price: PRICE[skin.rarity] }]));
 

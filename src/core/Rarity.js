@@ -2,10 +2,11 @@
 // Ordered weakest → strongest. Each tier has a UI colour and a glow strength
 // used for swatch borders / box-shadows.
 
-export const RARITY_ORDER = ['common', 'epic', 'legendary', 'mythic'];
+export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
 
 export const RARITY_COLORS = {
   common:    '#9aabb8',
+  rare:      '#3a9bff',
   epic:      '#b14df0',
   legendary: '#f5a623',
   mythic:    '#ff2e63',
@@ -14,6 +15,7 @@ export const RARITY_COLORS = {
 // Relative glow intensity for swatch styling (0 = none, 1 = max).
 export const RARITY_GLOW = {
   common:    0.0,
+  rare:      0.4,
   epic:      0.7,
   legendary: 0.9,
   mythic:    1.0,
