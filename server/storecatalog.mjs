@@ -1,4 +1,4 @@
-import { ARMOR_SKINS } from '../src/player/ArmorSkins.js';
+import { ARMOR_SKINS } from './characterskins.mjs';
 // Server-owned allow-list for paid digital items. Keep this module free of
 // renderer/browser imports so checkout can start on the production Node host.
 const byRarity = {

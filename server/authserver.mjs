@@ -1,4 +1,4 @@
-import { getArmorSkin } from '../src/player/ArmorSkins.js';
+import { getArmorSkin } from './characterskins.mjs';
 import { TeamRoom } from './teamroom.mjs';
 import { SurvivalRoom } from './survivalroom.mjs';
 import { createEconomyService } from './economy/service.mjs';
