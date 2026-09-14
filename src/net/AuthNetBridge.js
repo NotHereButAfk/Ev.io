@@ -1,3 +1,5 @@
+import { getArmorSkin } from '../player/ArmorSkins.js';
+import { applySkinToCharacter } from '../player/PreviewCharacter.js';
 import { EarningsUI } from '../ui/EarningsUI.js';
 // AuthNetBridge — folds the proven authoritative netcode (AuthClient) into the
 // LIVE game. When enabled it replaces the local ServerSim path: the server owns
@@ -171,6 +173,7 @@ export class AuthNetBridge {
       this._needsSpawnFacing = true;
       game._onAuthoritativeMap?.(mapId, match, false);
     };
+    this.client.armorSkin = this.game.selectedArmorSkin?.id;
     this.client.connect();
   }
 
@@ -472,6 +475,10 @@ export class AuthNetBridge {
     for (const r of this.client.remoteStates()) {
       seen.add(r.id);
       const a = this._remoteAvatar(r.id, r.isBot);
+      if(r.armorSkin && (a.armorSkin !== r.armorSkin || a.skinGroup !== a.avatar.group)){
+        applySkinToCharacter(a.avatar.group, DEFAULT_REMOTE_SKIN, getArmorSkin(r.armorSkin));
+        a.armorSkin=r.armorSkin;a.skinGroup=a.avatar.group;
+      }
       a.avatar.group.visible = mapReady;
       if (!mapReady) { a.nameEl.style.display = 'none'; continue; }
       a.pos.set(r.x, r.y, r.z);

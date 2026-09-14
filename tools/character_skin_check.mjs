@@ -51,3 +51,9 @@ for (const skin of ARMOR_SKINS) {
 }
 
 console.log(`ok   ${ARMOR_SKINS.length} character finishes, 2 starter skins, 4 themed silhouettes`);
+
+const collection=ARMOR_SKINS.filter(s=>s.collection==='Frontier Ten');
+assert.equal(collection.length,10);
+assert.equal(new Set(collection.map(s=>s.primary+':'+s.secondary+':'+s.emissive)).size,10);
+for(const s of collection){assert.equal(s.unlocked,true);assert.equal(s.earningEnabled,false);}
+console.log('Frontier Ten passed: ten unique free cosmetic finishes, no gameplay or E bonuses.');

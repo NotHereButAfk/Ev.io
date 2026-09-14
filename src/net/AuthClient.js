@@ -103,7 +103,7 @@ export class AuthClient {
       ? new WebSocket(this.url) : null;
     if (!ws) return;
     this.ws = ws;
-    ws.onopen = () => { this.connected = true; ws.send(JSON.stringify({ t: 'hello', name: this.name })); };
+    ws.onopen = () => { this.connected = true; ws.send(JSON.stringify({ t: 'hello', name: this.name, armorSkin: this.armorSkin })); };
     ws.onmessage = (ev) => this._recv(ev.data);
     ws.onclose = () => { this.connected = false; };
     ws.onerror = () => {};
@@ -284,6 +284,7 @@ export class AuthClient {
       if (!r) { r = { name: pl.name, isBot: !!pl.isBot, buf: [] }; this.remotes.set(pl.id, r); }
       r.name = pl.name;
       r.isBot = !!pl.isBot;
+      r.armorSkin = pl.armorSkin || null;
       const previous = r.buf[r.buf.length - 1];
       const jumped = previous && (
         previous.alive !== pl.alive
@@ -404,7 +405,7 @@ export class AuthClient {
       const state = interpolateRemoteSample(buf, renderT);
       if (!state) continue;
       out.push({
-        id, name: r.name, isBot: r.isBot, alive: state.alive, health: state.health,
+        id, name: r.name, isBot: r.isBot, armorSkin: r.armorSkin, alive: state.alive, health: state.health,
         x: state.x, y: state.y, z: state.z,
         // Shortest-way-round on yaw, or an avatar spins the long way through
         // the whole circle every time someone crosses ±π.

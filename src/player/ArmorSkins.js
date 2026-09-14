@@ -50,6 +50,56 @@ export const ARMOR_SKINS = [
     primary: 0x211a35, secondary: 0x0a0b11, emissive: 0xc54cff,
     emissiveIntensity: 1.05, roughness: 0.28, metalness: 0.78, price: 6400, shield: 0,
   },
+  {
+    id: 'arctic_ghost', name: 'Arctic Ghost', rarity: 'epic', collection: 'Frontier Ten', unlocked: true, theme: 'bone',
+    primary: 0xe4f3fa, secondary: 0x24334c, emissive: 0x67dbff,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'magma_revenant', name: 'Magma Revenant', rarity: 'legendary', collection: 'Frontier Ten', unlocked: true, theme: 'horns',
+    primary: 0x39333b, secondary: 0x21191b, emissive: 0xff581d,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'jade_ronin', name: 'Jade Ronin', rarity: 'epic', collection: 'Frontier Ten', unlocked: true, theme: 'horns',
+    primary: 0x397a5b, secondary: 0x152a25, emissive: 0xaaff76,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'desert_jackal', name: 'Desert Jackal', rarity: 'epic', collection: 'Frontier Ten', unlocked: true, theme: 'ears',
+    primary: 0xc7a776, secondary: 0x403528, emissive: 0x66e4e7,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'neon_specter', name: 'Neon Specter', rarity: 'legendary', collection: 'Frontier Ten', unlocked: true,
+    primary: 0x623a87, secondary: 0x211b36, emissive: 0xff60d5,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'abyss_diver', name: 'Abyss Diver', rarity: 'epic', collection: 'Frontier Ten', unlocked: true,
+    primary: 0x21667f, secondary: 0x14283b, emissive: 0x5cffe0,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'royal_aegis', name: 'Royal Aegis', rarity: 'legendary', collection: 'Frontier Ten', unlocked: true, theme: 'crown',
+    primary: 0x3658a1, secondary: 0x1c243d, emissive: 0xffd878,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'rose_wraith', name: 'Rose Wraith', rarity: 'epic', collection: 'Frontier Ten', unlocked: true, theme: 'bone',
+    primary: 0xd7a5b6, secondary: 0x433444, emissive: 0xff73b9,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'toxic_viper', name: 'Toxic Viper', rarity: 'legendary', collection: 'Frontier Ten', unlocked: true, theme: 'ears',
+    primary: 0x859c39, secondary: 0x252d22, emissive: 0xb5ff35,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
+  {
+    id: 'chrome_seraph', name: 'Chrome Seraph', rarity: 'mythic', collection: 'Frontier Ten', unlocked: true, theme: 'crown',
+    primary: 0xc5d4dd, secondary: 0x344252, emissive: 0xffe8a1,
+    emissiveIntensity: 0.65, roughness: 0.58, metalness: 0.32, price: 0, shield: 0, earningEnabled: false,
+  },
 ];
 
 // Re-exported from the shared rarity module so every cosmetic system agrees.

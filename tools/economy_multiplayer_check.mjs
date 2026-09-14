@@ -13,9 +13,12 @@ async function until(fn){for(let i=0;i<200;i++){if(await fn())return;await delay
 const sockets=[];
 try{
  await until(()=>[...app.rooms.values()].every(x=>x.economy.runtime.ready));
- async function connect(id){const ws=new WebSocket(`ws://127.0.0.1:${port}`,{origin:'http://localhost',headers:{Cookie:`fixture=${id}`}});const messages=[];ws.on('message',raw=>{const m=JSON.parse(raw);messages.push(m);if(m.t==='ping')ws.send(JSON.stringify({t:'pong',id:m.id}));});await new Promise(r=>ws.once('open',r));ws.send(JSON.stringify({t:'hello',name:'forged-account-name'}));sockets.push(ws);await until(()=>messages.some(m=>m.t==='welcome'));const pid=messages.find(m=>m.t==='welcome').you;await until(()=>app.room.economy.participant(pid));return {ws,messages,pid};}
+ async function connect(id){const ws=new WebSocket(`ws://127.0.0.1:${port}`,{origin:'http://localhost',headers:{Cookie:`fixture=${id}`}});const messages=[];ws.on('message',raw=>{const m=JSON.parse(raw);messages.push(m);if(m.t==='ping')ws.send(JSON.stringify({t:'pong',id:m.id}));});await new Promise(r=>ws.once('open',r));ws.send(JSON.stringify({t:'hello',name:'forged-account-name',armorSkin:id===1?'arctic_ghost':'not-a-skin'}));sockets.push(ws);await until(()=>messages.some(m=>m.t==='welcome'));const pid=messages.find(m=>m.t==='welcome').you;await until(()=>app.room.economy.participant(pid));return {ws,messages,pid};}
  const a=await connect(1),b=await connect(2),runtime=app.room.economy;
  assert.equal(app.room.players.get(a.pid).name,'Account1');
+ assert.equal(app.room.players.get(a.pid).armorSkin,'arctic_ghost');
+ assert.equal(app.room.players.get(b.pid).armorSkin,undefined);
+ await until(()=>b.messages.some(m=>m.players?.some(p=>p.id===a.pid&&p.armorSkin==='arctic_ghost')));
  const c=runtime.match.config;c.minimumMatchSeconds=0;c.minimumActiveSeconds=0;c.minimumScore=0;
  for(const id of [a.pid,b.pid]){runtime.participant(id).joinedAt-=60000;runtime.activity(id,true,1000);app.room.players.get(id).invulnerableUntil=0;}
  a.ws.send(JSON.stringify({t:'kill',score:1000000,e:999999}));a.ws.send(JSON.stringify({t:'add-e',amount:999999}));await delay(100);assert.equal(runtime.participant(a.pid).score,0);

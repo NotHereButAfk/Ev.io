@@ -1,3 +1,4 @@
+import { getArmorSkin } from '../player/ArmorSkins.js';
 const _KEY     = 'sio_shop';
 const _EQ_KEY  = 'sio_armor_skin';
 const STARTER  = 500; // coins new players start with
@@ -12,7 +13,7 @@ function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 export const Shop = {
   getCoins()  { return _load().coins; },
   getOwned()  { return _load().owned; },
-  isOwned(id) { return STARTER_ARMOR_SKINS.has(id) || _load().owned.includes(id); },
+  isOwned(id) { return getArmorSkin(id)?.unlocked === true || STARTER_ARMOR_SKINS.has(id) || _load().owned.includes(id); },
 
   addCoins(n) {
     const d = _load();

@@ -1531,7 +1531,7 @@ export class AuthRoom {
       const reloadTicks = p.reloadWid === p.wid ? Math.max(0, p.reloadUntil - now) : 0;
       const swingDuration = Math.max(1, p._swingUntil - p._swingStart);
       publicList.push({
-        id: p.id, name: p.name, isBot: p.isBot,
+        id: p.id, name: p.name, isBot: p.isBot, armorSkin: p.armorSkin || null,
         x: p.state.px, y: p.state.py, z: p.state.pz,
         yaw: p.isBot
           ? botPresentationYaw(p._lastYaw ?? 0, p._animVX, p._animVZ)
@@ -1616,7 +1616,7 @@ export class AuthRoom {
 
   _roster() {
     return Array.from(this.players.values()).map((p) => ({
-      id: p.id, name: p.name, isBot: p.isBot, kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
+      id: p.id, name: p.name, isBot: p.isBot, armorSkin: p.armorSkin || null, kills: p.kills, deaths: p.deaths, score: p.score, assists: p.assists,
         survival: this.mode==='survival', survivalEnemy: !!p.survivalEnemy, survivalAlly: !!p.survivalAlly, damageDealt:p.damageDealt||0, bossDamage:p.bossDamage||0, wavesSurvived:p.wavesSurvived||0,
     }));
   }
