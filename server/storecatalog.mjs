@@ -1,3 +1,4 @@
+import { ARMOR_SKINS } from '../src/player/ArmorSkins.js';
 // Server-owned allow-list for paid digital items. Keep this module free of
 // renderer/browser imports so checkout can start on the production Node host.
 const byRarity = {
@@ -7,15 +8,10 @@ const byRarity = {
   mythic: ['fireball','sakura','prismbreak','k9unit','overclock','eventhorizon'],
 };
 
-const armorByRarity = {
-  epic: ['solar_warden','oni_protocol'],
-  legendary: ['ivory_sentinel','boneframe'],
-  mythic: ['foxfire','void_regent'],
-};
 
 const label = (id) => id.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 
 export const STORE_ITEMS = [
   ...Object.entries(byRarity).flatMap(([rarity, ids]) => ids.map((id) => ({ id, name: label(id), kind: 'weapon', rarity }))),
-  ...Object.entries(armorByRarity).flatMap(([rarity, ids]) => ids.map((id) => ({ id, name: label(id), kind: 'character', rarity }))),
+  ...ARMOR_SKINS.map(({ id, name, rarity }) => ({ id, name, kind: 'character', rarity })),
 ];

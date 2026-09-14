@@ -5,30 +5,12 @@ import { resolveViewmodelPalette } from '../src/player/PreviewCharacter.js';
 
 assert.equal(new Set(ARMOR_SKINS.map((skin) => skin.id)).size, ARMOR_SKINS.length,
   'character skin ids must be unique');
-assert.ok(ARMOR_SKINS.length >= 8, 'character catalog should not regress to an empty shell');
-assert.equal(ARMOR_SKINS.filter((skin) => skin.starter).length, 2,
-  'guest inventory should expose two starter finishes');
+assert.equal(ARMOR_SKINS.length, 10);
+assert.ok(ARMOR_SKINS.every(s => s.rarity === 'common' && !s.starter && !s.unlocked));
 assert.ok(ARMOR_SKINS.some((skin) => skin.theme === 'ears'));
 assert.ok(ARMOR_SKINS.some((skin) => skin.theme === 'horns'));
 assert.ok(ARMOR_SKINS.some((skin) => skin.theme === 'crown'));
 assert.ok(ARMOR_SKINS.some((skin) => skin.theme === 'bone'));
-
-const rgb = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
-const luminance = (hex) => {
-  const [r, g, b] = rgb(hex).map((c) => c / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const starter = ARMOR_SKINS.find((skin) => skin.id === 'cobalt_circuit');
-assert.ok(starter && luminance(starter.primary) >= 0.65,
-  'default character must retain a bright readable outer shell');
-assert.ok(luminance(starter.secondary) <= 0.15,
-  'default character must retain a dark flexible undersuit');
-assert.ok(starter.emissive !== starter.primary,
-  'default character must retain a distinct energy accent');
-assert.ok(starter.roughness >= 0.7 && starter.metalness <= 0.15,
-  'default character must retain the arena-compatible matte finish');
-assert.ok(starter.emissiveIntensity <= 0.6,
-  'default character accent must not overpower the arena lighting');
 
 for (const skin of ARMOR_SKINS) {
   for (const field of ['primary', 'secondary', 'emissive']) {
@@ -50,10 +32,22 @@ for (const skin of ARMOR_SKINS) {
     `${skin.id} FPS accent differs from the third-person body`);
 }
 
-console.log(`ok   ${ARMOR_SKINS.length} character finishes, 2 starter skins, 4 themed silhouettes`);
+console.log(`ok   ${ARMOR_SKINS.length} character finishes, purchasable Common skins, 4 themed silhouettes`);
 
 const collection=ARMOR_SKINS.filter(s=>s.collection==='Frontier Ten');
 assert.equal(collection.length,10);
 assert.equal(new Set(collection.map(s=>s.primary+':'+s.secondary+':'+s.emissive)).size,10);
-for(const s of collection){assert.equal(s.unlocked,true);assert.equal(s.earningEnabled,false);}
-console.log('Frontier Ten passed: ten unique free cosmetic finishes, no gameplay or E bonuses.');
+for(const s of collection){assert.ok(!s.unlocked);assert.equal(s.earningEnabled,false);}
+console.log('Frontier Ten passed: ten unique purchasable cosmetic finishes, no gameplay or E bonuses.');
+
+const { STORE_ITEMS } = await import('../server/storecatalog.mjs');
+assert.deepEqual(STORE_ITEMS.filter(s => s.kind === 'character').map(s => s.id), ARMOR_SKINS.map(s => s.id));
+const storage = new Map([['sio_shop', JSON.stringify({coins:500,owned:['cobalt_circuit']})], ['sio_armor_skin','cobalt_circuit']]);
+globalThis.localStorage = {getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)};
+const { Shop } = await import('../src/core/Shop.js');
+assert.equal(Shop.getEquipped(),null);
+assert.deepEqual(Shop.getOwned(),[]);
+assert.equal(Shop.isOwned('arctic_ghost'),false);
+Shop.equip('arctic_ghost'); assert.equal(Shop.getEquipped(),null);
+Shop.unlock('arctic_ghost'); Shop.equip('arctic_ghost');
+assert.equal(Shop.getEquipped(),'arctic_ghost');

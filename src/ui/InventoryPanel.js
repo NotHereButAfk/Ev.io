@@ -314,7 +314,11 @@ export class InventoryPanel {
     });
     const fig = document.createElement('div');
     fig.className = 'inv-card-fig';
-    fig.innerHTML = CHAR_SVG;
+    const image = document.createElement('img');
+    image.src = `/assets/character-skins/${armorSkin.id}.png`;
+    image.alt = armorSkin.name;
+    image.style.cssText = 'width:100%;height:100%;object-fit:contain';
+    fig.appendChild(image);
     card.insertBefore(fig, card.firstChild);
     return card;
   }

@@ -6,14 +6,14 @@ const db=await PGlite.create({parsers:{1700:v=>v}});
 await db.exec('CREATE TABLE users(id BIGSERIAL PRIMARY KEY);CREATE TABLE user_skins(user_id BIGINT,skin_id TEXT,skin_kind TEXT,PRIMARY KEY(user_id,skin_id));INSERT INTO users DEFAULT VALUES;INSERT INTO users DEFAULT VALUES;');
 const query=async(sql,values)=>{if(sql.includes('pg_try_advisory_lock'))return {rows:[{locked:true}],rowCount:1};if(sql.includes('pg_advisory_unlock'))return {rows:[]};const r=values?await db.query(sql,values):(await db.exec(sql)).at(-1);return {...r,rowCount:r.affectedRows??r.rows?.length??0};};
 const pool={query,connect:async()=>({query,release(){}})};
-const accounts=Object.assign(async()=>false,{pool,ready:Promise.resolve(),session:async req=>{const id=req.headers.cookie?.match(/^fixture=(1|2)$/)?.[1];return id?{id,sessionId:'integration-'+id,username:'Account'+id,ownedSkins:[]}:null;}});
+const accounts=Object.assign(async()=>false,{pool,ready:Promise.resolve(),session:async req=>{const id=req.headers.cookie?.match(/^fixture=(1|2)$/)?.[1];return id?{id,sessionId:'integration-'+id,username:'Account'+id,ownedSkins:id==='1'?[{id:'arctic_ghost',kind:'character'}]:[]}:null;}});
 const app=makeAuthServer({accountService:accounts});await new Promise(resolve=>app.http.listen(0,'127.0.0.1',resolve));
 const port=app.http.address().port;const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn){for(let i=0;i<200;i++){if(await fn())return;await delay(25);}throw new Error('Condition timed out');}
 const sockets=[];
 try{
  await until(()=>[...app.rooms.values()].every(x=>x.economy.runtime.ready));
- async function connect(id){const ws=new WebSocket(`ws://127.0.0.1:${port}`,{origin:'http://localhost',headers:{Cookie:`fixture=${id}`}});const messages=[];ws.on('message',raw=>{const m=JSON.parse(raw);messages.push(m);if(m.t==='ping')ws.send(JSON.stringify({t:'pong',id:m.id}));});await new Promise(r=>ws.once('open',r));ws.send(JSON.stringify({t:'hello',name:'forged-account-name',armorSkin:id===1?'arctic_ghost':'not-a-skin'}));sockets.push(ws);await until(()=>messages.some(m=>m.t==='welcome'));const pid=messages.find(m=>m.t==='welcome').you;await until(()=>app.room.economy.participant(pid));return {ws,messages,pid};}
+ async function connect(id){const ws=new WebSocket(`ws://127.0.0.1:${port}`,{origin:'http://localhost',headers:{Cookie:`fixture=${id}`}});const messages=[];ws.on('message',raw=>{const m=JSON.parse(raw);messages.push(m);if(m.t==='ping')ws.send(JSON.stringify({t:'pong',id:m.id}));});await new Promise(r=>ws.once('open',r));ws.send(JSON.stringify({t:'hello',name:'forged-account-name',armorSkin:id===1?'arctic_ghost':'magma_revenant'}));sockets.push(ws);await until(()=>messages.some(m=>m.t==='welcome'));const pid=messages.find(m=>m.t==='welcome').you;await until(()=>app.room.economy.participant(pid));return {ws,messages,pid};}
  const a=await connect(1),b=await connect(2),runtime=app.room.economy;
  assert.equal(app.room.players.get(a.pid).name,'Account1');
  assert.equal(app.room.players.get(a.pid).armorSkin,'arctic_ghost');

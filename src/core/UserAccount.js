@@ -16,7 +16,7 @@ function _storeServerProfile(user) {
   const entitlements = Array.isArray(user?.ownedSkins) ? user.ownedSkins : [];
   const shop = JSON.parse(localStorage.getItem('sio_shop') || '{"coins":500,"owned":[]}');
   const armory = JSON.parse(localStorage.getItem('sio_armory') || '{}');
-  if (!Array.isArray(shop.owned)) shop.owned = [];
+  shop.owned = []; // Replace the previous account's character entitlements.
   if (!Array.isArray(armory.__owned)) armory.__owned = [];
   for (const item of entitlements) {
     const target = item.kind === 'character' ? shop.owned : armory.__owned;

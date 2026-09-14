@@ -2,7 +2,6 @@ import { getArmorSkin } from '../player/ArmorSkins.js';
 const _KEY     = 'sio_shop';
 const _EQ_KEY  = 'sio_armor_skin';
 const STARTER  = 500; // coins new players start with
-const STARTER_ARMOR_SKINS = new Set(['cobalt_circuit', 'crimson_guard']);
 
 function _load() {
   try { return JSON.parse(localStorage.getItem(_KEY) || `{"coins":${STARTER},"owned":[]}`); }
@@ -12,8 +11,8 @@ function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 
 export const Shop = {
   getCoins()  { return _load().coins; },
-  getOwned()  { return _load().owned; },
-  isOwned(id) { return getArmorSkin(id)?.unlocked === true || STARTER_ARMOR_SKINS.has(id) || _load().owned.includes(id); },
+  getOwned()  { return (_load().owned || []).filter(id => getArmorSkin(id)); },
+  isOwned(id) { return !!getArmorSkin(id) && this.getOwned().includes(id); },
 
   addCoins(n) {
     const d = _load();
@@ -40,15 +39,15 @@ export const Shop = {
     }
   },
 
-  // New profiles start with a readable blue/graphite finish instead of the
-  // nearly-black untinted material. An explicit empty string still means the
-  // player chose the unpainted default in Inventory.
-  getEquipped()   {
+  // Retired finishes fall back to the current unpainted model.
+  getEquipped() {
     try {
       const stored = localStorage.getItem(_EQ_KEY);
-      return stored === null ? 'cobalt_circuit' : (stored || null);
-    } catch { return 'cobalt_circuit'; }
+      if (stored && this.isOwned(stored)) return stored;
+      localStorage.setItem(_EQ_KEY, '');
+      return null;
+    } catch { return null; }
   },
-  equip(skinId)   { localStorage.setItem(_EQ_KEY, skinId || ''); },
-  unequip()       { localStorage.setItem(_EQ_KEY, ''); },
+  equip(skinId) { if (!skinId || this.isOwned(skinId)) localStorage.setItem(_EQ_KEY, skinId || ''); },
+  unequip() { localStorage.setItem(_EQ_KEY, ''); },
 };

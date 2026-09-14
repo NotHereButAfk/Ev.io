@@ -272,7 +272,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
             new Set(Array.from(room.players.values()).map((player) => player.name)),
           ));
           const requestedSkin=getArmorSkin(msg.armorSkin);
-          if(conn.id != null && requestedSkin && (requestedSkin.unlocked || requestedSkin.starter))room.players.get(conn.id).armorSkin=requestedSkin.id;
+          if(conn.id != null && requestedSkin && identity?.ownedSkins?.some(item => item.kind === 'character' && item.id === requestedSkin.id))room.players.get(conn.id).armorSkin=requestedSkin.id;
           if (conn.id == null) ws.close(1013, 'match full');
           else if (economy) {
             try {

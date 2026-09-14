@@ -925,7 +925,11 @@ export class MenuUI {
       preview.className = 'shop-preview';
       if (isCharacter) {
         preview.classList.add('shop-preview-char');
-        preview.innerHTML = SHOP_CHAR_SVG;
+        const image = document.createElement('img');
+        image.src = `/assets/character-skins/${skin.id}.png`;
+        image.alt = skin.name;
+        image.style.cssText = 'width:100%;height:100%;object-fit:contain';
+        preview.appendChild(image);
       } else {
         preview.classList.add('shop-preview-weapon');
         // Gun skins are a shared finish usable on any main gun — show a real,
@@ -1027,7 +1031,14 @@ export class MenuUI {
     const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
     const weaponItems    = WEAPON_SKINS.filter((s) => getWeaponIdForSkin(s.id))
       .map(s => ({ ...s, _kind: 'weapon' }));
-    const allItems = [...characterItems, ...weaponItems];
+    const heading = document.createElement('h3');
+    heading.textContent = 'COMMON CHARACTER SKINS';
+    root.appendChild(heading);
+    const characterGrid = document.createElement('div');
+    characterGrid.className = 'shop-skin-grid';
+    characterItems.forEach(s => characterGrid.appendChild(makeCard(s, 'character')));
+    root.appendChild(characterGrid);
+    const allItems = weaponItems;
     const isOwnedItem = (s) => s._kind === 'character' ? Shop.isOwned(s.id) : Armory.ownsSkin(s.id);
     const unowned = allItems.filter(s => !isOwnedItem(s));
 
