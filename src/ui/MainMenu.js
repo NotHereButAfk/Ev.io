@@ -978,7 +978,7 @@ export class MenuUI {
       body.appendChild(nameEl);
       const perkEl = document.createElement('div');
       perkEl.className = 'shop-perk-line';
-      perkEl.textContent = describePerk(rarity);
+      perkEl.textContent = skin.earningEnabled === false ? 'Cosmetic finish' : describePerk(rarity);
       body.appendChild(perkEl);
       card.appendChild(body);
 

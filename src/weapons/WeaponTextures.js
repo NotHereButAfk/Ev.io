@@ -1294,7 +1294,34 @@ function rarePattern(kind) {
   return c;
 }
 
+// Engraved legendary motifs retain the palette rather than baking in a tint.
+function legendaryPattern(kind) {
+  const c = makeCanvas(256), ctx = c.getContext('2d');
+  ctx.fillStyle = '#cbd0d4'; ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#52606c'; ctx.lineWidth = 5;
+  for(let y=-128;y<384;y+=128) for(let x=-128;x<384;x+=128) {
+    ctx.beginPath();
+    if(kind==='regalia') {
+      ctx.moveTo(x+16,y+40);ctx.lineTo(x+36,y+78);ctx.lineTo(x+64,y+25);ctx.lineTo(x+92,y+78);ctx.lineTo(x+112,y+40);ctx.lineTo(x+104,y+98);ctx.lineTo(x+24,y+98);ctx.closePath();ctx.stroke();
+      ctx.strokeRect(x+31,y+104,66,8);
+    } else if(kind==='feather') {
+      ctx.moveTo(x+16,y+112);ctx.quadraticCurveTo(x+28,y+30,x+110,y+16);ctx.quadraticCurveTo(x+105,y+99,x+16,y+112);ctx.stroke();
+      for(let n=0;n<4;n++){ctx.beginPath();ctx.moveTo(x+26+n*17,y+102-n*17);ctx.lineTo(x+29+n*24,y+56-n*11);ctx.stroke();}
+    } else if(kind==='constellation') {
+      ctx.moveTo(x+10,y+26);ctx.lineTo(x+63,y+40);ctx.lineTo(x+104,y+96);ctx.lineTo(x+36,y+110);ctx.stroke();
+      for(const [u,v] of [[10,26],[63,40],[104,96],[36,110]]) {ctx.fillStyle='#f6f8fa';ctx.fillRect(x+u-5,y+v-5,10,10);}
+    } else if(kind==='scale') {
+      for(let n=0;n<3;n++){ctx.beginPath();ctx.moveTo(x+n*42,y+8);ctx.quadraticCurveTo(x+n*42+58,y+58,x+n*42,y+114);ctx.quadraticCurveTo(x+n*42-58,y+58,x+n*42,y+8);ctx.stroke();}
+    } else {
+      ctx.arc(x+64,y+64,41,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.ellipse(x+64,y+64,63,15,-.5,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#f0f4f8';ctx.fillRect(x+60,y+13,8,13);
+    }
+  }
+  return c;
+}
+
 const DECALS = {
+  ...Object.fromEntries(['regalia','feather','constellation','scale','eclipse'].map(k => ['legend_'+k, () => legendaryPattern(k)])),
   ...Object.fromEntries(['circuit','orbit','shards','weave','chevron'].map(k => ['rare_'+k, () => rarePattern(k)])),
   fire:        fireDecal,
   anime:       animeDecal,
@@ -1329,7 +1356,7 @@ export function decalTexture(type) {
   return cached('decal_' + type, () => {
     const make = DECALS[type];
     if (!make) return null;
-    const repeat = type === 'animegirl' || type.startsWith('rare_') ? 1 : 2;
+    const repeat = type === 'animegirl' || (type.startsWith('rare_') || type.startsWith('legend_')) ? 1 : 2;
     return finalize(make(), { color: true, repeat });
   });
 }

@@ -790,7 +790,7 @@ export class Game {
   _computeSkinKillMult() {
     const multiplier = (skinList, id) => {
       const s = skinList.find(s => s.id === id);
-      return KILL_MULTIPLIER[s?.rarity] ?? 1;
+      return s?.earningEnabled === false ? 1 : (KILL_MULTIPLIER[s?.rarity] ?? 1);
     };
     const gunId    = Loadout.getGun();
     const meleeId  = Loadout.getMelee();

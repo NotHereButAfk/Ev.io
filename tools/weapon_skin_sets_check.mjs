@@ -3,6 +3,7 @@ import {
   MAIN_GUN_SKIN_SETS,
   WEAPON_SKINS,
   applyWeaponSkin,
+  animateWeaponSkin,
   getWeaponIdForSkin,
   getWeaponSkinsFor,
   isSkinForWeapon,
@@ -24,15 +25,15 @@ assert(Object.keys(MAIN_GUN_SKIN_SETS).length === 5, 'expected five main-gun ski
 const assigned = [];
 for (const weaponId of MAIN_WEAPON_IDS) {
   const skins = getWeaponSkinsFor(weaponId);
-  assert(skins.length === 10, `${weaponId} has ${skins.length} skins instead of 10`);
-  assert(skins.filter(s=>s.rarity==='rare').length===5 && skins.filter(s=>s.rarity==='common').length===5, 'five of each rarity required');
+  assert(skins.length === 15, `${weaponId} has ${skins.length} skins instead of 15`);
+  assert(skins.filter(s=>s.rarity==='legendary').length===5 && skins.filter(s=>s.rarity==='rare').length===5 && skins.filter(s=>s.rarity==='common').length===5, 'five of each rarity required');
   for (const skin of skins) {
     assert(isSkinForWeapon(weaponId, skin.id), `${skin.id} is not assigned to ${weaponId}`);
     assert(getWeaponIdForSkin(skin.id) === weaponId, `${skin.id} reverse assignment is wrong`);
     assigned.push(skin.id);
   }
 }
-assert(new Set(assigned).size === 50, 'main-gun skin assignments must be 50 unique finishes');
+assert(new Set(assigned).size === 75, 'main-gun skin assignments must be 75 unique finishes');
 assert(assigned.every((id) => WEAPON_SKINS.some((skin) => skin.id === id)), 'assigned skin is missing');
 
 // Applying every assigned finish must leave the model hierarchy, transforms,
@@ -48,7 +49,12 @@ for (const skinId of assigned) {
   const positions = [...geometry.attributes.position.array];
   const childCount = group.children.length;
   applyWeaponSkin(group, skin);
-  if(skin.rarity==='rare') {
+  if(skin.rarity==='rare' || skin.rarity==='legendary') {
+    if(skin.animated) {
+      animateWeaponSkin(group,skin,0);const first=material.emissiveIntensity;
+      animateWeaponSkin(group,skin,1);assert(first!==material.emissiveIntensity, 'Legendary glow must animate');
+      assert(material.emissiveIntensity<=skin.animMax, 'glow must stay bounded');
+    }
     assert(material.map?.isTexture, `${skinId} is missing its patterned wrap`);
     applyWeaponSkin(group, WEAPON_SKINS.find(s=>s.rarity==='common'));
     assert(material.map===null, 'switching back to Common must clear the Rare wrap');
@@ -60,4 +66,4 @@ for (const skinId of assigned) {
   `${skinId} changed gun transforms`);
 }
 
-console.log('weapon skins passed: 10 material-only finishes per main gun: five Common and five Rare (50 total)');
+console.log('weapon skins passed: 15 finishes per main gun: five Common, Rare and Legendary (75 total)');

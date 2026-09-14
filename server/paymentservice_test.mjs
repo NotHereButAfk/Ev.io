@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { createPaymentService } from './paymentservice.mjs';
 
-const testSkin = process.argv.includes('--common') ? 'm4_white_signal' : 'm4_azure_mainframe';
-const testPrice = process.argv.includes('--common') ? '20.00' : '30.00';
+const testSkin = process.argv.includes('--common') ? 'm4_white_signal' : process.argv.includes('--rare') ? 'm4_azure_mainframe' : 'm4_sovereign_gold';
+const testPrice = process.argv.includes('--common') ? '20.00' : process.argv.includes('--rare') ? '30.00' : '60.00';
 
 class FakePool {
   constructor() {
@@ -111,6 +111,7 @@ assert.equal(result.status, 200);
 assert.equal(result.json.configured, true);
 assert.equal(result.json.prices.common, '20.00');
 assert.equal(result.json.prices.rare, '30.00');
+assert.equal(result.json.prices.legendary, '60.00');
 
 result = await invoke(service, 'POST', '/api/store/client-token', undefined, { authorization: 'guest' });
 assert.equal(result.status, 401);
