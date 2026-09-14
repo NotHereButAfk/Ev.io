@@ -720,7 +720,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.1,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 0,
+    "shootSound": "legendary:m4_sovereign_gold"
   },
   {
     "id": "m4_obsidian_phoenix",
@@ -742,7 +744,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.25,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 1,
+    "shootSound": "legendary:m4_obsidian_phoenix"
   },
   {
     "id": "m4_celestial_crown",
@@ -764,7 +768,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.4000000000000001,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 2,
+    "shootSound": "legendary:m4_celestial_crown"
   },
   {
     "id": "m4_jade_dynasty",
@@ -786,7 +792,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.55,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 3,
+    "shootSound": "legendary:m4_jade_dynasty"
   },
   {
     "id": "m4_crimson_eclipse",
@@ -808,7 +816,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.7000000000000002,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 4,
+    "shootSound": "legendary:m4_crimson_eclipse"
   },
   {
     "id": "magnum_kings_ransom",
@@ -830,7 +840,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.1,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 0,
+    "shootSound": "legendary:magnum_kings_ransom"
   },
   {
     "id": "magnum_ashen_seraph",
@@ -852,7 +864,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.25,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 1,
+    "shootSound": "legendary:magnum_ashen_seraph"
   },
   {
     "id": "magnum_astral_monarch",
@@ -874,7 +888,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.4000000000000001,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 2,
+    "shootSound": "legendary:magnum_astral_monarch"
   },
   {
     "id": "magnum_emerald_oath",
@@ -896,7 +912,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.55,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 3,
+    "shootSound": "legendary:magnum_emerald_oath"
   },
   {
     "id": "magnum_blood_opal",
@@ -918,7 +936,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.7000000000000002,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 4,
+    "shootSound": "legendary:magnum_blood_opal"
   },
   {
     "id": "battlerifle_imperial_sun",
@@ -940,7 +960,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.1,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 0,
+    "shootSound": "legendary:battlerifle_imperial_sun"
   },
   {
     "id": "battlerifle_cinder_valkyrie",
@@ -962,7 +984,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.25,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 1,
+    "shootSound": "legendary:battlerifle_cinder_valkyrie"
   },
   {
     "id": "battlerifle_nebula_throne",
@@ -984,7 +1008,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.4000000000000001,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 2,
+    "shootSound": "legendary:battlerifle_nebula_throne"
   },
   {
     "id": "battlerifle_verdant_emperor",
@@ -1006,7 +1032,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.55,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 3,
+    "shootSound": "legendary:battlerifle_verdant_emperor"
   },
   {
     "id": "battlerifle_ruby_dominion",
@@ -1028,7 +1056,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.7000000000000002,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 4,
+    "shootSound": "legendary:battlerifle_ruby_dominion"
   },
   {
     "id": "energyshotgun_gilded_colossus",
@@ -1050,7 +1080,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.1,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 0,
+    "shootSound": "legendary:energyshotgun_gilded_colossus"
   },
   {
     "id": "energyshotgun_infernal_wings",
@@ -1072,7 +1104,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.25,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 1,
+    "shootSound": "legendary:energyshotgun_infernal_wings"
   },
   {
     "id": "energyshotgun_stellar_hammer",
@@ -1094,7 +1128,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.4000000000000001,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 2,
+    "shootSound": "legendary:energyshotgun_stellar_hammer"
   },
   {
     "id": "energyshotgun_malachite_titan",
@@ -1116,7 +1152,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.55,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 3,
+    "shootSound": "legendary:energyshotgun_malachite_titan"
   },
   {
     "id": "energyshotgun_scarlet_singularity",
@@ -1138,7 +1176,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.7000000000000002,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 4,
+    "shootSound": "legendary:energyshotgun_scarlet_singularity"
   },
   {
     "id": "plasmarifle_solar_divinity",
@@ -1160,7 +1200,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.1,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 0,
+    "shootSound": "legendary:plasmarifle_solar_divinity"
   },
   {
     "id": "plasmarifle_phoenix_ascendant",
@@ -1182,7 +1224,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.25,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 1,
+    "shootSound": "legendary:plasmarifle_phoenix_ascendant"
   },
   {
     "id": "plasmarifle_cosmic_regent",
@@ -1204,7 +1248,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.4000000000000001,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 2,
+    "shootSound": "legendary:plasmarifle_cosmic_regent"
   },
   {
     "id": "plasmarifle_celadon_dragon",
@@ -1226,7 +1272,9 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.55,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 3,
+    "shootSound": "legendary:plasmarifle_celadon_dragon"
   },
   {
     "id": "plasmarifle_rose_supernova",
@@ -1248,6 +1296,8 @@ export const WEAPON_SKINS = [
     "animSpeed": 1.7000000000000002,
     "animMin": 0.04,
     "animMax": 0.18,
-    "earningEnabled": false
+    "earningEnabled": false,
+    "legendaryStyle": 4,
+    "shootSound": "legendary:plasmarifle_rose_supernova"
   }
 ];

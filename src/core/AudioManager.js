@@ -1,3 +1,4 @@
+import { createLegendaryShot } from './LegendaryAudio.js';
 // Lightweight procedural sound effects via WebAudio — no external audio assets needed.
 export const WEAPON_AUDIO_PROFILES = Object.freeze({
   // Each firearm has its own acoustic fingerprint. Shared category profiles
@@ -580,6 +581,24 @@ export class AudioManager {
 
   // Dispatch a skin's custom shoot sound; returns false if there's no override.
   playSkinShot(soundId) {
+    if (typeof soundId === 'string' && soundId.startsWith('legendary:')) {
+      if (!this.ctx) return false;
+      this._legendaryBuffers ||= new Map();
+      let buffer = this._legendaryBuffers.get(soundId);
+      if (!buffer) {
+        const samples = createLegendaryShot(soundId, this.ctx.sampleRate);
+        if (!samples) return false;
+        buffer = this.ctx.createBuffer(1, samples.length, this.ctx.sampleRate);
+        buffer.copyToChannel(samples, 0);
+        this._legendaryBuffers.set(soundId, buffer);
+      }
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.out || this.master);
+      source.onended = () => source.disconnect();
+      source.start();
+      return true;
+    }
     switch (soundId) {
       case 'anime': this.playAnimeShot(); return true;
       case 'waifu': this.playWaifuShot(); return true;

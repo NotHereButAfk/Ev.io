@@ -1,3 +1,4 @@
+import { triggerLegendaryShot } from './LegendaryEffects.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { WEAPONS, isMainWeaponId, isMatchPickupWeaponId } from './weaponDefs.js';
@@ -1306,11 +1307,14 @@ export class WeaponSystem {
   }
 
   _flash() {
+    triggerLegendaryShot(this.models.get(this.currentDef.id)?.group, this.animTime);
     const skinSound  = this._activeSkinFor?.(this.currentDef?.id)?.shootSound;
     const animeActive = CUTE_SOUNDS.has(skinSound);
     const fireActive  = FIRE_SOUNDS.has(skinSound);
-    const flashColor  = animeActive ? 0xff69b4 : fireActive ? 0xff4400 : 0xffcc66;
-    const flashHex    = animeActive ? 0xff9de0 : fireActive ? 0xff6600 : 0xfff0a0;
+    const legendary = this._activeSkinFor?.(this.currentDef?.id);
+    const legendaryColor = legendary?.rarity === 'legendary' ? legendary.energyColor : null;
+    const flashColor  = legendaryColor ?? (animeActive ? 0xff69b4 : fireActive ? 0xff4400 : 0xffcc66);
+    const flashHex    = legendaryColor ?? (animeActive ? 0xff9de0 : fireActive ? 0xff6600 : 0xfff0a0);
     this.flashLight.color.setHex(flashColor);
     this.flashLight.intensity = animeActive ? 12 : fireActive ? 14 : 8;
     this.models.get(this.currentDef.id).muzzle.getWorldPosition(this._muzzleWorld);

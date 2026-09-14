@@ -1,3 +1,4 @@
+import { configureLegendaryEffect, updateLegendaryEffect } from './LegendaryEffects.js';
 import * as THREE from 'three';
 import { decalTexture } from './WeaponTextures.js';
 
@@ -44,6 +45,7 @@ export function applyWeaponSkin(group, skin) {
     if (seen.has(m)) return;
     seen.add(m);
     const role = m.userData?.role;
+    if (role === 'body' || role === 'metal') configureLegendaryEffect(m, skin);
     if (role === 'body') {
       m.color.setHex(skin.body);
       m.metalness = skin.metalness;
@@ -163,6 +165,7 @@ export function animateWeaponSkin(group, skin, t) {
     seen.add(m);
     const role = m.userData?.role;
     if (role !== 'body' && role !== 'metal') return;
+    updateLegendaryEffect(m, t);
     const keepWhite = glowDecal && role === 'body';
 
     switch (skin.animType) {
