@@ -567,15 +567,29 @@ export function buildEvMapScene(parsed, textures = []) {
       point.spawnYaw = THREE.MathUtils.degToRad(270 - spawn.position.w);
       return point;
     });
+  // Authored markers describe floating display centers, not floor pads.
+  // Probe both triangle sides because imported mirrored floors have mixed winding.
+  const pickupRay = new THREE.Raycaster();
+  const pickupSide = colliderMaterial.side;
+  colliderMaterial.side = THREE.DoubleSide;
   const weaponSpawnPoints = parsed.markers.map((marker) => {
     const point = new THREE.Vector3(
       -marker.position.x,
       marker.position.y,
       marker.position.z,
     );
+    pickupRay.set(point.clone().add(new THREE.Vector3(0, 0.2, 0)), new THREE.Vector3(0, -1, 0));
+    pickupRay.far = 12;
+    const floor = pickupRay.intersectObjects(raycastMeshes, false).find(hit => {
+      const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+      return Math.abs(normal.y) > 0.65 && hit.point.y <= point.y + 0.1;
+    });
+    if (floor) point.y = floor.point.y + 0.04;
     point.markerKind = marker.kind;
     return point;
   });
+
+  colliderMaterial.side = pickupSide;
 
   const collisionBounds = new THREE.Box3().setFromObject(colliderRoot);
   const bounds = spawnPoints.length

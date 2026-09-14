@@ -108,6 +108,7 @@ const FIREARM_CARRY_SCALE = Object.freeze({
   precision: 1.62,
 });
 const FIREARM_MODEL_SCALE = Object.freeze({
+  boltsniper: 0.86,
   // AR_3 is about 20% longer than the reference AR_1 after normalization. Its
   // own correction keeps the M16 readable at 60-degree FOV without shrinking
   // the correctly framed M4.

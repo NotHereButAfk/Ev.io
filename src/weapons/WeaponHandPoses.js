@@ -44,6 +44,11 @@ const RESOLVED_WEAPON_HAND_POSES = Object.freeze(Object.fromEntries(
 // muzzle. Resolve by model source so fallback loading and third-person IK use
 // the right contacts without changing either mesh or its dimensions.
 const QUATERNIUS_HAND_POSES = Object.freeze({
+  boltsniper: Object.freeze({
+    ...RESOLVED_WEAPON_HAND_POSES.boltsniper,
+    trigger: [0.012, 0.018, 0.255],
+    support: [-0.018, 0.014, -0.115],
+  }),
   m4: Object.freeze({
     ...RESOLVED_WEAPON_HAND_POSES.m4,
     trigger: [0.012, -0.035, 0.030],

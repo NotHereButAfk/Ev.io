@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { buildEvMapScene, parseEvMap } from '../src/world/EvMapLoader.js';
@@ -22,6 +23,16 @@ assert.deepEqual(
   'Rook authored weapon-marker kinds changed',
 );
 const scene = buildEvMapScene(map);
+// Pads must sit above a surface, not at the original floating display height.
+for (const point of scene.weaponSpawnPoints) {
+  const material=scene.raycastMeshes[0].material, side=material.side;
+  material.side=THREE.DoubleSide;
+  const ray=new THREE.Raycaster(point.clone(),new THREE.Vector3(0,-1,0),0,0.1);
+  const hit=ray.intersectObjects(scene.raycastMeshes,false)[0];
+  material.side=side;
+  assert.ok(hit && Math.abs(hit.distance-0.04)<0.005,'pickup pad must clear the surface by 4cm');
+}
+
 assert.deepEqual(
   scene.weaponSpawnPoints.map((point) => [
     Number(point.x.toFixed(2)),
@@ -30,12 +41,12 @@ assert.deepEqual(
     point.markerKind,
   ]),
   [
-    [-40, 18.75, 64, 524288],
-    [-0.5, 18, -0.75, 8388608],
-    [100, 17.5, 24.02, 1048576],
-    [-28.5, 10.75, -46, 2097152],
+    [-40, 17.04, 64, 524288],
+    [-0.5, 16.54, -0.75, 8388608],
+    [100, 16.54, 24.02, 1048576],
+    [-28.5, 9.04, -46, 2097152],
   ],
-  'Rook authored weapon spawns were not mirrored into game coordinates',
+  'Rook authored weapon spawns were not grounded in game coordinates',
 );
 assert.deepEqual(
   authoredWeaponSpecs(scene.weaponSpawnPoints)
@@ -46,10 +57,10 @@ assert.deepEqual(
       Number(spec.position.z.toFixed(2)),
     ]),
   [
-    ['boltsniper', -40, 18.75, 64],
-    ['rpg', -0.5, 18, -0.75],
-    ['fuelrod', 100, 17.5, 24.02],
-    ['concussion', -28.5, 10.75, -46],
+    ['boltsniper', -40, 17.04, 64],
+    ['rpg', -0.5, 16.54, -0.75],
+    ['fuelrod', 100, 16.54, 24.02],
+    ['concussion', -28.5, 9.04, -46],
   ],
   'power weapons were not placed on Rook authored markers',
 );

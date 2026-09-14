@@ -137,7 +137,7 @@ export class PickupSystem {
         type: 'loot', lootType: spec.lootType, gunId: spec.gunId,
         def: gun, name: gun?.name || 'Shield Stack', padId: spec.padId,
         color: spec.color, mesh, active: spec.active !== false,
-        respawnTimer: 0, baseY: 1.4, _animT: this._pickups.length * 1.37,
+        respawnTimer: 0, baseY: 0.85, _animT: this._pickups.length * 1.37,
         _requestCooldown: 0,
         _spin: mesh.getObjectByName('wpnSpin'),
       });
@@ -163,7 +163,7 @@ export class PickupSystem {
     ring.rotation.x = Math.PI / 2; ring.position.y = 0.12; ring.userData.noHit = true; group.add(ring);
 
     // Floating weapon model (procedural — no GLB dependency), scaled to fit.
-    const spin = new THREE.Group(); spin.name = 'wpnSpin'; spin.position.y = 1.4;
+    const spin = new THREE.Group(); spin.name = 'wpnSpin'; spin.position.y = 0.85;
     const built = gun ? buildWeaponModel(gun, { procedural: true }) : null;
     const wm = built?.group;
     if (wm && spec.lootType === 'weapon') {
@@ -171,8 +171,8 @@ export class PickupSystem {
       const box = new THREE.Box3().setFromObject(wm);
       const size = box.getSize(new THREE.Vector3());
       const maxd = Math.max(size.x, size.y, size.z) || 1;
-      wm.scale.setScalar(2.4 / maxd);
-      const c = box.getCenter(new THREE.Vector3()).multiplyScalar(2.4 / maxd);
+      wm.scale.setScalar(1.4 / maxd);
+      const c = box.getCenter(new THREE.Vector3()).multiplyScalar(1.4 / maxd);
       wm.position.sub(c);
       spin.add(wm);
     } else if (spec.lootType === 'shield') {
@@ -283,7 +283,7 @@ export class PickupSystem {
       color: next.color,
       mesh,
       active: next.active !== false,
-      baseY: 1.4,
+      baseY: 0.85,
       _spin: mesh.getObjectByName('wpnSpin'),
       _requestCooldown: 0,
     });
@@ -336,7 +336,7 @@ export class PickupSystem {
       p._animT += dt * 2.0;
       if (p.type === 'loot') {
         // Spin only the floating weapon; the beam/ring stay put.
-        if (p._spin) { p._spin.rotation.y += dt * 1.1; p._spin.position.y = p.baseY + Math.sin(p._animT) * 0.18; }
+        if (p._spin) { p._spin.rotation.y += dt * 1.1; p._spin.position.y = p.baseY + Math.sin(p._animT) * 0.10; }
       } else {
         p.mesh.position.y  = p.baseY + Math.sin(p._animT) * 0.12;
         p.mesh.rotation.y += dt * 1.4;
