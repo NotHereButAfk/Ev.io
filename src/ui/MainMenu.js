@@ -3,7 +3,7 @@ import { mobileIcon } from './MobileIcons.js';
 import { getSkin } from '../player/skins.js';
 import { loadArmorType } from '../player/ArmorTypes.js';
 import { ARMOR_SKINS, RARITY_ORDER, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
-import { WEAPON_SKINS, getWeaponIdForSkin } from '../weapons/WeaponSkins.js';
+import { ALL_WEAPON_SKINS as WEAPON_SKINS, getWeaponIdForSkin } from '../weapons/WeaponSkins.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { Achievements } from '../core/Achievements.js';
 import { Shop } from '../core/Shop.js';

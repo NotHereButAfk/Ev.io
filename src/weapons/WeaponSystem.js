@@ -1868,6 +1868,8 @@ export class WeaponSystem {
     if (def.kind === 'melee') {
       this.audio.playSwing();
       this._doMeleeSwing(player, world, botManager);
+      this._swordCombo = ((this._swordCombo ?? -1) + 1) % 3;
+      if (this.models.get(def.id)?.group) triggerLegendaryShot(this.models.get(def.id).group, this.animTime);
       this.swingPhase = 0;
       this.fireTimer = scheduleNextShot(this.fireTimer, def.fireRate);
       if (this.onShoot) this.onShoot(def);
@@ -2074,6 +2076,24 @@ export class WeaponSystem {
           this.kickPos.y + e * 0.025,
           this.kickPos.z - e * 0.20,
         );
+      } else if (def.id === 'sword') {
+        // Alternating diagonal cuts followed by an overhead finisher. Both hands
+        // travel with the blade; the combat cadence remains authoritative.
+        const side = this._swordCombo === 1 ? -1 : 1;
+        const overhead = this._swordCombo === 2;
+        const keys = [
+          [0, 0, 0, 0, 0, 0, 0],
+          [.18, -.20, -.12 * side, -.18 * side, .025 * side, .065, -.045],
+          [.50, overhead ? 1.10 : .72, .24 * side, .24 * side, -.075 * side, -.14, -.12],
+          [.66, .82, .18 * side, .16 * side, -.05 * side, -.11, -.08],
+          [1, 0, 0, 0, 0, 0, 0],
+        ];
+        const end = keys.findIndex(k => k[0] >= ph && k[0] > 0);
+        const a = keys[Math.max(0, end - 1)], b = keys[Math.max(1, end)];
+        const t = THREE.MathUtils.smoothstep(ph, a[0], b[0]);
+        const pose = a.slice(1).map((v, i) => THREE.MathUtils.lerp(v, b[i + 1], t));
+        this.kickGroup.rotation.set(...pose.slice(0, 3));
+        this.kickGroup.position.set(this.kickPos.x + pose[3], this.kickPos.y + pose[4], this.kickPos.z + pose[5]);
       } else if (ph < 0.22) {
         // Lift the hilt and cock the blade back without sweeping across the
         // sightline before the attack begins.
@@ -2118,6 +2138,16 @@ export class WeaponSystem {
     } else if (def.kind === 'melee') {
       if (def.id === 'knife') this.kickGroup.rotation.set(-0.10, -0.28, 0.10);
       else this.kickGroup.rotation.set(0, 0, 0);
+    }
+
+    if (def.id === 'sword' && this._inspectTime !== undefined) {
+      this._inspectTime += dt;
+      const p = Math.min(1, this._inspectTime / 2.2);
+      const envelope = Math.sin(Math.PI * p) ** 2;
+      this.kickGroup.rotation.set(-.12 * envelope, -.24 * envelope, .28 * envelope);
+      this.kickGroup.position.x -= .04 * envelope;
+      this.kickGroup.position.y += .06 * envelope;
+      if (p === 1) this._inspectTime = undefined;
     }
 
     // idle breathing / weapon settle — fades out during sprint. Its own smooth

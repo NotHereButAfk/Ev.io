@@ -10,7 +10,7 @@
 import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
 import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId, weaponsByCategory } from '../weapons/weaponDefs.js';
-import { WEAPON_SKINS, getWeaponSkinsFor } from '../weapons/WeaponSkins.js';
+import { ALL_WEAPON_SKINS as WEAPON_SKINS, getWeaponSkinsFor } from '../weapons/WeaponSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
 import { Shop } from '../core/Shop.js';
@@ -200,7 +200,7 @@ export class InventoryPanel {
     // The sword has its own independent equipped slot but intentionally uses
     // the same purchased finish catalog. Main guns remain restricted to their
     // authored five-skin sets so choosing a finish never swaps the gun shape.
-    const catalog = isMelee ? WEAPON_SKINS : getWeaponSkinsFor(gun.id);
+    const catalog = getWeaponSkinsFor(gun.id);
     const owned = catalog.filter((s) => Armory.ownsSkin(s.id));
     const jobs = [];
     for (const s of owned) {

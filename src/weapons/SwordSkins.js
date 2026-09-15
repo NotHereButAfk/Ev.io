@@ -7,7 +7,8 @@ import { decalTexture } from './WeaponTextures.js';
 // paint a `decal` pattern onto the blade (optionally glowing via decalEmissive).
 // Animated skins pulse/cycle the blade's emissive each frame.
 
-export const SWORD_SKINS = [];
+import { SWORD_SKINS } from '../../server/swordskins.mjs';
+export { SWORD_SKINS };
 
 const _col = new THREE.Color();
 

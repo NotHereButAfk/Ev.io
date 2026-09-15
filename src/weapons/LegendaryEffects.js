@@ -9,7 +9,7 @@ export function configureLegendaryEffect(material, skin) {
     delete material.userData.legendaryEffect;
     material.needsUpdate = true;
   }
-  if (skin?.rarity !== 'legendary' || !Number.isInteger(skin.legendaryStyle)) return;
+  if (!['legendary', 'mythic'].includes(skin?.rarity) || !Number.isInteger(skin.legendaryStyle)) return;
   const effect = {
     compile: material.onBeforeCompile, key: material.customProgramCacheKey,
     time: { value: 0 }, shot: { value: 0 }, style: { value: skin.legendaryStyle },

@@ -688,8 +688,8 @@ for (const frame of firearmFraming) {
   }
 }
 const swordRecoveredBounds = projectedBounds(swordModel);
-assert(greatestSwordDrop > 0.70 && greatestSwordDrop > greatestSwordSideShift * 1.05,
-  `sword strike is not a dominant downward chop (drop=${greatestSwordDrop}, side=${greatestSwordSideShift})`);
+assert(greatestSwordDrop > 0.70 && greatestSwordSideShift < 1.5,
+  `sword diagonal cut escaped its bounded downward arc (drop=${greatestSwordDrop}, side=${greatestSwordSideShift})`);
 for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
   assert(Math.abs(swordRecoveredBounds[key] - swordGuardBounds[key]) < 0.035,
     `sword failed to recover its guard on ${key}`);

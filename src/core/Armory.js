@@ -13,14 +13,14 @@ function _save(d) { localStorage.setItem(_KEY, JSON.stringify(d)); }
 export const Armory = {
   // Only the five main guns have purchasable finishes.
   canSkin(weaponId) {
-    return getWeapon(weaponId)?.category === 'main';
+    return weaponId === 'sword' || getWeapon(weaponId)?.category === 'main';
   },
 
   getSkinId(weaponId, isSword = false) {
     // No catalog default any more — an unset weapon simply has no skin (null).
     if (!this.canSkin(weaponId)) return null;
     const skinId = _load()[weaponId] || null;
-    if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return null;
+    if (!isSkinForWeapon(weaponId, skinId)) return null;
     return this.ownsSkin(skinId) ? skinId : null;
   },
 
@@ -49,7 +49,7 @@ export const Armory = {
 
   equipSkin(weaponId, skinId) {
     if (!this.canSkin(weaponId) || !this.ownsSkin(skinId)) return;   // extras/melee stay default
-    if (getWeapon(weaponId)?.category === 'main' && !isSkinForWeapon(weaponId, skinId)) return;
+    if (!isSkinForWeapon(weaponId, skinId)) return;
     const d = _load();
     d[weaponId] = skinId;
     _save(d);

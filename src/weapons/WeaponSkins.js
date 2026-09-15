@@ -3,18 +3,20 @@ import * as THREE from 'three';
 import { decalTexture } from './WeaponTextures.js';
 
 import { WEAPON_SKINS } from '../../server/weaponskins.mjs';
-export { WEAPON_SKINS };
+import { SWORD_SKINS } from '../../server/swordskins.mjs';
+export { WEAPON_SKINS, SWORD_SKINS };
+export const ALL_WEAPON_SKINS = [...WEAPON_SKINS, ...SWORD_SKINS];
 export const MAIN_GUN_SKIN_SETS = Object.freeze(Object.fromEntries(
   [...new Set(WEAPON_SKINS.map(s => s.weaponId))].map(id =>
     [id, Object.freeze(WEAPON_SKINS.filter(s => s.weaponId === id).map(s => s.id))]),
 ));
 
 const _skinWeapon = new Map(
-  Object.entries(MAIN_GUN_SKIN_SETS).flatMap(([weaponId, ids]) => ids.map((id) => [id, weaponId])),
+  ALL_WEAPON_SKINS.map(s => [s.id, s.weaponId]),
 );
 
 export function getWeaponSkinsFor(weaponId) {
-  const ids = MAIN_GUN_SKIN_SETS[weaponId] || [];
+  const ids = weaponId === 'sword' ? SWORD_SKINS.map(s => s.id) : MAIN_GUN_SKIN_SETS[weaponId] || [];
   return ids.map(getWeaponSkin).filter(Boolean);
 }
 
@@ -30,7 +32,7 @@ const _hsl = new THREE.Color();
 
 export function getWeaponSkin(id) {
   // Catalog is empty — no gun skins exist, so there is no default fallback.
-  return WEAPON_SKINS.find((s) => s.id === id) || null;
+  return ALL_WEAPON_SKINS.find((s) => s.id === id) || null;
 }
 
 /** Recolor a built gun model group using the skin's material role tags. */
@@ -45,7 +47,11 @@ export function applyWeaponSkin(group, skin) {
     if (seen.has(m)) return;
     seen.add(m);
     const role = m.userData?.role;
-    if (role === 'body' || role === 'metal') configureLegendaryEffect(m, skin);
+    if (skin.weaponId === 'sword' && (role === 'wood' || role === 'special')) {
+      m.color.setHex(role === 'wood' ? skin.grip : skin.guard);
+      m.needsUpdate = true;
+    }
+    if (role === 'body' || role === 'metal' || (role === 'energy' && skin.weaponId === 'sword')) configureLegendaryEffect(m, skin);
     if (role === 'body') {
       m.color.setHex(skin.body);
       m.metalness = skin.metalness;
@@ -164,7 +170,7 @@ export function animateWeaponSkin(group, skin, t) {
     if (seen.has(m)) return;
     seen.add(m);
     const role = m.userData?.role;
-    if (role !== 'body' && role !== 'metal') return;
+    if (role !== 'body' && role !== 'metal' && !(role === 'energy' && skin.weaponId === 'sword')) return;
     updateLegendaryEffect(m, t);
     const keepWhite = glowDecal && role === 'body';
 
