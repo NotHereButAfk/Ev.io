@@ -954,7 +954,7 @@ export class MenuUI {
       // Kind badge (WEAPON / SWORD / ARMOR) top-right
       const kindBadge = document.createElement('span');
       kindBadge.className = 'shop-kind-badge';
-      kindBadge.textContent = kind.toUpperCase();
+      kindBadge.textContent = isCharacter ? 'CHARACTER' : showcase?.id === 'sword' ? 'SWORD' : 'GUN';
       swatch.appendChild(kindBadge);
 
       // Status badge
@@ -972,12 +972,50 @@ export class MenuUI {
       body.className = 'shop-card-body';
       const nameEl = document.createElement('div');
       nameEl.className = 'shop-skin-name';
-      nameEl.textContent = isCharacter ? skin.name : `${showcase?.name ?? 'Weapon'} — ${skin.name}`;
+      const weaponLabel = document.createElement('div');
+      weaponLabel.className = 'shop-weapon-label';
+      weaponLabel.textContent = isCharacter ? 'PLAYER SKIN' : (showcase?.name || 'Weapon').toUpperCase();
+      body.appendChild(weaponLabel);
+      nameEl.textContent = skin.name;
+      nameEl.title = skin.name;
       body.appendChild(nameEl);
       const perkEl = document.createElement('div');
       perkEl.className = 'shop-perk-line';
-      perkEl.textContent = skin.earningEnabled === false ? 'Cosmetic finish' : describePerk(rarity);
+      const features = { common: 'Color finish', rare: 'Custom textured finish', epic: 'Textured finish · Animated glow', legendary: 'Detailed animated finish · Kill animation', mythic: 'Animated energy finish · Kill animation' };
+      perkEl.textContent = features[rarity] || 'Cosmetic finish';
+      if (skin.shootSound) perkEl.textContent += ' · Custom firing sound';
+      if (!isCharacter) {
+        const compatibility = document.createElement('div');
+        compatibility.className = 'shop-compatibility';
+        compatibility.textContent = `For ${showcase?.name || 'this weapon'} only`;
+        body.appendChild(compatibility);
+      }
       body.appendChild(perkEl);
+      if (skin.shootSound) {
+        const sound = document.createElement('button');
+        sound.className = 'shop-btn shop-btn-sound';
+        sound.textContent = '▶ Preview firing sound';
+        sound.addEventListener('click', async e => {
+          e.stopPropagation();
+          try {
+            const { createLegendaryShot } = await import('../core/LegendaryAudio.js');
+            const Context = window.AudioContext || window.webkitAudioContext;
+            this._shopAudio ||= new Context();
+            await this._shopAudio.resume();
+            const samples = createLegendaryShot(skin.shootSound, this._shopAudio.sampleRate);
+            if (!samples) return;
+            this._shopSound?.stop();
+            const buffer = this._shopAudio.createBuffer(1, samples.length, this._shopAudio.sampleRate);
+            buffer.copyToChannel(samples, 0);
+            const source = this._shopAudio.createBufferSource(), gain = this._shopAudio.createGain();
+            gain.gain.value = .25; source.buffer = buffer;
+            source.connect(gain); gain.connect(this._shopAudio.destination);
+            source.onended = () => { source.disconnect(); gain.disconnect(); if (this._shopSound === source) this._shopSound = null; };
+            this._shopSound = source; source.start();
+          } catch { sound.textContent = 'Sound unavailable'; }
+        });
+        body.appendChild(sound);
+      }
       card.appendChild(body);
 
       // CTA

@@ -131,6 +131,8 @@ export function applyWeaponSkin(group, skin) {
       }
       m.needsUpdate = true;
     } else if (role === 'metal') {
+      m.metalness = skin.metalness;
+      m.roughness = skin.roughness;
       m.color.setHex(skin.metal);
       m.emissive.setHex(skin.emissive ?? 0x000000);
       m.emissiveIntensity = skin.emissiveIntensity ?? 0;

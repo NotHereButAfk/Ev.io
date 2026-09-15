@@ -537,6 +537,9 @@ export class AuthNetBridge {
         if (e.by === me) {
           this.game.hud?.flashHitmarker?.(e.head);
           this.game.hud?.showKillConfirm?.(e.head, e.score ?? 100);
+          const skin = this.game.weaponSystem?.showLegendaryKill?.(e.wid);
+          const victim = this.remotes.get(e.id)?.avatar?.group;
+          if (skin && victim) this.game.deathEffects?.spawn(victim.position, skin.id, skin.id, e.wid === 'sword');
           if (e.head) this.game.hud?.showHeadshotFlair?.();
         }
         const tag = e.head ? ' 🎯' : '';

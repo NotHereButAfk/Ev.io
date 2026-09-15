@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import * as THREE from 'three';
-import {WEAPON_SKINS} from '../server/weaponskins.mjs';import {createLegendaryShot} from '../src/core/LegendaryAudio.js';import {configureLegendaryEffect,updateLegendaryEffect,triggerLegendaryShot} from '../src/weapons/LegendaryEffects.js';
+import {WEAPON_SKINS} from '../server/weaponskins.mjs';import {createLegendaryShot} from '../src/core/LegendaryAudio.js';import {configureLegendaryEffect,updateLegendaryEffect,triggerLegendaryShot,triggerLegendaryKill} from '../src/weapons/LegendaryEffects.js';
 const hashes=new Set(),rate=24000, demo=new Float32Array(rate*5);
 for(const [i,s] of WEAPON_SKINS.filter(s=>s.rarity==='legendary').entries()){
  const samples=createLegendaryShot(s.shootSound,rate);assert.ok(samples.length>2000);assert.ok(samples.every(Number.isFinite));assert.ok(Math.max(...samples.map(Math.abs))<=.59);assert.ok(Math.abs(samples.at(-1))<.001);
@@ -8,6 +8,7 @@ for(const [i,s] of WEAPON_SKINS.filter(s=>s.rarity==='legendary').entries()){
  const m=new THREE.MeshStandardMaterial();const before=m.onBeforeCompile;configureLegendaryEffect(m,s);
  const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <emissivemap_fragment>'};m.onBeforeCompile(shader,{});assert.ok(shader.fragmentShader.includes('legendaryShot'));assert.ok(shader.uniforms.legendaryColor);
  const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.BoxGeometry(),m));triggerLegendaryShot(g,1);updateLegendaryEffect(m,1);assert.equal(m.userData.legendaryEffect.shot.value,1);updateLegendaryEffect(m,2);assert.ok(m.userData.legendaryEffect.shot.value<.001);
+ triggerLegendaryKill(g,2);updateLegendaryEffect(m,2);assert.equal(m.userData.legendaryEffect.kill.value,1);updateLegendaryEffect(m,4);assert.equal(m.userData.legendaryEffect.kill.value,0);
  configureLegendaryEffect(m,WEAPON_SKINS[0]);assert.equal(m.onBeforeCompile,before);assert.equal(m.userData.legendaryEffect,undefined);
 }
 assert.equal(hashes.size,25);assert.equal(createLegendaryShot('legendary:fake',rate),null);

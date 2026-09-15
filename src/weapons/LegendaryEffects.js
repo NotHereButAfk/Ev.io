@@ -14,6 +14,7 @@ export function configureLegendaryEffect(material, skin) {
     compile: material.onBeforeCompile, key: material.customProgramCacheKey,
     time: { value: 0 }, shot: { value: 0 }, style: { value: skin.legendaryStyle },
     color: { value: new Color(skin.energyColor) }, shotAt: -Infinity,
+    kill: { value: 0 }, killAt: -Infinity,
   };
   material.userData.legendaryEffect = effect;
   const cacheKey = effect.key.call(material);
@@ -21,11 +22,11 @@ export function configureLegendaryEffect(material, skin) {
   material.onBeforeCompile = function(shader, renderer) {
     effect.compile.call(this, shader, renderer);
     Object.assign(shader.uniforms, { legendaryTime: effect.time, legendaryShot: effect.shot,
-      legendaryStyle: effect.style, legendaryColor: effect.color });
+      legendaryStyle: effect.style, legendaryColor: effect.color, legendaryKill: effect.kill });
     shader.vertexShader = 'varying vec3 vLegendaryPosition;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLegendaryPosition = position;');
     shader.fragmentShader = `varying vec3 vLegendaryPosition;
-      uniform float legendaryTime, legendaryShot, legendaryStyle;
+      uniform float legendaryTime, legendaryShot, legendaryStyle, legendaryKill;
       uniform vec3 legendaryColor;
     ` + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
@@ -45,7 +46,8 @@ export function configureLegendaryEffect(material, skin) {
       } else {
         fx = pow(0.5+0.5*sin(length(lp.xy)*44.0+lp.z*8.0-lt*3.0),18.0);
       }
-      totalEmissiveRadiance += legendaryColor * (fx*0.65 + legendaryShot*0.45);
+      float victory = pow(0.5 + 0.5*sin(lp.z*22.0 - legendaryTime*(8.0 + legendaryStyle*2.0)), 6.0);
+      totalEmissiveRadiance += legendaryColor * (fx*0.65 + legendaryShot*0.45 + legendaryKill*(0.35 + victory*1.5));
     `);
   };
   material.needsUpdate = true;
@@ -55,6 +57,7 @@ export function updateLegendaryEffect(material, time) {
   const effect = material.userData.legendaryEffect;
   if (!effect) return;
   effect.time.value = time;
+  effect.kill.value = Math.max(0, 1 - (time - effect.killAt) / 1.5);
   effect.shot.value = Math.exp(-Math.max(0,time-effect.shotAt)*18);
 }
 
@@ -62,5 +65,12 @@ export function triggerLegendaryShot(group, time) {
   group?.traverse(obj => {
     const effect = obj.material?.userData?.legendaryEffect;
     if (effect) { effect.shotAt = time; effect.shot.value = 1; }
+  });
+}
+
+export function triggerLegendaryKill(group, time) {
+  group?.traverse(obj => {
+    const effect = obj.material?.userData?.legendaryEffect;
+    if (effect) { effect.killAt = time; effect.kill.value = 1; }
   });
 }

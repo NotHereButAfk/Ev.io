@@ -1270,9 +1270,10 @@ function camoUrbanDecal() {
 
 // Neutral patterned wraps multiply against each skin's authored palette.
 function rarePattern(kind) {
-  const c = makeCanvas(256), ctx = c.getContext('2d');
-  ctx.fillStyle = '#cbd0d6'; ctx.fillRect(0, 0, 256, 256);
-  ctx.strokeStyle = '#4e5763'; ctx.fillStyle = '#66707c'; ctx.lineWidth = 9;
+  const c = makeCanvas(512), ctx = c.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.fillStyle = '#f4f6fa'; ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#172634'; ctx.fillStyle = '#294258'; ctx.lineWidth = 9;
   for (let y = -128; y < 384; y += 64) {
     for (let x = -128; x < 384; x += 64) {
       ctx.beginPath();
@@ -1296,9 +1297,14 @@ function rarePattern(kind) {
 
 // Engraved legendary motifs retain the palette rather than baking in a tint.
 function legendaryPattern(kind) {
-  const c = makeCanvas(256), ctx = c.getContext('2d');
-  ctx.fillStyle = '#cbd0d4'; ctx.fillRect(0, 0, 256, 256);
-  ctx.strokeStyle = '#52606c'; ctx.lineWidth = 5;
+  const c = makeCanvas(512), ctx = c.getContext('2d');
+  ctx.scale(2, 2);
+  ctx.fillStyle = '#f4e9c9'; ctx.fillRect(0, 0, 256, 256);
+  ctx.strokeStyle = '#596879'; ctx.lineWidth = .7;
+  for (let i = -256; i < 512; i += 16) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 256, 256); ctx.stroke();
+  }
+  ctx.strokeStyle = '#273142'; ctx.lineWidth = 5;
   for(let y=-128;y<384;y+=128) for(let x=-128;x<384;x+=128) {
     ctx.beginPath();
     if(kind==='regalia') {

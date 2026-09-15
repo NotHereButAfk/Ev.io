@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { ALL_WEAPON_SKINS } from '../weapons/WeaponSkins.js';
+const legendaryPresets = new Map(ALL_WEAPON_SKINS.filter(s => ['legendary', 'mythic'].includes(s.rarity)).map(s => [s.id, ['gold', 'fire', 'electric', 'poison', 'void_fx'][s.legendaryStyle]]));
 
 // Particle death effect — visual burst when a bot is eliminated.
 // Preset type is chosen by the killer's active skin.
@@ -38,8 +40,8 @@ export class DeathEffectManager {
   }
 
   spawn(position, weaponSkinId, swordSkinId, isMelee) {
-    const key = isMelee ? (swordSkinId || '') : (weaponSkinId || '');
-    const preset = PRESETS[ID_PRESET[key] || 'default'];
+    const key = isMelee ? (swordSkinId || weaponSkinId || '') : (weaponSkinId || '');
+    const preset = PRESETS[legendaryPresets.get(key) || ID_PRESET[key] || 'default'];
     const parts = [];
 
     // expanding shockwave ring at the kill point

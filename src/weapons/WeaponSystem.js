@@ -1,4 +1,4 @@
-import { triggerLegendaryShot } from './LegendaryEffects.js';
+import { triggerLegendaryShot, triggerLegendaryKill } from './LegendaryEffects.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { WEAPONS, isMainWeaponId, isMatchPickupWeaponId } from './weaponDefs.js';
@@ -1859,6 +1859,13 @@ export class WeaponSystem {
     this.kickVel.z += amount * 26;
     this.kickVel.y += amount * 6;
     this.kickRotXVel -= amount * 34;
+  }
+
+  showLegendaryKill(weaponId) {
+    const skin = this._armoryMap?.get(weaponId)?.skin;
+    if (!['legendary', 'mythic'].includes(skin?.rarity)) return null;
+    triggerLegendaryKill(this.models.get(weaponId)?.group, this.animTime);
+    return skin;
   }
 
   _fire(world, botMeshes, player, botManager) {

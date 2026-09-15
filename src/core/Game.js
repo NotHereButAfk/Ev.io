@@ -809,6 +809,7 @@ export class Game {
 
   _onEnemyKilled(enemy, weaponEntry, rewardMult = 1, headshot = false) {
     this.kills++;
+    if (weaponEntry?.skin) this.weaponSystem.showLegendaryKill(weaponEntry.skin.weaponId);
     this.hud.showKillConfirm(headshot, 100 * rewardMult);
     this.matchStats.currentStreak++;
     this.matchStats.bestStreak = Math.max(this.matchStats.bestStreak, this.matchStats.currentStreak);
