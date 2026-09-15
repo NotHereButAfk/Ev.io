@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
+import { getNightMarket, WEEK_MS } from './nightmarket.mjs';
 import { createPaymentService } from './paymentservice.mjs';
 
 const testSkin = process.argv.includes('--common') ? 'm4_white_signal' : process.argv.includes('--rare') ? 'm4_azure_mainframe' : 'm4_sovereign_gold';
+let marketNow = Date.UTC(2026, 0, 5);
+while (!getNightMarket(marketNow).items.some(s => s.id === testSkin)) marketNow += WEEK_MS;
 const testPrice = process.argv.includes('--common') ? '20.00' : process.argv.includes('--rare') ? '30.00' : '60.00';
 
 class FakePool {
@@ -102,7 +105,7 @@ const accounts = {
   session: async (req) => req.headers.authorization === 'guest' ? null : { id: 7 },
 };
 const service = createPaymentService(accounts, {
-  fetchImpl,
+  fetchImpl, now: () => marketNow,
   env: { PAYPAL_CLIENT_ID: 'CLIENT_ID', PAYPAL_CLIENT_SECRET: 'SECRET', PAYPAL_ENV: 'sandbox' },
 });
 
@@ -129,12 +132,16 @@ assert.equal(result.status, 400);
 result = await invoke(service, 'POST', '/api/store/orders', { skinId: 'not-for-sale', termsAccepted: true, termsVersion: '2026-08-31' });
 assert.equal(result.status, 400);
 
+const hiddenSkin = getNightMarket(marketNow + WEEK_MS).items.find(s => !getNightMarket(marketNow).items.some(o => o.id === s.id));
+result = await invoke(service, 'POST', '/api/store/orders', { skinId: hiddenSkin.id, termsAccepted: true, termsVersion: '2026-08-31' });
+assert.equal(result.status, 400);
 result = await invoke(service, 'POST', '/api/store/orders', { skinId: testSkin, price: '0.01', amount: '0.01', termsAccepted: true, termsVersion: '2026-08-31' });
 assert.equal(result.status, 201);
 assert.equal(result.json.orderId, 'PAYPALORDER1');
 const createCall = calls.find((call) => call.url.endsWith('/v2/checkout/orders'));
 assert.equal(JSON.parse(createCall.options.body).purchase_units[0].amount.value, testPrice);
 
+marketNow += WEEK_MS; // An order accepted before reset may complete after it.
 result = await invoke(service, 'POST', '/api/store/orders/PAYPALORDER1/capture');
 assert.equal(result.status, 200);
 assert.deepEqual(result.json, { ok: true, skinId: testSkin, kind: 'weapon' });

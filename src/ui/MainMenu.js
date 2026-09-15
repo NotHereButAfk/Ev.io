@@ -795,56 +795,41 @@ export class MenuUI {
 
   // ── Shop ───────────────────────────────────────────────────────────────────
 
-  // Seeded PRNG for daily Night Market rotation (deterministic per day).
-  _nightMarketSeed() {
-    const d = new Date();
-    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-  }
-
-  _nightMarketPick(allItems, count) {
-    let seed = this._nightMarketSeed();
-    const mulberry32 = (s) => { s |= 0; s = Math.imul(s ^ (s >>> 16), 0x45d9f3b); s = Math.imul(s ^ (s >>> 13), 0x45d9f3b); return ((s ^ (s >>> 16)) >>> 0) / 4294967296; };
-    const shuffled = allItems.slice();
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      const j = Math.floor(mulberry32(seed) * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, count);
-  }
-
-  // Deterministic per-skin, per-day showcase item: a weapon skin is a generic
-  // finish usable on any of the 5 main guns AND the always-equipped sword,
-  // but the Night Market card should still show *one* real weapon wearing it
-  // (stable for the day, so it doesn't flicker between renders).
   _nightMarketGunFor(skinId) {
-    const assigned = getWeaponIdForSkin(skinId);
-    if (assigned) return MAIN_GUNS.find((gun) => gun.id === assigned) || null;
-    const pool = [...MAIN_GUNS, { id: 'sword', label: 'Arc Blade' }];
-    let h = this._nightMarketSeed();
-    for (let i = 0; i < skinId.length; i++) h = (h * 31 + skinId.charCodeAt(i)) | 0;
-    return pool[Math.abs(h) % pool.length];
+    const id = getWeaponIdForSkin(skinId);
+    return id ? { id } : null;
   }
 
-  _nightMarketTimeLeft() {
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    return Math.max(0, Math.floor((tomorrow - now) / 1000));
+  async _loadNightMarket() {
+    if (this._nmLoading) return;
+    this._nmLoading = true;
+    try {
+      const response = await fetch('/api/store/night-market', { cache: 'no-store', credentials: 'same-origin' });
+      if (!response.ok) throw new Error('Night Market unavailable');
+      const market = await response.json();
+      if (!Array.isArray(market.items) || market.items.length !== 5 || !Number.isFinite(market.resetsAt)) throw new Error('Invalid market');
+      this._nightMarket = market;
+      this._nmDeadline = performance.now() + Math.max(0, market.resetsAt - market.serverTime);
+      this._nmError = false;
+    } catch { this._nmError = true; }
+    finally { this._nmLoading = false; }
+    this._renderShop();
   }
 
   _startNightMarketTimer() {
     if (this._nmInterval) return;
-    const update = () => {
+    this._nmInterval = setInterval(() => {
+      if (this._activePanel !== 'shop') return;
       const el = document.getElementById('nm-timer');
-      if (!el) return;
-      const secs = this._nightMarketTimeLeft();
-      const h = Math.floor(secs / 3600);
-      const m = Math.floor((secs % 3600) / 60);
-      const s = secs % 60;
-      el.textContent = `Refreshes in ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    };
-    update();
-    this._nmInterval = setInterval(update, 1000);
+      if (!this._nightMarket) return;
+      const secs = Math.max(0, Math.ceil((this._nmDeadline - performance.now()) / 1000));
+      if (el) el.textContent = `Refreshes in ${Math.floor(secs / 86400)}d ${Math.floor(secs % 86400 / 3600)}h ${Math.floor(secs % 3600 / 60)}m ${secs % 60}s`;
+      if (!secs) {
+        this._nightMarket = null;
+        this._nmError = false;
+        this._renderShop();
+      }
+    }, 1000);
   }
 
   _renderShop() {
@@ -871,6 +856,19 @@ export class MenuUI {
       warmWeaponThumbs(() => { if (this._activePanel === 'shop') this._renderShop(); });
     }
 
+    this._startNightMarketTimer();
+    if (!this._nightMarket) {
+      root.textContent = this._nmError ? 'Night Market unavailable. Try again.' : 'Loading weekly offers…';
+      if (this._nmError) {
+        const retry = document.createElement('button'); retry.textContent = 'Retry';
+        retry.onclick = () => { this._nmError = false; this._loadNightMarket(); };
+        root.appendChild(retry);
+      } else this._loadNightMarket();
+      return;
+    }
+    if (performance.now() >= this._nmDeadline) {
+      this._nightMarket = null; this._renderShop(); return;
+    }
     this._renderShopGrid(root);
   }
 
@@ -1021,27 +1019,15 @@ export class MenuUI {
       return card;
     };
 
-    // Full catalog: character finishes and five exclusive finishes per main gun.
-    const characterItems = ARMOR_SKINS.map(s => ({ ...s, _kind: 'character' }));
-    const weaponItems    = WEAPON_SKINS.filter((s) => getWeaponIdForSkin(s.id))
-      .map(s => ({ ...s, _kind: 'weapon' }));
-    const heading = document.createElement('h3');
-    heading.textContent = 'COMMON CHARACTER SKINS';
-    root.appendChild(heading);
-    const characterGrid = document.createElement('div');
-    characterGrid.className = 'shop-skin-grid';
-    characterItems.forEach(s => characterGrid.appendChild(makeCard(s, 'character')));
-    root.appendChild(characterGrid);
-    for (const weaponId of [...new Set(weaponItems.map(s => getWeaponIdForSkin(s.id)))]) {
-      const title = document.createElement('h3');
-      title.textContent = WEAPONS.find(w => w.id === weaponId)?.name || weaponId;
-      root.appendChild(title);
-      const grid = document.createElement('div');
-      grid.className = 'shop-skin-grid';
-      weaponItems.filter(s => getWeaponIdForSkin(s.id) === weaponId)
-        .forEach(s => grid.appendChild(makeCard(s, 'weapon')));
-      root.appendChild(grid);
+    const offers = this._nightMarket?.items || [];
+    const catalog = [...ARMOR_SKINS, ...WEAPON_SKINS];
+    const grid = document.createElement('div');
+    grid.className = 'shop-skin-grid';
+    for (const offer of offers) {
+      const skin = catalog.find(s => s.id === offer.id);
+      if (skin) grid.appendChild(makeCard(skin, offer.kind));
     }
+    root.appendChild(grid);
 
     // Progressive skinned-render pump: a few real 3D renders per frame so the
     // shop stays responsive while the previews fill in. Results are cached

@@ -107,13 +107,13 @@
           </div>
         </div>
 
-        <!-- SKIN SHOP dropdown — Night Market + Battle Pass (gated) -->
+        <!-- NIGHT MARKET dropdown — Night Market + Battle Pass (gated) -->
         <div class="nav-dd-wrap">
           <button class="nav-item nav-dd-btn" data-dd="store">STORE &#9660;</button>
           <div class="nav-dd profile-dropdown hidden" id="dd-store">
             <button class="profile-menu-item" data-panel="shop" data-gated="1">
               <span class="pm-icon">&#127769;</span>
-              <div class="pm-body"><div class="pm-name">SKIN SHOP</div><div class="pm-sub">Player and weapon skins</div></div>
+              <div class="pm-body"><div class="pm-name">NIGHT MARKET</div><div class="pm-sub">5 skins · Refreshes weekly</div></div>
             </button>
             <button class="profile-menu-item" data-panel="battlepass" data-gated="1">
               <span class="pm-icon">&#127903;</span>
@@ -494,11 +494,11 @@
       </div>
     </div>
 
-    <!-- ===================== PANEL: SKIN SHOP ===================== -->
+    <!-- ===================== PANEL: NIGHT MARKET ===================== -->
     <div id="panel-shop" class="nav-panel nav-panel-shop hidden">
       <!-- Top bar -->
       <div class="nm-topbar">
-        <div class="nm-brand">&#127769; SKIN SHOP</div>
+        <div class="nm-brand">&#127769; NIGHT MARKET</div>
         <div class="stp-currency">
           <span class="stp-coin-icon">&#9670;</span>
           <span id="shop-coin-balance">0</span>
@@ -509,16 +509,17 @@
       <!-- Guest / not-logged-in wall -->
       <div id="shop-auth-wall" class="shop-auth-wall hidden">
         <div class="saw-lock">&#128274;</div>
-        <div class="saw-title">SIGN IN TO ACCESS THE SKIN SHOP</div>
+        <div class="saw-title">SIGN IN TO ACCESS THE NIGHT MARKET</div>
         <div class="saw-sub">Create a free account to browse player and weapon skins.</div>
       </div>
 
       <!-- Main Night Market content (shown when logged in) -->
       <div id="shop-content" class="hidden">
         <div class="nm-header">
-          <div class="nm-title">SKIN SHOP</div>
-          <div class="nm-sub">10 player skins &middot; 5 Common + 5 Rare + 5 Legendary skins per main gun</div>
+          <div class="nm-title">NIGHT MARKET</div>
+          <div class="nm-sub">5 weekly offers &middot; Resets Monday at 00:00 UTC</div>
         </div>
+        <div id="nm-timer" aria-live="off">Weekly refresh</div>
         <div id="shop-grid-root"></div>
         <div class="shop-earn-tip">Earn E from eligible server-validated play &middot; <a href="/earnings">Balance, E items and history</a></div>
       </div>

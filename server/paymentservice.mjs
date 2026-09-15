@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
+import { getNightMarket } from './nightmarket.mjs';
 import { STORE_ITEMS } from './storecatalog.mjs';
 
 const PRICE = { common: '20.00', rare: '30.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
@@ -47,7 +48,7 @@ function isSameOrigin(req) {
   }
 }
 
-export function createPaymentService(accounts, { fetchImpl = fetch, env = process.env } = {}) {
+export function createPaymentService(accounts, { fetchImpl = fetch, env = process.env, now = Date.now } = {}) {
   if (!accounts?.pool || !accounts?.session) return null;
   env = loadPrivatePaymentEnv(env);
   const clientId = env.PAYPAL_CLIENT_ID || '';
@@ -108,6 +109,9 @@ export function createPaymentService(accounts, { fetchImpl = fetch, env = proces
   return async (req, res, pathname) => {
     if (!pathname.startsWith('/api/store/')) return false;
     await initialized;
+    if (req.method === 'GET' && pathname === '/api/store/night-market') {
+      send(res, 200, { ok: true, ...getNightMarket(now()) }); return true;
+    }
     if (req.method === 'GET' && pathname === '/api/store/config') {
       send(res, 200, { ok: true, configured: !!(clientId && secret), clientId: clientId || null, environment, prices: PRICE }); return true;
     }
@@ -129,7 +133,7 @@ export function createPaymentService(accounts, { fetchImpl = fetch, env = proces
           send(res, 400, { ok: false, err: 'Accept the current Digital Skin Purchase Terms to continue' }); return true;
         }
         const item = items.get(String(skinId));
-        if (!item) { send(res, 400, { ok: false, err: 'Skin is not for sale' }); return true; }
+        if (!item || !getNightMarket(now()).items.some(offer => offer.id === item.id)) { send(res, 400, { ok: false, err: 'Skin is not for sale' }); return true; }
         const owned = await accounts.pool.query('SELECT 1 FROM user_skins WHERE user_id=$1 AND skin_id=$2', [user.id, item.id]);
         if (owned.rowCount) { send(res, 409, { ok: false, err: 'Skin already owned' }); return true; }
         const localId = randomUUID();
