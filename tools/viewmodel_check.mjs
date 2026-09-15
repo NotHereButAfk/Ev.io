@@ -695,6 +695,37 @@ for (const key of ['minX', 'maxX', 'minY', 'maxY']) {
     `sword failed to recover its guard on ${key}`);
 }
 
+// Follow the actual blade tip, not its bounding box: a reversed pitch can
+// lower the box while the cutting edge scoops upward.
+let bladeTipMesh, bladeTipLocal, highestTip = -Infinity;
+swordModel.updateWorldMatrix(true, true);
+swordModel.traverse(mesh => {
+  if (!mesh.isMesh) return;
+  const positions = mesh.geometry.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const local = new THREE.Vector3().fromBufferAttribute(positions, i);
+    const y = camera.worldToLocal(mesh.localToWorld(local.clone())).y;
+    if (y > highestTip) { highestTip = y; bladeTipMesh = mesh; bladeTipLocal = local; }
+  }
+});
+for (const fps of [30, 60, 144]) for (const combo of [0, 1, 2]) {
+  system._swordCombo = combo;
+  let previousY = Infinity, startY;
+  for (let sample = 0; sample <= 12; sample++) {
+    const phase = .18 + .32 * sample / 12;
+    system.swingPhase = phase - 1 / fps / system.currentDef.fireRate;
+    tick(1, fps);
+    swordModel.updateWorldMatrix(true, true);
+    const y = camera.worldToLocal(bladeTipMesh.localToWorld(bladeTipLocal.clone())).y;
+    if (sample === 0) startY = y;
+    else assert(y < previousY, `sword combo ${combo} cuts upward at ${phase} (${fps}Hz)`);
+    previousY = y;
+  }
+  assert(startY - previousY > .35, `sword combo ${combo} must cut down through the target (${startY - previousY})`);
+}
+system.swingPhase = 1;
+tick(1);
+
 activate(WEAPONS.find((def) => def.id === 'm4'));
 let worstGlove = { value: Infinity, label: '' };
 assert(system.armGroup.visible && system.supportArmGroup.visible,

@@ -2086,15 +2086,16 @@ export class WeaponSystem {
           this.kickPos.z - e * 0.20,
         );
       } else if (def.id === 'sword') {
-        // Alternating diagonal cuts followed by an overhead finisher. Both hands
+        // Downward diagonal cuts followed by an overhead finisher. Negative X
+        // pitches the forward-facing blade down; positive X would scoop upward. Both hands
         // travel with the blade; the combat cadence remains authoritative.
         const side = this._swordCombo === 1 ? -1 : 1;
         const overhead = this._swordCombo === 2;
         const keys = [
           [0, 0, 0, 0, 0, 0, 0],
-          [.18, -.20, -.12 * side, -.18 * side, .025 * side, .065, -.045],
-          [.50, overhead ? 1.10 : .72, .24 * side, .24 * side, -.075 * side, -.14, -.12],
-          [.66, .82, .18 * side, .16 * side, -.05 * side, -.11, -.08],
+          [.18, -.10, -.12 * side, -.18 * side, .025 * side, .065, -.045],
+          [.50, overhead ? -1.65 : -1.45, .24 * side, .24 * side, -.075 * side, -.14, -.12],
+          [.66, -1.20, .18 * side, .16 * side, -.05 * side, -.11, -.08],
           [1, 0, 0, 0, 0, 0, 0],
         ];
         const end = keys.findIndex(k => k[0] >= ph && k[0] > 0);
