@@ -1,0 +1,33 @@
+import {createServer} from 'vite';
+import {chromium} from 'playwright';
+const server=await createServer({server:{host:'127.0.0.1',port:0}});await server.listen();
+const browser=await chromium.launch({args:['--use-gl=swiftshader','--enable-webgl','--no-sandbox','--enable-unsafe-swiftshader']});
+try {
+ const page=await browser.newPage({viewport:{width:1100,height:800}});await page.goto(server.resolvedUrls.local[0]);
+ await page.evaluate(async()=>{
+  const {InventoryPanel}=await import('/src/ui/InventoryPanel.js');
+  const {Armory}=await import('/src/core/Armory.js');const {Loadout}=await import('/src/core/Loadout.js');const {Shop}=await import('/src/core/Shop.js');
+  const {warmWeaponThumbs}=await import('/src/ui/WeaponThumbnails.js');await new Promise(r=>warmWeaponThumbs(r));
+  document.body.innerHTML='<main class="nav-panel-inv" style="position:fixed;inset:0;padding:25px;background:#101722;color:white;overflow:auto"><h2>EQUIPPED</h2><div id="inv-equipped"></div><h2>YOUR INVENTORY</h2><p>Choose a weapon, then click an owned skin to equip it.</p><div id="inv-tabs"></div><div id="inv-grid" class="inv-grid"></div></main>';
+  let changed=0;const inv=new InventoryPanel({_currentUser:'__guest__',onArmoryChanged:()=>changed++,onArmorSkinEquipped:()=>changed++,_updateArmorPreview:()=>{}});
+  Armory.grantSkin('magnum_kings_ransom');Armory.grantSkin('sword_sovereign_blade');Shop.unlock('arctic_ghost');Loadout.setGun('m4');Shop.unequip();inv.open();
+  const check=(ok,msg)=>{if(!ok)throw Error(msg)};
+  check(document.querySelectorAll('#inv-equipped .inv-item').length===3,'exactly three equipped slots');
+  const tab=id=>{inv._tab=id;inv._renderTabs();inv._renderGrid()};
+  tab('magnum');document.querySelector('#inv-grid [data-skin-id="magnum_kings_ransom"]').click();
+  check(Loadout.getGun()==='magnum'&&Armory.getSkinId('magnum')==='magnum_kings_ransom','one-click main replacement');
+  tab('sword');document.querySelector('#inv-grid [data-skin-id="sword_sovereign_blade"]').click();
+  check(Loadout.getGun()==='magnum'&&Armory.getSkinId('sword')==='sword_sovereign_blade','independent sword slot');
+  tab('character');document.querySelectorAll('#inv-grid .inv-item')[1].click();
+  check(Shop.getEquipped()==='arctic_ghost'&&Loadout.getGun()==='magnum','independent character slot');
+  inv.close();inv.open();check(document.querySelectorAll('#inv-equipped .inv-item').length===3,'reopen retains three slots');
+  tab('m4');check(!document.querySelector('#inv-grid .equipped'),'inactive gun not equipped');
+  document.querySelector('#inv-grid .inv-item').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+  check(Loadout.getGun()==='m4'&&!Armory.getSkinId('m4'),'keyboard default replaces main');
+  check(Armory.getSkinId('sword')==='sword_sovereign_blade'&&Shop.getEquipped()==='arctic_ghost','other slots preserved');
+  tab('magnum');document.querySelector('#inv-grid [data-skin-id="magnum_kings_ransom"]').click();
+  check(changed===5,'one change callback per selection');
+ });
+ await page.waitForTimeout(500);await page.screenshot({path:'../../outputs/inventory.png'});
+ console.log('Inventory passed: three slots, owned skin click and keyboard equip, replacements, isolation and persistence');
+}finally{await browser.close();await server.close();}process.exit(0);

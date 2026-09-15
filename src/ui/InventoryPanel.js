@@ -9,7 +9,7 @@
  */
 import { getSkin } from '../player/skins.js';
 import { ARMOR_SKINS, RARITY_COLORS, getArmorSkin } from '../player/ArmorSkins.js';
-import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId, weaponsByCategory } from '../weapons/weaponDefs.js';
+import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId } from '../weapons/weaponDefs.js';
 import { ALL_WEAPON_SKINS as WEAPON_SKINS, getWeaponSkinsFor } from '../weapons/WeaponSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
@@ -20,12 +20,12 @@ import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponT
 // The five permanent weapon choices. Specials and heavies are collected from
 // glowing pads during a live match, so they do not appear in this menu.
 const EV_INVENTORY_LABELS = ['Auto Rifle', 'Hand Cannon', 'Burst Rifle', 'Sweeper', 'Laser Rifle'];
-export const MAIN_GUNS = MAIN_WEAPON_IDS.map((id, index) => {
+export const MAIN_GUNS = MAIN_WEAPON_IDS.map((id) => {
   const weapon = WEAPONS.find((w) => w.id === id);
-  return { id, label: EV_INVENTORY_LABELS[index] || weapon?.name || id };
+  return { id, label: weapon?.name || id };
 });
 // Melee remains a separate equipment slot.
-const MELEE = weaponsByCategory('melee').slice(0, 1).map((w) => ({ id: w.id, label: 'Sword' }));
+const MELEE = WEAPONS.filter(w => w.id === 'sword').map((w) => ({ id: w.id, label: 'Sword' }));
 
 // Tab strip organised into labelled groups.
 const TAB_GROUPS = [
@@ -75,7 +75,7 @@ export class InventoryPanel {
     this._open = true;
     if (!this._thumbsRequested) {
       this._thumbsRequested = true;
-      warmWeaponThumbs(() => { if (this._open) this._renderGrid(); });
+      warmWeaponThumbs(() => { if (this._open) { _thumbCache.clear(); this._renderEquipped(); this._renderGrid(); } });
     }
     // Sync display name into the header.
     const nameEl = document.getElementById('inv-username');
@@ -158,7 +158,7 @@ export class InventoryPanel {
     }
 
     // Equipped skin for each EV-style weapon category.
-    for (const choice of [...MAIN_GUNS, ...MELEE]) {
+    for (const choice of [{ id: Loadout.getGun() }, { id: Loadout.getMelee() }]) {
       const gunDef = WEAPONS.find((w) => w.id === choice.id);
       if (!gunDef) continue;
       const isMelee = gunDef.kind === 'melee';
@@ -166,6 +166,10 @@ export class InventoryPanel {
       const skin = skinId ? WEAPON_SKINS.find((s) => s.id === skinId) : null;
       row.appendChild(this._weaponCard(gunDef, skin, /*equipped=*/true));
     }
+    [...row.children].forEach((card, i) => {
+      const label = document.createElement('div'); label.className = 'inv-slot-label';
+      label.textContent = ['CHARACTER', 'MAIN GUN', 'SWORD'][i]; card.prepend(label);
+    });
   }
 
   // ── main grid (Default + skin cards for the active tab) ────────────────────
@@ -230,6 +234,7 @@ export class InventoryPanel {
   // ── equip actions ──────────────────────────────────────────────────────────
 
   _equipWeapon(gun, skinId) {
+    if (skinId && (!Armory.ownsSkin(skinId) || !getWeaponSkinsFor(gun.id).some(s => s.id === skinId))) return;
     if (gun.kind === 'melee') {
       Loadout.setMelee(gun.id);
     } else {
@@ -244,6 +249,7 @@ export class InventoryPanel {
   }
 
   _equipCharacter(skin) {
+    if (skin && !Shop.isOwned(skin.id)) return;
     if (!skin) {
       Shop.unequip();
       this.host.onArmorSkinEquipped?.(null);
@@ -277,7 +283,17 @@ export class InventoryPanel {
     nm.className = 'inv-item-name';
     nm.textContent = name;
     card.appendChild(nm);
-    if (onClick) card.addEventListener('click', onClick);
+    if (equipped) {
+      const badge = document.createElement('span'); badge.className = 'inv-selection-label';
+      badge.textContent = '✓ EQUIPPED'; card.appendChild(badge);
+    }
+    if (onClick) {
+      card.setAttribute('role', 'button'); card.tabIndex = 0;
+      card.setAttribute('aria-pressed', String(!!equipped));
+      card.setAttribute('aria-label', `${equipped ? 'Equipped' : 'Equip'} ${name}`);
+      card.addEventListener('click', onClick);
+      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } });
+    }
     return card;
   }
 
@@ -294,6 +310,10 @@ export class InventoryPanel {
       bg, rarity: skin?.rarity, equipped, onClick,
       name: skin ? _clean(skin.name) : 'Default',
     });
+    const weaponLabel = document.createElement('div');
+    weaponLabel.className = 'inv-weapon-name'; weaponLabel.textContent = gun.name;
+    card.appendChild(weaponLabel);
+    card.dataset.weaponId = gun.id; card.dataset.skinId = skin?.id || 'default';
     const img = document.createElement('div');
     img.className = 'inv-card-img';
     const cachedKey = skin ? `${gun.id}:${skin.id}` : `${gun.id}:__def__`;
@@ -301,7 +321,11 @@ export class InventoryPanel {
     const fallback = getWeaponThumb(gun.id);
     if (cached) img.style.backgroundImage = `url(${cached})`;
     else if (!skin && fallback) img.style.backgroundImage = `url(${fallback})`;
-    else if (fallback) img.style.backgroundImage = `url(${fallback})`;
+    else if (skin) {
+      const rendered = renderWeaponSkinned(gun, skin);
+      if (rendered) { _thumbCache.set(cachedKey, rendered); img.style.backgroundImage = `url(${rendered})`; }
+      else if (fallback) img.style.backgroundImage = `url(${fallback})`;
+    }
     card.insertBefore(img, card.firstChild);
     return card;
   }
