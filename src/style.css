@@ -7377,3 +7377,20 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 .nav-panel-inv #inv-equipped .inv-item { margin:0; }
 .nav-panel-inv .inv-help { font-size:13px; line-height:1.5; color:#bed0e0; margin:0 0 12px; }
 @media(max-width:600px) { .nav-panel-inv { padding:16px !important; } .nav-panel-inv #inv-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Full-screen frosted inventory with compact reference-style tiles. */
+#panel-loadout.nav-panel-inv { position:fixed !important; inset:0 !important; width:100vw !important; height:100dvh !important; max-width:none !important; max-height:none !important; transform:none !important; margin:0 !important; border-radius:0 !important; padding:60px max(24px,calc((100vw - 1020px)/2)) !important; background:rgba(12,15,18,.52) !important; backdrop-filter:blur(16px) !important; -webkit-backdrop-filter:blur(16px) !important; z-index:1000; }
+#panel-loadout .inv-profile-head { min-height:170px; }
+#panel-loadout .inv-equipped-title { margin-top:22px; text-transform:uppercase; }
+#panel-loadout .inv-inventory-title { margin-top:48px; text-transform:uppercase; }
+#panel-loadout #inv-equipped { display:flex; gap:12px; }
+#panel-loadout #inv-equipped .inv-item { width:150px; height:165px; flex:0 0 150px; }
+#panel-loadout #inv-grid { grid-template-columns:repeat(auto-fill,150px); gap:12px; }
+#panel-loadout #inv-grid .inv-item { height:150px; }
+#panel-loadout .inv-tabs { justify-content:flex-start; }
+#panel-loadout .inv-close-btn { position:fixed; top:32px; right:5vw; font-size:28px; }
+#panel-loadout .inv-help { font-size:12px; }
+#panel-loadout .inv-item { background:rgba(200,210,220,.18) !important; }
+@media(max-width:600px) { #panel-loadout.nav-panel-inv { padding:55px 16px 30px !important; } #panel-loadout #inv-equipped { gap:6px; } #panel-loadout #inv-equipped .inv-item { flex:1 1 0; width:0; min-width:0; height:145px; } #panel-loadout #inv-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+#panel-loadout .inv-tabs { max-width:none; margin:0 0 20px !important; }

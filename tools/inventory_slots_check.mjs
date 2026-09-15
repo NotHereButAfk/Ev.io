@@ -8,7 +8,7 @@ try {
   const {InventoryPanel}=await import('/src/ui/InventoryPanel.js');
   const {Armory}=await import('/src/core/Armory.js');const {Loadout}=await import('/src/core/Loadout.js');const {Shop}=await import('/src/core/Shop.js');
   const {warmWeaponThumbs}=await import('/src/ui/WeaponThumbnails.js');await new Promise(r=>warmWeaponThumbs(r));
-  document.body.innerHTML='<main class="nav-panel-inv" style="position:fixed;inset:0;padding:25px;background:#101722;color:white;overflow:auto"><h2>EQUIPPED</h2><div id="inv-equipped"></div><h2>YOUR INVENTORY</h2><p>Choose a weapon, then click an owned skin to equip it.</p><div id="inv-tabs"></div><div id="inv-grid" class="inv-grid"></div></main>';
+  document.body.innerHTML='<main id="panel-loadout" class="nav-panel-inv" style="position:fixed;inset:0;padding:25px;background:transparent;color:white;overflow:auto"><h2>EQUIPPED</h2><div id="inv-equipped"></div><h2>YOUR INVENTORY</h2><p>Choose a weapon, then click an owned skin to equip it.</p><div id="inv-tabs"></div><div id="inv-grid" class="inv-grid"></div></main>';
   let changed=0;const inv=new InventoryPanel({_currentUser:'__guest__',onArmoryChanged:()=>changed++,onArmorSkinEquipped:()=>changed++,_updateArmorPreview:()=>{}});
   Armory.grantSkin('magnum_kings_ransom');Armory.grantSkin('sword_sovereign_blade');Shop.unlock('arctic_ghost');Loadout.setGun('m4');Shop.unequip();inv.open();
   const check=(ok,msg)=>{if(!ok)throw Error(msg)};

@@ -14,7 +14,7 @@ export function preloadViewmodelArms(onLoad) {
   if (onLoad) callbacks.push(onLoad);
   if (loading) return;
   loading = true;
-  new GLTFLoader().load('/kyx-view-arms.glb', (gltf) => {
+  new GLTFLoader().load('/ev-view-arms.glb', (gltf) => {
     template = gltf.scene;
     loading = false;
     callbacks.splice(0).forEach((cb) => cb(true));
@@ -26,15 +26,11 @@ export function preloadViewmodelArms(onLoad) {
 }
 
 function cloneMaterial(material) {
-  // Same material construction as the live player's authored body.
-  const clone = new THREE.MeshToonMaterial({
-    color: material.color.clone(), transparent: material.transparent,
-    opacity: material.opacity, alphaTest: material.alphaTest, side: material.side,
-  });
-  clone.name = material.name;
+  const clone = material.clone();
   clone.userData.authoredColor = material.color.getHex();
-  clone.depthTest = false;
-  clone.depthWrite = false;
+  clone.userData.authoredEmissive = material.emissive?.getHex() ?? 0;
+  clone.userData.authoredIntensity = material.emissiveIntensity ?? 0;
+  clone.depthTest = true; clone.depthWrite = true;
   return clone;
 }
 
@@ -65,8 +61,8 @@ function continueUpperArm(mesh, side) {
 }
 
 /**
- * Clone one arm baked from the same KYX_Warrior mesh shown to other players.
- * Its origin is the wrist and its fingers already use the authored GunIdle
+ * Clone one arm baked from the same EV character mesh shown to other players.
+ * Its origin is the wrist and its fingers already use the authored armed idle
  * pose. WeaponSystem measures the closed palm before seating it on a grip.
  */
 export function buildViewmodelArm(side, sourceTemplate = template) {
@@ -75,7 +71,7 @@ export function buildViewmodelArm(side, sourceTemplate = template) {
   const root = source.clone(true);
   root.traverse((object) => {
     if (!object.isMesh) return;
-    continueUpperArm(object, side);
+    if (!source.userData.sourceCharacter) continueUpperArm(object, side);
     if (Array.isArray(object.material)) {
       object.material = object.material.map((material) => cloneMaterial(material));
     } else {
@@ -112,7 +108,15 @@ export function tintViewmodelArm(root, { plate, sleeve, glove, accent, authored 
     for (const material of materials) {
       if (authored && material.userData.authoredColor !== undefined) {
         material.color.setHex(material.userData.authoredColor);
-        material.emissive?.setHex(0);
+        material.emissive?.setHex(material.userData.authoredEmissive ?? 0);
+        material.emissiveIntensity = material.userData.authoredIntensity ?? 0;
+        continue;
+      }
+      if (material.userData.evArmMaterial) {
+        const name = material.name;
+        material.color.copy(/Undersuit/.test(name) ? colors.sleeve : /orange/.test(name) ? colors.plate : /gray/.test(name) ? new THREE.Color(plate).multiplyScalar(1 / .92).lerp(new THREE.Color(0xe8edf2), .58) : colors.accent);
+        material.emissive?.setHex(/accents/.test(name) ? accent : 0);
+        material.emissiveIntensity = /accents/.test(name) ? .52 : 0;
         continue;
       }
       material.color.copy(colors[role]);

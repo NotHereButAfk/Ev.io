@@ -108,7 +108,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(78, 16 / 9, 0.02, 300);
 scene.add(camera);
 const system = new WeaponSystem(camera, scene, new Proxy({}, { get: () => noop }));
-const arms = await parse('../public/kyx-view-arms.glb');
+const arms = await parse('../public/ev-view-arms.glb');
 const { buildViewmodelArm } = await import('../src/player/ViewmodelArms.js');
 system._installAuthoredViewmodelArms((side) => buildViewmodelArm(side, arms.scene));
 const previous = system.models.get('m4');

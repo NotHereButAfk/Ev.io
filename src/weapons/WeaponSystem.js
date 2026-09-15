@@ -538,10 +538,11 @@ export class WeaponSystem {
       // The bake is wrist-centred, not palm-centred. Anchor the actual closed
       // glove, rather than guessing another offset whenever the camera changes.
       // The glove then closes around the same grip used by the third-person player.
-      const palm = model.getObjectByName(`KYX_View${side}_Hand`);
-      if (!palm) return null;
       model.updateWorldMatrix(true, true);
-      const palmCenter = new THREE.Box3().setFromObject(palm).getCenter(new THREE.Vector3());
+      const palmBox = new THREE.Box3();
+      model.traverse(o => { if (o.isMesh && /_Hand$/i.test(o.name)) palmBox.union(new THREE.Box3().setFromObject(o)); });
+      if (palmBox.isEmpty()) return null;
+      const palmCenter = palmBox.getCenter(new THREE.Vector3());
       model.worldToLocal(palmCenter);
       model.position.copy(palmCenter).negate();
       grip.add(model);
@@ -554,12 +555,16 @@ export class WeaponSystem {
           object.name = 'viewmodel_palm';
           object.userData.authoredViewArm = true;
           this._handSurfaceMeshes.push(object);
-        } else if (/_Sleeve$/i.test(object.name)) {
+        } else if (/_(?:Upper)?Sleeve(?:_\d+)?$/i.test(object.name)) {
           object.userData.viewmodelPart = 'sleeve';
           object.name = 'viewmodel_upper_sleeve';
         } else if (/ForearmGuard/i.test(object.name)) {
           object.userData.viewmodelPart = 'plate';
           object.name = 'viewmodel_gauntlet';
+        }
+        if (object.material?.userData.evArmMaterial) {
+          const name = object.material.name;
+          object.userData.viewmodelPart = /Undersuit/.test(name) ? (handSurface ? 'glove' : 'sleeve') : /orange/.test(name) ? 'plate' : /gray/.test(name) ? 'plate' : 'accent';
         }
         object.renderOrder = 0;
         const materials = Array.isArray(object.material) ? object.material : [object.material];

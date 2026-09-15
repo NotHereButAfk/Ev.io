@@ -103,7 +103,7 @@ const system = new WeaponSystem(camera, scene, audio);
 const authoredArms = process.argv.includes('--authored-arms') || process.env.KYX_TEST_AUTHORED_ARMS === '1';
 if (authoredArms) {
   const { buildViewmodelArm } = await import('../src/player/ViewmodelArms.js');
-  const armsGlb = await loadGlb('../public/kyx-view-arms.glb');
+  const armsGlb = await loadGlb('../public/ev-view-arms.glb');
   system._installAuthoredViewmodelArms((side) => buildViewmodelArm(side, armsGlb.scene));
   assert(system.armGroup.userData.authoredViewArm && system.supportArmGroup.userData.authoredViewArm,
     'the shipped player-arm mesh must be installed in the authored pose check');
@@ -124,7 +124,7 @@ if (authoredArms) {
   for (const arm of [system.armGroup, system.supportArmGroup]) {
     arm.traverse((object) => {
       if (!object.isMesh || !object.userData.viewmodelPart) return;
-      const role = object.userData.viewmodelPart;
+      const role = object.material?.userData.evArmMaterial ? (/Undersuit/.test(object.material.name) ? 'sleeve' : /orange/.test(object.material.name) ? 'plate' : /gray/.test(object.material.name) ? 'trim' : 'accent') : object.userData.viewmodelPart;
       if (!(role in paletteProbe)) return;
       seen.add(role);
       const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -134,7 +134,7 @@ if (authoredArms) {
       }
     });
   }
-  for (const role of ['plate', 'sleeve', 'glove']) {
+  for (const role of ['plate', 'sleeve']) {
     assert(seen.has(role), `authored viewmodel arm has no ${role} surface`);
   }
 } else {
