@@ -43,17 +43,27 @@ const RESOLVED_WEAPON_HAND_POSES = Object.freeze(Object.fromEntries(
 // imported AR_1's trigger hand grab below the stock, with the support at the
 // muzzle. Resolve by model source so fallback loading and third-person IK use
 // the right contacts without changing either mesh or its dimensions.
+// Individually fitted to each imported mesh after normalization. Trigger
+// coordinates locate the wrist just below the closed palm; support targets
+// sit on the underside of the actual fore-end, never on the muzzle or stock.
 const QUATERNIUS_HAND_POSES = Object.freeze({
-  boltsniper: Object.freeze({
-    ...RESOLVED_WEAPON_HAND_POSES.boltsniper,
-    trigger: [0.012, 0.018, 0.255],
-    support: [-0.018, 0.014, -0.115],
-  }),
-  m4: Object.freeze({
-    ...RESOLVED_WEAPON_HAND_POSES.m4,
-    trigger: [0.012, -0.035, 0.030],
-    support: [-0.020, -0.045, -0.230],
-  }),
+  sidearm: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.sidearm, trigger: [0.01, -0.016, 0.119], support: [-0.04, 0.014, 0.119] }),
+  magnum: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.magnum, trigger: [0.01, -0.011, 0.058], support: [-0.04, 0.019, 0.058] }),
+  uzi: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.uzi, trigger: [0.012, 0.024, -0.007], support: [-0.02, 0.075, -0.16] }),
+  levershotgun: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.levershotgun, trigger: [0.012, -0.039, 0.11], support: [-0.022, -0.04, -0.191] }),
+  m4: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.m4, trigger: [0.012, -0.035, 0.03], support: [-0.02, -0.045, -0.23] }),
+  m16: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.m16, trigger: [0.012, -0.004, 0.023], support: [-0.024, 0.058, -0.27] }),
+  rifle: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.rifle, trigger: [0.012, -0.03, 0.114], support: [-0.022, -0.021, -0.226] }),
+  lmg: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.lmg, trigger: [0.012, -0.028, -0.072], support: [-0.024, -0.016, -0.28] }),
+  rpg: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.rpg, trigger: [0.012, -0.084, 0.124], support: [-0.025, -0.042, -0.24] }),
+  boltsniper: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.boltsniper, trigger: [0.012, -0.03, 0.11], support: [-0.022, 0.038, -0.17] }),
+  battlerifle: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.battlerifle, trigger: [0.012, -0.007, -0.026], support: [-0.024, 0.054, -0.322] }),
+  needler: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.needler, trigger: [0.012, 0.026, 0.033], support: [-0.021, 0.044, -0.117] }),
+  plasmarifle: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.plasmarifle, trigger: [0.012, -0.011, 0.054], support: [-0.022, 0.047, -0.168] }),
+  dmr: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.dmr, trigger: [0.012, -0.028, 0.128], support: [-0.022, -0.005, -0.13] }),
+  fuelrod: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.fuelrod, trigger: [0.012, -0.03, -0.063], support: [-0.024, 0.033, -0.198] }),
+  concussion: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.concussion, trigger: [0.012, -0.039, 0.124], support: [-0.022, -0.005, -0.138] }),
+  energyshotgun: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.energyshotgun, trigger: [0.012, -0.065, 0.275], support: [-0.023, 0.035, -0.14] }),
 });
 
 export function weaponHandPose(weaponOrId) {

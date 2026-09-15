@@ -1121,3 +1121,29 @@ console.log(
   + `ADS sway=${Math.max(...adsStability.map((s) => s.sway)).toFixed(4)}rad, `
   + `landing=${softLanding.toFixed(2)}x/${hardLanding.toFixed(2)}x`,
 );
+
+// Imported handles must meet the closed glove, not just match an arbitrary IK
+// target. Measure against actual triangles, excluding decorative outline hulls.
+for (const def of WEAPONS.filter(w => w.kind !== 'melee')) {
+  const group = system.models.get(def.id)?.group;
+  if (group?.userData.modelSource !== 'quaternius') continue;
+  const pose = weaponHandPose(group);
+  group.updateWorldMatrix(true, true);
+  const triangles = [];
+  group.traverse(mesh => {
+    if (!mesh.isMesh || mesh.name === 'outline') return;
+    const p = mesh.geometry.attributes.position, idx = mesh.geometry.index;
+    for (let i = 0; i < (idx?.count ?? p.count); i += 3) {
+      const points = [0,1,2].map(k => group.worldToLocal(new THREE.Vector3().fromBufferAttribute(p, idx ? idx.getX(i+k) : i+k).applyMatrix4(mesh.matrixWorld)));
+      const triangle = new THREE.Triangle(...points);
+      if (triangle.getArea() > 1e-12) triangles.push(triangle);
+    }
+  });
+  for (const key of ['trigger', ...(pose.supportVisible === false ? [] : ['support'])]) {
+    const target = new THREE.Vector3(...pose[key]); if (key === 'trigger') target.y += .030;
+    let gap = Infinity; const nearest = new THREE.Vector3();
+    for (const triangle of triangles) { triangle.closestPointToPoint(target, nearest); gap = Math.min(gap, nearest.distanceTo(target)); }
+    assert(gap < .035, `${def.id} ${key} palm floats ${(gap*100).toFixed(1)}cm away from imported mesh`);
+  }
+}
+console.log('Imported firearm palm contacts are within 3.5cm of real mesh surfaces.');

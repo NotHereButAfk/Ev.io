@@ -107,16 +107,13 @@ const FIREARM_CARRY_SCALE = Object.freeze({
   launcher: 1.40,
   precision: 1.62,
 });
+// Individually sized first-person fits; normalized world dimensions stay intact.
 const FIREARM_MODEL_SCALE = Object.freeze({
-  boltsniper: 0.86,
-  // AR_3 is about 20% longer than the reference AR_1 after normalization. Its
-  // own correction keeps the M16 readable at 60-degree FOV without shrinking
-  // the correctly framed M4.
-  m16: 0.82,
-  // These two pack meshes have unusually broad silhouettes.  Their small
-  // corrections retain the same hand contacts without covering the reticle.
-  needler: 0.85,
-  energyshotgun: 0.72,
+  sidearm: .90, magnum: .92, uzi: 1.00, levershotgun: 1.00,
+  m4: 1.00, m16: .82, rifle: 1.00, lmg: 1.00,
+  rpg: 1.00, boltsniper: .86, battlerifle: 1.00, needler: .85,
+  plasmarifle: 1.00, dmr: 1.00, fuelrod: 1.00, concussion: 1.00,
+  energyshotgun: .72,
 });
 const VIEWMODEL_PITCH = 0.14;
 const VIEWMODEL_YAW = 0.10;
@@ -911,7 +908,7 @@ export class WeaponSystem {
       trigger[0],
       // The wrist contact sits below the closed palm on a pistol grip. Seat
       // the glove 3cm above it so the fingers wrap the handle, not its base.
-      trigger[1] + (triggerAuthored ? 0.030 : 0.006) + (narrow ? 0.065 : 0),
+      trigger[1] + (triggerAuthored ? 0.030 : 0.006),
       trigger[2] + (triggerAuthored ? 0 : 0.034),
     );
     this.armGroup.scale.set(
@@ -922,7 +919,7 @@ export class WeaponSystem {
 
     const support = pose.support;
     const supportAuthored = this.supportArmGroup.userData.authoredViewArm;
-    const supportDepthComp = portrait ? 0.20 : (narrow ? 0.08 : 0);
+    const supportDepthComp = 0; // Responsive framing moves the mount, never the grip.
     const supportWidthScale = supportAuthored
       ? (portrait ? 0.57 : (narrow ? 0.76 : 0.86))
       : (portrait ? 0.43 : 0.54);
@@ -931,7 +928,7 @@ export class WeaponSystem {
       : (portrait ? 0.52 : 0.54);
     this.supportArmGroup.position.set(
       support[0],
-      support[1] + (supportAuthored ? 0 : 0.006) + (narrow ? 0.035 : 0),
+      support[1] + (supportAuthored ? 0 : 0.006),
       support[2] + (supportAuthored ? 0 : 0.034) + supportDepthComp,
     );
     this.supportArmGroup.scale.set(
