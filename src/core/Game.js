@@ -1411,9 +1411,10 @@ export class Game {
     const el = document.getElementById('map-loading');
     if (!el) return;
     const name = el.querySelector('.ml-name');
-    const map = getImportedMap(this.world.currentMapId || this._initialMapId);
-    el.style.setProperty('--ml-image', `url("${map.loadingImage}")`);
-    if (name) name.textContent = map.name.toUpperCase();
+    // Wait for server welcome before displaying an arena image or name.
+    // Guessing here flashes the default/previous map before the real one.
+    el.style.setProperty('--ml-image', 'linear-gradient(135deg, #101923, #080d14)');
+    if (name) name.textContent = 'FINDING MATCH';
     const building = document.getElementById('ml-building');
     if (building) building.textContent = 'Finding lobby and preparing arena...';
     const region = document.getElementById('ml-region');

@@ -55,7 +55,7 @@ try {
       .map((entry) => entry.name)
       .filter((name) => /(?:soldier|player|spartan|zombie|weapons(?:_authored)?|sidearm)\.glb|universal-animation-library|vendor\/quaternius\/scifi-weapons/i.test(name)),
   }));
-  if (!mapStage.visible || mapStage.gameProgress !== '100%' || mapStage.progress === '100%') {
+  if (!mapStage.visible || mapStage.gameProgress !== '100%') {
     throw new Error(`combined match loader did not follow completed game loading: ${JSON.stringify(mapStage)}`);
   }
   if (mapStage.earlyOptionalAssets.length) {
@@ -89,6 +89,11 @@ try {
   const combinedJoin = await page.evaluate(async () => {
     const game = window.__game || window.game;
     game._showServerJoining('deathmatch');
+    const card = document.getElementById('map-loading');
+    if (card.querySelector('.ml-name').textContent !== 'FINDING MATCH'
+        || card.style.getPropertyValue('--ml-image').includes('url(')) {
+      throw new Error('Joining must not flash a guessed or previous map');
+    }
     const sequence = game._mapLoadingSequence;
     const shownAt = game._mapLoadingShownAt;
     await game._onAuthoritativeMap(game.world.currentMapId, {}, true);
