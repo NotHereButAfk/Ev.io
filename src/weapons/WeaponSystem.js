@@ -109,7 +109,7 @@ const FIREARM_CARRY_SCALE = Object.freeze({
 });
 // Individually sized first-person fits; normalized world dimensions stay intact.
 const FIREARM_MODEL_SCALE = Object.freeze({
-  sidearm: .90, magnum: .83, uzi: 1.00, levershotgun: 1.00,
+  sidearm: .90, magnum: 1.03, uzi: 1.00, levershotgun: 1.00,
   m4: 1.00, m16: .82, rifle: 1.00, lmg: 1.00,
   rpg: 1.00, boltsniper: .86, battlerifle: 1.00, needler: .85,
   plasmarifle: 1.00, dmr: 1.00, fuelrod: 1.00, concussion: 1.00,
