@@ -351,6 +351,7 @@ export class AuthRoom {
       player.alive = true;
       player.deadUntil = 0;
       player.kills = 0;
+      player.killStreak = 0;
       player.deaths = 0;
       player.score = 0;
       player.assists = 0;
@@ -1212,13 +1213,16 @@ export class AuthRoom {
     this._resetLifeInventory(target);
     target.deadUntil = this.tick + RESPAWN_TICKS;
     if (target.isBot) target._botState = BOT_STATES.DEAD;
+    const victimStreak = target.killStreak || 0;
+    target.killStreak = 0;
     target.deaths++;
     let awardedScore=0;
     if (shooter && target !== shooter) {
       shooter.kills++;
+      shooter.killStreak = (shooter.killStreak || 0) + 1;
       const boss=target.bossInstance?this.economy?.match.bosses[target.bossInstance]:null;
       const kind=target.survivalEnemy?(boss?'boss':'survival_kill'):(head?'headshot':'kill');
-      const reward=this.economy?.ready?this.economy.award(shooter.id,kind,{victim:target.id,victimIsBot:target.isBot,earnsE:this.mode!=='survival'||!!target.survivalEnemy,...(boss?{score:boss.scoreReward}:{})}):null;
+      const reward=this.economy?.ready?this.economy.award(shooter.id,kind,{victimStreak,victim:target.id,victimIsBot:target.isBot,earnsE:this.mode!=='survival'||!!target.survivalEnemy,...(boss?{score:boss.scoreReward}:{})}):null;
       awardedScore=reward?.score ?? (head ? 150 : 100);
       shooter.score += awardedScore;
       if(reward && reward.e !== '0.0000')shooter.send({t:'earning',kind:'kill',amount:reward.e});

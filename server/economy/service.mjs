@@ -44,7 +44,7 @@ export function createEconomyService(accounts, options = {}) {
     try {
       await ready;
     } catch {
-      send(res, 503, { error: "E temporarily unavailable" });
+      send(res, 503, { error: "K temporarily unavailable" });
       return true;
     }
     try {
@@ -189,7 +189,7 @@ export function createEconomyService(accounts, options = {}) {
         send(res, 200, { ok: true });
         return true;
       }
-      send(res, 404, { error: "Unknown E operation" });
+      send(res, 404, { error: "Unknown K operation" });
     } catch (e) {
       console.error("[economy request]", e.message);
       send(res, 400, {

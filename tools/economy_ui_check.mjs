@@ -90,7 +90,7 @@ try {
   });
   await page.goto(server.resolvedUrls.local[0] + "economy-admin");
   await page.locator("#admin").waitFor({ state: "visible" });
-  await page.getByLabel("E PER 100 SCORE", { exact: true }).fill("1.25");
+  await page.getByLabel("K PER 100 SCORE", { exact: true }).fill("1.25");
   await page
     .getByRole("button", { name: "Save economy configuration" })
     .click();
@@ -102,7 +102,7 @@ try {
   }
   await page.goto(server.resolvedUrls.local[0] + "earnings");
   await page.locator("#account").waitFor({ state: "visible" });
-  assert.equal(await page.locator("#balance").textContent(), "8,525.90 E");
+  assert.equal(await page.locator("#balance").textContent(), "8,525.90 K");
   assert.equal(await page.locator("#ledger img").count(), 0);
   if (process.env.E_UI_SHOTS)
     await page.screenshot({ path: process.env.E_UI_SHOTS + "/e-account.png" });
@@ -130,10 +130,10 @@ try {
       lastSummary: s,
     });
   }, summary);
-  assert(await page.locator("#e-summary").isVisible());
-  assert(
-    (await page.locator(".e-summary-rows").textContent()).includes("104.40 E"),
-  );
+  assert.equal(await page.locator("#e-summary").count(), 0, "removed summary modal must stay removed");
+  assert((await page.locator("#e-hud").textContent()).includes("Session K"));
+  await page.evaluate(() => eProbe.notify("1.25", "kill"));
+  assert((await page.locator("#e-toast").textContent()).includes("1.25 K"));
   if (process.env.E_UI_SHOTS)
     await page.screenshot({
       path: process.env.E_UI_SHOTS + "/e-summary-mobile.png",

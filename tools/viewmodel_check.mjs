@@ -680,7 +680,7 @@ if (reportMode) {
 for (const frame of firearmFraming) {
   assert(frame.scale >= 1.10 && frame.scale <= 1.82,
     `${frame.id} first-person scale ${frame.scale.toFixed(3)} is outside the fitted arsenal range`);
-  assert(frame.area >= 0.03 && frame.area <= 0.55,
+  assert(frame.area >= (frame.carry === 'pistol' ? 0.025 : 0.03) && frame.area <= 0.55,
     `${frame.id} occupies ${(frame.area * 100).toFixed(1)}% of the desktop view`);
   if (frame.carry === 'launcher') {
     assert(frame.area >= 0.08,

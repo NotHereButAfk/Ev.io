@@ -109,7 +109,7 @@ const FIREARM_CARRY_SCALE = Object.freeze({
 });
 // Individually sized first-person fits; normalized world dimensions stay intact.
 const FIREARM_MODEL_SCALE = Object.freeze({
-  sidearm: .90, magnum: .92, uzi: 1.00, levershotgun: 1.00,
+  sidearm: .90, magnum: .83, uzi: 1.00, levershotgun: 1.00,
   m4: 1.00, m16: .82, rifle: 1.00, lmg: 1.00,
   rpg: 1.00, boltsniper: .86, battlerifle: 1.00, needler: .85,
   plasmarifle: 1.00, dmr: 1.00, fuelrod: 1.00, concussion: 1.00,
@@ -2292,7 +2292,7 @@ export class WeaponSystem {
     this._mountPos.z = expDamp(this._mountPos.z, tgtZ, 20, dt);
     const targetMountPitch = swordGuard
       ? SWORD_VIEWMODEL_PITCH - sprintCarry * 0.055 + landPulse * 0.05
-      : THREE.MathUtils.lerp(VIEWMODEL_PITCH + sprintCarry * 0.06, ADS_PITCH, adsEase)
+      : THREE.MathUtils.lerp((def.id === 'magnum' ? .02 : VIEWMODEL_PITCH) + sprintCarry * 0.06, ADS_PITCH, adsEase)
         + 0.50 * framedBell + 0.14 * framedRack
         + landPulse * 0.12 * adsClearance;
     const targetMountYaw = swordGuard

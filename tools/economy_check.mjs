@@ -227,6 +227,7 @@ const rt = new EconomyRuntime(store, {
 });
 rt.ready = true;
 rt.config = structuredClone(config);
+rt.config.killRewards.enabled = false; // Exercise legacy score-based matches.
 rt.config.modes.deathmatch.minimumPlayers = 1;
 rt.config.minimumMatchSeconds = 0;
 rt.config.minimumActiveSeconds = 0;
@@ -321,6 +322,36 @@ assert.equal(
   "10.0000",
 );
 assert.equal(calculateEarnings(match,{...player,userId:null},{...config,guestEarning:true}).finalE,"0.0000","legacy config cannot enable guest E");
+
+// K kill rolls are server-owned, retain streak bounties, and survive early exit.
+const kr = new EconomyRuntime(store, {serverId: "k-rewards", clock: () => time});
+kr.ready = true; kr.begin(); await kr.queue;
+await kr.join(55, {id: "1", sessionId: "k-test"}, () => {});
+time += 2000; kr.activity(55, true, 50);
+for (const [bot, streak, low, high] of [[true, 50, .7, 1], [false, 0, 1, 2], [false, 2, 1, 2], [false, 5, 4, 5]]) {
+  kr.award(55, "kill", {victimIsBot: bot, victimStreak: streak});
+  const amount = Number(kr.participant(55).actions.at(-1).killBaseK);
+  assert(amount >= low && amount <= high);
+}
+const pending = kr.preview(55).finalE;
+const closedId = kr.match.id;
+const balanceBefore = u((await store.profile(1, "k-test")).balance);
+kr.leave(55); await kr.queue;
+await kr.finish(); await kr.queue;
+assert.equal(u((await store.profile(1, "k-test")).balance) - balanceBefore, u(pending));
+await store.finalize({id: closedId}, 1);
+assert.equal(u((await store.profile(1, "k-test")).balance) - balanceBefore, u(pending));
+// Upgrade an existing E-era configuration without rewriting balances or ledger.
+const preservedBalance = (await store.profile(1, "k-test")).balance;
+await query("UPDATE e_config SET config=config - 'killRewards'");
+await store.init();
+const upgraded = await store.config();
+assert.deepEqual(upgraded.config.killRewards, DEFAULT_ECONOMY.killRewards);
+assert.equal(upgraded.config.botEarning, true);
+assert.equal(upgraded.config.modes.deathmatch.minimumPlayers, 1);
+await store.init();
+assert.equal((await store.config()).revision, upgraded.revision);
+assert.equal((await store.profile(1, "k-test")).balance, preservedBalance);
 await db.close();
 console.log(
   "E economy passed: exact decimals, eligibility, items, waves, caps, guests/private, real SQL migration/idempotency/rollback, ledger purchases/refunds, reconnect and farming tiers",

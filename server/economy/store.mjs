@@ -18,6 +18,12 @@ export class EconomyStore {
       "INSERT INTO e_config(id,config) VALUES(1,$1) ON CONFLICT DO NOTHING",
       [DEFAULT_ECONOMY],
     );
+    // Keep existing decimal balances and ledger IDs. Upgrade configuration once.
+    await this.pool.query(`UPDATE e_config SET config = jsonb_set(config || $1::jsonb,
+      '{modes,deathmatch,minimumPlayers}', '1'::jsonb),
+      revision=revision+1, updated_at=NOW() WHERE NOT (config ? 'killRewards')`,
+      [JSON.stringify({killRewards: DEFAULT_ECONOMY.killRewards, botEarning: true})]);
+
   }
   async transaction(fn) {
     const c = await this.pool.connect();

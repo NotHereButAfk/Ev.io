@@ -6,7 +6,7 @@ export const GAME_MODES = [
     name:      'FREE FOR ALL',
     icon:      '⚔',
     tag:       'FFA',
-    desc:      'Every Spartan for themselves. 8 players, 3 minutes. Eligible score earns E for registered accounts.',
+    desc:      'Every Spartan for themselves. 8 players, 3 minutes. Eligible score earns K for registered accounts.',
     color:     '#ff5c5c',
     botCount:  7,
     noRespawn: false,

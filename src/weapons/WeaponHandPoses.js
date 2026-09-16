@@ -48,7 +48,7 @@ const RESOLVED_WEAPON_HAND_POSES = Object.freeze(Object.fromEntries(
 // sit on the underside of the actual fore-end, never on the muzzle or stock.
 const QUATERNIUS_HAND_POSES = Object.freeze({
   sidearm: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.sidearm, trigger: [0.01, -0.016, 0.119], support: [-0.04, 0.014, 0.119] }),
-  magnum: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.magnum, trigger: [0.01, -0.011, 0.058], support: [-0.04, 0.019, 0.058] }),
+  magnum: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.magnum, trigger: [0.01, -0.035, 0.058], support: [-0.028, -0.035, 0.078], supportVisible: true }),
   uzi: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.uzi, trigger: [0.012, 0.024, -0.007], support: [-0.02, 0.075, -0.16] }),
   levershotgun: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.levershotgun, trigger: [0.012, -0.039, 0.11], support: [-0.022, -0.04, -0.191] }),
   m4: Object.freeze({ ...RESOLVED_WEAPON_HAND_POSES.m4, trigger: [0.012, -0.035, 0.03], support: [-0.02, -0.045, -0.23] }),

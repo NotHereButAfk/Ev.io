@@ -145,7 +145,7 @@ export class MenuUI {
       if (['profile', 'shop', 'battlepass', 'party'].includes(panel)) button.dataset.gated = '1';
       more?.appendChild(button);
     }
-    const earningsLink=document.createElement('a');earningsLink.className='profile-menu-item';earningsLink.href='/earnings';earningsLink.textContent='E EARNINGS';more?.appendChild(earningsLink);
+    const earningsLink=document.createElement('a');earningsLink.className='profile-menu-item';earningsLink.href='/earnings';earningsLink.textContent='K EARNINGS';more?.appendChild(earningsLink);
     this._mobileHome = home;
   }
 
@@ -615,7 +615,7 @@ export class MenuUI {
     set('ps-games', games);
     set('ps-survival', '00:00:00');
     set('ps-rank', _rank(kills));
-    set('ps-balance', EAccount.loaded ? Number(EAccount.balance).toFixed(2)+' E' : 'Sign in to earn E');
+    set('ps-balance', EAccount.loaded ? Number(EAccount.balance).toFixed(2)+' K' : 'Sign in to earn K');
 
     const logout = document.getElementById('profile-logout-btn');
     if (logout) logout.style.display = isGuest ? 'none' : 'block';

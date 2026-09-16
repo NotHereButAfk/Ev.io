@@ -1,4 +1,4 @@
-// Read-only account projection. Permanent E is never written to browser storage.
+// Read-only account projection. Permanent K is never written to browser storage.
 export const EAccount = {
   balance: "0.0000",
   loaded: false,
@@ -19,6 +19,8 @@ export const EAccount = {
       this.render();
     } catch {
       this.loaded = false;
+    } finally {
+      this.render();
     }
   },
   render() {
@@ -26,10 +28,10 @@ export const EAccount = {
       Number(this.balance).toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }) + " E";
-    for (const id of ["nav-coins", "ps-balance"]) {
+      }) + " K";
+    for (const id of ["nav-coins", "ps-balance", "inv-balance"]) {
       const el = document.getElementById(id);
-      if (el) el.textContent = this.loaded ? text : "Sign in to earn E";
+      if (el) el.textContent = this.loaded ? text : "Sign in to earn K";
     }
   },
 };

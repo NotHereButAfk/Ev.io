@@ -20,7 +20,8 @@ export const DEFAULT_ECONOMY = {
   afkSeconds: 30,
   maximumEPerMinute: "200",
   maximumKillsPerMinute: 30,
-  botEarning: false,
+  botEarning: true,
+  killRewards: { enabled: true, botMin: "0.7", botMax: "1", playerMin: "1", playerMax: "2", streakThreshold: 2, streakBonus: "1" },
   sameNetworkEarning: false,
   repeatedVictim: {
     windowSeconds: 180,
@@ -29,7 +30,7 @@ export const DEFAULT_ECONOMY = {
     reducedMultiplier: "0.5",
   },
   modes: {
-    deathmatch: mode(true, "25"),
+    deathmatch: { ...mode(true, "25"), minimumPlayers: 1 },
     teamslayer: mode(true, "20"),
     ctf: mode(true),
     koth: mode(true),
@@ -146,6 +147,13 @@ export function validateConfig(c) {
   mult(c.survival.waveIncrement, "wave increment");
   mult(c.survival.maxMultiplier, "wave max");
   integer(c.survival.waveInterval, "wave interval", 1, 1000);
+  if (c.killRewards) {
+    const k = c.killRewards;
+    bool(k.enabled, "kill rewards");
+    for (const key of ["botMin", "botMax", "playerMin", "playerMax", "streakBonus"]) money(k[key], key);
+    integer(k.streakThreshold, "streak threshold", 0, 1000);
+    if (units(k.botMin) > units(k.botMax) || units(k.playerMin) > units(k.playerMax)) throw new Error("Invalid kill reward range");
+  }
   const r = c.repeatedVictim;
   integer(r.fullKills, "full kills");
   integer(r.reducedKills, "reduced kills", r.fullKills);

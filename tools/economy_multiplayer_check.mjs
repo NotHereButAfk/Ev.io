@@ -22,12 +22,14 @@ try{
  const c=runtime.match.config;c.minimumMatchSeconds=0;c.minimumActiveSeconds=0;c.minimumScore=0;
  for(const id of [a.pid,b.pid]){runtime.participant(id).joinedAt-=60000;runtime.activity(id,true,1000);app.room.players.get(id).invulnerableUntil=0;}
  a.ws.send(JSON.stringify({t:'kill',score:1000000,e:999999}));a.ws.send(JSON.stringify({t:'add-e',amount:999999}));await delay(100);assert.equal(runtime.participant(a.pid).score,0);
+ app.room.players.get(b.pid).killStreak=5;
  app.room._damage(app.room.players.get(b.pid),app.room.players.get(a.pid),200,false);
- await until(()=>a.messages.some(m=>m.t==='earning'));assert.equal(a.messages.find(m=>m.t==='earning').amount,'1.0000');
+ await until(()=>a.messages.some(m=>m.t==='earning'));const paid=a.messages.find(m=>m.t==='earning').amount;assert(Number(paid)>=4&&Number(paid)<=5);
+ assert.equal(app.room.players.get(b.pid).killStreak,0);assert.equal(app.room.players.get(a.pid).killStreak,1);
  const matchId=runtime.match.id;accounts.onLogout('integration-1');assert.equal(runtime.connections.has(a.pid),false,'logout immediately detaches earning identity');await until(()=>!runtime.connections.has(a.pid));await runtime.queue;
  app.room.matchStart=Date.now()-app.room.matchDurationMs;app.room._rotateMatch();await runtime.queue;
- const balance=(await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance;assert.equal(balance,'1.0000');
- await runtime.store.finalize({id:matchId},1);assert.equal((await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance,'1.0000');
+ const balance=(await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance;assert.equal(balance,paid);
+ await runtime.store.finalize({id:matchId},1);assert.equal((await query('SELECT e_balance FROM users WHERE id=1')).rows[0].e_balance,paid);
  const expired=[...app.wss.clients].find(ws=>ws._conn?.id===b.pid);
  expired._conn.sessionExpiresAt=Date.now()-1;
  await until(()=>!runtime.connections.has(b.pid));

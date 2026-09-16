@@ -8,7 +8,7 @@ export class EarningsUI {
     this.el.id = "e-hud";
     this.el.className = "hidden";
     this.el.innerHTML =
-      '<div class="e-rate-row">Earn Rate <span title="E multipliers applied by the server">ⓘ</span><b data-e="rate">1x</b></div><div class="e-balance-row">Balance <b data-e="balance">0.00</b><span class="e-match-gain">(+<span data-e="match">0.00</span>)</span></div><div class="e-details">Session E: <b data-e="session">0.00</b><div data-e="daily"></div></div><small data-e="status"></small><div id="e-toast" aria-live="polite"></div>';
+      '<div class="e-rate-row">Earn Rate <span title="K multipliers applied by the server">ⓘ</span><b data-e="rate">1x</b></div><div class="e-balance-row">Balance <b data-e="balance">0.00</b><span class="e-match-gain">(+<span data-e="match">0.00</span>)</span></div><div class="e-details">Session K: <b data-e="session">0.00</b><div data-e="daily"></div></div><small data-e="status"></small><div id="e-toast" aria-live="polite"></div>';
     document.body.appendChild(this.el);
   }
 
@@ -25,7 +25,7 @@ export class EarningsUI {
     }
     this.el.classList.remove("hidden");
     this.data = data;
-    this.el.title = `E per 100 eligible score: ${data.ePer100Score ?? 1}. Pending earnings are finalized at match end.`;
+    this.el.title = `K coins earned from server-verified kills and eligible actions. Leaving preserves pending rewards, credited at match end.`;
     const set = (key, text) => {
       this.el.querySelector(`[data-e="${key}"]`).textContent = text;
     };
@@ -36,14 +36,14 @@ export class EarningsUI {
     set(
       "daily",
       data.dailyCap === null
-        ? `Daily E: ${this.format(data.dailyE)}`
-        : `Daily E: ${this.format(data.dailyE)} / ${this.format(data.dailyCap)}`,
+        ? `Daily K: ${this.format(data.dailyE)}`
+        : `Daily K: ${this.format(data.dailyE)} / ${this.format(data.dailyCap)}`,
     );
     set(
       "status",
       data.reason ||
         (data.guest
-          ? "Temporary guest E · not saved"
+          ? "Temporary guest K · not saved"
           : "Pending server validation"),
     );
     const status=this.el.querySelector('[data-e="status"]');
@@ -60,7 +60,7 @@ export class EarningsUI {
     this.notificationTotal += Number(amount);
     clearTimeout(this.timer);
     const el = this.el.querySelector("#e-toast");
-    el.textContent = `${kind === "boss" ? "JACKPOT " : ""}+${this.format(this.notificationTotal)} E`;
+    el.textContent = `${kind === "boss" ? "JACKPOT " : ""}+${this.format(this.notificationTotal)} K`;
     this.timer = setTimeout(() => {
       el.textContent = "";
       this.notificationTotal = 0;

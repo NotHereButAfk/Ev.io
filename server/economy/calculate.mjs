@@ -83,7 +83,7 @@ export function calculateEarnings(
   )
     return { ...result, reason: "Earning disabled in this match" };
   if (!player.userId)
-    return { ...result, reason: "Sign in to earn E" };
+    return { ...result, reason: "Sign in to earn K" };
   let eligible = 0n,
     base = 0n,
     itemBonus = 0n,
@@ -107,7 +107,9 @@ export function calculateEarnings(
     if (!rule?.earnsE || !a.allowed) continue;
     const score = mul(BigInt(a.score) * SCALE, u(a.farmingMultiplier || "1"));
     eligible += score;
-    let exact = score * u(config.E_PER_100_SCORE) * SCALE ** 4n;
+    let exact = a.killBaseK !== undefined
+      ? mul(u(a.killBaseK), u(a.farmingMultiplier || "1")) * DEN
+      : score * u(config.E_PER_100_SCORE) * SCALE ** 4n;
     exactBase += exact;
     exact = (exact * im) / SCALE;
     exactItem += exact;
@@ -170,6 +172,7 @@ export function calculateEarnings(
   let reason = null;
   if (
     final &&
+    !(player.actions || []).some(a => a.allowed && a.killBaseK !== undefined && u(a.farmingMultiplier || "1") > 0n) &&
     (match.closedAt - match.startedAt < config.minimumMatchSeconds * 1000 ||
       player.activeMs < config.minimumActiveSeconds * 1000 ||
       player.score < config.minimumScore)
@@ -178,7 +181,7 @@ export function calculateEarnings(
     reason = "Minimum participation not met";
   }
   if (dailyCap !== null && u(dailyEarned) >= u(dailyCap))
-    reason = "Daily E Limit Reached";
+    reason = "Daily K Limit Reached";
   return {
     ...result,
     eligibleScore: d(eligible),

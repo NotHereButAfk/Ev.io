@@ -19,6 +19,7 @@ const labelFor = (k) =>
   k
     .replace(/_/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\bE\b/g, "K")
     .replace(/^./, (s) => s.toUpperCase());
 const templates = {
   catalog: {
@@ -41,7 +42,7 @@ const templates = {
     stackable: true,
     maximumStack: 1,
     source: "admin",
-    description: "Temporary E boost",
+    description: "Temporary K boost",
     userIds: [],
   },
   events: {
@@ -54,7 +55,7 @@ const templates = {
     stackable: true,
     maximumStack: 1,
     source: "event",
-    description: "E event",
+    description: "K event",
     dailyCap: null,
     maxEPerMatch: null,
     winE: null,
@@ -79,7 +80,7 @@ function field(parent, key, value, change) {
   if (key === "guestEarning") {
     change(false);
     const note = document.createElement("p");
-    note.textContent = "E earning requires a registered login. Guests cannot earn E.";
+    note.textContent = "K earning requires a registered login. Guests cannot earn K.";
     parent.appendChild(note);
     return;
   }
@@ -284,7 +285,7 @@ $("ledger-form").onsubmit = async (e) => {
         t.id,
         t.created_at,
         t.type,
-        t.amount + " E",
+        t.amount + " K",
         t.previous_balance + " → " + t.new_balance,
         t.description,
       ]) {

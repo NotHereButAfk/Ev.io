@@ -197,7 +197,7 @@ export class EconomyRuntime {
   award(
     id,
     kind,
-    { score, wave = this.match?.wave || 1, victim = null, victimIsBot = false, earnsE = true } = {},
+    { score, wave = this.match?.wave || 1, victim = null, victimIsBot = false, victimStreak = 0, earnsE = true } = {},
   ) {
     const p = this.participant(id),
       c = this.match?.config || this.config,
@@ -252,7 +252,17 @@ export class EconomyRuntime {
       return { score: normalScore, e: "0.0000" };
     }
     const before = u(this.preview(id).finalE);
+    let killBaseK;
+    const kr = c.killRewards;
+    if (kr?.enabled && ["kill", "headshot"].includes(kind)) {
+      const low = u(victimIsBot ? kr.botMin : kr.playerMin);
+      const high = u(victimIsBot ? kr.botMax : kr.playerMax);
+      const streakBonus = !victimIsBot && this.mode === "deathmatch"
+        ? BigInt(Math.max(0, Math.floor(victimStreak) - kr.streakThreshold)) * u(kr.streakBonus) : 0n;
+      killBaseK = d(low + BigInt(randomInt(Number(high - low) + 1)) + streakBonus);
+    }
     p.actions.push({
+      ...(killBaseK !== undefined ? { killBaseK } : {}),
       kind,
       score: normalScore,
       wave,
@@ -319,7 +329,7 @@ export class EconomyRuntime {
       pending: true,
       guest: !p.userId,
       ePer100Score: this.match.config.E_PER_100_SCORE,
-      ...(this.failed ? { reason: "E temporarily unavailable" } : {}),
+      ...(this.failed ? { reason: "K temporarily unavailable" } : {}),
       lastSummary: this.results.get(c.key) || null,
     };
   }

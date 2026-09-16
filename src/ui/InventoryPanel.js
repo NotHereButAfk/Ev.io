@@ -13,6 +13,7 @@ import { MAIN_WEAPON_IDS, WEAPONS, isMainWeaponId } from '../weapons/weaponDefs.
 import { ALL_WEAPON_SKINS as WEAPON_SKINS, getWeaponSkinsFor } from '../weapons/WeaponSkins.js';
 import { Armory } from '../core/Armory.js';
 import { Loadout } from '../core/Loadout.js';
+import { EAccount } from '../core/EAccount.js';
 import { Shop } from '../core/Shop.js';
 import { UserAccount } from '../core/UserAccount.js';
 import { warmWeaponThumbs, getWeaponThumb, renderWeaponSkinned } from './WeaponThumbnails.js';
@@ -103,7 +104,7 @@ export class InventoryPanel {
 
   _renderMeta() {
     const bal = document.getElementById('inv-balance');
-    if (bal) bal.textContent = Shop.getCoins().toLocaleString();
+    if (bal) EAccount.render();
     const nw = document.getElementById('inv-networth');
     if (nw) {
       const owned = ARMOR_SKINS.filter((s) => Shop.isOwned(s.id));

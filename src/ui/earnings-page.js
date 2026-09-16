@@ -16,7 +16,7 @@ async function api(path, data) {
       : {}),
   });
   const value = await r.json();
-  if (!r.ok) throw new Error(value.error || "E unavailable");
+  if (!r.ok) throw new Error(value.error || "K unavailable");
   return value;
 }
 function text(tag, value, parent) {
@@ -31,10 +31,10 @@ async function load() {
       h = await api("history");
     $("status").textContent = p.earningEnabled
       ? "Rewards are finalized by the game server."
-      : "E earning is currently disabled.";
+      : "K earning is currently disabled.";
     $("account").hidden = false;
     $("admin-link").hidden = !p.admin;
-    $("balance").textContent = fmt(p.balance) + " E";
+    $("balance").textContent = fmt(p.balance) + " K";
     $("session").textContent = fmt(p.sessionE);
     $("daily").textContent =
       fmt(p.dailyE) + (p.dailyCap === null ? "" : " / " + fmt(p.dailyCap));
@@ -69,8 +69,8 @@ async function load() {
     for (const item of p.catalog.filter((i) => i.priceE != null)) {
       const card = document.createElement("article");
       text("h3", item.id, card);
-      text("p", `${item.rarity} · ${fmt(item.priceE)} E`, card);
-      const b = text("button", "Buy with E", card);
+      text("p", `${item.rarity} · ${fmt(item.priceE)} K`, card);
+      const b = text("button", "Buy with K", card);
       b.onclick = async () => {
         b.disabled = true;
         try {
@@ -86,7 +86,7 @@ async function load() {
     if (!$("catalog").children.length)
       text(
         "p",
-        "No E items are currently listed. Basic earnings require no items.",
+        "No K items are currently listed. Basic earnings require no items.",
         $("catalog"),
       );
     $("ledger").replaceChildren();
@@ -95,8 +95,8 @@ async function load() {
       for (const v of [
         new Date(t.created_at).toLocaleString(),
         t.type,
-        fmt(t.amount) + " E",
-        fmt(t.new_balance) + " E",
+        fmt(t.amount) + " K",
+        fmt(t.new_balance) + " K",
         t.description,
       ])
         text("td", v, row);
@@ -107,13 +107,13 @@ async function load() {
       const box = document.createElement("details");
       text(
         "summary",
-        `${fmt(s.finalE)} E · match ${s.matchId.slice(0, 8)}`,
+        `${fmt(s.finalE)} K · match ${s.matchId.slice(0, 8)}`,
         box,
       );
       for (const [key, label] of [
         ["score", "Score"],
         ["eligibleScore", "Eligible score"],
-        ["baseE", "Base E"],
+        ["baseE", "Base K"],
         ["itemBonus", "Item bonus"],
         ["survivalBonus", "Survival bonus"],
         ["eventBonus", "Event bonus"],
@@ -127,7 +127,7 @@ async function load() {
     }
   } catch (e) {
     $("status").textContent =
-      e.message + " — sign in with a registered account to view permanent E.";
+      e.message + " — sign in with a registered account to view permanent K.";
   }
 }
 load();
