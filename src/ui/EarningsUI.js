@@ -56,15 +56,16 @@ export class EarningsUI {
     window.dispatchEvent(new CustomEvent("e-balance", { detail: data }));
   }
   notify(amount, kind) {
-    if (Number(amount) <= 0) return;
-    this.notificationTotal += Number(amount);
-    clearTimeout(this.timer);
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) return;
     const el = this.el.querySelector("#e-toast");
-    el.textContent = `${kind === "boss" ? "JACKPOT " : ""}+${this.format(this.notificationTotal)} K`;
-    this.timer = setTimeout(() => {
-      el.textContent = "";
-      this.notificationTotal = 0;
-    }, 1600);
+    const popup = document.createElement("div");
+    popup.className = "k-reward-popup";
+    popup.textContent = `${kind === "boss" ? "JACKPOT " : ""}+${this.format(value)} K`;
+    el.appendChild(popup);
+    // Show each server reward separately, with a bounded stack for rapid kills.
+    while (el.children.length > 4) el.firstElementChild.remove();
+    popup.addEventListener("animationend", () => popup.remove(), { once: true });
   }
   hide() {
     this.el.classList.add("hidden");

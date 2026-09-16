@@ -134,6 +134,17 @@ try {
   assert((await page.locator("#e-hud").textContent()).includes("Session K"));
   await page.evaluate(() => eProbe.notify("1.25", "kill"));
   assert((await page.locator("#e-toast").textContent()).includes("1.25 K"));
+  await page.evaluate(() => eProbe.notify("0.80", "kill"));
+  assert.equal(await page.locator(".k-reward-popup").count(), 2);
+  const popupBounds = await page.locator("#e-toast").boundingBox();
+  const viewport = page.viewportSize();
+  assert(popupBounds.y > viewport.height / 2 && popupBounds.y + popupBounds.height < viewport.height,
+    "K rewards must appear within the bottom half of the screen");
+  assert(Math.abs(popupBounds.x + popupBounds.width / 2 - viewport.width / 2) < 2,
+    "K rewards must be horizontally centered");
+  await page.waitForTimeout(2500);
+  assert.equal(await page.locator(".k-reward-popup").count(), 0);
+
   if (process.env.E_UI_SHOTS)
     await page.screenshot({
       path: process.env.E_UI_SHOTS + "/e-summary-mobile.png",
