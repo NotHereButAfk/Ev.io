@@ -20,6 +20,8 @@
         <p>KYX currently stores demo account identity, settings, and match statistics in this browser. This browser-local build does not transmit account passwords or provide email delivery.</p>
         <h2>Browser storage</h2>
         <p>Passwords are stored as salted PBKDF2 hashes. Your username, normalized email address, settings, and aggregate game statistics remain in local browser storage until you clear site data.</p>
+        <h2>Skin purchases</h2>
+        <p>For Solana skin purchases, the server stores your account ID, purchased item, payment currency and amount, order reference, quote, accepted terms version, timestamps, merchant address, and transaction signature. The blockchain transaction is public and may reveal the paying wallet address. We use a Solana RPC service to verify payment and Coinbase public market data to quote SOL prices. We do not request or store wallet private keys or recovery phrases. Purchase records remain on the server for delivery and support; clearing browser storage does not delete them.</p>
         <h2>Online matches</h2>
         <p>When you join an online match, the game server processes the session and gameplay state required to run that match. Do not reuse a sensitive password for this demo account.</p>
         <p><a class="login-link" href="/register">Return to account creation</a></p>

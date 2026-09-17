@@ -565,20 +565,22 @@
         </label>
         <button id="checkout-continue" class="checkout-continue" type="button" disabled>ACCEPT &amp; CONTINUE</button>
         <div id="checkout-payment-options" class="checkout-payment-options hidden">
-          <div id="paypal-buttons" class="paypal-buttons"></div>
-          <div id="checkout-or" class="checkout-or hidden"><span>OR PAY BY CARD</span></div>
-          <div id="paypal-card-form" class="paypal-card-form hidden">
-            <div id="paypal-card-name" class="paypal-card-field"></div>
-            <div id="paypal-card-number" class="paypal-card-field"></div>
-            <div class="paypal-card-row">
-              <div id="paypal-card-expiry" class="paypal-card-field"></div>
-              <div id="paypal-card-cvv" class="paypal-card-field"></div>
-            </div>
-            <button id="paypal-card-submit" class="checkout-card-submit" type="button">PAY SECURELY</button>
+          <div id="checkout-assets" class="checkout-assets">
+            <button id="checkout-sol" class="checkout-continue" type="button">PAY WITH SOL</button>
+            <button id="checkout-usdc" class="checkout-continue" type="button">PAY WITH USDC</button>
+          </div>
+          <div id="checkout-order" class="hidden">
+            <h3 id="checkout-amount"></h3>
+            <p>Solana mainnet only. Network fees are separate.</p>
+            <canvas id="checkout-qr" aria-label="Solana Pay payment request"></canvas>
+            <a id="checkout-wallet" class="checkout-continue" href="#">OPEN WALLET</a>
+            <button id="checkout-copy" type="button">COPY PAYMENT REQUEST</button>
+            <p id="checkout-order-id"></p>
+            <p>Recipient: <span id="checkout-recipient"></span></p>
           </div>
         </div>
         <div id="checkout-status" class="checkout-status" aria-live="polite"></div>
-        <div class="checkout-trust">Payment details are encrypted and processed by PayPal. KYX.IO never receives or stores your card number.</div>
+        <div class="checkout-trust">Approve payment in your wallet. We never ask for your private key or recovery phrase. Skin purchases do not convert K coins into cryptocurrency.</div>
       </div>
     </div>
 

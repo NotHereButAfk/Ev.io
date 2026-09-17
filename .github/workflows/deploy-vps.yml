@@ -14,8 +14,7 @@ name: Deploy to VPS
 # VITE_AUTH_WS_URL is the public authoritative WebSocket URL. For the combined
 # Nginx/Node deployment use wss://kryx.live.
 #
-# PayPal checkout is enabled when PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are
-# present. PAYPAL_ENV must be either sandbox or live. The secret is installed
+# Solana checkout requires SOLANA_MERCHANT_ADDRESS; SOLANA_RPC_URL is optional.
 # only in the server service environment; it is never included in the Vite app.
 
 on:
@@ -111,9 +110,8 @@ jobs:
           DEPLOY_HOST: ${{ secrets.VPS_HOST }}
           DEPLOY_PATH: ${{ secrets.VPS_PATH }}
           DEPLOY_USER: ${{ secrets.VPS_USER }}
-          PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
-          PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
-          PAYPAL_ENV: ${{ secrets.PAYPAL_ENV }}
+          SOLANA_MERCHANT_ADDRESS: ${{ secrets.SOLANA_MERCHANT_ADDRESS }}
+          SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
@@ -122,7 +120,7 @@ jobs:
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/dist/"
-          /usr/bin/rsync -az --delete --exclude node_modules/ --exclude .paypal.env \
+          /usr/bin/rsync -az --delete --exclude node_modules/ --exclude .paypal.env --exclude .solana.json \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             server/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/"
           /usr/bin/rsync -az --delete \
@@ -144,29 +142,17 @@ jobs:
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             package.json package-lock.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
-          if test -n "$PAYPAL_CLIENT_ID" && test -n "$PAYPAL_CLIENT_SECRET"; then
-            case "$PAYPAL_CLIENT_ID$PAYPAL_CLIENT_SECRET" in
-              *[!A-Za-z0-9_-]*) echo "PayPal credentials contain unsupported environment-file characters"; exit 1 ;;
-            esac
-            case "$PAYPAL_ENV" in
-              sandbox|live) ;;
-              *) echo "PAYPAL_ENV must be sandbox or live"; exit 1 ;;
-            esac
-            payment_env="$(/usr/bin/mktemp)"
-            /usr/bin/chmod 600 "$payment_env"
-            /usr/bin/printf 'PAYPAL_CLIENT_ID=%s\nPAYPAL_CLIENT_SECRET=%s\nPAYPAL_ENV=%s\n' \
-              "$PAYPAL_CLIENT_ID" "$PAYPAL_CLIENT_SECRET" "$PAYPAL_ENV" > "$payment_env"
-            /usr/bin/scp -i ~/.ssh/deploy_key -P 22 \
-              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
-              "$payment_env" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/.paypal.env.next"
-            /usr/bin/rm -f "$payment_env"
-            /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
-              -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
-              "$DEPLOY_USER@$DEPLOY_HOST" \
-              "/usr/bin/chmod 600 '$DEPLOY_PATH/server/.paypal.env.next' && /usr/bin/mv -f '$DEPLOY_PATH/server/.paypal.env.next' '$DEPLOY_PATH/server/.paypal.env'"
-          else
-            echo "PayPal secrets are not set; deploying checkout in disabled mode."
-          fi
+          payment_env="$(/usr/bin/mktemp)"
+          /usr/bin/chmod 600 "$payment_env"
+          PAYMENT_CONFIG_PATH="$payment_env" node --input-type=module -e 'import {writeFileSync} from "node:fs"; const {SOLANA_MERCHANT_ADDRESS="",SOLANA_RPC_URL="",PAYMENT_CONFIG_PATH}=process.env; if(SOLANA_MERCHANT_ADDRESS && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(SOLANA_MERCHANT_ADDRESS)) throw Error("Invalid Solana recipient"); if(SOLANA_RPC_URL && new URL(SOLANA_RPC_URL).protocol!=="https:") throw Error("HTTPS RPC required"); writeFileSync(PAYMENT_CONFIG_PATH,JSON.stringify({SOLANA_MERCHANT_ADDRESS,SOLANA_RPC_URL}));'
+          /usr/bin/scp -i ~/.ssh/deploy_key -P 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$payment_env" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/.solana.json.next"
+          /usr/bin/rm -f "$payment_env"
+          /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "/usr/bin/chmod 600 '$DEPLOY_PATH/server/.solana.json.next' && /usr/bin/mv -f '$DEPLOY_PATH/server/.solana.json.next' '$DEPLOY_PATH/server/.solana.json'"
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \

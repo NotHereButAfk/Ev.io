@@ -16,7 +16,7 @@ import { ArmorPreviewRenderer } from './ArmorPreviewRenderer.js';
 import { InventoryPanel, MAIN_GUNS } from './InventoryPanel.js';
 import { WEAPONS } from '../weapons/weaponDefs.js';
 import { warmWeaponThumbs, renderWeaponSkinned } from './WeaponThumbnails.js';
-import { openPayPalCheckout } from '../payments/PayPalCheckout.js';
+import { openSolanaCheckout } from '../payments/SolanaCheckout.js';
 
 // Shop card previews use the same weapon-render pipeline as the inventory:
 // each gun-skin card shows one of the 5 main guns wearing the finish.
@@ -1049,7 +1049,7 @@ export class MenuUI {
         btn.textContent = `$${price.toFixed(2)} · BUY`;
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          openPayPalCheckout({ skinId: skin.id, name: skin.name, kind, price, onComplete: () => this._renderShop() });
+          openSolanaCheckout({ skinId: skin.id, name: skin.name, kind, price, onComplete: () => this._renderShop() });
         });
       }
       ctaWrap.appendChild(btn);

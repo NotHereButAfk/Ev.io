@@ -343,7 +343,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
   const close = () => new Promise((resolveClose) => {
     clearInterval(loop); clearInterval(hb);
     for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
-    wss.close(() => http.close(async () => { try { for(const {economy}of rooms.values())await economy?.runtime.close(); } catch(e){console.error('[economy close]',e.message);} resolveClose(); }));
+    wss.close(() => http.close(async () => { try { await payments?.close?.(); for(const {economy}of rooms.values())await economy?.runtime.close(); } catch(e){console.error('[economy close]',e.message);} resolveClose(); }));
   });
 
   if (port) http.listen(port, () => console.log(`[auth] listening on :${port} (tick ${TICK_MS.toFixed(1)}ms)`));
