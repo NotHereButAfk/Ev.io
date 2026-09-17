@@ -26,6 +26,7 @@ import { WebSocketServer } from 'ws';
 import { AuthRoom, TICK_MS } from './authroom.mjs';
 import { createAccountService } from './accountservice.mjs';
 import { createPaymentService } from './paymentservice.mjs';
+import { createWithdrawalService } from './withdrawals.mjs';
 
 const MAX_MSG_BYTES = 2 * 1024;             // a single command is tiny
 const RATE_TOKENS = 60, RATE_REFILL_MS = 1000;   // ~60 msgs/sec sustained
@@ -170,8 +171,9 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
     ? staticHandler(staticRoot)
     : (_req, res) => { res.writeHead(200, { 'content-type': 'text/plain' }); res.end('kyx auth server'); };
   const accounts = accountService === undefined ? createAccountService() : accountService;
-  const payments = createPaymentService(accounts);
   const economy = createEconomyService(accounts, {serverId:process.env.E_SERVER_ID || 'public-1',mode,privateMatch:process.env.PRIVATE_MATCH==='1'});
+  const payments = createPaymentService(accounts ? { pool: accounts.pool, session: accounts.session, ready: economy?.ready || accounts.ready } : null);
+  const withdrawals = createWithdrawalService(accounts ? { pool: accounts.pool, session: accounts.session, ready: economy?.ready || accounts.ready } : null);
   room.economy = economy?.runtime || null;
   const rooms=new Map([[mode,{room,economy}]]);
   if(mode==='deathmatch'){
@@ -189,6 +191,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
     if(!economy && pathname.startsWith('/api/e/')){res.writeHead(503,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'E database unavailable'}));return;}
     if(pathname==='/withdrawal' || pathname==='/withdrawal.html'){res.writeHead(302,{Location:'/earnings','Cache-Control':'no-store'});res.end();return;}
     if (economy && await economy.handler(req, res, pathname)) return;
+    if (withdrawals && await withdrawals(req, res, pathname)) return;
     if (payments && await payments(req, res, pathname)) return;
     if (accounts && await accounts(req, res, pathname)) return;
     if (req.method === 'GET' && pathname === '/api/matchmake') {
@@ -343,7 +346,7 @@ export function makeAuthServer({ server, port, staticRoot, targetPopulation = 0,
   const close = () => new Promise((resolveClose) => {
     clearInterval(loop); clearInterval(hb);
     for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
-    wss.close(() => http.close(async () => { try { await payments?.close?.(); for(const {economy}of rooms.values())await economy?.runtime.close(); } catch(e){console.error('[economy close]',e.message);} resolveClose(); }));
+    wss.close(() => http.close(async () => { try { await withdrawals?.close?.(); await payments?.close?.(); for(const {economy}of rooms.values())await economy?.runtime.close(); } catch(e){console.error('[economy close]',e.message);} resolveClose(); }));
   });
 
   if (port) http.listen(port, () => console.log(`[auth] listening on :${port} (tick ${TICK_MS.toFixed(1)}ms)`));

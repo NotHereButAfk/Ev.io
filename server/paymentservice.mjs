@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import bs58 from 'bs58';
 import { getNightMarket } from './nightmarket.mjs';
 import { STORE_ITEMS } from './storecatalog.mjs';
+import { EconomyStore } from './economy/store.mjs';
 import { address, decimalAmount, MAINNET_GENESIS, paymentUrl, quoteUnits, validateTransfer } from './solanapayment.mjs';
 
 const PRICE = { common: '20.00', rare: '30.00', epic: '40.00', legendary: '60.00', mythic: '80.00' };
-const TERMS_VERSION = '2026-09-17';
+const TERMS_VERSION = '2026-09-17-K';
 const items = new Map(STORE_ITEMS.map(s => [s.id, { ...s, cents: Number(PRICE[s.rarity].replace('.', '')) }]));
 const send = (res, status, value) => {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -117,10 +118,33 @@ export function createPaymentService(accounts, { fetchImpl = fetch, env = proces
     try {
       await initialized;
       if (req.method === 'GET' && pathname === '/api/store/night-market') return send(res, 200, { ok: true, ...getNightMarket(now()) });
-      if (req.method === 'GET' && pathname === '/api/store/config') return send(res, 200, { ok: true, configured, assets: ['SOL','USDC'], network: 'Solana mainnet', prices: PRICE });
+      if (req.method === 'GET' && pathname === '/api/store/config') return send(res, 200, { ok: true, configured, assets: ['SOL','USDC'], kPurchases: true, kPerDollar: 1000, network: 'Solana mainnet', prices: PRICE });
       if (req.method !== 'GET' && !sameOrigin(req)) return send(res, 403, { ok: false, err: 'Cross-site checkout is not allowed' });
       const user = await accounts.session(req);
       if (!user) return send(res, 401, { ok: false, err: 'Log in to purchase skins' });
+      if (req.method === 'POST' && pathname === '/api/store/purchase-k') {
+        const body = await readBody(req);
+        const item = items.get(body.skinId);
+        if (body.termsAccepted !== true || body.termsVersion !== TERMS_VERSION)
+          return send(res, 400, { ok: false, err: 'Accept the current purchase terms' });
+        if (!item || !getNightMarket(now()).items.some(o => o.id === item.id)
+            || !/^[a-zA-Z0-9-]{16,64}$/.test(body.requestId || ''))
+          return send(res, 400, { ok: false, err: 'Invalid purchase request' });
+        try {
+          const result = await new EconomyStore(accounts.pool).purchase(user.id, item.id, `nightmarket:${body.requestId}`, {
+            items: { catalog: [{ id: item.id, kind: item.kind, priceE: String(item.cents * 10) }] },
+          }, { beforePurchase: async c => {
+            const active = await c.query("SELECT 1 FROM solana_store_orders WHERE user_id=$1 AND skin_id=$2 AND status='pending' AND expires_at>$3", [user.id, item.id, new Date(now())]);
+            if (active.rowCount) throw new Error('Crypto payment already open for this skin');
+          }
+          });
+          return send(res, 200, { ok: true, ...result, skinId: item.id, kind: item.kind, asset: 'K', status: 'completed' });
+        } catch (e) {
+          if (['Already owned','Not enough E','Request key reused','Crypto payment already open for this skin'].includes(e.message))
+            return send(res, 409, { ok: false, err: e.message.replace('Not enough E', 'Not enough K') });
+          throw e;
+        }
+      }
       if (!configured) return send(res, 503, { ok: false, err: 'Solana checkout is awaiting merchant configuration' });
       if (req.method === 'POST' && pathname === '/api/store/orders') {
         const body = await readBody(req);

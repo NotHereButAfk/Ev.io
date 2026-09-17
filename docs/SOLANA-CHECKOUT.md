@@ -1,8 +1,8 @@
 # Skin checkout
 
 The Night Market accepts SOL and native USDC on Solana mainnet through a
-[Solana Pay transfer request](https://docs.solanapay.com/spec). K is unchanged:
-it is not purchasable or withdrawable through this checkout.
+[Solana Pay transfer request](https://docs.solanapay.com/spec). K can also pay for skins at 1,000 K per $1;
+K cannot be purchased through this checkout. See K-WITHDRAWALS.md for the separate, currently disabled payout system.
 
 ## Configuration
 

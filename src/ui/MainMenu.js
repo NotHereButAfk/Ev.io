@@ -1046,7 +1046,7 @@ export class MenuUI {
         }
       } else {
         btn.classList.add('shop-btn-buy');
-        btn.textContent = `$${price.toFixed(2)} · BUY`;
+        btn.textContent = `${(price * 1000).toLocaleString()} K / $${price.toFixed(2)}`;
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           openSolanaCheckout({ skinId: skin.id, name: skin.name, kind, price, onComplete: () => this._renderShop() });

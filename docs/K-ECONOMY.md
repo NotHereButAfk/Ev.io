@@ -1,6 +1,6 @@
 # K coins
 
-K is internal game currency for registered accounts. Existing balances, purchases and transaction IDs are preserved. The legacy e_balance tables, /api/e routes and decimal payload field names remain compatible; they now represent K.
+K is game currency for registered accounts. Skins cost 1,000 K per $1 of shop value. Planned USDC redemption includes existing and future balances at 1,000 K per USDC, but payouts remain disabled pending a funded provider; see K-WITHDRAWALS.md. Existing balances, purchases and transaction IDs are preserved. The legacy e_balance tables, /api/e routes and decimal payload field names remain compatible; they now represent K.
 
 The server rolls kill rewards once and journals the roll alongside the scoring action:
 - Bots: 0.7–1 K.

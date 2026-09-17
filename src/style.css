@@ -7408,3 +7408,6 @@ input:focus-visible, .quality-btn:focus-visible, .mode-card:focus-visible {
 
 #checkout-copy { margin: 12px 0; padding: 10px 16px; color: #bfe9ef; background: transparent; border: 1px solid #42606b; cursor: pointer; }
 #checkout-wallet { padding: 12px; }
+
+.checkout-assets { flex-wrap: wrap; }
+.checkout-assets button { flex: 1 1 120px; }

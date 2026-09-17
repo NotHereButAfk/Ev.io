@@ -16,12 +16,12 @@ export async function openSolanaCheckout({ skinId, name, price, onComplete }) {
   const el = id => document.getElementById(id);
   const modal = el('checkout-modal'), options = el('checkout-payment-options'), status = el('checkout-status');
   const accept = el('checkout-terms-checkbox'), proceed = el('checkout-continue');
-  el('checkout-item').textContent = `${name} · $${price.toFixed(2)} USD`;
+  el('checkout-item').textContent = `${name} · ${(price * 1000).toLocaleString()} K or $${price.toFixed(2)} USD`;
   modal.classList.remove('hidden'); options.classList.add('hidden');
   el('checkout-order').classList.add('hidden');
   el('checkout-assets').classList.remove('hidden');
   accept.checked = false; proceed.disabled = true; proceed.classList.remove('hidden');
-  status.textContent = 'Pay with SOL or USDC on Solana.';
+  status.textContent = 'Pay with K coins, SOL, or USDC on Solana.';
   accept.onchange = () => { proceed.disabled = !accept.checked; };
   let activeOrder = null;
   let finished = false;
@@ -78,19 +78,39 @@ export async function openSolanaCheckout({ skinId, name, price, onComplete }) {
     try {
       const config = await request('/api/store/config');
       if (generation !== current) return;
-      if (!config.configured) throw new Error('Solana checkout is awaiting merchant setup.');
+      el('checkout-sol').disabled = el('checkout-usdc').disabled = !config.configured;
       options.classList.remove('hidden'); proceed.classList.add('hidden');
-      status.textContent = 'Choose SOL or USDC. Network fees are paid separately in SOL.';
+      status.textContent = '1,000 K = $1 in the shop. Crypto network fees are paid separately in SOL.';
     } catch (e) { if (generation === current) { status.textContent = e.message; proceed.disabled = false; } }
+  };
+  const purchaseKey = crypto.randomUUID();
+  el('checkout-k').disabled = false;
+  el('checkout-k').textContent = `PAY ${(price * 1000).toLocaleString()} K`;
+  el('checkout-k').onclick = async () => {
+    el('checkout-k').disabled = el('checkout-sol').disabled = el('checkout-usdc').disabled = true;
+    try {
+      const result = await request('/api/store/purchase-k', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skinId, requestId: purchaseKey, termsAccepted: accept.checked, termsVersion: '2026-09-17-K' }) });
+      if (generation !== current) return;
+      finished = true;
+      if (result.kind === 'character') Shop.unlock(result.skinId); else Armory.grantSkin(result.skinId);
+      options.classList.add('hidden');
+      status.textContent = `PURCHASE COMPLETE — Balance: ${result.balance} K`;
+      onComplete?.(result);
+    } catch (e) {
+      if (generation !== current) return;
+      status.textContent = e.message;
+      el('checkout-k').disabled = false;
+    }
   };
   for (const asset of ['SOL', 'USDC']) {
     el(`checkout-${asset.toLowerCase()}`).disabled = false;
     el(`checkout-${asset.toLowerCase()}`).onclick = async () => {
-      el('checkout-sol').disabled = el('checkout-usdc').disabled = true;
+      el('checkout-k').disabled = el('checkout-sol').disabled = el('checkout-usdc').disabled = true;
       status.textContent = 'Preparing your payment…';
       try {
         await render(await request('/api/store/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ skinId, asset, termsAccepted: accept.checked, termsVersion: '2026-09-17' }) }));
+          body: JSON.stringify({ skinId, asset, termsAccepted: accept.checked, termsVersion: '2026-09-17-K' }) }));
       } catch (e) {
         if (generation !== current) return;
         status.textContent = e.message; el('checkout-sol').disabled = el('checkout-usdc').disabled = false;

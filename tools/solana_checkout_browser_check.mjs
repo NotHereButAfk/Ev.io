@@ -15,6 +15,7 @@ try {
   await page.route('**/api/store/**', async route => {
     const url = route.request().url();
     if (url.endsWith('/config')) return route.fulfill({ json: { ok: true, configured: true } });
+    if (url.endsWith('/purchase-k')) return route.fulfill({json:{ok:true,status:'completed',kind:'weapon',skinId:'m4_white_signal',balance:'80000.0000'}});
     if (route.request().method() === 'POST') { creates++; assert.equal(route.request().postDataJSON().asset, 'USDC'); }
     return route.fulfill({ json: completed ? { ...order, status: 'completed', paymentUrl: null } : order });
   });
@@ -43,6 +44,19 @@ try {
   assert.equal(await page.locator('#checkout-wallet').isVisible(), false);
   await page.click('#checkout-close');
   assert.equal(await page.locator('#checkout-modal').isVisible(), false);
+  await page.evaluate(async()=>{const {openSolanaCheckout}=await import('/src/payments/SolanaCheckout.js');openSolanaCheckout({skinId:'m4_white_signal',name:'White Signal',price:20});});
+  await page.check('#checkout-terms-checkbox');await page.click('#checkout-continue');
+  assert.match(await page.locator('#checkout-k').textContent(),/20,000 K/);
+  await page.click('#checkout-k');
+  await page.waitForFunction(()=>document.getElementById('checkout-status').textContent.includes('80000.0000 K'));
+  await page.route('**/api/e/**',route=>route.fulfill({json:route.request().url().endsWith('/me')
+    ?{earningEnabled:true,balance:'1000',sessionE:'0',dailyE:'0',dailyCap:null,catalog:[],equipment:[],ownedSkins:[]}
+    :{transactions:[],summaries:[]}}));
+  await page.route('**/api/withdrawals',route=>route.fulfill({json:{enabled:false,kPerUSDC:1000,limits:null,withdrawals:[]}}));
+  await page.goto('http://127.0.0.1:5996/earnings.html');
+  await page.waitForFunction(()=>document.getElementById('withdrawal-status').textContent.includes('not live yet'));
+  assert.equal(await page.locator('#withdrawal-form').isVisible(),false);
+  await page.screenshot({path:'../repo-validation/k-withdrawals-disabled.png'});
   assert.deepEqual(errors, []);
   console.log('PASS checkout browser: terms, USDC, QR/link, mobile layout, confirmed delivery, close');
 } finally { await browser.close(); }

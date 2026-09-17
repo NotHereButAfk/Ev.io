@@ -33,6 +33,7 @@ async function load() {
       ? "Rewards are finalized by the game server."
       : "K earning is currently disabled.";
     $("account").hidden = false;
+    loadWithdrawals();
     $("admin-link").hidden = !p.admin;
     $("balance").textContent = fmt(p.balance) + " K";
     $("session").textContent = fmt(p.sessionE);
@@ -130,4 +131,45 @@ async function load() {
       e.message + " — sign in with a registered account to view permanent K.";
   }
 }
+let withdrawalKey = crypto.randomUUID();
+async function loadWithdrawals() {
+  try {
+    const response = await fetch('/api/withdrawals', { credentials: 'same-origin' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Payout status unavailable');
+    $('withdrawal-form').hidden = !data.enabled;
+    $('withdrawal-status').textContent = data.enabled
+      ? `Minimum: ${data.limits.minimumK} K. Per withdrawal: ${data.limits.perWithdrawalK} K. Daily: ${data.limits.perUserDailyK} K. Network fees are paid by the game.`
+      : 'USDC withdrawals are not live yet. Payout provider setup and funding are required. Your K stays in your balance.';
+    $('withdrawal-history').replaceChildren();
+    for (const row of data.withdrawals) {
+      const box = document.createElement('article');
+      const micro = BigInt(row.usdc_units);
+      text('p', `${row.k_amount} K → ${micro / 1000000n}.${String(micro % 1000000n).padStart(6,'0')} USDC · ${row.state}`, box);
+      text('p', `Recipient: ${row.destination}`, box);
+      if (row.reason) text('p', row.reason, box);
+      if (row.signature) { const link = text('a','View transaction',box); link.href=`https://solscan.io/tx/${encodeURIComponent(row.signature)}`; link.target='_blank';link.rel='noopener noreferrer'; }
+      $('withdrawal-history').appendChild(box);
+    }
+  } catch(e) { $('withdrawal-status').textContent=e.message; }
+}
+$('withdrawal-amount').oninput = () => {
+  withdrawalKey=crypto.randomUUID();
+  const raw=$('withdrawal-amount').value;
+  if (!/^\d+(\.\d{1,3})?$/.test(raw)) { $('withdrawal-quote').textContent='Use up to three decimal places.';return; }
+  const [whole,frac='']=raw.split('.');
+  const micro=BigInt(whole)*1000n+BigInt(frac.padEnd(3,'0'));
+  $('withdrawal-quote').textContent=`You receive ${micro/1000000n}.${String(micro%1000000n).padStart(6,'0')} USDC.`;
+};
+$('withdrawal-address').oninput=()=>{withdrawalKey=crypto.randomUUID();};
+$('withdrawal-form').onsubmit=async event=>{
+  event.preventDefault();$('withdrawal-submit').disabled=true;
+  try {
+    const response=await fetch('/api/withdrawals',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({amountK:$('withdrawal-amount').value,destination:$('withdrawal-address').value.trim(),key:withdrawalKey,termsAccepted:$('withdrawal-terms').checked,termsVersion:'2026-09-17-K'})});
+    const data=await response.json();if(!response.ok)throw Error(data.error || 'Withdrawal unavailable');
+    await load();
+    $('withdrawal-status').textContent=`Withdrawal ${data.id} is ${data.state}. K is reserved until the payout finishes.`;
+  }catch(e){$('withdrawal-status').textContent=e.message;}finally{$('withdrawal-submit').disabled=false;}
+};
 load();

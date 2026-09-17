@@ -13,7 +13,7 @@
         ><a id="admin-link" href="/economy-admin" hidden>Economy admin</a>
       </nav>
       <h1>K Earnings</h1>
-      <p>K is an internal game currency, earned through eligible play.</p>
+      <p>Earn K through eligible play. Spend 1,000 K per $1 of skin value.</p>
       <p id="status" role="status">Loading account…</p>
       <section id="account" hidden>
         <div class="metrics">
@@ -30,6 +30,20 @@
             <h2 id="daily"></h2>
           </article>
         </div>
+        <section id="withdrawals">
+          <h2>Withdraw USDC</h2>
+          <p>Planned redemption rate: 1,000 K = 1 USDC on Solana. Existing and future earned balances qualify, subject to account review and payout limits.</p>
+          <p id="withdrawal-status" role="status">Checking payout availability...</p>
+          <form id="withdrawal-form" hidden>
+            <label>Amount of K <input id="withdrawal-amount" type="number" min="0.001" step="0.001" required /></label>
+            <label>Your Solana receiving address <input id="withdrawal-address" type="text" minlength="32" maxlength="44" required autocomplete="off" /></label>
+            <p id="withdrawal-quote"></p>
+            <p>Check your address carefully. Completed transfers cannot be reversed.</p>
+            <label><input id="withdrawal-terms" type="checkbox" required /> I accept the <a href="/terms#digital-purchases" target="_blank" rel="noopener">purchase and withdrawal terms</a>.</label>
+            <button id="withdrawal-submit" type="submit">REQUEST USDC WITHDRAWAL</button>
+          </form>
+          <div id="withdrawal-history"></div>
+        </section>
         <h2>Earning equipment</h2>
         <p>
           Everyone starts at 1.0×. Optional owned items can add bonuses.

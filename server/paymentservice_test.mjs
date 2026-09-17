@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import bs58 from 'bs58';
 import { PGlite } from '@electric-sql/pglite';
 import { createPaymentService } from './paymentservice.mjs';
@@ -12,6 +13,7 @@ const merchant = key(), payer = key();
 let now = Date.UTC(2026, 8, 17), userId = 1;
 const db = new PGlite();
 await db.exec('CREATE TABLE users(id BIGINT PRIMARY KEY); INSERT INTO users VALUES(1),(2); CREATE TABLE user_skins(user_id BIGINT,skin_id TEXT,skin_kind TEXT,PRIMARY KEY(user_id,skin_id)); CREATE TABLE store_orders(id TEXT); INSERT INTO store_orders VALUES(\'legacy\');');
+await db.exec(readFileSync(new URL('./migrations/001_e_economy.sql', import.meta.url),'utf8'));
 let failGrant = false;
 const pool = {
   async query(sql, args) {
@@ -44,7 +46,7 @@ async function call(path, body, headers = {}) {
   return { httpStatus: status, ...data };
 }
 const skin = getNightMarket(now).items[0].id;
-const orderBody = (asset = 'SOL') => ({ skinId: skin, asset, termsAccepted: true, termsVersion: '2026-09-17', amount: 0.001 });
+const orderBody = (asset = 'SOL') => ({ skinId: skin, asset, termsAccepted: true, termsVersion: '2026-09-17-K', amount: 0.001 });
 assert.equal(quoteUnits(2000, 'SOL', '150.00'), '133333334');
 assert.equal(quoteUnits(2000, 'USDC'), '20000000');
 assert.throws(() => quoteUnits(2000, 'SOL', '0'));
@@ -117,5 +119,15 @@ assert.equal((await call(`orders/${late.orderId}`)).status, 'needs_review');
 assert.equal((await pool.query('SELECT * FROM user_skins WHERE skin_id=$1', [otherSkin])).rowCount, 0);
 assert.equal((await pool.query('SELECT * FROM store_orders')).rows[0].id, 'legacy');
 assert.equal((await call('client-token', {})).httpStatus, 404);
+const kBody={skinId:otherSkin,requestId:'k-purchase-test-123456',termsAccepted:true,termsVersion:'2026-09-17-K',price:1};
+assert.equal((await call('purchase-k', kBody)).httpStatus,409,'insufficient balance');
+await pool.query('UPDATE users SET e_balance=100000 WHERE id=2');
+const purchased=await call('purchase-k',kBody);
+assert.equal(purchased.httpStatus,200);
+const ledger=(await pool.query("SELECT * FROM e_transactions WHERE type='SHOP_PURCHASE' AND user_id=2")).rows;
+assert.equal(ledger.length,1);
+assert.ok(Number(ledger[0].amount)<=-20000,'server-priced K purchase ignores client price');
+assert.equal((await call('purchase-k',kBody)).balance,purchased.balance,'retry does not debit again');
+assert.equal((await pool.query("SELECT * FROM e_transactions WHERE type='SHOP_PURCHASE' AND user_id=2")).rows.length,1);
 await service.close(); await db.close();
 console.log('PASS Solana checkout: integer quotes, auth, origin, terms, mainnet, freshness, references, SOL/USDC validation, rollback, replay, background recovery, legacy data');

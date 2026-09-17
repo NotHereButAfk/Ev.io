@@ -276,7 +276,7 @@ export class EconomyStore {
     );
     if (!r.rowCount) throw new Error("Item not owned");
   }
-  async purchase(userId, itemId, key, config) {
+  async purchase(userId, itemId, key, config, { beforePurchase } = {}) {
     const item = config.items.catalog.find(
       (i) => i.id === itemId && i.priceE != null,
     );
@@ -298,6 +298,7 @@ export class EconomyStore {
           throw new Error("Request key reused");
         return { balance: prior.new_balance };
       }
+      if (beforePurchase) await beforePurchase(c);
       const owned = await c.query(
         "SELECT 1 FROM user_skins WHERE user_id=$1 AND skin_id=$2",
         [userId, itemId],
