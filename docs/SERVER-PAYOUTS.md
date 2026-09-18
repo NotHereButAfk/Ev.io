@@ -17,3 +17,5 @@ After backup, funding, and an approved live payout check, set repository Actions
 Back up PostgreSQL and the treasury key securely. After restoring an old database backup, keep payouts disabled and reconcile chain history before processing jobs: restoring past the signing record can otherwise lose idempotency evidence. Keep the signed-transfer table and withdrawal ledger together.
 
 Tests use disposable keys and a fake RPC; no test sends real funds. Mainnet delivery remains unverified until an authorized funded test is completed.
+
+A paused wallet does not require RPC availability to serve withdrawal history. Mainnet verification remains mandatory before signing, reserving new payouts, or reconciling/broadcasting saved transfers. Deployment reports RPC readiness separately; a paused deployment can succeed with an RPC warning, which must be resolved before activation.

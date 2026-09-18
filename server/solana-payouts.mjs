@@ -25,7 +25,7 @@ export function createPayoutRpc(url,fetchImpl=fetch) {
   return async(method,params=[])=>{
     const response=await fetchImpl(url,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(15000)});
-    if(!response.ok)throw Error('Payout RPC unavailable');
+    if(!response.ok)throw Error(`Payout RPC HTTP ${response.status}`);
     const result=await response.json();
     if(result.error)throw Error('Payout RPC rejected request');
     return result.result;
@@ -66,6 +66,9 @@ export class SolanaPayoutProvider extends EconomyStore {
       treasury VARCHAR(44) NOT NULL, last_valid_height BIGINT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    if(this.accepting)await this.verifyNetwork();
+  }
+  async verifyNetwork() {
     if(await this.rpc('getGenesisHash')!==MAINNET_GENESIS)throw Error('Payout RPC is not Solana mainnet');
   }
   outcome(row,status,extra={}) {
@@ -84,6 +87,7 @@ export class SolanaPayoutProvider extends EconomyStore {
   }
   async canReserve(amountUnits) {
     if(!this.accepting)throw Error('Withdrawals are paused');
+    await this.verifyNetwork();
     const balances=await this.liquidity();
     const pending=(await this.pool.query("SELECT COALESCE(SUM(usdc_units),0) AS amount, COUNT(*) AS count FROM k_withdrawals WHERE state NOT IN ('failed','completed')")).rows[0];
     if(balances.usdc<BigInt(pending.amount)+BigInt(amountUnits))throw Error('Payout wallet needs more USDC');
@@ -97,6 +101,7 @@ export class SolanaPayoutProvider extends EconomyStore {
     if(info.value && (info.value.executable || info.value.owner!=='11111111111111111111111111111111'))throw Error('Enter a wallet address, not a token account');
   }
   async submit(request) {
+    await this.verifyNetwork();
     if(request.network!=='solana-mainnet' || request.mint!==USDC_MINT)throw Error('Unsupported payout asset');
     const row=await this.transaction(async c=>{
       const job=(await c.query('SELECT * FROM k_withdrawals WHERE id=$1 FOR UPDATE',[request.idempotencyKey])).rows[0];
@@ -119,6 +124,7 @@ export class SolanaPayoutProvider extends EconomyStore {
     return row?this.reconcile(row):null;
   }
   async reconcile(row) {
+    await this.verifyNetwork();
     const result=await this.rpc('getSignatureStatuses',[[row.signature],{searchTransactionHistory:true}]);
     const status=result?.value?.[0];
     if(status?.confirmationStatus==='finalized') {
