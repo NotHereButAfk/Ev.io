@@ -5,6 +5,7 @@ import {signerFromSeed,buildUsdcPayout,SolanaPayoutProvider,SERVER_WALLET_LIMITS
 import {WithdrawalStore} from './withdrawals.mjs';
 import {USDC_MINT,MAINNET_GENESIS} from './solanapayment.mjs';
 import {TOKEN_PROGRAM_ADDRESS} from '@solana-program/token';
+assert.equal(MAINNET_GENESIS,'5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d');
 const db=new PGlite();
 await db.exec('CREATE TABLE users(id BIGINT PRIMARY KEY);INSERT INTO users VALUES(1);');
 await db.exec(readFileSync(new URL('./migrations/001_e_economy.sql',import.meta.url),'utf8'));
@@ -15,7 +16,7 @@ const pool={async query(sql,args){const r=await db.query(sql,args);return {...r,
 const signer=await signerFromSeed('11'.repeat(32)),recipient=await signerFromSeed('22'.repeat(32));
 let status=null,height=10,sendTimeout=true,liquid='9000000000';const sent=[];
 const rpc=async(method,params)=>{
-  if(method==='getGenesisHash')return MAINNET_GENESIS;
+  if(method==='getGenesisHash')return '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
   if(method==='getAccountInfo')return params[1].encoding==='base64'?{value:null}:{value:{owner:TOKEN_PROGRAM_ADDRESS,data:{parsed:{info:{mint:USDC_MINT,owner:signer.address,state:'initialized',tokenAmount:{amount:liquid}}}}}};
   if(method==='getBalance')return {value:1000000000};
   if(method==='getLatestBlockhash')return {value:{blockhash:'11111111111111111111111111111111',lastValidBlockHeight:100}};
@@ -56,5 +57,6 @@ await assert.rejects(buildUsdcPayout({signer,destination:signer.address,amountUn
 await assert.rejects(new SolanaPayoutProvider(pool,{signer,rpc:async()=> 'devnet',accepting:true}).init(),/mainnet/);
 await new SolanaPayoutProvider(pool,{signer,rpc:async()=>{throw Error('offline');},accepting:false}).init();
 await assert.rejects(new SolanaPayoutProvider(pool,{signer,rpc:async()=> 'devnet'}).reconcile({}),/mainnet/);
+await assert.rejects(new SolanaPayoutProvider(pool,{signer,rpc:async()=> '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',accepting:true}).init(),/mainnet/);
 await db.close();
 console.log('PASS server wallet: minimum-only limits, funding gate, real signing, durable same-byte retries, finality, expired review, failed refund, network guard');
