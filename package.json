@@ -76,6 +76,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@solana-program/token": "^0.16.1",
+    "@solana/kit": "^8.3.0",
     "bs58": "^6.0.0",
     "qrcode": "^1.5.4",
     "three": "^0.184.0"

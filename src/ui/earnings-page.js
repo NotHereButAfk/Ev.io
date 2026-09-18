@@ -138,9 +138,10 @@ async function loadWithdrawals() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Payout status unavailable');
     $('withdrawal-form').hidden = !data.enabled;
+    if (data.limits?.minimumK) $('withdrawal-amount').min = data.limits.minimumK;
     $('withdrawal-status').textContent = data.enabled
-      ? `Minimum: ${data.limits.minimumK} K. Per withdrawal: ${data.limits.perWithdrawalK} K. Daily: ${data.limits.perUserDailyK} K. Network fees are paid by the game.`
-      : 'USDC withdrawals are not live yet. Payout provider setup and funding are required. Your K stays in your balance.';
+      ? `Minimum: ${data.limits.minimumK} K. ${data.limits.perWithdrawalK == null ? 'No per-withdrawal maximum.' : `Per withdrawal: ${data.limits.perWithdrawalK} K.`} ${data.limits.perUserDailyK == null ? 'No daily maximum.' : `Daily: ${data.limits.perUserDailyK} K.`} Network fees are paid by the game.`
+      : 'USDC withdrawals are not live yet. Payout wallet setup and funding are required. Your K stays in your balance.';
     $('withdrawal-history').replaceChildren();
     for (const row of data.withdrawals) {
       const box = document.createElement('article');

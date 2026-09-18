@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { EconomyStore } from './economy/store.mjs';
 import { units, decimal } from './economy/money.mjs';
 import { address, USDC_MINT } from './solanapayment.mjs';
+import { configuredServerPayouts, SERVER_WALLET_LIMITS } from './solana-payouts.mjs';
 
 export const K_PER_USDC = 1000;
 export function withdrawalQuote(kAmount) {
@@ -17,8 +18,12 @@ export function withdrawalQuote(kAmount) {
 export class WithdrawalStore extends EconomyStore {
   constructor(pool, { provider = null, limits = null } = {}) {
     super(pool); this.provider = provider; this.limits = limits;
-    this.enabled = !!provider && ['minimumK','perWithdrawalK','perUserDailyK','globalDailyK']
-      .every(key => { try { return units(limits?.[key]) > 0n; } catch { return false; } });
+    this.enabled = this.validConfiguration();
+  }
+  validConfiguration() {
+    try { return !!this.provider && this.provider.accepting !== false && units(this.limits?.minimumK)>0n
+      && ['perWithdrawalK','perUserDailyK','globalDailyK'].every(key => this.limits[key] === null || units(this.limits[key])>0n);
+    } catch { return false; }
   }
   async init() {
     await this.pool.query(readFileSync(new URL('./migrations/002_k_withdrawals.sql', import.meta.url), 'utf8'));
@@ -27,7 +32,7 @@ export class WithdrawalStore extends EconomyStore {
     if (!this.enabled) throw new Error('USDC withdrawals are not enabled yet');
     const target = address(destination), quote = withdrawalQuote(amount), k = units(quote.k);
     if (!/^[a-zA-Z0-9-]{16,64}$/.test(key || '')) throw new Error('Invalid request key');
-    if (k < units(this.limits.minimumK) || k > units(this.limits.perWithdrawalK)) throw new Error('Amount is outside the withdrawal limits');
+    if (k < units(this.limits.minimumK) || (this.limits.perWithdrawalK !== null && k > units(this.limits.perWithdrawalK))) throw new Error('Amount is outside the withdrawal limits');
     return this.transaction(async c => {
       // Serialize global daily budget and each user's balance before reserving.
       await c.query('SELECT id FROM k_withdrawal_lock WHERE id=1 FOR UPDATE');
@@ -44,10 +49,12 @@ export class WithdrawalStore extends EconomyStore {
         COALESCE(SUM(k_amount) FILTER(WHERE user_id=$1),0) AS player
         FROM k_withdrawals WHERE created_at>=date_trunc('day',NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
         AND state<>'failed'`, [userId])).rows[0];
-      if (units(daily.total) + k > units(this.limits.globalDailyK)
-          || units(daily.player) + k > units(this.limits.perUserDailyK)) throw new Error('Daily withdrawal limit reached');
+      if ((this.limits.globalDailyK !== null && units(daily.total) + k > units(this.limits.globalDailyK))
+          || (this.limits.perUserDailyK !== null && units(daily.player) + k > units(this.limits.perUserDailyK))) throw new Error('Daily withdrawal limit reached');
       const before = units(user.e_balance);
       if (before < k) throw new Error('Not enough K');
+      await this.provider.validateDestination?.(target);
+      await this.provider.canReserve?.(quote.usdcUnits);
       const id = randomUUID();
       const row = (await c.query(`INSERT INTO k_withdrawals(id,user_id,request_key,destination,k_amount,usdc_units)
         VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [id,userId,key,target,quote.k,quote.usdcUnits])).rows[0];
@@ -59,7 +66,7 @@ export class WithdrawalStore extends EconomyStore {
     });
   }
   async processOne() {
-    if (!this.enabled) return false;
+    if (!this.provider) return false;
     const job = await this.transaction(async c => {
       const row = (await c.query(`SELECT * FROM k_withdrawals WHERE state IN ('queued','processing','submitted')
         AND (lease_until IS NULL OR lease_until<NOW()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
@@ -71,6 +78,7 @@ export class WithdrawalStore extends EconomyStore {
     try {
       // Recover a provider submission after a timeout/crash before attempting send.
       let outcome = await this.provider.lookup(job.id);
+      if (!outcome && !this.enabled) return false;
       if (!outcome) outcome = await this.provider.submit({ idempotencyKey: job.id, destination: job.destination,
         amountUnits: String(job.usdc_units), mint: USDC_MINT, network: 'solana-mainnet' });
       await this.applyOutcome(job, outcome);
@@ -91,7 +99,9 @@ export class WithdrawalStore extends EconomyStore {
         await c.query("UPDATE k_withdrawals SET state='review',reason='Provider transfer details differ from request',updated_at=NOW() WHERE id=$1", [row.id]);
         return;
       }
-      if (outcome.status === 'failed' && outcome.definitive === true) {
+      if (outcome.status === 'review') {
+        await c.query("UPDATE k_withdrawals SET state='review',reason='Payout requires transaction reconciliation',updated_at=NOW() WHERE id=$1", [row.id]);
+      } else if (outcome.status === 'failed' && outcome.definitive === true) {
         const user = (await c.query('SELECT e_balance FROM users WHERE id=$1 FOR UPDATE', [row.user_id])).rows[0];
         const before = units(user.e_balance), after = before + units(row.k_amount);
         await c.query(`INSERT INTO e_transactions(id,user_id,amount,type,description,previous_balance,new_balance,metadata,idempotency_key)
@@ -111,12 +121,20 @@ export class WithdrawalStore extends EconomyStore {
 export function createWithdrawalService(accounts, options = {}) {
   if (!accounts?.pool) return null;
   const store = new WithdrawalStore(accounts.pool, options);
-  const ready = Promise.resolve(accounts.ready).then(() => store.init());
+  const ready = Promise.resolve(accounts.ready).then(async () => {
+    await store.init();
+    if (!Object.hasOwn(options,'provider')) {
+      store.provider = await configuredServerPayouts(accounts.pool);
+      store.limits = SERVER_WALLET_LIMITS;
+      await store.provider?.init();
+      store.enabled = store.validConfiguration();
+    }
+  });
   ready.catch(() => console.error('[withdrawals] Initialization unavailable'));
   let running = null;
-  const timer = store.enabled ? setInterval(() => {
+  const timer = setInterval(() => {
     if (!running) running = ready.then(() => store.processOne()).catch(() => {}).finally(() => { running = null; });
-  }, 15000) : null;
+  }, 15000);
   timer?.unref();
   const send = (res, status, value) => { res.writeHead(status, {'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));return true; };
   const handler = async (req,res,path) => {
@@ -132,7 +150,7 @@ export function createWithdrawalService(accounts, options = {}) {
       if (req.method !== 'POST') return send(res,405,{error:'Method not allowed'});
       if (!req.headers.origin || req.headers['sec-fetch-site']==='cross-site' || new URL(req.headers.origin).host!==req.headers.host)
         return send(res,403,{error:'Same-origin request required'});
-      if (!store.enabled) return send(res,503,{error:'USDC payouts are awaiting provider setup and funding. Your K has not been deducted.'});
+      if (!store.enabled) return send(res,503,{error:'USDC payouts are awaiting payout wallet setup and funding. Your K has not been deducted.'});
       let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096)throw Error('Request too large');}
       const data=JSON.parse(raw);
       if(data.termsAccepted!==true || data.termsVersion!=='2026-09-17-K') return send(res,400,{error:'Accept the withdrawal terms'});

@@ -13,3 +13,7 @@ __pycache__/
 server/.solana.json
 server/.solana.json.next
 server/.paypal.env
+
+# Private server payout signing configuration
+server/.payout-wallet.json
+server/.payout-wallet.json.next

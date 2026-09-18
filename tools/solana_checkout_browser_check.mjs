@@ -57,6 +57,13 @@ try {
   await page.waitForFunction(()=>document.getElementById('withdrawal-status').textContent.includes('not live yet'));
   assert.equal(await page.locator('#withdrawal-form').isVisible(),false);
   await page.screenshot({path:'../repo-validation/k-withdrawals-disabled.png'});
+  await page.route('**/api/withdrawals',route=>route.fulfill({json:{enabled:true,kPerUSDC:1000,limits:{minimumK:'5000',perWithdrawalK:null,perUserDailyK:null,globalDailyK:null},withdrawals:[]}}));
+  await page.reload();
+  await page.waitForFunction(()=>document.getElementById('withdrawal-status').textContent.includes('No daily maximum'));
+  assert.equal(await page.locator('#withdrawal-form').isVisible(),true);
+  assert.equal(await page.locator('#withdrawal-amount').getAttribute('min'),'5000');
+  assert.ok(!(await page.locator('#withdrawal-status').textContent()).includes('null'));
+  await page.screenshot({path:'../repo-validation/k-withdrawals-minimum-only.png'});
   assert.deepEqual(errors, []);
   console.log('PASS checkout browser: terms, USDC, QR/link, mobile layout, confirmed delivery, close');
 } finally { await browser.close(); }

@@ -112,6 +112,9 @@ jobs:
           DEPLOY_USER: ${{ secrets.VPS_USER }}
           SOLANA_MERCHANT_ADDRESS: ${{ secrets.SOLANA_MERCHANT_ADDRESS }}
           SOLANA_RPC_URL: ${{ secrets.SOLANA_RPC_URL }}
+          SOLANA_PAYOUT_SEED: ${{ secrets.SOLANA_PAYOUT_SEED }}
+          SOLANA_PAYOUT_ENABLED: ${{ vars.SOLANA_PAYOUT_ENABLED }}
+          SOLANA_PAYOUT_BACKUP_CONFIRMED: ${{ vars.SOLANA_PAYOUT_BACKUP_CONFIRMED }}
           PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         run: |
           /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
@@ -120,7 +123,7 @@ jobs:
           /usr/bin/rsync -az --delete \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/dist/"
-          /usr/bin/rsync -az --delete --exclude node_modules/ --exclude .paypal.env --exclude .solana.json \
+          /usr/bin/rsync -az --delete --exclude node_modules/ --exclude .paypal.env --exclude .solana.json --exclude .payout-wallet.json --exclude .payout-wallet.json.next \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             server/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/"
           /usr/bin/rsync -az --delete \
@@ -142,6 +145,17 @@ jobs:
           /usr/bin/rsync -az \
             -e "/usr/bin/ssh -i ~/.ssh/deploy_key -p 22 -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15" \
             package.json package-lock.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          payout_env="$(/usr/bin/mktemp)"
+          /usr/bin/chmod 600 "$payout_env"
+          PAYOUT_CONFIG_PATH="$payout_env" node tools/write-payout-config.mjs
+          /usr/bin/scp -i ~/.ssh/deploy_key -P 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$payout_env" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/server/.payout-wallet.json.next"
+          /usr/bin/rm -f "$payout_env"
+          /usr/bin/ssh -i ~/.ssh/deploy_key -p 22 \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "/usr/bin/chmod 600 '$DEPLOY_PATH/server/.payout-wallet.json.next' && /usr/bin/mv -f '$DEPLOY_PATH/server/.payout-wallet.json.next' '$DEPLOY_PATH/server/.payout-wallet.json'"
           payment_env="$(/usr/bin/mktemp)"
           /usr/bin/chmod 600 "$payment_env"
           PAYMENT_CONFIG_PATH="$payment_env" node --input-type=module -e 'import {writeFileSync} from "node:fs"; const {SOLANA_MERCHANT_ADDRESS="",SOLANA_RPC_URL="",PAYMENT_CONFIG_PATH}=process.env; if(SOLANA_MERCHANT_ADDRESS && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(SOLANA_MERCHANT_ADDRESS)) throw Error("Invalid Solana recipient"); if(SOLANA_RPC_URL && new URL(SOLANA_RPC_URL).protocol!=="https:") throw Error("HTTPS RPC required"); writeFileSync(PAYMENT_CONFIG_PATH,JSON.stringify({SOLANA_MERCHANT_ADDRESS,SOLANA_RPC_URL}));'
