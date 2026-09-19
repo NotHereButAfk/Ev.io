@@ -54,6 +54,7 @@ const ICON_ACH = {
 
 export class MenuUI {
   constructor({ mobile = false } = {}) {
+    document.getElementById('nm-back')?.addEventListener('click', () => this._closeAllPanels());
     // Top-nav elements
     this.topNav      = document.getElementById('top-nav');
     this.mobileNavToggle = document.getElementById('nav-mobile-toggle');
