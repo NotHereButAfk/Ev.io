@@ -834,8 +834,7 @@ export class MenuUI {
 
   _renderShop() {
     this._refreshCoins();
-    const bal = document.getElementById('shop-coin-balance');
-    if (bal) bal.textContent = Shop.getCoins().toLocaleString();
+
 
     const authWall  = document.getElementById('shop-auth-wall');
     const content   = document.getElementById('shop-content');
@@ -898,6 +897,7 @@ export class MenuUI {
       const card = document.createElement('div');
       card.className = 'shop-skin-card' + (isEquip ? ' equipped' : owned ? ' owned' : '');
       card.dataset.rarity = rarity;
+      card.style.setProperty('--item-accent', color || '#9db7ce');
 
       // Swatch
       const swatch = document.createElement('div');
@@ -906,7 +906,7 @@ export class MenuUI {
       inner.className = 'shop-swatch-inner';
       const c1 = isCharacter ? _hex6(skin.primary) : _hex6(skin.body ?? skin.blade ?? 0x2a2a2a);
       const c2 = isCharacter ? _hex6(skin.secondary) : _hex6(skin.accent ?? skin.guard ?? 0x111111);
-      inner.style.background = `linear-gradient(145deg,#${c1},#${c2})`;
+      inner.style.background = `radial-gradient(ellipse at 50% 35%, #${c1}65, transparent 72%), linear-gradient(150deg, #162334, #${c2}35 150%)`;
       if (skin.emissive) {
         const gc = '#' + _hex6(skin.emissive);
         inner.style.boxShadow = `inset 0 0 20px ${gc}55`;
@@ -1046,7 +1046,14 @@ export class MenuUI {
         }
       } else {
         btn.classList.add('shop-btn-buy');
-        btn.textContent = `${(price * 1000).toLocaleString()} K / $${price.toFixed(2)}`;
+        const priceLine = document.createElement('div');
+        priceLine.className = 'shop-price-line';
+        priceLine.textContent = `${(price * 1000).toLocaleString()} K`;
+        const alternative = document.createElement('span');
+        alternative.textContent = `or $${price.toFixed(2)} in SOL / USDC`;
+        priceLine.appendChild(alternative);
+        ctaWrap.appendChild(priceLine);
+        btn.textContent = 'VIEW PURCHASE OPTIONS';
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           openSolanaCheckout({ skinId: skin.id, name: skin.name, kind, price, onComplete: () => this._renderShop() });
