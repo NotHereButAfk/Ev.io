@@ -2,14 +2,6 @@
 // Original authored arenas and imported arenas use the same collision format.
 export const IMPORTED_MAPS = Object.freeze([
   Object.freeze({
-    id: 'copper-circuit', name: 'Copper Circuit', region: 'Copper District',
-    fileName: 'CopperCircuit.evmap', url: '/maps/CopperCircuit.evmap',
-    loadingImage: '/images/maps/copper-circuit.jpg', environment: 'dust',
-    background: 0x91d5f5, fog: 0xbce2eb, fogNear: 90, fogFar: 210,
-    lighting: Object.freeze({sky: 0xe4f6ff, ground: 0x434440, hemisphereIntensity: 1.3,
-      sun: 0xffebc4, sunIntensity: 1.9, rim: 0x6fffea, rimIntensity: .4}),
-  }),
-  Object.freeze({
     id: 'daytime-rook',
     name: 'Daytime Rook',
     loadingImage: '/images/maps/daytime-rook.jpg',
